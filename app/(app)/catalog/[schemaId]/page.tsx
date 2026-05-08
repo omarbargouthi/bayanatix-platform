@@ -8,10 +8,17 @@ import { AvatarStack } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { IconDB, IconTable, IconChevron } from "@/components/layout/icons";
 import { fmtNumber } from "@/lib/utils";
+import { HighlightScroll } from "@/components/catalog/HighlightScroll";
 
 export const dynamic = "force-dynamic";
 
-export default async function SchemaPage({ params }: { params: { schemaId: string } }) {
+export default async function SchemaPage({
+  params,
+  searchParams,
+}: {
+  params:       { schemaId: string };
+  searchParams: { highlight?: string };
+}) {
   const user = await getSession();
   if (!user) redirect("/login");
 
@@ -19,6 +26,8 @@ export default async function SchemaPage({ params }: { params: { schemaId: strin
   if (!Number.isFinite(id)) notFound();
   const schema = await getSchemaById(id);
   if (!schema) notFound();
+
+  const highlightId = searchParams.highlight ? Number(searchParams.highlight) : null;
 
   const tables = schema.entities.filter((e) => !e.isView);
   const views = schema.entities.filter((e) => e.isView);
@@ -36,6 +45,7 @@ export default async function SchemaPage({ params }: { params: { schemaId: strin
         user={user}
       />
 
+      {highlightId && <HighlightScroll entityId={highlightId} />}
       <main className="px-8 py-7 pb-14">
         <div className="grid grid-cols-[280px_1fr] gap-6">
           {/* Tree panel */}
@@ -56,7 +66,10 @@ export default async function SchemaPage({ params }: { params: { schemaId: strin
                 <Link
                   key={e.entityId}
                   href={`/catalog/${schema.schemaId}/tables/${e.entityId}`}
-                  className="flex items-center gap-2.5 pl-12 pr-3 py-1.5 rounded-md hover:bg-canvas text-ink-soft hover:text-ink"
+                  className={[
+                    "flex items-center gap-2.5 pl-12 pr-3 py-1.5 rounded-md hover:bg-canvas text-ink-soft hover:text-ink",
+                    highlightId === e.entityId ? "bg-brand-purple/10 text-brand-purple font-semibold" : "",
+                  ].join(" ")}
                 >
                   <IconTable className="w-4 h-4" />
                   <span className="truncate">{e.entityName}</span>
@@ -104,8 +117,12 @@ export default async function SchemaPage({ params }: { params: { schemaId: strin
               {schema.entities.map((e) => (
                 <Link
                   key={e.entityId}
+                  id={`entity-${e.entityId}`}
                   href={`/catalog/${schema.schemaId}/tables/${e.entityId}`}
-                  className="grid grid-cols-[2fr_2fr_1.2fr_1.1fr_1.4fr_1.3fr_1.4fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors"
+                  className={[
+                    "grid grid-cols-[2fr_2fr_1.2fr_1.1fr_1.4fr_1.3fr_1.4fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors",
+                    highlightId === e.entityId ? "bg-brand-purple/10 ring-1 ring-inset ring-brand-purple/30" : "",
+                  ].join(" ")}
                 >
                   <div className="flex items-center gap-2 font-semibold text-brand-deep">
                     <IconTable className="w-[18px] h-[18px] text-brand-purple" />

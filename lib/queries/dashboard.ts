@@ -31,16 +31,25 @@ export async function getMaturityTrends(year: number): Promise<TrendPoint[]> {
 
 export async function getRecentAssets(userId: string, limit = 6): Promise<RecentAsset[]> {
   return sql<RecentAsset[]>`
-    SELECT DISTINCT ON (asset_id, asset_type)
-      asset_type  AS "assetType",
-      asset_id    AS "assetId",
-      asset_name  AS "assetName",
-      asset_meta  AS "assetMeta",
-      row_count::int   AS "rowCount",
-      visited_at  AS "visitedAt"
-    FROM bayanat.user_recent_assets
-    WHERE user_id = ${userId}
-    ORDER BY asset_id, asset_type, visited_at DESC
+    SELECT DISTINCT ON (a.asset_id, a.asset_type)
+      a.asset_type  AS "assetType",
+      a.asset_id    AS "assetId",
+      a.asset_name  AS "assetName",
+      a.asset_meta  AS "assetMeta",
+      a.row_count::int AS "rowCount",
+      a.visited_at  AS "visitedAt",
+      CASE
+        WHEN a.asset_type = 'TABLE' THEN
+          '/catalog/' || COALESCE(s.schema_id::text, '1') || '?highlight=' || a.asset_id
+        WHEN a.asset_type = 'COLUMN' THEN
+          '/catalog/' || COALESCE(e.schema_id::text, '1') || '/tables/' || COALESCE(e.entity_id::text, '1')
+        ELSE '/catalog'
+      END AS "href"
+    FROM bayanat.user_recent_assets a
+    LEFT JOIN bayanat.data_schemas  s ON s.schema_name_text = a.asset_meta AND a.asset_type = 'TABLE'
+    LEFT JOIN bayanat.data_entities e ON e.entity_name_text = a.asset_meta AND a.asset_type = 'COLUMN'
+    WHERE a.user_id = ${userId}
+    ORDER BY a.asset_id, a.asset_type, a.visited_at DESC
     LIMIT ${limit}
   `;
 }

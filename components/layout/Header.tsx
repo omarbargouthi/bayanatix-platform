@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
-import { IconBell, IconSearch, IconLogout, IconMenu, IconGlobe, IconHistory, IconUsers } from "./icons";
+import { IconBell, IconSearch, IconLogout, IconMenu, IconGlobe, IconHistory, IconCollaborate } from "./icons";
+import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
@@ -36,7 +37,8 @@ function HeaderIconBtn({
 export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen]   = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -45,6 +47,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
   }
 
   return (
+    <>
     <header className="sticky top-0 z-20 h-[60px] bg-white border-b border-line flex items-center gap-3 px-5">
       {/* Hamburger */}
       <button
@@ -92,7 +95,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
         </button>
 
         {/* Notification */}
-        <HeaderIconBtn label="Notifications" badge>
+        <HeaderIconBtn label="Notifications" badge onClick={() => setNotifOpen(true)}>
           <IconBell className="w-[17px] h-[17px]" />
         </HeaderIconBtn>
 
@@ -103,7 +106,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
 
         {/* Collaboration */}
         <HeaderIconBtn label="Collaboration">
-          <IconUsers className="w-[17px] h-[17px]" />
+          <IconCollaborate className="w-[17px] h-[17px]" />
         </HeaderIconBtn>
 
         {/* Avatar + dropdown */}
@@ -132,5 +135,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
         </div>
       </div>
     </header>
+    <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+    </>
   );
 }

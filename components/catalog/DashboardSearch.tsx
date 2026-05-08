@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import Link from "next/link";
 import type { RecentAsset } from "@/lib/types";
 
 type Props = {
@@ -111,9 +112,11 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
               <div className="text-[10px] uppercase tracking-wider text-muted mb-3">Recently Visited</div>
               <div className="flex gap-3 flex-wrap">
                 {recentAssets.map((a) => (
-                  <button
+                  <Link
                     key={`${a.assetType}-${a.assetId}`}
+                    href={a.href}
                     onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setFocused(false)}
                     className="flex flex-col items-center gap-1.5 group"
                   >
                     <div className="w-14 h-14 rounded-xl bg-canvas border border-line flex items-center justify-center text-brand-navy group-hover:border-brand-purple group-hover:bg-brand-purple/5 transition-colors">
@@ -125,7 +128,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
                         <div className="text-[10px] text-muted">{fmtCount(a.rowCount)}</div>
                       )}
                     </div>
-                  </button>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -137,15 +140,16 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
       {!focused && (
         <div className="flex flex-wrap gap-4 mt-4">
           {recentAssets.slice(0, 6).map((a) => (
-            <button
+            <Link
               key={`${a.assetType}-${a.assetId}`}
+              href={a.href}
               className="flex flex-col items-center gap-1 text-ink-soft hover:text-brand-purple transition-colors"
             >
               <span className="w-10 h-10 grid place-items-center bg-white/70 border border-white rounded-lg text-brand-navy">
                 <AssetIcon type={a.assetType} />
               </span>
               <span className="text-[11px] font-medium truncate max-w-[56px]">{a.assetName}</span>
-            </button>
+            </Link>
           ))}
         </div>
       )}

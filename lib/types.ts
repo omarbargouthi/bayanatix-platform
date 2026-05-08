@@ -113,4 +113,18 @@ export type RecentAsset = {
   assetMeta: string | null;
   rowCount:  number | null;
   visitedAt: string;
+  href:      string;
+};
+
+export type Notification = {
+  notificationId: number;
+  type:           string;
+  title:          string;
+  body:           string | null;
+  isRead:         boolean;
+  severity:       "INFO" | "SUCCESS" | "WARNING" | "ERROR";
+  domainCode:     string | null;
+  actionLabel:    string | null;
+  actionHref:     string | null;
+  createdAt:      string;
 };
