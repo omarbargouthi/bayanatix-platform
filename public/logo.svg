@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" fill="none">
+  <!-- Bayanatix mark: stylized "A" made of triangular facets -->
+  <!-- Left vertical light-blue blade -->
+  <polygon points="50,30 95,30 80,210 50,210" fill="#81B4E1"/>
+  <polygon points="80,210 95,30 95,210" fill="#7AA1D0"/>
+  <!-- Upper-right dark navy triangle (peak of A) -->
+  <polygon points="105,30 170,30 170,120 130,90" fill="#2A336D"/>
+  <polygon points="105,30 130,90 105,120" fill="#201C55"/>
+  <!-- Lower-right purple triangle (right leg of A) -->
+  <polygon points="105,135 170,135 170,210 110,210" fill="#6058A0"/>
+  <polygon points="105,135 170,135 170,160 130,160" fill="#4D4B8D"/>
+</svg>
