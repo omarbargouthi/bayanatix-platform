@@ -165,3 +165,27 @@ export const IconFlag = ({ className }: P) => (
     <line x1="4" y1="22" x2="4" y2="15" />
   </svg>
 );
+
+export const IconGlobe = ({ className }: P) => (
+  <svg {...base(className)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </svg>
+);
+
+export const IconHistory = ({ className }: P) => (
+  <svg {...base(className)}>
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-4.42" />
+    <polyline points="12 7 12 12 15 14" />
+  </svg>
+);
+
+export const IconUsers = ({ className }: P) => (
+  <svg {...base(className)}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);

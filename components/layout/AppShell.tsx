@@ -1,6 +1,7 @@
 "use client";
 import { SidebarProvider, useSidebar } from "@/lib/sidebar-context";
 import { Sidebar } from "./Sidebar";
+import { ChatbotBubble } from "@/components/ui/ChatbotBubble";
 import type { SessionUser } from "@/lib/types";
 
 function ShellGrid({ user, children }: { user: SessionUser; children: React.ReactNode }) {
@@ -12,6 +13,7 @@ function ShellGrid({ user, children }: { user: SessionUser; children: React.Reac
     >
       <Sidebar user={user} />
       <div className="flex flex-col min-w-0">{children}</div>
+      <ChatbotBubble />
     </div>
   );
 }

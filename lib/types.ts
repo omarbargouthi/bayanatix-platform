@@ -92,3 +92,25 @@ export type CatalogStats = {
   tables: number;
   schemas: number;
 };
+
+export type ComplianceSnapshot = {
+  current:     number;
+  previous:    number;
+  periodLabel: string;
+  prevLabel:   string;
+};
+
+export type TrendPoint = {
+  month:     number;
+  ndiScore:  number;
+  naiiScore: number;
+};
+
+export type RecentAsset = {
+  assetType: "TABLE" | "COLUMN" | "GLOSSARY";
+  assetId:   string;
+  assetName: string;
+  assetMeta: string | null;
+  rowCount:  number | null;
+  visitedAt: string;
+};

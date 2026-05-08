@@ -1,10 +1,29 @@
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { IconBell, IconFlag } from "@/components/layout/icons";
 import type { GovernanceDomain } from "@/lib/types";
 import Link from "next/link";
 
+function WarnTriangle({ level }: { level: "red" | "amber" }) {
+  const color = level === "red" ? "#EF4444" : "#F59E0B";
+  return (
+    <svg viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="0"
+      strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="17" r="1" fill="white" />
+    </svg>
+  );
+}
+
+function warnLevel(alertCount: number): "red" | "amber" | null {
+  if (alertCount >= 3) return "red";
+  if (alertCount >= 1) return "amber";
+  return null;
+}
+
 export function DomainCard({ d }: { d: GovernanceDomain }) {
-  const href = d.domainCode === "DCAT" ? "/catalog" : "#";
+  const href  = d.domainCode === "DCAT" ? "/catalog" : "#";
+  const level = warnLevel(d.alertCount);
+
   return (
     <Link
       href={href}
@@ -14,10 +33,11 @@ export function DomainCard({ d }: { d: GovernanceDomain }) {
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-1">
         <h3 className="text-[14px] font-bold text-brand-deep leading-snug">{d.name}</h3>
-        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-          <IconBell className="w-3.5 h-3.5 text-amber-400" />
-          <IconFlag className="w-3.5 h-3.5 text-amber-400" />
-        </div>
+        {level && (
+          <div className="shrink-0 pt-0.5">
+            <WarnTriangle level={level} />
+          </div>
+        )}
       </div>
 
       {/* Description */}

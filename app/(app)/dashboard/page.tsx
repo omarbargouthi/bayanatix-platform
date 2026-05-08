@@ -1,11 +1,17 @@
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { getDomains, getComplianceSummary } from "@/lib/queries/domains";
-import { Donut } from "@/components/ui/Donut";
+import {
+  getComplianceSnapshot,
+  getMaturityTrends,
+  getRecentAssets,
+  getRecentSearches,
+} from "@/lib/queries/dashboard";
+import { HalfDonut } from "@/components/ui/HalfDonut";
 import { DomainCard } from "@/components/catalog/DomainCard";
 import { MaturityChart } from "@/components/catalog/MaturityChart";
+import { DashboardSearch } from "@/components/catalog/DashboardSearch";
 import { Tag } from "@/components/ui/Tag";
-import { IconSearch, IconDB, IconReports, IconBook, IconChat, IconCircle } from "@/components/layout/icons";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +20,15 @@ export default async function DashboardPage() {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const [domains, summary] = await Promise.all([getDomains(), getComplianceSummary()]);
+  const [domains, summary, snapshot, trends, recentAssets, recentSearches] = await Promise.all([
+    getDomains(),
+    getComplianceSummary(),
+    getComplianceSnapshot(),
+    getMaturityTrends(2025),
+    getRecentAssets(user.userId, 6),
+    getRecentSearches(user.userId, 5),
+  ]);
+
   const firstName = user.fullName.split(" ")[0];
 
   return (
@@ -28,59 +42,51 @@ export default async function DashboardPage() {
           <div className="absolute -bottom-16 left-[10%] w-48 h-48 rounded-full bg-brand-purple/25 blur-2xl" />
 
           <div className="relative">
-            <h1 className="text-2xl font-bold text-brand-deep mb-4">Welcome, {firstName} 👋</h1>
-
-            <div className="flex items-center gap-2.5 bg-white border border-line rounded-lg shadow-sm px-4 py-3 max-w-2xl">
-              <IconSearch className="w-5 h-5 text-muted" />
-              <input
-                className="flex-1 bg-transparent border-0 outline-none text-[15px] placeholder:text-muted"
-                placeholder="Search across schemas, tables, glossaries, reports…"
-              />
-              <button className="btn btn-primary btn-sm !py-2 !px-4">Search</button>
-            </div>
-
-            <div className="flex flex-wrap gap-4 mt-4">
-              <SearchCat label="Tables"     Icon={IconDB} />
-              <SearchCat label="Reports"    Icon={IconReports} />
-              <SearchCat label="Glossary"   Icon={IconBook} />
-              <SearchCat label="Stewards"   Icon={IconCircle} />
-              <SearchCat label="Dashboards" Icon={IconChat} />
-              <SearchCat label="Domains"    Icon={IconCircle} />
-            </div>
+            <h1 className="text-2xl font-bold text-brand-deep mb-4">Welcome, {firstName}!</h1>
+            <DashboardSearch recentAssets={recentAssets} recentSearches={recentSearches} />
           </div>
         </section>
 
-        {/* Two metric cards */}
+        {/* Metric cards */}
         <section className="grid grid-cols-2 gap-5 mb-6">
+          {/* Overall Compliance — half donut */}
           <div className="card p-5">
-            <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-bold">Overall Compliance</h3>
-              <Tag variant="purple">Q4 2025</Tag>
+              {snapshot && <Tag variant="purple">{snapshot.periodLabel}</Tag>}
             </div>
-            <div className="flex items-center gap-6">
-              <Donut value={summary.overallPct} label="Compliant" size={160} />
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 flex-1">
-                <Stat label="Specs tracked"   value={summary.specsTracked} />
-                <Stat label="Domains active"  value={`${summary.domainsActive} / 14`} />
+            <div className="flex items-center gap-5">
+              <div className="shrink-0">
+                <HalfDonut
+                  value={snapshot?.current ?? summary.overallPct}
+                  previousValue={snapshot?.previous}
+                  prevLabel={snapshot?.prevLabel ?? "last period"}
+                  size={195}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-x-5 gap-y-3 flex-1">
+                <Stat label="Specs tracked"    value={summary.specsTracked} />
+                <Stat label="Domains active"   value={`${summary.domainsActive} / 14`} />
                 <Stat label="Controls passing" value={summary.controlsPassing} />
-                <Stat label="Open findings"   value={summary.openFindings} />
+                <Stat label="Open findings"    value={summary.openFindings} />
               </div>
             </div>
           </div>
 
+          {/* Overall Maturity — NDI / NAII trend */}
           <div className="card p-5">
-            <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-bold">Overall Maturity</h3>
               <div className="flex items-center gap-3 text-[11px] text-muted">
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-brand-purple" /> This year
+                  <span className="w-2.5 h-2.5 rounded-sm bg-brand-purple inline-block" /> NDI
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-brand-light" /> Last year
+                  <span className="w-2.5 h-2.5 rounded-sm bg-brand-light inline-block" /> NAII
                 </span>
               </div>
             </div>
-            <MaturityChart />
+            <MaturityChart data={trends} />
           </div>
         </section>
 
@@ -104,16 +110,5 @@ function Stat({ label, value }: { label: string; value: number | string }) {
       <div className="text-base font-bold text-ink">{value}</div>
       <div className="text-[12px] text-muted">{label}</div>
     </div>
-  );
-}
-
-function SearchCat({ label, Icon }: { label: string; Icon: React.ComponentType<{ className?: string }> }) {
-  return (
-    <button className="flex flex-col items-center gap-1 text-ink-soft hover:text-brand-purple transition-colors">
-      <span className="w-9 h-9 grid place-items-center bg-white/70 rounded-md text-brand-navy">
-        <Icon className="w-5 h-5" />
-      </span>
-      <span className="text-[12px] font-medium">{label}</span>
-    </button>
   );
 }
