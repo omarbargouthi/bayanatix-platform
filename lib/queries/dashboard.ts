@@ -36,7 +36,7 @@ export async function getRecentAssets(userId: string, limit = 6): Promise<Recent
       asset_id    AS "assetId",
       asset_name  AS "assetName",
       asset_meta  AS "assetMeta",
-      row_count   AS "rowCount",
+      row_count::int   AS "rowCount",
       visited_at  AS "visitedAt"
     FROM bayanat.user_recent_assets
     WHERE user_id = ${userId}

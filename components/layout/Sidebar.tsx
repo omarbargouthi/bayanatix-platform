@@ -12,9 +12,9 @@ import {
 } from "./icons";
 
 type Item = {
-  href: string;
-  label: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  href:   string;
+  label:  string;
+  Icon:   React.ComponentType<{ className?: string }>;
   badge?: number;
 };
 
@@ -41,14 +41,15 @@ export function Sidebar({ user }: { user: SessionUser }) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <aside className="sticky top-0 h-screen shrink-0 z-30 flex flex-col bg-gradient-to-b from-sidebar to-[#181840] text-white/80 overflow-hidden">
-      {/* User */}
-      <div className={`flex items-center border-b border-white/5 py-4 ${collapsed ? "justify-center px-2" : "gap-2.5 px-4"}`}>
+    <aside className="sticky top-0 h-screen shrink-0 z-30 flex flex-col bg-white border-r border-line overflow-hidden">
+
+      {/* User section */}
+      <div className={`flex items-center border-b border-line py-4 ${collapsed ? "justify-center px-2" : "gap-3 px-4"}`}>
         <Avatar initials={initials(user.fullName)} seed={user.userId} size={36} />
         {!collapsed && (
           <div className="min-w-0">
-            <div className="font-semibold text-white text-sm truncate">{user.fullName}</div>
-            <div className="text-[11px] text-white/50">{prettyRole(user.role)}</div>
+            <div className="font-semibold text-brand-deep text-sm truncate">{user.fullName}</div>
+            <div className="text-[11px] text-muted">{prettyRole(user.role)}</div>
           </div>
         )}
       </div>
@@ -60,8 +61,8 @@ export function Sidebar({ user }: { user: SessionUser }) {
         ))}
 
         {collapsed
-          ? <div className="my-2 border-t border-white/10" />
-          : <div className="px-3 pt-3 pb-1 text-[11px] tracking-[0.12em] uppercase text-white/40 font-semibold">Domains</div>
+          ? <div className="my-2 mx-1 border-t border-line" />
+          : <div className="px-3 pt-3 pb-1 text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">Domains</div>
         }
 
         {NAV_DOMAINS.map((it) => (
@@ -70,12 +71,15 @@ export function Sidebar({ user }: { user: SessionUser }) {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-white/5 px-2.5 py-3">
+      <div className="border-t border-line px-2.5 py-3">
         <NavLink item={{ href: "/support",  label: "Support",  Icon: IconHelp }} active={isActive("/support")}  collapsed={collapsed} />
         <NavLink item={{ href: "/settings", label: "Settings", Icon: IconCog  }} active={isActive("/settings")} collapsed={collapsed} />
-        <div className={`flex items-center mt-1 pt-3 border-t border-white/5 ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
+
+        <div className={`flex items-center mt-2 pt-3 border-t border-line ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
           <img src="/logo.svg" alt="" className="w-5 h-6 shrink-0" />
-          {!collapsed && <span className="text-xs font-bold tracking-[0.16em] text-white/85">BAYANATIX</span>}
+          {!collapsed && (
+            <span className="text-xs font-bold tracking-[0.16em] text-brand-deep/70">BAYANATIX</span>
+          )}
         </div>
       </div>
     </aside>
@@ -88,15 +92,15 @@ function NavLink({ item, active, collapsed }: { item: Item; active: boolean; col
     <Link
       href={item.href}
       title={collapsed ? item.label : undefined}
-      className={
-        "flex items-center gap-2.5 py-2 rounded-md text-sm font-medium transition-colors " +
-        (collapsed ? "justify-center px-2 " : "px-3 ") +
-        (active
-          ? "bg-gradient-to-r from-brand-purple/55 to-brand-purple/20 text-white shadow-[inset_3px_0_0_#81B4E1]"
-          : "text-white/70 hover:bg-white/5 hover:text-white")
-      }
+      className={[
+        "flex items-center gap-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+        collapsed ? "justify-center px-2" : "px-3",
+        active
+          ? "bg-brand-purple/10 text-brand-deep shadow-[inset_3px_0_0_#6058A0]"
+          : "text-ink-soft hover:bg-canvas hover:text-brand-deep",
+      ].join(" ")}
     >
-      <Icon className="w-[18px] h-[18px] opacity-90 shrink-0" />
+      <Icon className={["w-[18px] h-[18px] shrink-0", active ? "text-brand-purple" : ""].join(" ")} />
       {!collapsed && <span className="flex-1">{item.label}</span>}
       {!collapsed && item.badge ? (
         <span className="bg-brand-purple text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
