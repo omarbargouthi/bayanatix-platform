@@ -1,5 +1,5 @@
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { IconWarn } from "@/components/layout/icons";
+import { IconBell, IconFlag } from "@/components/layout/icons";
 import type { GovernanceDomain } from "@/lib/types";
 import Link from "next/link";
 
@@ -11,27 +11,34 @@ export function DomainCard({ d }: { d: GovernanceDomain }) {
       className="block bg-white border border-line rounded-lg p-5 transition-all
                  hover:-translate-y-0.5 hover:border-brand-light hover:shadow-sm"
     >
-      <div className="flex items-start justify-between mb-1.5">
-        <h3 className="text-[15px] font-bold text-brand-deep">{d.name}</h3>
-        {d.alertCount > 0 && (
-          <span className="inline-flex items-center gap-1 text-amber-700 text-xs font-semibold">
-            <IconWarn className="w-3.5 h-3.5" />
-            {d.alertCount}
-          </span>
-        )}
-      </div>
-      <p className="text-[13px] text-ink-soft mb-4 leading-snug">{d.description}</p>
-
-      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-line-soft">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted">Compliance</div>
-          <ProgressBar value={d.compliancePct} />
-          <div className="text-[13px] font-semibold text-ink mt-1.5">{d.compliancePct}%</div>
+      {/* Title row */}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <h3 className="text-[14px] font-bold text-brand-deep leading-snug">{d.name}</h3>
+        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+          <IconBell className="w-3.5 h-3.5 text-amber-400" />
+          <IconFlag className="w-3.5 h-3.5 text-amber-400" />
         </div>
+      </div>
+
+      {/* Description */}
+      <p className="text-[12px] text-muted leading-snug mb-4">{d.description}</p>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-x-5 pt-3 border-t border-line-soft">
+        {/* Compliance */}
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted">Maturity</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Compliance</div>
+          <div className="text-[13px] font-bold text-ink mb-1.5">{d.compliancePct}%</div>
+          <ProgressBar value={d.compliancePct} />
+        </div>
+
+        {/* Maturity */}
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Maturity</div>
           <Stars value={d.maturityLevel} />
-          <span className="text-xs font-bold text-brand-purple ml-1">{d.level}</span>
+          <div className="mt-1">
+            <span className="text-[11px] font-bold text-brand-purple">{d.level}</span>
+          </div>
         </div>
       </div>
     </Link>
@@ -40,11 +47,11 @@ export function DomainCard({ d }: { d: GovernanceDomain }) {
 
 function Stars({ value }: { value: number }) {
   return (
-    <div className="flex items-center gap-0.5 text-brand-purple mt-1">
+    <div className="flex items-center gap-0.5 text-brand-purple">
       {[1, 2, 3, 4, 5].map((i) => (
         <svg
           key={i}
-          className={"w-3 h-3 " + (i <= value ? "" : "opacity-25")}
+          className={"w-3 h-3 " + (i <= value ? "opacity-100" : "opacity-20")}
           viewBox="0 0 24 24"
           fill={i <= value ? "currentColor" : "none"}
           stroke="currentColor"

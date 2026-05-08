@@ -150,3 +150,18 @@ export const IconLogout = ({ className }: P) => (
     <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 );
+
+export const IconMenu = ({ className }: P) => (
+  <svg {...base(className)}>
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+);
+
+export const IconFlag = ({ className }: P) => (
+  <svg {...base(className)}>
+    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+    <line x1="4" y1="22" x2="4" y2="15" />
+  </svg>
+);
