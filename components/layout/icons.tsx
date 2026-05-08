@@ -181,6 +181,15 @@ export const IconHistory = ({ className }: P) => (
   </svg>
 );
 
+export const IconGlossary = ({ className }: P) => (
+  <svg {...base(className)}>
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    <line x1="9" y1="8"  x2="15" y2="8"  />
+    <line x1="9" y1="12" x2="15" y2="12" />
+  </svg>
+);
+
 export const IconCollaborate = ({ className }: P) => (
   <svg {...base(className)}>
     <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5z" />

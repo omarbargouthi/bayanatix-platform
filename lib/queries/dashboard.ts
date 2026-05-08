@@ -43,7 +43,7 @@ export async function getRecentAssets(userId: string, limit = 6): Promise<Recent
           '/catalog/' || COALESCE(s.schema_id::text, '1') || '?highlight=' || a.asset_id
         WHEN a.asset_type = 'COLUMN' THEN
           '/catalog/' || COALESCE(e.schema_id::text, '1') || '/tables/' || COALESCE(e.entity_id::text, '1')
-        ELSE '/catalog'
+        ELSE '/glossary/' || a.asset_id
       END AS "href"
     FROM bayanat.user_recent_assets a
     LEFT JOIN bayanat.data_schemas  s ON s.schema_name_text = a.asset_meta AND a.asset_type = 'TABLE'

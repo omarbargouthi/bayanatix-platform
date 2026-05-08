@@ -116,6 +116,54 @@ export type RecentAsset = {
   href:      string;
 };
 
+export type GlossaryDomain = {
+  glossaryId:  number;
+  termName:    string;
+  description: string;
+  classCode:   string | null;
+  termCount:   number;
+};
+
+export type GlossaryTerm = {
+  glossaryId:         number;
+  termName:           string;
+  definition:         string;
+  classCode:          string | null;
+  isPii:              boolean;
+  domainName:         string | null;
+  domainId:           number | null;
+  aliasCount:         number;
+  linkedAttrCount:    number;
+  createdAt:          string;
+};
+
+export type GlossaryTermDetail = {
+  glossaryId:     number;
+  termName:       string;
+  definition:     string;
+  businessRules:  string | null;
+  format:         string | null;
+  example:        string | null;
+  classCode:      string | null;
+  isPii:          boolean;
+  piCategory:     string | null;
+  npiCategory:    string | null;
+  domainName:     string | null;
+  domainId:       number | null;
+  createdAt:      string;
+  aliases:        string[];
+  linkedAttributes: {
+    attributeId:  number;
+    physicalName: string;
+    friendlyName: string | null;
+    dataType:     string;
+    entityName:   string;
+    entityId:     number;
+    schemaId:     number;
+    classCode:    string | null;
+  }[];
+};
+
 export type Notification = {
   notificationId: number;
   type:           string;

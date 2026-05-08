@@ -8,7 +8,7 @@ import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp,
+  IconLock, IconShare, IconChat, IconCog, IconHelp, IconGlossary,
 } from "./icons";
 
 type Item = {
@@ -27,6 +27,7 @@ const NAV_TOP: Item[] = [
 const NAV_DOMAINS: Item[] = [
   { href: "/governance",     label: "Data Governance", Icon: IconCircle },
   { href: "/catalog",        label: "Data Catalog",    Icon: IconBook },
+  { href: "/glossary",       label: "Business Glossary", Icon: IconGlossary },
   { href: "/quality",        label: "Data Quality",    Icon: IconCheck },
   { href: "/classification", label: "Classification",  Icon: IconLines },
   { href: "/privacy",        label: "Data Privacy",    Icon: IconLock },
