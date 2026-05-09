@@ -240,3 +240,39 @@ export type Notification = {
   actionHref:     string | null;
   createdAt:      string;
 };
+
+// ── Collaboration ─────────────────────────────────────────────────────────────
+
+export type CollabAssetRef = {
+  assetType: string;
+  assetId:   string;
+  assetPath: string;
+};
+
+export type CollabThread = {
+  threadId:     number;
+  title:        string;
+  createdBy:    string;
+  authorName:   string;
+  createdAt:    string;
+  updatedAt:    string;
+  messageCount: number;
+  assetRefs:    CollabAssetRef[];
+};
+
+export type CollabMessage = {
+  messageId:  number;
+  threadId:   number;
+  authorId:   string;
+  authorName: string;
+  body:       string;
+  createdAt:  string;
+};
+
+// Item returned by the /api/collab/assets picker endpoint
+export type AssetPickerItem = {
+  id:        string;
+  label:     string;
+  assetType: "DATA_SOURCE" | "SCHEMA" | "TABLE" | "COLUMN" | "GLOSSARY_DOMAIN" | "GLOSSARY_TERM";
+  hasChildren: boolean;
+};
