@@ -35,6 +35,11 @@ export default function CollaborationPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: newTitle.trim(), body }),
     });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: "Unknown error" }));
+      console.error("[collaboration] create thread failed:", err);
+      throw new Error(err.error ?? "Failed to create thread");
+    }
     const { threadId } = await r.json();
     setShowNew(false);
     setNewTitle("");

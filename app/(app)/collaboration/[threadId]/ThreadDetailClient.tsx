@@ -49,11 +49,15 @@ export function ThreadDetailClient({
   const router = useRouter();
 
   async function handleReply(body: string) {
-    await fetch(`/api/collab/threads/${thread.threadId}/messages`, {
+    const r = await fetch(`/api/collab/threads/${thread.threadId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ body }),
     });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(err.error ?? "Failed to send reply");
+    }
     router.refresh();
   }
 
