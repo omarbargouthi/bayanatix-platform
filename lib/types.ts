@@ -116,6 +116,70 @@ export type RecentAsset = {
   href:      string;
 };
 
+// ── Admin / RBAC ─────────────────────────────────────────────────────────────
+
+export type AdminUser = {
+  userId:      string;
+  email:       string;
+  fullName:    string;
+  systemRole:  string;
+  isActive:    boolean;
+  createdAt:   string;
+  teamCount:   number;
+};
+
+export type Role = {
+  roleId:         number;
+  roleName:       string;
+  description:    string | null;
+  metadataRead:   boolean;
+  metadataWrite:  boolean;
+  metadataDelete: boolean;
+  dataRead:       boolean;
+  isAdmin:        boolean;
+  createdAt:      string;
+  userCount:      number;
+  teamCount:      number;
+};
+
+export type Team = {
+  teamId:      number;
+  teamName:    string;
+  description: string | null;
+  memberCount: number;
+  roleCount:   number;
+  createdAt:   string;
+};
+
+export type RoleAssignment = {
+  assignmentId:  number;
+  roleId:        number;
+  roleName:      string;
+  metadataRead:  boolean;
+  metadataWrite: boolean;
+  metadataDelete:boolean;
+  dataRead:      boolean;
+  isAdmin:       boolean;
+  userId:        string | null;
+  userFullName:  string | null;
+  teamId:        number | null;
+  teamName:      string | null;
+  resourceType:  "GLOBAL" | "DATA_SOURCE" | "SCHEMA" | "TABLE";
+  resourceId:    string | null;
+  resourceName:  string | null;
+  createdAt:     string;
+};
+
+export type TeamMember = {
+  userId:    string;
+  fullName:  string;
+  email:     string;
+  systemRole:string;
+  joinedAt:  string;
+};
+
+// ── Glossary ──────────────────────────────────────────────────────────────────
+
 export type GlossaryDomain = {
   glossaryId:  number;
   termName:    string;

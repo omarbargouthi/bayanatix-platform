@@ -49,4 +49,9 @@
            placeholder:text-muted
            focus:outline-none focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20;
   }
+  .input-field {
+    @apply w-full px-3.5 py-2.5 rounded-md border border-line bg-white text-sm
+           placeholder:text-muted
+           focus:outline-none focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20;
+  }
 }

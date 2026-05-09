@@ -8,7 +8,7 @@ import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp, IconGlossary,
+  IconLock, IconShare, IconChat, IconCog, IconHelp, IconGlossary, IconShield,
 } from "./icons";
 
 type Item = {
@@ -69,6 +69,20 @@ export function Sidebar({ user }: { user: SessionUser }) {
         {NAV_DOMAINS.map((it) => (
           <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={collapsed} />
         ))}
+
+        {user.role === "ADMIN" && (
+          <>
+            {collapsed
+              ? <div className="my-2 mx-1 border-t border-line" />
+              : <div className="px-3 pt-3 pb-1 text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">Administration</div>
+            }
+            <NavLink
+              item={{ href: "/admin/users", label: "User Management", Icon: IconShield }}
+              active={isActive("/admin")}
+              collapsed={collapsed}
+            />
+          </>
+        )}
       </nav>
 
       {/* Bottom */}
