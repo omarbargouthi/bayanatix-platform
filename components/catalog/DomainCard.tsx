@@ -14,67 +14,77 @@ function WarnTriangle({ level }: { level: "red" | "amber" }) {
   const fill = level === "red" ? "#EF4444" : "#F59E0B";
   return (
     <svg viewBox="0 0 24 24" width="16" height="16">
-      {/* Filled triangle */}
       <path
         d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
         fill={fill}
       />
-      {/* Exclamation bar */}
       <rect x="11.1" y="9" width="1.8" height="5" rx="0.9" fill="white" />
-      {/* Exclamation dot */}
       <circle cx="12" cy="17" r="1" fill="white" />
     </svg>
   );
 }
 
-// Border-top colour when warning is present — makes the alert visible at card level
 const accentClass: Record<NonNullable<WarnLevel>, string> = {
   red:   "border-t-2 border-t-red-400",
   amber: "border-t-2 border-t-amber-400",
 };
 
 export function DomainCard({ d }: { d: GovernanceDomain }) {
-  const href  = d.domainCode === "DCAT" ? "/catalog" : "#";
-  const level = warnLevel(d.alertCount);
+  const href         = d.domainCode === "DCAT" ? "/catalog" : "#";
+  const requestCount = d.openRequestCount ?? 0;
+  const level        = warnLevel(requestCount);
 
   return (
-    <Link
-      href={href}
+    <div
       className={[
-        "block bg-white border border-line rounded-lg p-5 transition-all",
-        "hover:-translate-y-0.5 hover:border-brand-light hover:shadow-sm",
+        "relative bg-white border border-line rounded-lg transition-all",
+        "hover:border-brand-light hover:shadow-sm",
         level ? accentClass[level] : "",
       ].join(" ")}
     >
-      {/* Title row */}
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <h3 className="text-[14px] font-bold text-brand-deep leading-snug">{d.name}</h3>
-        {level && (
-          <div className="shrink-0 pt-0.5">
-            <WarnTriangle level={level} />
-          </div>
-        )}
-      </div>
+      {/* Warning triangle — separate link to filtered requests page */}
+      {level && (
+        <Link
+          href={`/requests?domain=${d.domainCode}`}
+          className="absolute top-3 right-3 flex items-center gap-1 z-10 hover:opacity-75"
+          title={`${requestCount} open request${requestCount !== 1 ? "s" : ""}`}
+        >
+          <WarnTriangle level={level} />
+          <span
+            className={`text-[11px] font-bold leading-none ${
+              level === "red" ? "text-red-500" : "text-amber-600"
+            }`}
+          >
+            {requestCount}
+          </span>
+        </Link>
+      )}
 
-      {/* Description */}
-      <p className="text-[12px] text-muted leading-snug mb-4">{d.description}</p>
+      {/* Card body — navigates to domain detail */}
+      <Link
+        href={href}
+        className={["block p-5 hover:-translate-y-0.5 transition-transform", level ? "pr-12" : ""].join(" ")}
+      >
+        <h3 className="text-[14px] font-bold text-brand-deep leading-snug mb-1">{d.name}</h3>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-x-5 pt-3 border-t border-line-soft">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Compliance</div>
-          <div className="text-[13px] font-bold text-ink mb-1.5">{d.compliancePct}%</div>
-          <ProgressBar value={d.compliancePct} />
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Maturity</div>
-          <Stars value={d.maturityLevel} />
-          <div className="mt-1">
-            <span className="text-[11px] font-bold text-brand-purple">{d.level}</span>
+        <p className="text-[12px] text-muted leading-snug mb-4">{d.description}</p>
+
+        <div className="grid grid-cols-2 gap-x-5 pt-3 border-t border-line-soft">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Compliance</div>
+            <div className="text-[13px] font-bold text-ink mb-1.5">{d.compliancePct}%</div>
+            <ProgressBar value={d.compliancePct} />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Maturity</div>
+            <Stars value={d.maturityLevel} />
+            <div className="mt-1">
+              <span className="text-[11px] font-bold text-brand-purple">{d.level}</span>
+            </div>
           </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
 

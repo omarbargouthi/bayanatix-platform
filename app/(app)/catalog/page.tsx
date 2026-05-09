@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
+import { canEditMetadata } from "@/lib/can";
 import { Donut } from "@/components/ui/Donut";
 import { Tag } from "@/components/ui/Tag";
 import { AssetTree } from "@/components/catalog/AssetTree";
 import { getCatalogStats, getSourcesWithSchemas, getGlossaryRoots } from "@/lib/queries/catalog";
 import { fmtNumber } from "@/lib/utils";
 import { IconBook } from "@/components/layout/icons";
+import { AddAssetButton } from "@/components/catalog/AddAssetButton";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +17,11 @@ export default async function CatalogPage() {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const [stats, sources, glossaries] = await Promise.all([
+  const [stats, sources, glossaries, canEdit] = await Promise.all([
     getCatalogStats(),
     getSourcesWithSchemas(),
     getGlossaryRoots(),
+    canEditMetadata(user),
   ]);
   const glossaryTermCount = glossaries.reduce((s, g) => s + g.termCount, 0);
 
@@ -46,7 +50,7 @@ export default async function CatalogPage() {
           <div className="flex items-center gap-2">
             <button className="btn btn-sm">Filter</button>
             <button className="btn btn-sm">Export</button>
-            <button className="btn btn-primary btn-sm">+ Add Asset</button>
+            <AddAssetButton />
           </div>
         </div>
         <p className="text-ink-soft max-w-2xl mb-7">
@@ -118,7 +122,7 @@ export default async function CatalogPage() {
               <Big label="Schemas" value={stats.schemas} />
             </div>
             <div className="px-2 py-2">
-              <AssetTree sources={sources} />
+              <AssetTree sources={sources} canEdit={canEdit} />
             </div>
           </div>
 
@@ -135,15 +139,15 @@ export default async function CatalogPage() {
             </div>
             <div className="py-2">
               {glossaries.map((g) => (
-                <div key={g.glossaryId} className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-canvas">
+                <Link key={g.glossaryId} href={`/glossary?domain=${g.glossaryId}`} className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-canvas transition-colors">
                   <span className="w-8 h-8 grid place-items-center rounded-md bg-brand-purple/10 text-brand-purple">
                     <IconBook className="w-4 h-4" />
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm text-ink truncate">{g.termName}</div>
+                    <div className="font-semibold text-sm text-brand-deep hover:underline truncate">{g.termName}</div>
                   </div>
                   <span className="text-xs text-muted">{g.termCount} terms</span>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

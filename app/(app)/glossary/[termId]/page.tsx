@@ -2,9 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
+import { canEditMetadata } from "@/lib/can";
 import { getGlossaryTermById } from "@/lib/queries/glossary";
 import { Tag } from "@/components/ui/Tag";
 import { IconGlossary, IconTable, IconLines } from "@/components/layout/icons";
+import { TermEditButton } from "@/components/glossary/TermEditButton";
+import { TermHistoryButton } from "@/components/glossary/TermHistoryButton";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +17,12 @@ const CLASS_STYLE: Record<string, string> = {
   CONFIDENTIAL: "bg-amber-50  text-amber-700  border border-amber-200",
   RESTRICTED:   "bg-red-50    text-red-700    border border-red-200",
   SECRET:       "bg-purple-50 text-purple-700 border border-purple-200",
+  TOP_SECRET:   "bg-red-100   text-red-900    border border-red-300",
+};
+
+const TERM_TYPE_LABEL: Record<string, string> = {
+  TERM:       "Term",
+  KPI_METRIC: "KPI / Metric",
 };
 
 function ClassBadge({ code }: { code: string | null }) {
@@ -21,7 +30,7 @@ function ClassBadge({ code }: { code: string | null }) {
   const style = CLASS_STYLE[code.toUpperCase()] ?? "bg-gray-50 text-gray-600 border border-gray-200";
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-semibold ${style}`}>
-      {code.charAt(0) + code.slice(1).toLowerCase()}
+      {code.charAt(0) + code.slice(1).toLowerCase().replace(/_/g, " ")}
     </span>
   );
 }
@@ -60,6 +69,8 @@ export default async function GlossaryTermPage({
   const term = await getGlossaryTermById(id);
   if (!term) notFound();
 
+  const canEdit = await canEditMetadata(user);
+
   const classStyle = term.classCode
     ? CLASS_STYLE[term.classCode.toUpperCase()] ?? ""
     : "";
@@ -88,9 +99,14 @@ export default async function GlossaryTermPage({
                 {term.domainName && (
                   <Tag variant="blue">{term.domainName}</Tag>
                 )}
+                {term.termType && term.termType !== "TERM" && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {TERM_TYPE_LABEL[term.termType] ?? term.termType}
+                  </span>
+                )}
                 {term.classCode && (
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-semibold ${classStyle}`}>
-                    {term.classCode.charAt(0) + term.classCode.slice(1).toLowerCase()}
+                    {term.classCode.charAt(0) + term.classCode.slice(1).toLowerCase().replace(/_/g, " ")}
                   </span>
                 )}
                 {term.isPii && (
@@ -110,7 +126,7 @@ export default async function GlossaryTermPage({
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-[11px] text-muted uppercase tracking-wider">Also known as:</span>
                   {term.aliases.map((a) => (
-                    <span key={a} className="tag">{a}</span>
+                    <span key={a.aliasId} className="tag">{a.name}</span>
                   ))}
                 </div>
               )}
@@ -118,7 +134,8 @@ export default async function GlossaryTermPage({
 
             <div className="flex items-center gap-2 shrink-0">
               <button className="btn btn-sm">★ Follow</button>
-              <button className="btn btn-sm">Edit</button>
+              <TermHistoryButton glossaryId={term.glossaryId} termName={term.termName} />
+              {canEdit && <TermEditButton term={term} />}
               <button className="btn btn-primary btn-sm">Request Change</button>
             </div>
           </div>
@@ -228,6 +245,11 @@ export default async function GlossaryTermPage({
                     ? <Link href={`/glossary?domain=${term.domainId}`} className="text-brand-purple hover:underline font-medium">{term.domainName}</Link>
                     : <span className="text-muted">—</span>}
                 </PropRow>
+                <PropRow label="Term Type">
+                  <span className="text-ink text-[12px]">
+                    {term.termType ? (TERM_TYPE_LABEL[term.termType] ?? term.termType) : "Term"}
+                  </span>
+                </PropRow>
                 <PropRow label="Classification">
                   {term.classCode ? <ClassBadge code={term.classCode} /> : <span className="text-muted">—</span>}
                 </PropRow>
@@ -260,10 +282,10 @@ export default async function GlossaryTermPage({
             </Section>
 
             {term.aliases.length > 0 && (
-              <Section title={`Aliases (${term.aliases.length})`}>
+              <Section title={`Synonyms (${term.aliases.length})`}>
                 <div className="flex flex-wrap gap-1.5">
                   {term.aliases.map((a) => (
-                    <span key={a} className="tag">{a}</span>
+                    <span key={a.aliasId} className="tag">{a.name}</span>
                   ))}
                 </div>
               </Section>

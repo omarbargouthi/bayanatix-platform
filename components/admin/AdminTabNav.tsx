@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/roles", label: "Roles" },
-  { href: "/admin/teams", label: "Teams" },
+  { href: "/admin/users",     label: "Users" },
+  { href: "/admin/roles",     label: "Roles" },
+  { href: "/admin/teams",     label: "Teams" },
+  { href: "/admin/tags",      label: "Tags" },
+  { href: "/admin/audit-log", label: "Audit Log" },
 ];
 
 export function AdminTabNav() {

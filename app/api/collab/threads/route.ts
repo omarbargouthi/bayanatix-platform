@@ -18,12 +18,12 @@ export async function POST(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { title, body } = await req.json();
+    const { title, body, threadType } = await req.json();
     if (!title?.trim() || !body?.trim()) {
       return NextResponse.json({ error: "title and body are required" }, { status: 400 });
     }
-
-    const threadId = await createThread(title.trim(), body.trim(), session.userId, session.fullName);
+    const type = threadType === "QUESTION" ? "QUESTION" : "DISCUSSION";
+    const threadId = await createThread(title.trim(), body.trim(), session.userId, session.fullName, type);
     return NextResponse.json({ threadId }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/collab/threads]", err);

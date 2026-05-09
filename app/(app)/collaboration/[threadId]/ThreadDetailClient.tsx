@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CollabThread, CollabMessage } from "@/lib/types";
@@ -47,18 +48,34 @@ export function ThreadDetailClient({
   messages: CollabMessage[];
 }) {
   const router = useRouter();
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [closing,    setClosing]    = useState(false);
+
+  async function handleClose() {
+    if (!confirm("Close this thread? The author will be marked as having resolved it.")) return;
+    setClosing(true);
+    await fetch(`/api/collab/threads/${thread.threadId}/close`, { method: "POST" });
+    router.refresh();
+    setClosing(false);
+  }
 
   async function handleReply(body: string) {
-    const r = await fetch(`/api/collab/threads/${thread.threadId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({ error: "Unknown error" }));
-      throw new Error(err.error ?? "Failed to send reply");
+    setReplyError(null);
+    try {
+      const r = await fetch(`/api/collab/threads/${thread.threadId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      if (!r.ok) {
+        const payload = await r.json().catch(() => ({ error: "Unknown error" }));
+        setReplyError(payload.error ?? "Failed to send reply");
+        return;
+      }
+      router.refresh();
+    } catch (e) {
+      setReplyError(String(e));
     }
-    router.refresh();
   }
 
   return (
@@ -72,7 +89,33 @@ export function ThreadDetailClient({
 
       {/* Thread header */}
       <div className="card p-6 mb-6">
-        <h1 className="text-xl font-extrabold text-brand-deep mb-2">{thread.title}</h1>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <h1 className="text-xl font-extrabold text-brand-deep">{thread.title}</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Type badge */}
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+              thread.threadType === "QUESTION"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-blue-50 text-blue-700 border-blue-200"
+            }`}>
+              {thread.threadType === "QUESTION" ? "❓ Question" : "💬 Discussion"}
+            </span>
+            {/* Status badge */}
+            {thread.statusCode === "CLOSED" ? (
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ✓ Resolved
+              </span>
+            ) : (
+              <button
+                onClick={handleClose}
+                disabled={closing}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-line text-muted hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+              >
+                {closing ? "Closing…" : "Close thread"}
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Asset references */}
         {thread.assetRefs.length > 0 && (
@@ -92,6 +135,9 @@ export function ThreadDetailClient({
           Started by <span className="font-medium text-ink">{thread.authorName}</span>
           &nbsp;·&nbsp;{thread.messageCount} messages
           &nbsp;·&nbsp;Last activity {timeAgo(thread.updatedAt)}
+          {thread.statusCode === "CLOSED" && thread.closedAt && (
+            <>&nbsp;·&nbsp;<span className="text-emerald-600">Closed {timeAgo(thread.closedAt)}</span></>
+          )}
         </div>
       </div>
 
@@ -131,14 +177,26 @@ export function ThreadDetailClient({
       </div>
 
       {/* Reply composer */}
-      <div className="card p-5">
-        <h3 className="font-bold text-sm text-brand-deep mb-3">Reply to thread</h3>
-        <CollabComposer
-          onSubmit={handleReply}
-          placeholder="Add your reply… Use # to reference an asset, #user. to mention a colleague"
-          rows={4}
-        />
-      </div>
+      {thread.statusCode === "CLOSED" ? (
+        <div className="card p-5 flex items-center gap-3 text-sm text-muted">
+          <span className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 text-base grid place-items-center shrink-0">✓</span>
+          <span>This thread has been closed. New replies are disabled.</span>
+        </div>
+      ) : (
+        <div className="card p-5">
+          <h3 className="font-bold text-sm text-brand-deep mb-3">Reply to thread</h3>
+          <CollabComposer
+            onSubmit={handleReply}
+            placeholder="Add your reply… Use # to reference an asset, #user. to mention a colleague"
+            rows={4}
+          />
+          {replyError && (
+            <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              {replyError}
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }

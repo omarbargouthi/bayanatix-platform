@@ -53,14 +53,18 @@ export async function listThreads(): Promise<CollabThread[]> {
   const threads = await sql<{
     thread_id: number; title: string; created_by: string; author_name: string;
     created_at: string; updated_at: string; message_count: number;
+    thread_type: string; status_code: string; closed_at: string | null;
   }[]>`
     SELECT
       t.thread_id,
       t.title,
       t.created_by,
-      u.full_name                                                          AS author_name,
+      u.full_name AS author_name,
       t.created_at,
       t.updated_at,
+      t.thread_type,
+      t.status_code,
+      t.closed_at,
       (SELECT COUNT(*)::int FROM bayanat.collab_messages m WHERE m.thread_id = t.thread_id) AS message_count
     FROM bayanat.collab_threads t
     JOIN bayanat.users u ON u.user_id = t.created_by
@@ -93,6 +97,9 @@ export async function listThreads(): Promise<CollabThread[]> {
     updatedAt:    String(t.updated_at),
     messageCount: t.message_count,
     assetRefs:    refsMap.get(t.thread_id) ?? [],
+    threadType:   (t.thread_type ?? "DISCUSSION") as "DISCUSSION" | "QUESTION",
+    statusCode:   (t.status_code  ?? "OPEN") as "OPEN" | "CLOSED",
+    closedAt:     t.closed_at ? String(t.closed_at) : null,
   }));
 }
 
@@ -103,10 +110,11 @@ export async function getThreadById(threadId: number): Promise<{
   const threads = await sql<{
     thread_id: number; title: string; created_by: string; author_name: string;
     created_at: string; updated_at: string; message_count: number;
+    thread_type: string; status_code: string; closed_at: string | null;
   }[]>`
     SELECT
       t.thread_id, t.title, t.created_by, u.full_name AS author_name,
-      t.created_at, t.updated_at,
+      t.created_at, t.updated_at, t.thread_type, t.status_code, t.closed_at,
       (SELECT COUNT(*)::int FROM bayanat.collab_messages m WHERE m.thread_id = t.thread_id) AS message_count
     FROM bayanat.collab_threads t
     JOIN bayanat.users u ON u.user_id = t.created_by
@@ -140,6 +148,9 @@ export async function getThreadById(threadId: number): Promise<{
       updatedAt:    String(t.updated_at),
       messageCount: t.message_count,
       assetRefs:    refs.map((r) => ({ assetType: r.asset_type, assetId: r.asset_id, assetPath: r.asset_path })),
+      threadType:   (t.thread_type ?? "DISCUSSION") as "DISCUSSION" | "QUESTION",
+      statusCode:   (t.status_code  ?? "OPEN") as "OPEN" | "CLOSED",
+      closedAt:     t.closed_at ? String(t.closed_at) : null,
     },
     messages: msgs.map((m) => ({
       messageId:  m.message_id,
@@ -152,15 +163,24 @@ export async function getThreadById(threadId: number): Promise<{
   };
 }
 
+export async function closeThread(threadId: number, userId: string): Promise<void> {
+  await sql`
+    UPDATE bayanat.collab_threads
+    SET status_code='CLOSED', closed_at=NOW(), closed_by=${userId}
+    WHERE thread_id=${threadId}
+  `;
+}
+
 export async function createThread(
   title: string,
   body: string,
   authorId: string,
   authorName: string,
+  threadType: "DISCUSSION" | "QUESTION" = "DISCUSSION",
 ): Promise<number> {
   const threadRows = await sql<{ thread_id: number }[]>`
-    INSERT INTO bayanat.collab_threads (title, created_by)
-    VALUES (${title}, ${authorId})
+    INSERT INTO bayanat.collab_threads (title, created_by, thread_type)
+    VALUES (${title}, ${authorId}, ${threadType})
     RETURNING thread_id
   `;
   const threadId = threadRows[0].thread_id;

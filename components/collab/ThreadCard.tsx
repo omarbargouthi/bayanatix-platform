@@ -47,6 +47,18 @@ export function ThreadCard({ thread }: { thread: CollabThread }) {
             <span className="font-semibold text-brand-deep text-sm group-hover:text-brand-purple transition-colors line-clamp-1">
               {thread.title}
             </span>
+            <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+              thread.threadType === "QUESTION"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-blue-50 text-blue-600 border-blue-200"
+            }`}>
+              {thread.threadType === "QUESTION" ? "Q" : "D"}
+            </span>
+            {thread.statusCode === "CLOSED" && (
+              <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Resolved
+              </span>
+            )}
           </div>
 
           {/* Author + time */}

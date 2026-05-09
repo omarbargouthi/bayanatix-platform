@@ -8,7 +8,7 @@ import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp, IconGlossary, IconShield, IconCollaborate,
+  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory,
 } from "./icons";
 
 type Item = {
@@ -27,14 +27,20 @@ const NAV_TOP: Item[] = [
 const NAV_DOMAINS: Item[] = [
   { href: "/governance",     label: "Data Governance", Icon: IconCircle },
   { href: "/catalog",        label: "Data Catalog",    Icon: IconBook },
-  { href: "/glossary",       label: "Business Glossary", Icon: IconGlossary },
   { href: "/quality",        label: "Data Quality",    Icon: IconCheck },
   { href: "/classification", label: "Classification",  Icon: IconLines },
   { href: "/privacy",        label: "Data Privacy",    Icon: IconLock },
   { href: "/sharing",        label: "Data Sharing",    Icon: IconShare },
   { href: "/foi",            label: "FOI Requests",    Icon: IconChat, badge: 3 },
-  { href: "/collaboration",  label: "Collaboration",   Icon: IconCollaborate },
   { href: "/ai-governance",  label: "AI Governance",   Icon: IconCog },
+];
+
+const NAV_ADMIN: Item[] = [
+  { href: "/admin/users",     label: "Users",     Icon: IconShield },
+  { href: "/admin/roles",     label: "Roles",     Icon: IconLock },
+  { href: "/admin/teams",     label: "Teams",     Icon: IconChat },
+  { href: "/admin/tags",      label: "Tags",      Icon: IconLines },
+  { href: "/admin/audit-log", label: "Audit Log", Icon: IconHistory },
 ];
 
 export function Sidebar({ user }: { user: SessionUser }) {
@@ -77,11 +83,17 @@ export function Sidebar({ user }: { user: SessionUser }) {
               ? <div className="my-2 mx-1 border-t border-line" />
               : <div className="px-3 pt-3 pb-1 text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">Administration</div>
             }
-            <NavLink
-              item={{ href: "/admin/users", label: "User Management", Icon: IconShield }}
-              active={isActive("/admin")}
-              collapsed={collapsed}
-            />
+            {collapsed ? (
+              <NavLink
+                item={{ href: "/admin/users", label: "Admin", Icon: IconShield }}
+                active={isActive("/admin")}
+                collapsed={collapsed}
+              />
+            ) : (
+              NAV_ADMIN.map((it) => (
+                <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={false} indent />
+              ))
+            )}
           </>
         )}
       </nav>
@@ -102,22 +114,22 @@ export function Sidebar({ user }: { user: SessionUser }) {
   );
 }
 
-function NavLink({ item, active, collapsed }: { item: Item; active: boolean; collapsed: boolean }) {
+function NavLink({ item, active, collapsed, indent }: { item: Item; active: boolean; collapsed: boolean; indent?: boolean }) {
   const { Icon } = item;
   return (
     <Link
       href={item.href}
       title={collapsed ? item.label : undefined}
       className={[
-        "flex items-center gap-2.5 py-2 rounded-md text-sm font-medium transition-colors",
-        collapsed ? "justify-center px-2" : "px-3",
+        "flex items-center gap-2.5 py-1.5 rounded-md text-sm font-medium transition-colors",
+        collapsed ? "justify-center px-2" : indent ? "pl-7 pr-3" : "px-3",
         active
           ? "bg-brand-purple/10 text-brand-deep shadow-[inset_3px_0_0_#6058A0]"
           : "text-ink-soft hover:bg-canvas hover:text-brand-deep",
       ].join(" ")}
     >
-      <Icon className={["w-[18px] h-[18px] shrink-0", active ? "text-brand-purple" : ""].join(" ")} />
-      {!collapsed && <span className="flex-1">{item.label}</span>}
+      <Icon className={["w-[15px] h-[15px] shrink-0", active ? "text-brand-purple" : ""].join(" ")} />
+      {!collapsed && <span className="flex-1 text-[13px]">{item.label}</span>}
       {!collapsed && item.badge ? (
         <span className="bg-brand-purple text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
           {item.badge}

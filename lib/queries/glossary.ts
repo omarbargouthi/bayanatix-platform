@@ -1,5 +1,6 @@
 import { sql } from "../db";
-import type { GlossaryDomain, GlossaryTerm, GlossaryTermDetail } from "../types";
+import { logUpdate } from "../audit";
+import type { GlossaryDomain, GlossaryTerm, GlossaryTermDetail, GlossaryAlias } from "../types";
 
 export type GlossaryStats = {
   totalTerms:   number;
@@ -76,6 +77,7 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     isPii:         boolean;
     piCategory:    string | null;
     npiCategory:   string | null;
+    termType:      string | null;
     domainName:    string | null;
     domainId:      number | null;
     createdAt:     string;
@@ -91,6 +93,7 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
       g.is_pii_indicator       AS "isPii",
       g.pi_category_code       AS "piCategory",
       g.npi_category_code      AS "npiCategory",
+      g.term_type              AS "termType",
       p.term_name_text         AS "domainName",
       p.glossary_id            AS "domainId",
       g.created_at_timestamp   AS "createdAt"
@@ -102,8 +105,8 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
   if (!rows[0]) return null;
   const term = rows[0];
 
-  const aliasRows = await sql<{ alias: string }[]>`
-    SELECT alias_name_text AS alias
+  const aliasRows = await sql<{ aliasId: number; alias: string }[]>`
+    SELECT alias_id AS "aliasId", alias_name_text AS alias
     FROM bayanat.glossary_aliases
     WHERE glossary_id = ${id}
     ORDER BY alias_name_text
@@ -136,7 +139,77 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
 
   return {
     ...term,
-    aliases:          aliasRows.map((r) => r.alias),
+    aliases:          aliasRows.map((r): GlossaryAlias => ({ aliasId: r.aliasId, name: r.alias })),
     linkedAttributes: attrRows,
   };
+}
+
+// ----- Glossary mutations -----
+
+export async function updateGlossaryTerm(
+  glossaryId: number,
+  userId: string,
+  patch: {
+    definition:    string;
+    format:        string;
+    businessRules: string;
+    classCode:     string | null;
+    isPii:         boolean;
+    piCategory:    string | null;
+    example:       string;
+    termType:      string;
+  },
+): Promise<void> {
+  const [old] = await sql<{
+    definition_text:     string | null;
+    format_text:         string | null;
+    business_rules_text: string | null;
+    classification_code: string | null;
+    is_pii_indicator:    boolean;
+    pi_category_code:    string | null;
+    example_text:        string | null;
+    term_type:           string | null;
+  }[]>`
+    SELECT definition_text, format_text, business_rules_text, classification_code,
+           is_pii_indicator, pi_category_code, example_text, term_type
+    FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
+  `;
+  await sql`
+    UPDATE bayanat.business_glossaries
+    SET
+      definition_text     = ${patch.definition},
+      format_text         = ${patch.format        || null},
+      business_rules_text = ${patch.businessRules || null},
+      classification_code = ${patch.classCode},
+      is_pii_indicator    = ${patch.isPii},
+      pi_category_code    = ${patch.piCategory},
+      example_text        = ${patch.example       || null},
+      term_type           = ${patch.termType}
+    WHERE glossary_id = ${glossaryId}
+  `;
+  if (old) {
+    await logUpdate("BUSINESS_GLOSSARIES", glossaryId, userId, [
+      { field: "definition_text",     oldVal: old.definition_text,          newVal: patch.definition    || null },
+      { field: "format_text",         oldVal: old.format_text,              newVal: patch.format        || null },
+      { field: "business_rules_text", oldVal: old.business_rules_text,      newVal: patch.businessRules || null },
+      { field: "classification_code", oldVal: old.classification_code,      newVal: patch.classCode },
+      { field: "is_pii_indicator",    oldVal: String(old.is_pii_indicator), newVal: String(patch.isPii) },
+      { field: "pi_category_code",    oldVal: old.pi_category_code,         newVal: patch.piCategory },
+      { field: "example_text",        oldVal: old.example_text,             newVal: patch.example       || null },
+      { field: "term_type",           oldVal: old.term_type,                newVal: patch.termType },
+    ]);
+  }
+}
+
+export async function addAlias(glossaryId: number, name: string): Promise<number> {
+  const rows = await sql<{ aliasId: number }[]>`
+    INSERT INTO bayanat.glossary_aliases (glossary_id, alias_name_text)
+    VALUES (${glossaryId}, ${name})
+    RETURNING alias_id AS "aliasId"
+  `;
+  return rows[0].aliasId;
+}
+
+export async function deleteAlias(aliasId: number): Promise<void> {
+  await sql`DELETE FROM bayanat.glossary_aliases WHERE alias_id = ${aliasId}`;
 }

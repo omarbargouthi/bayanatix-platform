@@ -14,8 +14,22 @@ export type DataSource = {
   sourceType: string;
   databaseName: string;
   description: string | null;
+  businessAppName: string | null;
   schemaCount?: number;
   tableCount?: number;
+};
+
+export type AuditEntry = {
+  auditId:   number;
+  action:    string;
+  userId:    string;
+  userName:  string | null;
+  timestamp: string;
+  changes: {
+    field: string;
+    from:  string | null;
+    to:    string | null;
+  }[];
 };
 
 export type DataSchema = {
@@ -28,6 +42,7 @@ export type DataSchema = {
   viewCount?: number;
   columnCount?: number;
   sourceName?: string;
+  cdeCount?: number;
 };
 
 export type DataEntity = {
@@ -39,10 +54,43 @@ export type DataEntity = {
   description: string | null;
   isView: boolean;
   certCode?: string | null;
+  dataCertCode?: string | null;
   trustScore?: number | null;
   rowCount?: number | null;
   columnCount?: number;
   stewards?: Steward[];
+  // Incidents (legacy DQ tracking)
+  openIncidentCount?: number;
+  topSeverity?: "HIGH" | "MEDIUM" | "LOW" | null;
+  highIncidents?: number;
+  mediumIncidents?: number;
+  lowIncidents?: number;
+  // Requests (unified issue/request system)
+  openRequestCount?: number;
+  topRequestPriority?: "HIGH" | "MEDIUM" | "LOW" | null;
+  // Open request count shown in warning triangle (requests only, incidents in DQ panel)
+  totalWarnings?: number;
+  // Rating summary (denormalised from asset_ratings for list view)
+  avgRating?: number | null;
+  ratingCount?: number;
+  // Usage
+  queries30d?: number | null;
+  queryPrev30d?: number | null;
+  uniqueUsers?: number | null;
+  uniqueUsersPrev?: number | null;
+  avgQueryMs?: number | null;
+  avgQueryMsPrev?: number | null;
+  lastAccessedAt?: string | null;
+};
+
+export type TagRecord = {
+  tagId:       number;
+  tagName:     string;
+  parentTagId: number | null;
+  colorHex:    string;
+  description: string | null;
+  createdAt:   string;
+  childCount?: number;
 };
 
 export type DataAttribute = {
@@ -58,6 +106,8 @@ export type DataAttribute = {
   glossaryTerm?: string | null;
   qualityScore?: number | null;
   nullPercentage?: number | null;
+  isEncrypted: boolean;
+  columnType: string | null;
 };
 
 export type Steward = {
@@ -76,6 +126,7 @@ export type GovernanceDomain = {
   level: string;
   alertCount: number;
   sortOrder: number;
+  openRequestCount?: number;
 };
 
 export type ComplianceSummary = {
@@ -201,6 +252,11 @@ export type GlossaryTerm = {
   createdAt:          string;
 };
 
+export type GlossaryAlias = {
+  aliasId: number;
+  name:    string;
+};
+
 export type GlossaryTermDetail = {
   glossaryId:     number;
   termName:       string;
@@ -212,10 +268,11 @@ export type GlossaryTermDetail = {
   isPii:          boolean;
   piCategory:     string | null;
   npiCategory:    string | null;
+  termType:       string | null;
   domainName:     string | null;
   domainId:       number | null;
   createdAt:      string;
-  aliases:        string[];
+  aliases:        GlossaryAlias[];
   linkedAttributes: {
     attributeId:  number;
     physicalName: string;
@@ -258,6 +315,31 @@ export type CollabThread = {
   updatedAt:    string;
   messageCount: number;
   assetRefs:    CollabAssetRef[];
+  threadType:   "DISCUSSION" | "QUESTION";
+  statusCode:   "OPEN" | "CLOSED";
+  closedAt:     string | null;
+};
+
+// ── Asset tags / terms / ratings ──────────────────────────────────────────────
+
+export type AssetTag = {
+  tagId:       number;
+  tagName:     string;
+  colorHex:    string;
+  parentTagId: number | null;
+};
+
+export type LinkedTerm = {
+  glossaryId:  number;
+  termName:    string;
+  domainName:  string | null;
+  isPii:       boolean;
+};
+
+export type AssetRating = {
+  average:  number | null;
+  count:    number;
+  myRating: { stars: number; comment: string | null } | null;
 };
 
 export type CollabMessage = {
@@ -275,4 +357,43 @@ export type AssetPickerItem = {
   label:     string;
   assetType: "DATA_SOURCE" | "SCHEMA" | "TABLE" | "COLUMN" | "GLOSSARY_DOMAIN" | "GLOSSARY_TERM";
   hasChildren: boolean;
+};
+
+// ── Asset Requests ─────────────────────────────────────────────────────────────
+
+export type RequestTypeCode =
+  | "FIX_DATA_ISSUE"
+  | "UPDATE_DEFINITION"
+  | "CERTIFY_ASSET"
+  | "GRANT_ACCESS"
+  | "REMOVE_ACCESS"
+  | "OTHER";
+
+export type RequestPriority = "HIGH" | "MEDIUM" | "LOW";
+export type RequestStatus   = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+
+export type AssetRequestTarget = {
+  targetId:      number;
+  requestId:     number;
+  assetTypeCode: string;
+  assetId:       number | null;
+  assetIdText:   string | null;
+  assetName:     string | null;
+};
+
+export type AssetRequest = {
+  requestId:          number;
+  requestTypeCode:    RequestTypeCode;
+  title:              string;
+  descriptionText:    string | null;
+  priorityCode:       RequestPriority;
+  statusCode:         RequestStatus;
+  raisedByUserId:     string;
+  raisedByName:       string | null;
+  assignedToUserId:   string | null;
+  assignedToName:     string | null;
+  resolutionNotes:    string | null;
+  createdAt:          string;
+  updatedAt:          string;
+  targets:            AssetRequestTarget[];
 };

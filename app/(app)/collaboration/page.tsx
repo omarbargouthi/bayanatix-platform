@@ -1,19 +1,30 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { CollabThread } from "@/lib/types";
 import { ThreadCard } from "@/components/collab/ThreadCard";
 import { CollabComposer } from "@/components/collab/CollabComposer";
 
 export default function CollaborationPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const [threads,     setThreads]     = useState<CollabThread[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState("");
   const [showNew,     setShowNew]     = useState(false);
   const [newTitle,    setNewTitle]    = useState("");
+  const [threadType,  setThreadType]  = useState<"DISCUSSION" | "QUESTION">("DISCUSSION");
   const [titleError,  setTitleError]  = useState(false);
+
+  // Auto-open new thread form when navigated from an asset's collaborate icon
+  useEffect(() => {
+    const preset = searchParams.get("newTitle");
+    if (preset) {
+      setNewTitle(decodeURIComponent(preset));
+      setShowNew(true);
+    }
+  }, [searchParams]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,7 +44,7 @@ export default function CollaborationPage() {
     const r = await fetch("/api/collab/threads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newTitle.trim(), body }),
+      body: JSON.stringify({ title: newTitle.trim(), body, threadType }),
     });
     if (!r.ok) {
       const err = await r.json().catch(() => ({ error: "Unknown error" }));
@@ -102,6 +113,25 @@ export default function CollaborationPage() {
                   className={`input-field ${titleError ? "border-red-400" : ""}`}
                 />
                 {titleError && <p className="text-[11px] text-red-500 mt-1">Please enter a title.</p>}
+              </div>
+              <div>
+                <label className="field-label">Thread Type</label>
+                <div className="flex gap-2 mt-1">
+                  {(["DISCUSSION", "QUESTION"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setThreadType(t)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        threadType === t
+                          ? "bg-brand-purple text-white border-brand-purple"
+                          : "border-line text-ink-soft hover:border-brand-purple hover:text-brand-deep"
+                      }`}
+                    >
+                      {t === "DISCUSSION" ? "💬 Discussion" : "❓ Question"}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="field-label">First Message</label>

@@ -105,7 +105,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
         </HeaderIconBtn>
 
         {/* Collaboration */}
-        <HeaderIconBtn label="Collaboration">
+        <HeaderIconBtn label="Collaboration" onClick={() => router.push("/collaboration")}>
           <IconCollaborate className="w-[17px] h-[17px]" />
         </HeaderIconBtn>
 
@@ -123,6 +123,30 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
                 <div className="text-sm font-semibold text-ink">{user.fullName}</div>
                 <div className="text-xs text-muted truncate">{user.email}</div>
               </div>
+              <Link
+                href="/profile"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setMenuOpen(false)}
+                className="w-full text-left px-3 py-2 text-sm text-ink-soft hover:bg-canvas flex items-center gap-2"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+                My Profile
+              </Link>
+              <Link
+                href="/requests"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setMenuOpen(false)}
+                className="w-full text-left px-3 py-2 text-sm text-ink-soft hover:bg-canvas flex items-center gap-2"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Asset Requests
+              </Link>
+              <div className="border-t border-line my-1" />
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={logout}

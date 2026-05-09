@@ -1,14 +1,25 @@
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
+import { canEditMetadata } from "@/lib/can";
 import { getEntityById } from "@/lib/queries/catalog";
 import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
 import { Donut } from "@/components/ui/Donut";
 import { IconTable } from "@/components/layout/icons";
 import { TableTabs } from "@/components/catalog/TableTabs";
+import { TableEditPanel } from "@/components/catalog/TableEditPanel";
+import { ColumnsTable } from "@/components/catalog/ColumnsTable";
+import { TablePageActions } from "@/components/catalog/TablePageActions";
 import { fmtNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+const ENTITY_TYPE_LABEL: Record<string, string> = {
+  TRANSACTIONAL: "Transactional",
+  MASTER:        "Master",
+  REFERENCE:     "Lookup / Reference",
+  SYSTEM:        "System / Setup",
+};
 
 export default async function TablePage({
   params,
@@ -23,6 +34,7 @@ export default async function TablePage({
   const entity = await getEntityById(id);
   if (!entity) notFound();
 
+  const canEdit = await canEditMetadata(user);
   const dq = computeDqAggregates(entity.attributes);
 
   return (
@@ -45,14 +57,17 @@ export default async function TablePage({
             <IconTable className="w-6 h-6 text-brand-purple" />
             {entity.entityName}
             <CertTag code={entity.certCode} />
-            {entity.category && <Tag variant="purple">{entity.category}</Tag>}
+            {entity.category && (
+              <Tag variant="purple">
+                {ENTITY_TYPE_LABEL[entity.category] ?? entity.category}
+              </Tag>
+            )}
             <Tag>{entity.isView ? "View" : "Table"} · {fmtNumber(entity.rowCount as number | null)} rows</Tag>
           </h1>
-          <div className="flex items-center gap-2">
-            <button className="btn btn-sm">★ Follow</button>
-            <button className="btn btn-sm">Request Access</button>
-            <button className="btn btn-primary btn-sm">+ Custom Attribute</button>
-          </div>
+          <TablePageActions
+            entityId={entity.entityId}
+            entityName={entity.entityName}
+          />
         </div>
 
         <TableTabs />
@@ -60,8 +75,13 @@ export default async function TablePage({
         <section className="grid grid-cols-[1.4fr_1fr] gap-5 mb-6">
           {/* Description + DQ */}
           <div className="card p-5">
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold m-0">Description</h3><button className="btn btn-sm">Edit</button></div>
-            <p className="text-ink-soft text-[14px] leading-relaxed">{entity.description ?? "No description provided yet."}</p>
+            <TableEditPanel
+              entityId={entity.entityId}
+              description={entity.description}
+              displayName={entity.displayName}
+              category={entity.category}
+              canEdit={canEdit}
+            />
 
             <div className="flex flex-wrap gap-2 mt-4">
               <Tag>PK: <strong className="ml-1">{entity.attributes.find((a) => a.isPrimaryKey)?.physicalName ?? "—"}</strong></Tag>
@@ -99,50 +119,7 @@ export default async function TablePage({
         </section>
 
         {/* Columns table */}
-        <div className="card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
-            <h3 className="font-bold">
-              Columns <span className="text-muted text-xs font-normal ml-1.5">{entity.attributes.length} attributes</span>
-            </h3>
-            <div className="flex items-center gap-2">
-              <button className="btn btn-sm">Filter</button>
-              <button className="btn btn-sm">Sort</button>
-              <button className="btn btn-sm">Profile</button>
-            </div>
-          </div>
-          <div className="grid grid-cols-[36px_1.6fr_1fr_0.9fr_1.1fr_1fr_1fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-            <div></div>
-            <div>Column</div>
-            <div>Type</div>
-            <div>Null %</div>
-            <div>Sensitivity</div>
-            <div>Glossary</div>
-            <div>Quality</div>
-          </div>
-          {entity.attributes.map((a) => (
-            <div
-              key={a.attributeId}
-              className="grid grid-cols-[36px_1.6fr_1fr_0.9fr_1.1fr_1fr_1fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors"
-            >
-              <div>
-                {a.isPrimaryKey ? (
-                  <span className="w-[22px] h-[22px] grid place-items-center bg-brand-purple/10 text-brand-purple rounded text-[10px] font-bold">PK</span>
-                ) : a.physicalName.endsWith("_id") ? (
-                  <span className="w-[22px] h-[22px] grid place-items-center bg-brand-light/30 text-brand-navy rounded text-[10px] font-bold">FK</span>
-                ) : null}
-              </div>
-              <div>
-                <div className="font-semibold text-brand-deep">{a.physicalName}</div>
-                <div className="text-[11px] text-muted">{a.description ?? a.friendlyName ?? "—"}</div>
-              </div>
-              <div className="font-mono text-[12px] text-ink-soft">{a.dataType}</div>
-              <div>{a.nullPercentage != null ? `${Number(a.nullPercentage).toFixed(1)}%` : "—"}</div>
-              <div><ClassificationTag code={a.classificationCode} /></div>
-              <div>{a.glossaryTerm ? <Tag variant="blue">{a.glossaryTerm}</Tag> : <span className="text-muted">—</span>}</div>
-              <div className="font-bold">{a.qualityScore != null ? `${Number(a.qualityScore).toFixed(1)}%` : "—"}</div>
-            </div>
-          ))}
-        </div>
+        <ColumnsTable attributes={entity.attributes} canEdit={canEdit} />
       </main>
     </>
   );
@@ -179,7 +156,7 @@ function computeDqAggregates(attrs: { qualityScore?: number | null; nullPercenta
   const uniqueness = attrs.find((a) => a.isPrimaryKey) ? 99.1 : 0;
   return {
     completeness: Math.max(0, Math.min(100, completeness)),
-    validity: Math.max(0, Math.min(100, validity)),
+    validity:     Math.max(0, Math.min(100, validity)),
     uniqueness,
   };
 }

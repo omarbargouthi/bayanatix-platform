@@ -4,16 +4,24 @@ import type { GovernanceDomain, ComplianceSummary } from "../types";
 export async function getDomains(): Promise<GovernanceDomain[]> {
   return sql<GovernanceDomain[]>`
     select
-      domain_code        as "domainCode",
-      domain_name        as "name",
-      domain_description as "description",
-      compliance_pct     as "compliancePct",
-      maturity_level     as "maturityLevel",
-      maturity_label     as "level",
-      alert_count        as "alertCount",
-      sort_order         as "sortOrder"
-    from bayanat.governance_domains
-    order by sort_order asc
+      d.domain_code        as "domainCode",
+      d.domain_name        as "name",
+      d.domain_description as "description",
+      d.compliance_pct     as "compliancePct",
+      d.maturity_level     as "maturityLevel",
+      d.maturity_label     as "level",
+      d.alert_count        as "alertCount",
+      d.sort_order         as "sortOrder",
+      (
+        select count(*)::int
+        from bayanat.asset_request_targets art
+        join bayanat.asset_requests ar on ar.request_id = art.request_id
+        where art.asset_type_code = 'GOVERNANCE_DOMAIN'
+          and art.asset_id_text = d.domain_code
+          and ar.status_code in ('OPEN','IN_PROGRESS')
+      ) as "openRequestCount"
+    from bayanat.governance_domains d
+    order by d.sort_order asc
   `;
 }
 
