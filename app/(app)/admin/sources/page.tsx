@@ -1,0 +1,410 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+type Conn = {
+  connectionId: number; connectionName: string; dbTypeCode: string;
+  hostAddress: string; portNumber: number; databaseName: string | null;
+  serviceName: string | null; defaultSchema: string | null;
+  usernameText: string | null; sslEnabled: boolean; isActiveBoolean: boolean;
+  connectionStatus: string; lastTestedAt: string | null;
+  crawlStatus: string; crawlErrorText: string | null;
+  crawledSchemaCount: number; crawledTableCount: number; crawledColumnCount: number;
+  lastDiscoveryTimestamp: string | null; createdAtTimestamp: string;
+};
+
+const DB_TYPES = [
+  { value: "POSTGRES", label: "PostgreSQL", port: 5432 },
+  { value: "MYSQL",    label: "MySQL",      port: 3306 },
+  { value: "MSSQL",    label: "SQL Server", port: 1433 },
+  { value: "ORACLE",   label: "Oracle DB",  port: 1521 },
+];
+
+const DB_ICON: Record<string, string> = {
+  POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶",
+};
+
+const STATUS_DOT: Record<string, string> = {
+  OK:        "bg-green-500",
+  FAILED:    "bg-red-500",
+  TESTING:   "bg-yellow-400 animate-pulse",
+  UNCHECKED: "bg-gray-300",
+};
+
+const CRAWL_DOT: Record<string, string> = {
+  COMPLETED: "bg-green-500",
+  FAILED:    "bg-red-500",
+  CRAWLING:  "bg-brand-purple animate-pulse",
+  IDLE:      "bg-gray-300",
+};
+
+const BLANK_FORM = { connectionName: "", dbTypeCode: "POSTGRES", hostAddress: "localhost", portNumber: 5432, databaseName: "", serviceName: "", defaultSchema: "", usernameText: "", passwordText: "", sslEnabled: false };
+
+export default function DataSourcesPage() {
+  const [connections, setConnections] = useState<Conn[]>([]);
+  const [selected, setSelected]   = useState<Conn | null>(null);
+  const [isAdding, setIsAdding]   = useState(false);
+  const [form, setForm]           = useState({ ...BLANK_FORM });
+  const [saving, setSaving]       = useState(false);
+  const [testing, setTesting]     = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [crawling, setCrawling]   = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [showPwd, setShowPwd]     = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function load() {
+    const r = await fetch("/api/admin/sources");
+    if (r.ok) setConnections(await r.json());
+  }
+
+  useEffect(() => { load(); }, []);
+
+  // Poll selected connection while crawling
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (!selected || selected.crawlStatus !== "CRAWLING") { setCrawling(false); return; }
+    setCrawling(true);
+    pollRef.current = setInterval(async () => {
+      const r = await fetch(`/api/admin/sources/${selected.connectionId}`);
+      if (!r.ok) return;
+      const fresh: Conn = await r.json();
+      setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+      setSelected(fresh);
+      if (fresh.crawlStatus !== "CRAWLING") {
+        clearInterval(pollRef.current!);
+        setCrawling(false);
+      }
+    }, 2000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [selected?.connectionId, selected?.crawlStatus]);
+
+  function selectConn(c: Conn) {
+    setSelected(c); setIsAdding(false); setTestResult(null); setDeleteConfirm(false); setShowPwd(false);
+    setForm({ connectionName: c.connectionName, dbTypeCode: c.dbTypeCode, hostAddress: c.hostAddress, portNumber: c.portNumber, databaseName: c.databaseName || "", serviceName: c.serviceName || "", defaultSchema: c.defaultSchema || "", usernameText: c.usernameText || "", passwordText: "", sslEnabled: c.sslEnabled });
+  }
+
+  function startAdd() {
+    setSelected(null); setIsAdding(true); setTestResult(null); setDeleteConfirm(false); setShowPwd(false);
+    setForm({ ...BLANK_FORM });
+  }
+
+  function setDbType(type: string) {
+    const found = DB_TYPES.find(t => t.value === type);
+    setForm(f => ({ ...f, dbTypeCode: type, portNumber: found?.port ?? f.portNumber }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      if (isAdding) {
+        const r = await fetch("/api/admin/sources", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, portNumber: Number(form.portNumber) }),
+        });
+        if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+        await load();
+        const data = await r.json();
+        setIsAdding(false);
+        const fresh = await (await fetch(`/api/admin/sources/${data.connectionId}`)).json();
+        setSelected(fresh);
+        setConnections(prev => [...prev, fresh]);
+      } else if (selected) {
+        const body: Record<string, unknown> = { ...form, portNumber: Number(form.portNumber) };
+        if (!form.passwordText) delete body.passwordText;
+        const r = await fetch(`/api/admin/sources/${selected.connectionId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+        const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
+        setSelected(fresh);
+        setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+        setTestResult(null);
+      }
+    } finally { setSaving(false); }
+  }
+
+  async function handleTest() {
+    if (!selected) return;
+    setTesting(true); setTestResult(null);
+    // Save password if changed before test
+    if (form.passwordText) {
+      await fetch(`/api/admin/sources/${selected.connectionId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passwordText: form.passwordText }),
+      });
+    }
+    const r = await fetch(`/api/admin/sources/${selected.connectionId}/test`, { method: "POST" });
+    const data = await r.json();
+    setTestResult(data);
+    const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
+    setSelected(fresh);
+    setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+    setTesting(false);
+  }
+
+  async function handleCrawl() {
+    if (!selected) return;
+    const r = await fetch(`/api/admin/sources/${selected.connectionId}/crawl`, { method: "POST" });
+    if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+    const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
+    setSelected(fresh);
+    setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+  }
+
+  async function handleDelete() {
+    if (!selected || !deleteConfirm) return;
+    await fetch(`/api/admin/sources/${selected.connectionId}`, { method: "DELETE" });
+    setConnections(prev => prev.filter(c => c.connectionId !== selected.connectionId));
+    setSelected(null); setDeleteConfirm(false);
+  }
+
+  const isEditing = !!selected && !isAdding;
+
+  return (
+    <div className="flex h-[calc(100vh-120px)] overflow-hidden">
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <aside className="w-64 shrink-0 border-r border-line bg-canvas flex flex-col">
+        <div className="p-4 border-b border-line flex items-center justify-between">
+          <span className="text-xs font-semibold text-muted uppercase tracking-wider">Data Sources</span>
+          <button onClick={startAdd} className="text-[11px] font-semibold text-brand-purple hover:underline">+ Add</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {connections.length === 0 && (
+            <div className="p-6 text-center text-muted text-xs">No data sources yet</div>
+          )}
+          {connections.map(c => (
+            <button
+              key={c.connectionId}
+              onClick={() => selectConn(c)}
+              className={`w-full text-left px-4 py-3 border-b border-line hover:bg-white transition-colors ${selected?.connectionId === c.connectionId ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">{DB_ICON[c.dbTypeCode] ?? "🗄"}</span>
+                <span className="text-[13px] font-medium text-ink truncate flex-1">{c.connectionName}</span>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[c.connectionStatus] ?? "bg-gray-300"}`} title={`Connection: ${c.connectionStatus}`} />
+              </div>
+              <div className="mt-1 pl-6 flex items-center gap-2">
+                <span className="text-[10px] text-muted truncate">{c.hostAddress}/{c.databaseName || "—"}</span>
+                {c.crawlStatus !== "IDLE" && (
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CRAWL_DOT[c.crawlStatus] ?? "bg-gray-300"}`} title={`Crawl: ${c.crawlStatus}`} />
+                )}
+              </div>
+              {c.crawledTableCount > 0 && (
+                <div className="pl-6 mt-0.5 text-[10px] text-muted">{c.crawledTableCount} tables · {c.crawledColumnCount} cols</div>
+              )}
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── Main Panel ──────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto p-8">
+        {!selected && !isAdding && (
+          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+            <div className="text-6xl">🗄</div>
+            <h2 className="text-xl font-semibold text-ink">Onboard a Data Source</h2>
+            <p className="text-muted text-sm max-w-md">Connect to PostgreSQL, MySQL, SQL Server, or Oracle databases. Test the connection, then crawl to discover schemas, tables, and columns automatically.</p>
+            <button onClick={startAdd} className="mt-2 px-5 py-2.5 bg-brand-purple text-white text-sm font-semibold rounded-lg hover:bg-brand-deep transition-colors">
+              + Add Data Source
+            </button>
+          </div>
+        )}
+
+        {(isAdding || isEditing) && (
+          <div className="max-w-2xl">
+            <h2 className="text-lg font-bold text-ink mb-6">{isAdding ? "New Data Source Connection" : `Edit – ${selected?.connectionName}`}</h2>
+
+            {/* Connection Form */}
+            <div className="bg-white border border-line rounded-xl p-6 space-y-5">
+              <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">Connection Details</h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-ink mb-1">Connection Name *</label>
+                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.connectionName} onChange={e => setForm(f => ({ ...f, connectionName: e.target.value }))} placeholder="e.g. CRMDB – Production" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">Database Type *</label>
+                  <select className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple bg-white" value={form.dbTypeCode} onChange={e => setDbType(e.target.value)}>
+                    {DB_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">Port *</label>
+                  <input type="number" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.portNumber} onChange={e => setForm(f => ({ ...f, portNumber: Number(e.target.value) }))} />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-ink mb-1">Host Address *</label>
+                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.hostAddress} onChange={e => setForm(f => ({ ...f, hostAddress: e.target.value }))} placeholder="localhost or 192.168.1.100" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">{form.dbTypeCode === "ORACLE" ? "SID / Service Name" : "Database Name"}</label>
+                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.databaseName} onChange={e => setForm(f => ({ ...f, databaseName: e.target.value }))} placeholder={form.dbTypeCode === "ORACLE" ? "XE" : "mydb"} />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">Default Schema <span className="text-muted font-normal">(filter crawl)</span></label>
+                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.defaultSchema} onChange={e => setForm(f => ({ ...f, defaultSchema: e.target.value }))} placeholder="e.g. crm or dbo" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">Username</label>
+                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.usernameText} onChange={e => setForm(f => ({ ...f, usernameText: e.target.value }))} placeholder="postgres" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">Password {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
+                  <div className="relative">
+                    <input type={showPwd ? "text" : "password"} className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} placeholder={isEditing ? "unchanged" : "••••••••"} />
+                    <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
+                  </div>
+                </div>
+
+                <div className="col-span-2 flex items-center gap-3">
+                  <button type="button" onClick={() => setForm(f => ({ ...f, sslEnabled: !f.sslEnabled }))} className={`relative w-10 h-5 rounded-full transition-colors ${form.sslEnabled ? "bg-brand-purple" : "bg-gray-300"}`}>
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${form.sslEnabled ? "left-5" : "left-0.5"}`} />
+                  </button>
+                  <label className="text-sm text-ink">Enable SSL / TLS</label>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-brand-purple text-white text-sm font-semibold rounded-lg hover:bg-brand-deep disabled:opacity-50 transition-colors">
+                  {saving ? "Saving…" : isAdding ? "Add Connection" : "Save Changes"}
+                </button>
+                {isAdding && (
+                  <button onClick={() => setIsAdding(false)} className="px-4 py-2 text-sm text-muted hover:text-ink border border-line rounded-lg transition-colors">Cancel</button>
+                )}
+              </div>
+            </div>
+
+            {/* Actions panel — only for saved connections */}
+            {isEditing && selected && (
+              <div className="mt-6 space-y-4">
+                {/* Test Connection */}
+                <div className="bg-white border border-line rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-ink">Test Connection</h3>
+                      <p className="text-xs text-muted mt-0.5">Verify connectivity and credentials before crawling</p>
+                    </div>
+                    <button onClick={handleTest} disabled={testing} className="px-4 py-2 text-sm font-semibold border border-brand-purple text-brand-purple rounded-lg hover:bg-brand-purple hover:text-white disabled:opacity-50 transition-colors flex items-center gap-2">
+                      {testing && <span className="w-3 h-3 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />}
+                      {testing ? "Testing…" : "Test Connection"}
+                    </button>
+                  </div>
+                  {testResult && (
+                    <div className={`rounded-lg px-4 py-3 text-sm flex items-start gap-2 ${testResult.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+                      <span className="text-base">{testResult.ok ? "✓" : "✗"}</span>
+                      <span>{testResult.message}</span>
+                    </div>
+                  )}
+                  {!testResult && selected.connectionStatus !== "UNCHECKED" && (
+                    <div className={`rounded-lg px-4 py-2 text-xs flex items-center gap-2 ${selected.connectionStatus === "OK" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                      <span className={`w-2 h-2 rounded-full ${STATUS_DOT[selected.connectionStatus]}`} />
+                      Last test: {selected.connectionStatus} — {selected.lastTestedAt ? new Date(selected.lastTestedAt).toLocaleString() : "—"}
+                    </div>
+                  )}
+                </div>
+
+                {/* Crawl */}
+                <div className="bg-white border border-line rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-ink">Discover Assets (Crawl)</h3>
+                      <p className="text-xs text-muted mt-0.5">Crawl schemas, tables, and columns. Results will appear in the Data Catalog.</p>
+                    </div>
+                    <button onClick={handleCrawl} disabled={crawling || selected.crawlStatus === "CRAWLING"} className="px-4 py-2 text-sm font-semibold bg-brand-purple text-white rounded-lg hover:bg-brand-deep disabled:opacity-50 transition-colors flex items-center gap-2">
+                      {(crawling || selected.crawlStatus === "CRAWLING") && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      {selected.crawlStatus === "CRAWLING" ? "Crawling…" : "Start Crawl"}
+                    </button>
+                  </div>
+
+                  {selected.crawlStatus === "CRAWLING" && (
+                    <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100 text-sm text-brand-purple">
+                      <span className="w-4 h-4 border-2 border-brand-purple border-t-transparent rounded-full animate-spin shrink-0" />
+                      Discovering schemas, tables, and columns… this may take a moment.
+                    </div>
+                  )}
+
+                  {selected.crawlStatus === "COMPLETED" && (
+                    <div className="space-y-3">
+                      <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-green-700 font-semibold text-sm">✓ Crawl completed</span>
+                          <span className="text-xs text-green-600">{selected.lastDiscoveryTimestamp ? new Date(selected.lastDiscoveryTimestamp).toLocaleString() : ""}</span>
+                        </div>
+                        <div className="flex gap-6 text-sm text-green-800">
+                          <span><strong>{selected.crawledSchemaCount}</strong> schema{selected.crawledSchemaCount !== 1 ? "s" : ""}</span>
+                          <span><strong>{selected.crawledTableCount}</strong> table{selected.crawledTableCount !== 1 ? "s" : ""}</span>
+                          <span><strong>{selected.crawledColumnCount}</strong> column{selected.crawledColumnCount !== 1 ? "s" : ""}</span>
+                        </div>
+                      </div>
+                      <a href="/catalog" className="inline-flex items-center gap-1 text-sm text-brand-purple font-medium hover:underline">
+                        View in Data Catalog →
+                      </a>
+                    </div>
+                  )}
+
+                  {selected.crawlStatus === "FAILED" && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800">
+                      <div className="font-semibold mb-1">✗ Crawl failed</div>
+                      <div className="text-xs font-mono">{selected.crawlErrorText || "Unknown error"}</div>
+                    </div>
+                  )}
+
+                  {selected.crawlStatus === "IDLE" && (
+                    <p className="text-xs text-muted">Not crawled yet. Test the connection first, then start a crawl.</p>
+                  )}
+                </div>
+
+                {/* Connection info summary */}
+                <div className="bg-white border border-line rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-ink mb-4">Connection Summary</h3>
+                  <div className="grid grid-cols-2 gap-y-3 text-sm">
+                    {[
+                      ["Type",     DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
+                      ["Host",     selected.hostAddress],
+                      ["Port",     String(selected.portNumber)],
+                      ["Database", selected.databaseName || "—"],
+                      ["Schema filter", selected.defaultSchema || "all schemas"],
+                      ["Username", selected.usernameText || "—"],
+                      ["SSL",      selected.sslEnabled ? "Enabled" : "Disabled"],
+                      ["Added",    new Date(selected.createdAtTimestamp).toLocaleDateString()],
+                    ].map(([k, v]) => (
+                      <div key={k}>
+                        <div className="text-[10px] text-muted uppercase tracking-wide font-semibold">{k}</div>
+                        <div className="text-ink text-[13px] font-mono">{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Delete */}
+                <div className="bg-white border border-red-200 rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-red-700 mb-1">Delete Connection</h3>
+                  <p className="text-xs text-muted mb-4">Removes the connection and all discovered catalog data linked to it. This cannot be undone.</p>
+                  {deleteConfirm ? (
+                    <div className="flex items-center gap-3">
+                      <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors">Yes, Delete</button>
+                      <button onClick={() => setDeleteConfirm(false)} className="px-4 py-2 text-sm text-muted border border-line rounded-lg hover:text-ink transition-colors">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirm(true)} className="px-4 py-2 text-sm font-semibold text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors">
+                      Delete Connection
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
