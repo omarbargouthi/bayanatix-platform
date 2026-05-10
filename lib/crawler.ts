@@ -159,7 +159,7 @@ async function crawlMssql(cfg: ConnCfg): Promise<CrawlResult> {
 async function crawlOracle(cfg: ConnCfg): Promise<CrawlResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let oracledb: any;
-  try { oracledb = await import("oracledb"); }
+  try { oracledb = await import(/* webpackIgnore: true */ "oracledb"); }
   catch { throw new Error("oracledb driver not installed — run: npm install oracledb (also requires Oracle Instant Client)"); }
   const conn = await oracledb.getConnection({
     user: cfg.usernameText || undefined,
