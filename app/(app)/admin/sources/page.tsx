@@ -127,20 +127,34 @@ export default function DataSourcesPage() {
   async function handleTest() {
     if (!selected) return;
     setTesting(true); setTestResult(null);
-    // Save password if changed before test
-    if (form.passwordText) {
-      await fetch(`/api/admin/sources/${selected.connectionId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passwordText: form.passwordText }),
-      });
+    try {
+      // Save password if changed before test
+      if (form.passwordText) {
+        await fetch(`/api/admin/sources/${selected.connectionId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passwordText: form.passwordText }),
+        });
+      }
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 30000);
+      let data: { ok: boolean; message: string };
+      try {
+        const r = await fetch(`/api/admin/sources/${selected.connectionId}/test`, { method: "POST", signal: ac.signal });
+        data = await r.json();
+      } catch {
+        data = { ok: false, message: "Request timed out or connection refused" };
+      } finally {
+        clearTimeout(timer);
+      }
+      setTestResult(data);
+      const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
+      setSelected(fresh);
+      setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+    } catch (e: unknown) {
+      setTestResult({ ok: false, message: (e as Error).message });
+    } finally {
+      setTesting(false);
     }
-    const r = await fetch(`/api/admin/sources/${selected.connectionId}/test`, { method: "POST" });
-    const data = await r.json();
-    setTestResult(data);
-    const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
-    setSelected(fresh);
-    setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
-    setTesting(false);
   }
 
   async function handleCrawl() {

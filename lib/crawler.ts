@@ -208,9 +208,9 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
 
   try {
     if (cfg.dbTypeCode === "POSTGRES") {
-      const pg = postgres({ host: cfg.hostAddress, port: cfg.portNumber, database: cfg.databaseName || "postgres", username: cfg.usernameText || undefined, password: cfg.passwordText || undefined, ssl: cfg.sslEnabled ? "require" : false, max: 1, connect_timeout: 10 });
+      const pg = postgres({ host: cfg.hostAddress, port: cfg.portNumber, database: cfg.databaseName || "postgres", username: cfg.usernameText || undefined, password: cfg.passwordText || undefined, ssl: cfg.sslEnabled ? "require" : false, max: 1, connect_timeout: 10, idle_timeout: 5 });
       const [v] = await pg<{ v: string }[]>`SELECT version() AS v`;
-      await pg.end();
+      await pg.end({ timeout: 5 });
       return { ok: true, message: v.v.split(",")[0] };
     }
     if (cfg.dbTypeCode === "MYSQL") {
