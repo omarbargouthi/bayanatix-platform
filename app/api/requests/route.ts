@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { startWorkflow } from "@/lib/workflow";
 
 export async function GET(req: Request) {
   const session = await getSession();
@@ -139,6 +140,9 @@ export async function POST(req: Request) {
       `;
     }
   }
+
+  // Start the workflow assigned to this request type (non-blocking — ignore errors)
+  await startWorkflow(created.requestId, requestTypeCode, title.trim()).catch(() => {});
 
   return NextResponse.json({ ok: true, requestId: created.requestId });
 }

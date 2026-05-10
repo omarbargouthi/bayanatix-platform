@@ -8,16 +8,16 @@ import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export type Crumb = { label: string; href?: string };
 
 function HeaderIconBtn({
-  onClick, label, badge, children,
+  onClick, label, badgeCount, children,
 }: {
   onClick?: () => void;
   label: string;
-  badge?: boolean;
+  badgeCount?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -27,8 +27,10 @@ function HeaderIconBtn({
       className="relative w-8 h-8 grid place-items-center rounded-md text-ink-soft hover:bg-canvas hover:text-brand-purple transition-colors"
     >
       {children}
-      {badge && (
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-purple rounded-full ring-2 ring-white" />
+      {badgeCount != null && badgeCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-brand-purple rounded-full ring-2 ring-white text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+          {badgeCount > 9 ? "9+" : badgeCount}
+        </span>
       )}
     </button>
   );
@@ -37,8 +39,16 @@ function HeaderIconBtn({
 export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
-  const [menuOpen, setMenuOpen]   = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [menuOpen, setMenuOpen]     = useState(false);
+  const [notifOpen, setNotifOpen]   = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/notifications/count")
+      .then((r) => r.ok ? r.json() : { unread: 0 })
+      .then((d) => setUnreadCount(d.unread ?? 0))
+      .catch(() => {});
+  }, [notifOpen]); // re-check after panel closes (user may have read notifications)
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -95,7 +105,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
         </button>
 
         {/* Notification */}
-        <HeaderIconBtn label="Notifications" badge onClick={() => setNotifOpen(true)}>
+        <HeaderIconBtn label="Notifications" badgeCount={unreadCount} onClick={() => setNotifOpen(true)}>
           <IconBell className="w-[17px] h-[17px]" />
         </HeaderIconBtn>
 

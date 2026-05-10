@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import type { AssetRequest, RequestStatus } from "@/lib/types";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -168,7 +169,9 @@ function RequestsPageContent() {
                               {req.statusCode.replace("_", " ")}
                             </span>
                           </div>
-                          <p className="text-sm font-semibold text-brand-deep">{req.title}</p>
+                          <Link href={`/requests/${req.requestId}`} className="text-sm font-semibold text-brand-deep hover:text-brand-purple hover:underline">
+                            {req.title}
+                          </Link>
                           <div className="text-[11px] text-muted mt-0.5 flex items-center gap-2">
                             <span>{req.raisedByName ?? req.raisedByUserId}</span>
                             <span>·</span>
