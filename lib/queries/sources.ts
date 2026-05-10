@@ -1,5 +1,62 @@
 import { sql } from "../db";
 
+export type CrawlConfig = {
+  configId:             number | null;
+  connectionId:         number;
+  schemaIncludeList:    string[] | null;
+  schemaExcludeList:    string[];
+  tableExcludePatterns: string[];
+  profilingEnabled:     boolean;
+  profilingMode:        "TOP_N" | "TOP_PCT" | "FULL";
+  profilingLimit:       number;
+};
+
+export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig> {
+  const rows = await sql<CrawlConfig[]>`
+    SELECT config_id AS "configId", connection_id AS "connectionId",
+           schema_include_list    AS "schemaIncludeList",
+           coalesce(schema_exclude_list,    ARRAY[]::TEXT[]) AS "schemaExcludeList",
+           coalesce(table_exclude_patterns, ARRAY[]::TEXT[]) AS "tableExcludePatterns",
+           profiling_enabled AS "profilingEnabled",
+           profiling_mode    AS "profilingMode",
+           profiling_limit   AS "profilingLimit"
+    FROM bayanat.crawl_config WHERE connection_id = ${connectionId}
+  `;
+  return rows[0] ?? {
+    configId: null, connectionId,
+    schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
+    profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
+  };
+}
+
+export async function saveCrawlConfig(
+  connectionId: number,
+  cfg: Omit<CrawlConfig, "configId" | "connectionId">,
+): Promise<void> {
+  await sql`
+    INSERT INTO bayanat.crawl_config
+      (connection_id, schema_include_list, schema_exclude_list, table_exclude_patterns,
+       profiling_enabled, profiling_mode, profiling_limit, updated_at)
+    VALUES
+      (${connectionId},
+       ${cfg.schemaIncludeList ?? null},
+       ${cfg.schemaExcludeList},
+       ${cfg.tableExcludePatterns},
+       ${cfg.profilingEnabled},
+       ${cfg.profilingMode},
+       ${cfg.profilingLimit},
+       NOW())
+    ON CONFLICT (connection_id) DO UPDATE SET
+      schema_include_list    = EXCLUDED.schema_include_list,
+      schema_exclude_list    = EXCLUDED.schema_exclude_list,
+      table_exclude_patterns = EXCLUDED.table_exclude_patterns,
+      profiling_enabled      = EXCLUDED.profiling_enabled,
+      profiling_mode         = EXCLUDED.profiling_mode,
+      profiling_limit        = EXCLUDED.profiling_limit,
+      updated_at             = NOW()
+  `;
+}
+
 export type DataSourceConnection = {
   connectionId:        number;
   connectionName:      string;

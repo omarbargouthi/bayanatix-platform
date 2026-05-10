@@ -4,13 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/admin/users",     label: "Users" },
-  { href: "/admin/roles",     label: "Roles" },
-  { href: "/admin/teams",     label: "Teams" },
-  { href: "/admin/tags",      label: "Tags" },
-  { href: "/admin/workflows", label: "Workflows" },
-  { href: "/admin/sources",   label: "Data Sources" },
-  { href: "/admin/audit-log", label: "Audit Log" },
+  { href: "/admin/user-management", label: "User Management" },
+  { href: "/admin/workflows",       label: "Workflows" },
+  { href: "/admin/sources",         label: "Data Sources" },
+  { href: "/admin/audit-logs",      label: "Audit & Logs" },
+  { href: "/admin/configuration",   label: "Configuration" },
 ];
 
 export function AdminTabNav() {

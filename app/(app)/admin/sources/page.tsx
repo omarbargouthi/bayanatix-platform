@@ -13,6 +13,19 @@ type Conn = {
   lastDiscoveryTimestamp: string | null; createdAtTimestamp: string;
 };
 
+type CrawlJob = {
+  jobId: number; connectionName: string; startedAt: string; finishedAt: string | null;
+  status: string; schemaCount: number; tableCount: number; columnCount: number; errorText: string | null;
+};
+
+type CrawlJobLog = { logId: number; loggedAt: string; level: string; message: string };
+
+type CrawlCfg = {
+  schemaIncludeList: string[] | null; schemaExcludeList: string[];
+  tableExcludePatterns: string[]; profilingEnabled: boolean;
+  profilingMode: string; profilingLimit: number;
+};
+
 const DB_TYPES = [
   { value: "POSTGRES", label: "PostgreSQL", port: 5432 },
   { value: "MYSQL",    label: "MySQL",      port: 3306 },
@@ -40,6 +53,11 @@ const CRAWL_DOT: Record<string, string> = {
 
 const BLANK_FORM = { connectionName: "", dbTypeCode: "POSTGRES", hostAddress: "localhost", portNumber: 5432, databaseName: "", serviceName: "", defaultSchema: "", usernameText: "", passwordText: "", sslEnabled: false };
 
+const BLANK_CFG: CrawlCfg = { schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [], profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000 };
+
+function arr2str(a: string[] | null | undefined) { return (a ?? []).join(", "); }
+function str2arr(s: string) { return s.split(",").map(x => x.trim()).filter(Boolean); }
+
 export default function DataSourcesPage() {
   const [connections, setConnections] = useState<Conn[]>([]);
   const [selected, setSelected]   = useState<Conn | null>(null);
@@ -53,12 +71,81 @@ export default function DataSourcesPage() {
   const [showPwd, setShowPwd]     = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Crawl config state
+  const [crawlCfg, setCrawlCfg]       = useState<CrawlCfg>({ ...BLANK_CFG });
+  const [cfgSaving, setCfgSaving]     = useState(false);
+  const [cfgSaved, setCfgSaved]       = useState(false);
+  const [cfgIncludes, setCfgIncludes] = useState("");
+  const [cfgExcludes, setCfgExcludes] = useState("");
+  const [cfgPatterns, setCfgPatterns] = useState("");
+
+  // Job history state
+  const [jobs, setJobs]               = useState<CrawlJob[]>([]);
+  const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
+  const [jobLogs, setJobLogs]         = useState<Map<number, CrawlJobLog[]>>(new Map());
+
   async function load() {
     const r = await fetch("/api/admin/sources");
     if (r.ok) setConnections(await r.json());
   }
 
+  async function loadCrawlConfig(id: number) {
+    const r = await fetch(`/api/admin/sources/${id}/config`);
+    if (!r.ok) return;
+    const cfg: CrawlCfg = await r.json();
+    setCrawlCfg(cfg);
+    setCfgIncludes(arr2str(cfg.schemaIncludeList));
+    setCfgExcludes(arr2str(cfg.schemaExcludeList));
+    setCfgPatterns(arr2str(cfg.tableExcludePatterns));
+  }
+
+  async function loadJobs(id: number) {
+    const r = await fetch(`/api/admin/crawl-jobs?connectionId=${id}`);
+    if (r.ok) setJobs(await r.json());
+  }
+
+  async function toggleJobLogs(jobId: number) {
+    if (expandedJobId === jobId) { setExpandedJobId(null); return; }
+    setExpandedJobId(jobId);
+    if (!jobLogs.has(jobId)) {
+      const r = await fetch(`/api/admin/crawl-jobs/${jobId}/logs`);
+      const data: CrawlJobLog[] = await r.json();
+      setJobLogs(prev => new Map(prev).set(jobId, data));
+    }
+  }
+
+  async function handleSaveConfig() {
+    if (!selected) return;
+    setCfgSaving(true);
+    try {
+      await fetch(`/api/admin/sources/${selected.connectionId}/config`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schemaIncludeList:    str2arr(cfgIncludes).length ? str2arr(cfgIncludes) : null,
+          schemaExcludeList:    str2arr(cfgExcludes),
+          tableExcludePatterns: str2arr(cfgPatterns),
+          profilingEnabled:     crawlCfg.profilingEnabled,
+          profilingMode:        crawlCfg.profilingMode,
+          profilingLimit:       crawlCfg.profilingLimit,
+        }),
+      });
+      setCfgSaved(true);
+      setTimeout(() => setCfgSaved(false), 2000);
+    } finally { setCfgSaving(false); }
+  }
+
   useEffect(() => { load(); }, []);
+
+  // Load crawl config + job history when a connection is selected
+  useEffect(() => {
+    if (selected?.connectionId) {
+      loadCrawlConfig(selected.connectionId);
+      loadJobs(selected.connectionId);
+      setJobLogs(new Map());
+      setExpandedJobId(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.connectionId]);
 
   // Poll selected connection while crawling
   useEffect(() => {
@@ -74,6 +161,7 @@ export default function DataSourcesPage() {
       if (fresh.crawlStatus !== "CRAWLING") {
         clearInterval(pollRef.current!);
         setCrawling(false);
+        loadJobs(fresh.connectionId);
       }
     }, 2000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -300,6 +388,68 @@ export default function DataSourcesPage() {
             {/* Actions panel — only for saved connections */}
             {isEditing && selected && (
               <div className="mt-6 space-y-4">
+
+                {/* ── Crawl Settings ── */}
+                <div className="bg-white border border-line rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-ink mb-1">Crawl Settings</h3>
+                  <p className="text-xs text-muted mb-5">Control which schemas and tables are discovered, and optionally capture column profiling statistics.</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-ink mb-1">Include Schemas <span className="text-muted font-normal">(comma-separated, blank = all)</span></label>
+                        <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgIncludes} onChange={e => setCfgIncludes(e.target.value)} placeholder="crm, finance, hr" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-ink mb-1">Exclude Schemas <span className="text-muted font-normal">(comma-separated)</span></label>
+                        <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgExcludes} onChange={e => setCfgExcludes(e.target.value)} placeholder="staging, test" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-ink mb-1">Exclude Table Patterns <span className="text-muted font-normal">(LIKE patterns, comma-separated)</span></label>
+                      <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgPatterns} onChange={e => setCfgPatterns(e.target.value)} placeholder="tmp_%, _bak, %_archive" />
+                    </div>
+                    <div className="border-t border-line pt-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setCrawlCfg(c => ({ ...c, profilingEnabled: !c.profilingEnabled }))}
+                          className={`relative w-10 h-5 rounded-full transition-colors ${crawlCfg.profilingEnabled ? "bg-brand-purple" : "bg-gray-300"}`}>
+                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${crawlCfg.profilingEnabled ? "left-5" : "left-0.5"}`} />
+                        </button>
+                        <label className="text-sm text-ink font-medium">Enable Column Profiling</label>
+                        <span className="text-xs text-muted">(null%, distinct count, min/max, top values)</span>
+                      </div>
+                      {crawlCfg.profilingEnabled && (
+                        <div className="grid grid-cols-2 gap-4 pl-13">
+                          <div>
+                            <label className="block text-xs font-semibold text-ink mb-1">Profiling Mode</label>
+                            <select className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand-purple"
+                              value={crawlCfg.profilingMode} onChange={e => setCrawlCfg(c => ({ ...c, profilingMode: e.target.value }))}>
+                              <option value="TOP_N">Top N rows</option>
+                              <option value="TOP_PCT">Top N% (TABLESAMPLE)</option>
+                              <option value="FULL">Full table scan</option>
+                            </select>
+                          </div>
+                          {crawlCfg.profilingMode !== "FULL" && (
+                            <div>
+                              <label className="block text-xs font-semibold text-ink mb-1">
+                                {crawlCfg.profilingMode === "TOP_N" ? "Row Limit" : "Sample %"}
+                              </label>
+                              <input type="number" min={1} max={crawlCfg.profilingMode === "TOP_PCT" ? 100 : undefined}
+                                className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-purple"
+                                value={crawlCfg.profilingLimit} onChange={e => setCrawlCfg(c => ({ ...c, profilingLimit: Number(e.target.value) }))} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                      <button onClick={handleSaveConfig} disabled={cfgSaving} className="btn btn-primary btn-sm">
+                        {cfgSaving ? "Saving…" : "Save Crawl Settings"}
+                      </button>
+                      {cfgSaved && <span className="text-xs text-green-700 font-semibold">✓ Saved</span>}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Test Connection */}
                 <div className="bg-white border border-line rounded-xl p-6">
                   <div className="flex items-center justify-between mb-3">
@@ -376,6 +526,52 @@ export default function DataSourcesPage() {
                     <p className="text-xs text-muted">Not crawled yet. Test the connection first, then start a crawl.</p>
                   )}
                 </div>
+
+                {/* Job History */}
+                {jobs.length > 0 && (
+                  <div className="bg-white border border-line rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-semibold text-ink">Crawl Job History</h3>
+                      <button onClick={() => selected && loadJobs(selected.connectionId)} className="text-xs text-muted hover:text-ink">Refresh</button>
+                    </div>
+                    <div className="space-y-2">
+                      {jobs.map(job => {
+                        const statusStyle: Record<string,string> = {
+                          COMPLETED: "bg-green-100 text-green-800",
+                          FAILED:    "bg-red-100 text-red-800",
+                          RUNNING:   "bg-yellow-100 text-yellow-800",
+                        };
+                        const dur = job.finishedAt
+                          ? (() => { const ms = new Date(job.finishedAt).getTime() - new Date(job.startedAt).getTime(); return ms < 60000 ? `${Math.round(ms/1000)}s` : `${Math.round(ms/60000)}m`; })()
+                          : null;
+                        return (
+                          <div key={job.jobId} className="border border-line rounded-lg overflow-hidden">
+                            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-canvas-soft text-sm"
+                              onClick={() => toggleJobLogs(job.jobId)}>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusStyle[job.status] ?? "bg-gray-100 text-gray-600"}`}>{job.status}</span>
+                              <span className="text-muted text-xs">{new Date(job.startedAt).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                              {dur && <span className="text-muted text-xs">({dur})</span>}
+                              <span className="text-xs text-ink ml-auto">{job.tableCount} tables · {job.columnCount} cols</span>
+                              <span className="text-muted text-xs">{expandedJobId === job.jobId ? "▲" : "▼"}</span>
+                            </button>
+                            {expandedJobId === job.jobId && (
+                              <div className="bg-gray-950 px-4 py-3 font-mono text-[11px] max-h-48 overflow-y-auto">
+                                {!jobLogs.has(job.jobId) && <div className="text-gray-400">Loading…</div>}
+                                {(jobLogs.get(job.jobId) ?? []).map(log => (
+                                  <div key={log.logId} className={`flex gap-3 py-0.5 ${log.level==="ERROR"?"text-red-400":log.level==="WARN"?"text-yellow-300":"text-green-300"}`}>
+                                    <span className="text-gray-600 shrink-0">{new Date(log.loggedAt).toLocaleTimeString("en-GB")}</span>
+                                    <span className={`shrink-0 ${log.level==="ERROR"?"text-red-400":log.level==="WARN"?"text-yellow-300":"text-blue-400"}`}>[{log.level}]</span>
+                                    <span>{log.message}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Connection info summary */}
                 <div className="bg-white border border-line rounded-xl p-6">
