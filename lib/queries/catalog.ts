@@ -356,8 +356,9 @@ export async function getEntityProfile(entityId: number): Promise<EntityProfileD
       distinctCount: Number(a.distinctCount),
       minValue:      a.minValue,
       maxValue:      a.maxValue,
-      topValues:     ((a.topValues as { value: string; count: number }[] | null) ?? [])
-                       .map(v => ({ value: v.value, count: Number(v.count) })),
+      topValues:     Array.isArray(a.topValues)
+                       ? (a.topValues as { value: string; count: number }[]).map(v => ({ value: v.value, count: Number(v.count) }))
+                       : [],
     })),
   };
 }
