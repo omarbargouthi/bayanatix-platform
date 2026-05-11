@@ -343,8 +343,22 @@ export async function getEntityProfile(entityId: number): Promise<EntityProfileD
   `;
 
   return {
-    ...prof,
-    attributes: attrRows.map(a => ({ ...a, topValues: (a.topValues as { value: string; count: number }[] | null) ?? [] })),
+    profileId:      prof.profileId,
+    profiledAt:     prof.profiledAt,
+    rowCount:       prof.rowCount != null ? Number(prof.rowCount) : null,
+    sampleSize:     prof.sampleSize != null ? Number(prof.sampleSize) : null,
+    profilingMode:  prof.profilingMode,
+    profilingLimit: prof.profilingLimit != null ? Number(prof.profilingLimit) : null,
+    attributes: attrRows.map(a => ({
+      attributeId:   Number(a.attributeId),
+      nullCount:     Number(a.nullCount),
+      nullPct:       Number(a.nullPct),
+      distinctCount: Number(a.distinctCount),
+      minValue:      a.minValue,
+      maxValue:      a.maxValue,
+      topValues:     ((a.topValues as { value: string; count: number }[] | null) ?? [])
+                       .map(v => ({ value: v.value, count: Number(v.count) })),
+    })),
   };
 }
 
