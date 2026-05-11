@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
-import { getEntityById } from "@/lib/queries/catalog";
+import { getEntityById, getEntityProfile } from "@/lib/queries/catalog";
 import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
 import { Donut } from "@/components/ui/Donut";
 import { IconTable } from "@/components/layout/icons";
@@ -10,6 +10,7 @@ import { TableTabs } from "@/components/catalog/TableTabs";
 import { TableEditPanel } from "@/components/catalog/TableEditPanel";
 import { ColumnsTable } from "@/components/catalog/ColumnsTable";
 import { TablePageActions } from "@/components/catalog/TablePageActions";
+import { ProfilingPanel } from "@/components/catalog/ProfilingPanel";
 import { fmtNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,10 @@ export default async function TablePage({
 
   const id = Number(params.tableId);
   if (!Number.isFinite(id)) notFound();
-  const entity = await getEntityById(id);
+  const [entity, profile] = await Promise.all([
+    getEntityById(id),
+    getEntityProfile(id),
+  ]);
   if (!entity) notFound();
 
   const canEdit = await canEditMetadata(user);
@@ -120,6 +124,11 @@ export default async function TablePage({
 
         {/* Columns table */}
         <ColumnsTable attributes={entity.attributes} canEdit={canEdit} />
+
+        {/* Profiling panel */}
+        {profile && (
+          <ProfilingPanel profile={profile} attributes={entity.attributes} />
+        )}
       </main>
     </>
   );

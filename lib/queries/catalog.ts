@@ -292,6 +292,62 @@ export async function getEntityById(entityId: number): Promise<
   return { ...entity, schema, source, attributes: attrs };
 }
 
+// ----- Profiling data for a table -----
+
+export type AttributeProfile = {
+  attributeId:   number;
+  nullCount:     number;
+  nullPct:       number;
+  distinctCount: number;
+  minValue:      string | null;
+  maxValue:      string | null;
+  topValues:     { value: string; count: number }[];
+};
+
+export type EntityProfileData = {
+  profileId:      number;
+  profiledAt:     string;
+  rowCount:       number | null;
+  sampleSize:     number | null;
+  profilingMode:  string | null;
+  profilingLimit: number | null;
+  attributes:     AttributeProfile[];
+};
+
+export async function getEntityProfile(entityId: number): Promise<EntityProfileData | null> {
+  const rows = await sql<{
+    profileId: number; profiledAt: string;
+    rowCount: number | null; sampleSize: number | null;
+    profilingMode: string | null; profilingLimit: number | null;
+  }[]>`
+    SELECT profile_id AS "profileId", profiled_at::text AS "profiledAt",
+           row_count AS "rowCount", sample_size AS "sampleSize",
+           profiling_mode AS "profilingMode", profiling_limit AS "profilingLimit"
+    FROM bayanat.entity_profile
+    WHERE entity_id = ${entityId}
+    ORDER BY profiled_at DESC LIMIT 1
+  `;
+  if (!rows[0]) return null;
+  const prof = rows[0];
+
+  const attrRows = await sql<{
+    attributeId: number; nullCount: number; nullPct: number; distinctCount: number;
+    minValue: string | null; maxValue: string | null; topValues: { value: string; count: number }[] | null;
+  }[]>`
+    SELECT attribute_id AS "attributeId", null_count AS "nullCount",
+           null_pct AS "nullPct", distinct_count AS "distinctCount",
+           min_value AS "minValue", max_value AS "maxValue",
+           top_values AS "topValues"
+    FROM bayanat.attribute_profile
+    WHERE profile_id = ${prof.profileId}
+  `;
+
+  return {
+    ...prof,
+    attributes: attrRows.map(a => ({ ...a, topValues: (a.topValues as { value: string; count: number }[] | null) ?? [] })),
+  };
+}
+
 // ----- Metadata edits (with application-level audit logging) -----
 
 export async function updateDataSource(
