@@ -308,6 +308,7 @@ export type EntityProfileData = {
   profileId:      number;
   profiledAt:     string;
   rowCount:       number | null;
+  prevRowCount:   number | null;
   sampleSize:     number | null;
   profilingMode:  string | null;
   profilingLimit: number | null;
@@ -325,10 +326,11 @@ export async function getEntityProfile(entityId: number): Promise<EntityProfileD
            profiling_mode AS "profilingMode", profiling_limit AS "profilingLimit"
     FROM bayanat.entity_profile
     WHERE entity_id = ${entityId}
-    ORDER BY profiled_at DESC LIMIT 1
+    ORDER BY profiled_at DESC LIMIT 2
   `;
   if (!rows[0]) return null;
   const prof = rows[0];
+  const prev = rows[1] ?? null;
 
   const attrRows = await sql<{
     attributeId: number; nullCount: number; nullPct: number; distinctCount: number;
@@ -346,6 +348,7 @@ export async function getEntityProfile(entityId: number): Promise<EntityProfileD
     profileId:      prof.profileId,
     profiledAt:     prof.profiledAt,
     rowCount:       prof.rowCount != null ? Number(prof.rowCount) : null,
+    prevRowCount:   prev?.rowCount != null ? Number(prev.rowCount) : null,
     sampleSize:     prof.sampleSize != null ? Number(prof.sampleSize) : null,
     profilingMode:  prof.profilingMode,
     profilingLimit: prof.profilingLimit != null ? Number(prof.profilingLimit) : null,

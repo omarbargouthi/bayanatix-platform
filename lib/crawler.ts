@@ -23,10 +23,11 @@ type ColProfile = {
 type CrawlColumn = {
   name: string; dataType: string; isNullable: boolean;
   isPrimaryKey: boolean; defaultValue: string | null;
+  comment?: string | null;
   profile?: ColProfile;
 };
 
-type CrawlTable  = { name: string; isView: boolean; columns: CrawlColumn[]; rowCount?: number; sampleSize?: number };
+type CrawlTable  = { name: string; isView: boolean; columns: CrawlColumn[]; comment?: string | null; rowCount?: number; sampleSize?: number };
 type CrawlSchema = { name: string; tables: CrawlTable[] };
 
 export type CrawlResult = {
@@ -201,6 +202,23 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
         `;
         const pk = new Set(pkRows.map(r => r.c));
 
+        // Table comment + column comments in one query
+        const [tCommentRow] = await pg<{ cmt: string | null }[]>`
+          SELECT obj_description(c.oid, 'pg_class') AS cmt
+          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = ${sr.n} AND c.relname = ${tr.t}
+        `;
+        const colCommentRows = await pg<{ n: string; cmt: string | null }[]>`
+          SELECT a.attname AS n, d.description AS cmt
+          FROM pg_attribute a
+          JOIN pg_class c ON c.oid = a.attrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          LEFT JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = a.attnum
+          WHERE n.nspname = ${sr.n} AND c.relname = ${tr.t}
+            AND a.attnum > 0 AND NOT a.attisdropped
+        `;
+        const colComments = new Map(colCommentRows.map(r => [r.n, r.cmt ?? null]));
+
         const cols = await pg<{ n: string; dt: string; nl: string; def: string | null }[]>`
           SELECT column_name AS n, data_type AS dt, is_nullable AS nl, column_default AS def
           FROM information_schema.columns
@@ -210,6 +228,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
         const columns: CrawlColumn[] = cols.map(c => ({
           name: c.n, dataType: c.dt,
           isNullable: c.nl === "YES", isPrimaryKey: pk.has(c.n), defaultValue: c.def,
+          comment: colComments.get(c.n) ?? null,
         }));
 
         let rowCount: number | undefined;
@@ -230,7 +249,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
           }
         }
 
-        tables.push({ name: tr.t, isView: tr.v === "VIEW", columns, rowCount, sampleSize });
+        tables.push({ name: tr.t, isView: tr.v === "VIEW", columns, comment: tCommentRow?.cmt ?? null, rowCount, sampleSize });
       }
 
       if (tables.length > 0) schemas.push({ name: sr.n, tables });
@@ -275,26 +294,29 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
 
       await logger.info(`Crawling schema: ${sname}`);
       const [tRows] = await conn.query(
-        `SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name`, [sname],
+        `SELECT table_name, table_type, table_comment FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name`, [sname],
       );
       const tables: CrawlTable[] = [];
       for (const tRow of tRows as Record<string, string>[]) {
         const tname = tRow.table_name || tRow.TABLE_NAME;
         if (!tableIncluded(tname, config)) continue;
         const ttype = tRow.table_type || tRow.TABLE_TYPE;
+        const tcomment = tRow.table_comment || tRow.TABLE_COMMENT || null;
         const [cRows] = await conn.query(
-          `SELECT column_name, data_type, is_nullable, column_default, column_key
+          `SELECT column_name, data_type, is_nullable, column_default, column_key, column_comment
            FROM information_schema.columns
            WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, [sname, tname],
         );
         tables.push({
           name: tname, isView: ttype === "VIEW",
+          comment: tcomment || null,
           columns: (cRows as Record<string, string>[]).map(c => ({
-            name:         c.column_name || c.COLUMN_NAME,
-            dataType:     c.data_type   || c.DATA_TYPE,
-            isNullable:   (c.is_nullable || c.IS_NULLABLE) === "YES",
-            isPrimaryKey: (c.column_key  || c.COLUMN_KEY)  === "PRI",
+            name:         c.column_name    || c.COLUMN_NAME,
+            dataType:     c.data_type      || c.DATA_TYPE,
+            isNullable:   (c.is_nullable   || c.IS_NULLABLE) === "YES",
+            isPrimaryKey: (c.column_key    || c.COLUMN_KEY)  === "PRI",
             defaultValue: c.column_default || c.COLUMN_DEFAULT || null,
+            comment:      c.column_comment || c.COLUMN_COMMENT || null,
           })),
         });
       }
@@ -348,16 +370,28 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
           WHERE i.is_primary_key=1 AND sc.name=@s AND tb.name=@t`);
         const pk = new Set(pkr.recordset.map((r: Record<string,string>) => r.cn));
         const cr = await pool.request().input("s",mssql.VarChar,sname).input("t",mssql.VarChar,trow.table_name).query(`
-          SELECT c.name AS cn, tp.name AS dt, c.is_nullable AS nl
-          FROM sys.columns c JOIN sys.tables tb ON tb.object_id=c.object_id
+          SELECT c.name AS cn, tp.name AS dt, c.is_nullable AS nl,
+            CAST(ep.value AS NVARCHAR(MAX)) AS cmt
+          FROM sys.columns c
+          JOIN sys.tables tb ON tb.object_id=c.object_id
           JOIN sys.schemas sc ON sc.schema_id=tb.schema_id
           JOIN sys.types tp ON tp.user_type_id=c.user_type_id
+          LEFT JOIN sys.extended_properties ep ON ep.major_id=c.object_id
+            AND ep.minor_id=c.column_id AND ep.name='MS_Description'
           WHERE sc.name=@s AND tb.name=@t ORDER BY c.column_id`);
+        const tcmt = await pool.request().input("s",mssql.VarChar,sname).input("t",mssql.VarChar,trow.table_name).query(`
+          SELECT CAST(ep.value AS NVARCHAR(MAX)) AS cmt
+          FROM sys.extended_properties ep
+          JOIN sys.objects o ON o.object_id=ep.major_id
+          JOIN sys.schemas sc ON sc.schema_id=o.schema_id
+          WHERE ep.name='MS_Description' AND ep.minor_id=0 AND sc.name=@s AND o.name=@t`);
         tables.push({
           name: trow.table_name, isView: trow.table_type === "VIEW",
-          columns: cr.recordset.map((c: Record<string, string|boolean>) => ({
+          comment: tcmt.recordset[0]?.cmt ?? null,
+          columns: cr.recordset.map((c: Record<string, string|boolean|null>) => ({
             name: c.cn as string, dataType: c.dt as string,
             isNullable: !!c.nl, isPrimaryKey: pk.has(c.cn as string), defaultValue: null,
+            comment: c.cmt as string | null ?? null,
           })),
         });
       }
@@ -407,12 +441,23 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
         `SELECT cc.column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.constraint_name=c.constraint_name AND cc.owner=c.owner WHERE c.owner=:o AND c.table_name=:t AND c.constraint_type='P'`,
         { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
+      const tCommentRes = await conn.execute(
+        `SELECT comments FROM all_tab_comments WHERE owner=:o AND table_name=:t`,
+        { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
+      );
+      const cCommentRes = await conn.execute(
+        `SELECT column_name, comments FROM all_col_comments WHERE owner=:o AND table_name=:t`,
+        { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
+      );
       const pk = new Set((pkRes.rows || []).map((r: Record<string,string>) => r.COLUMN_NAME));
+      const colCmts = new Map(((cCommentRes.rows || []) as Record<string,string>[]).map(r => [r.COLUMN_NAME, r.COMMENTS ?? null]));
       schemaMap.get(owner)!.push({
         name: tname, isView: row.TTYPE === "VIEW",
+        comment: ((tCommentRes.rows || []) as Record<string,string>[])[0]?.COMMENTS ?? null,
         columns: (colRes.rows || []).map((c: Record<string, string>) => ({
           name: c.COLUMN_NAME, dataType: c.DATA_TYPE,
           isNullable: c.NULLABLE === "Y", isPrimaryKey: pk.has(c.COLUMN_NAME), defaultValue: null,
+          comment: colCmts.get(c.COLUMN_NAME) ?? null,
         })),
       });
     }
@@ -522,8 +567,8 @@ async function saveCrawlResults(
     for (const table of schema.tables) {
       const [entRow] = await sql<{ id: number }[]>`
         INSERT INTO bayanat.data_entities
-          (schema_id, entity_name_text, display_name_text, is_view_indicator)
-        VALUES (${schRow.id}, ${table.name}, ${table.name}, ${table.isView})
+          (schema_id, entity_name_text, display_name_text, is_view_indicator, description_text)
+        VALUES (${schRow.id}, ${table.name}, ${table.name}, ${table.isView}, ${table.comment ?? null})
         RETURNING entity_id AS id
       `;
       const entityId = entRow.id;
@@ -531,6 +576,11 @@ async function saveCrawlResults(
       // Save profiling metadata if collected
       let profileId: number | null = null;
       if (table.rowCount !== undefined) {
+        // Keep row_count_estimate in sync with actual measured count
+        await sql`
+          UPDATE bayanat.data_entities SET row_count_estimate = ${table.rowCount}
+          WHERE entity_id = ${entityId}
+        `;
         const [profRow] = await sql<{ id: number }[]>`
           INSERT INTO bayanat.entity_profile
             (entity_id, job_id, row_count, sample_size, profiling_mode, profiling_limit)
@@ -546,8 +596,8 @@ async function saveCrawlResults(
         const [attrRow] = await sql<{ id: number }[]>`
           INSERT INTO bayanat.data_attributes
             (entity_id, physical_name_text, friendly_name_text, data_type_text,
-             is_nullable_indicator, is_primary_key_indicator)
-          VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey})
+             is_nullable_indicator, is_primary_key_indicator, description_text)
+          VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey}, ${col.comment ?? null})
           RETURNING attribute_id AS id
         `;
 
