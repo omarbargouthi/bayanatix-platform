@@ -36,11 +36,11 @@ const NAV_DOMAINS: Item[] = [
 ];
 
 const NAV_ADMIN: Item[] = [
-  { href: "/admin/users",     label: "Users",     Icon: IconShield },
-  { href: "/admin/roles",     label: "Roles",     Icon: IconLock },
-  { href: "/admin/teams",     label: "Teams",     Icon: IconChat },
-  { href: "/admin/tags",      label: "Tags",      Icon: IconLines },
-  { href: "/admin/audit-log", label: "Audit Log", Icon: IconHistory },
+  { href: "/admin/user-management", label: "User Management", Icon: IconShield },
+  { href: "/admin/workflows",       label: "Workflows",       Icon: IconLines },
+  { href: "/admin/sources",         label: "Data Sources",    Icon: IconShare },
+  { href: "/admin/audit-logs",      label: "Audit & Logs",    Icon: IconHistory },
+  { href: "/admin/configuration",   label: "Configuration",   Icon: IconCog },
 ];
 
 export function Sidebar({ user }: { user: SessionUser }) {
@@ -85,7 +85,7 @@ export function Sidebar({ user }: { user: SessionUser }) {
             }
             {collapsed ? (
               <NavLink
-                item={{ href: "/admin/users", label: "Admin", Icon: IconShield }}
+                item={{ href: "/admin/user-management", label: "Admin", Icon: IconShield }}
                 active={isActive("/admin")}
                 collapsed={collapsed}
               />

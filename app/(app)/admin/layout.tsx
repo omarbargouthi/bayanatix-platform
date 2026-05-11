@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
-import { AdminTabNav } from "@/components/admin/AdminTabNav";
 
 export default async function AdminLayout({
   children,
@@ -21,7 +20,6 @@ export default async function AdminLayout({
         ]}
         user={user}
       />
-      <AdminTabNav />
       {children}
     </>
   );
