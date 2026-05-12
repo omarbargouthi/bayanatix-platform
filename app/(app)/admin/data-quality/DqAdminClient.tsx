@@ -148,7 +148,18 @@ function RuleFormModal({
   const [error, setError] = useState("");
   const [showAssetPicker, setShowAssetPicker] = useState(false);
 
-  const selectedTemplate = DQ_TEMPLATES.find((t) => t.code === form.ruleTemplateCode);
+  // Derive which templates apply based on the first selected asset's type
+  const assetKind: "table" | "column" | null =
+    form.selectedAssets.length > 0
+      ? (form.selectedAssets[0].assetType === "DATA_ENTITIES" ? "table" : "column")
+      : null;
+
+  const applicableTemplates = DQ_TEMPLATES.filter(
+    (t) => !assetKind || t.assetType === assetKind || t.assetType === "any"
+  );
+
+  const selectedTemplate = applicableTemplates.find((t) => t.code === form.ruleTemplateCode)
+    ?? applicableTemplates[0];
 
   async function handleSave() {
     if (!form.ruleName.trim()) {
@@ -293,9 +304,16 @@ function RuleFormModal({
 
           {/* Template picker */}
           <div>
-            <label className="block text-xs font-semibold text-muted mb-2">Rule Template</label>
+            <div className="flex items-baseline gap-3 mb-2">
+              <label className="text-xs font-semibold text-muted">Rule Template</label>
+              {assetKind && (
+                <span className="text-[10px] text-muted">
+                  Showing {applicableTemplates.length} templates for {assetKind}-level rules
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-2">
-              {DQ_TEMPLATES.map((t) => (
+              {applicableTemplates.map((t) => (
                 <button
                   key={t.code}
                   type="button"
@@ -314,7 +332,7 @@ function RuleFormModal({
           </div>
 
           {/* Template config fields */}
-          {selectedTemplate && "configFields" in selectedTemplate && selectedTemplate.configFields.length > 0 && (
+          {selectedTemplate && selectedTemplate.configFields.length > 0 && (
             <div>
               <label className="block text-xs font-semibold text-muted mb-2">Template Configuration</label>
               <div className="grid grid-cols-2 gap-3 p-3 bg-canvas-soft rounded-lg border border-line">
@@ -406,7 +424,23 @@ function RuleFormModal({
     {showAssetPicker && (
       <AssetPicker
         selected={form.selectedAssets}
-        onChange={(assets) => setForm((f) => ({ ...f, selectedAssets: assets }))}
+        onChange={(assets) => {
+          setForm((f) => {
+            const kind = assets.length > 0
+              ? (assets[0].assetType === "DATA_ENTITIES" ? "table" : "column")
+              : null;
+            const valid = DQ_TEMPLATES.find(
+              (t) => t.code === f.ruleTemplateCode && (!kind || t.assetType === kind || t.assetType === "any")
+            );
+            const fallback = DQ_TEMPLATES.find((t) => !kind || t.assetType === kind || t.assetType === "any");
+            return {
+              ...f,
+              selectedAssets: assets,
+              ruleTemplateCode: valid ? f.ruleTemplateCode : (fallback?.code ?? f.ruleTemplateCode),
+              ruleConfig: valid ? f.ruleConfig : {},
+            };
+          });
+        }}
         onClose={() => setShowAssetPicker(false)}
       />
     )}

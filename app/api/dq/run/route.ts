@@ -15,8 +15,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   if (body.ruleId) {
-    const result = await runDqRule(Number(body.ruleId));
-    return NextResponse.json(result);
+    try {
+      const result = await runDqRule(Number(body.ruleId));
+      return NextResponse.json(result);
+    } catch (err) {
+      return NextResponse.json({
+        ruleId: body.ruleId,
+        statusCode: "ERROR",
+        message: String(err),
+        score: null,
+      });
+    }
   }
 
   // Run all active rules for asset

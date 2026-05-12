@@ -143,7 +143,7 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
 function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
   const scoredByDim: Record<string, number[]> = {};
   for (const r of rules) {
-    if (r.lastScore == null) continue;
+    if (r.lastScore == null || r.lastStatusCode === "ERROR") continue;
     const key = r.dimensionName ?? r.dimensionCode ?? "Other";
     if (!scoredByDim[key]) scoredByDim[key] = [];
     scoredByDim[key].push(Number(r.lastScore));
@@ -218,31 +218,31 @@ function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
   );
 }
 
-/** Chart 4 — stacked horizontal bars: PASSED/FAILED/WARNING/NOT-RUN per dimension */
+/** Chart 4 — stacked horizontal bars: PASSED/FAILED/WARNING per dimension (threshold results only) */
 function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
-  const byDim: Record<string, { PASSED: number; FAILED: number; WARNING: number; ERROR: number; NONE: number }> = {};
+  // Only count successfully-executed rules (threshold outcomes)
+  const byDim: Record<string, { PASSED: number; FAILED: number; WARNING: number; NONE: number }> = {};
   for (const r of rules) {
     const key = r.dimensionName ?? r.dimensionCode ?? "Other";
-    if (!byDim[key]) byDim[key] = { PASSED: 0, FAILED: 0, WARNING: 0, ERROR: 0, NONE: 0 };
-    const s = r.lastStatusCode ?? "NONE";
-    if (s in byDim[key]) byDim[key][s as keyof typeof byDim[string]]++;
-    else byDim[key].NONE++;
+    if (!byDim[key]) byDim[key] = { PASSED: 0, FAILED: 0, WARNING: 0, NONE: 0 };
+    const s = r.lastStatusCode;
+    if (s === "PASSED" || s === "FAILED" || s === "WARNING") byDim[key][s]++;
+    else if (s !== "ERROR") byDim[key].NONE++; // never-run
   }
 
   const entries = Object.entries(byDim);
   if (entries.length === 0) return <EmptyChart label="No rules to display" />;
 
   const statusConfig = [
-    { key: "PASSED",  color: "#10B981", label: "Pass" },
-    { key: "WARNING", color: "#F59E0B", label: "Warn" },
-    { key: "FAILED",  color: "#EF4444", label: "Fail" },
-    { key: "ERROR",   color: "#94A3B8", label: "Err"  },
-    { key: "NONE",    color: "#E2E8F0", label: "—"    },
+    { key: "PASSED",  color: "#10B981", label: "Above threshold" },
+    { key: "WARNING", color: "#F59E0B", label: "Near threshold"  },
+    { key: "FAILED",  color: "#EF4444", label: "Below threshold" },
+    { key: "NONE",    color: "#E2E8F0", label: "Not run"         },
   ];
 
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center gap-3 mb-1">
+      <div className="flex items-center gap-3 mb-1 flex-wrap">
         {statusConfig.filter((s) => s.key !== "NONE").map((s) => (
           <div key={s.key} className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} />
@@ -284,8 +284,8 @@ function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
 
 /** Overall DQ score card with trend indicator */
 function OverallScoreCard({ rules }: { rules: DqRule[] }) {
-  const scoredRules = rules.filter((r) => r.lastScore != null);
-  const prevScoredRules = rules.filter((r) => r.previousScore != null);
+  const scoredRules = rules.filter((r) => r.lastScore != null && r.lastStatusCode !== "ERROR");
+  const prevScoredRules = rules.filter((r) => r.previousScore != null && r.lastStatusCode !== "ERROR");
 
   if (scoredRules.length === 0) {
     return (
@@ -396,43 +396,54 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-xl shadow-2xl w-[580px] border border-line max-h-[70vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
-          <h3 className="font-bold text-ink">Value Samples</h3>
+          <h3 className="font-bold text-ink">Failing Records</h3>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {loading && <div className="text-sm text-muted text-center py-8">Loading samples…</div>}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {loading && <div className="text-sm text-muted text-center py-8">Loading…</div>}
           {!loading && samples.length === 0 && (
             <div className="text-sm text-muted text-center py-8">
-              No value samples captured for this run.
+              No value samples were captured for this run.
             </div>
           )}
           {!loading && samples.length > 0 && (
-            <div className="grid grid-cols-2 gap-4">
+            <>
+              {/* Failing records first */}
               <div>
-                <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-3">Valid ({valid.length})</div>
-                <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {valid.length === 0 && <div className="text-xs text-muted">None captured</div>}
-                  {valid.map((s) => (
-                    <div key={s.sampleId} className="flex justify-between bg-emerald-50 border border-emerald-100 rounded px-3 py-1.5">
-                      <span className="font-mono text-[12px]">{s.sampleValue}</span>
-                      <span className="text-[11px] text-muted">×{s.sampleCount}</span>
-                    </div>
-                  ))}
+                <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span>Failing Records ({invalid.length})</span>
+                  <span className="text-[10px] font-normal text-muted">— values that did not meet the DQ rule condition</span>
                 </div>
+                {invalid.length === 0 ? (
+                  <div className="text-xs text-muted bg-canvas-soft rounded-md px-3 py-2">No failing records captured</div>
+                ) : (
+                  <div className="space-y-1 max-h-72 overflow-y-auto">
+                    {invalid.map((s) => (
+                      <div key={s.sampleId} className="flex justify-between bg-red-50 border border-red-100 rounded px-3 py-1.5">
+                        <span className="font-mono text-[12px] text-red-800">{s.sampleValue}</span>
+                        <span className="text-[11px] text-muted">×{s.sampleCount}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div>
-                <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider mb-3">Invalid ({invalid.length})</div>
-                <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {invalid.length === 0 && <div className="text-xs text-muted">None captured</div>}
-                  {invalid.map((s) => (
-                    <div key={s.sampleId} className="flex justify-between bg-red-50 border border-red-100 rounded px-3 py-1.5">
-                      <span className="font-mono text-[12px]">{s.sampleValue}</span>
-                      <span className="text-[11px] text-muted">×{s.sampleCount}</span>
-                    </div>
-                  ))}
+              {/* Valid samples as collapsible reference */}
+              {valid.length > 0 && (
+                <div>
+                  <div className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">
+                    Sample Valid Values ({valid.length})
+                  </div>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {valid.map((s) => (
+                      <div key={s.sampleId} className="flex justify-between bg-emerald-50 border border-emerald-100 rounded px-3 py-1.5">
+                        <span className="font-mono text-[12px] text-emerald-800">{s.sampleValue}</span>
+                        <span className="text-[11px] text-muted">×{s.sampleCount}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -463,7 +474,16 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
   }]);
   const [showPicker, setShowPicker] = useState(false);
 
-  const template = DQ_TEMPLATES.find((t) => t.code === ruleTemplateCode);
+  const assetKind: "table" | "column" | null =
+    selectedAssets.length > 0
+      ? (selectedAssets[0].assetType === "DATA_ENTITIES" ? "table" : "column")
+      : null;
+
+  const applicableTemplates = DQ_TEMPLATES.filter(
+    (t) => !assetKind || t.assetType === assetKind || t.assetType === "any"
+  );
+
+  const template = applicableTemplates.find((t) => t.code === ruleTemplateCode) ?? applicableTemplates[0];
 
   async function save() {
     if (!ruleName.trim()) { setError("Rule name is required"); return; }
@@ -556,9 +576,14 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-muted mb-2">Template</label>
+            <div className="flex items-baseline gap-2 mb-2">
+              <label className="block text-[11px] font-semibold text-muted">Template</label>
+              {assetKind && (
+                <span className="text-[10px] text-muted">{assetKind}-level rules only</span>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-1.5">
-              {DQ_TEMPLATES.filter((t) => t.assetType === "table" || t.assetType === "any").map((t) => (
+              {applicableTemplates.map((t) => (
                 <button key={t.code} type="button"
                   onClick={() => { setRuleTemplateCode(t.code); setRuleConfig({}); }}
                   className={`text-left px-2.5 py-2 rounded-lg border text-[11px] transition-colors ${ruleTemplateCode === t.code ? "border-brand-purple bg-brand-purple/5 text-brand-purple" : "border-line hover:border-brand-purple/40 text-ink-soft"}`}
@@ -568,7 +593,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               ))}
             </div>
           </div>
-          {template && "configFields" in template && template.configFields.length > 0 && (
+          {template && template.configFields.length > 0 && (
             <div className="grid grid-cols-2 gap-3 p-3 bg-canvas-soft rounded-lg border border-line">
               {template.configFields.map((f) => (
                 <div key={f.key}>
@@ -613,9 +638,23 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
     {showPicker && (
       <AssetPicker
         selected={selectedAssets}
-        onChange={setSelectedAssets}
+        onChange={(assets) => {
+          setSelectedAssets(assets);
+          // Auto-switch template if type changed
+          const kind = assets.length > 0
+            ? (assets[0].assetType === "DATA_ENTITIES" ? "table" : "column")
+            : null;
+          const valid = DQ_TEMPLATES.find(
+            (t) => t.code === ruleTemplateCode && (!kind || t.assetType === kind || t.assetType === "any")
+          );
+          if (!valid) {
+            const fallback = DQ_TEMPLATES.find((t) => !kind || t.assetType === kind || t.assetType === "any");
+            if (fallback) { setRuleTemplateCode(fallback.code); setRuleConfig({}); }
+          }
+        }}
         preFilterEntityId={entityId}
         preFilterEntityName={entityName}
+        defaultMode="column"
         onClose={() => setShowPicker(false)}
       />
     )}
@@ -651,6 +690,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   const [runningAll, setRunningAll] = useState(false);
   const [runningId, setRunningId] = useState<number | null>(null);
   const [samplesResultId, setSamplesResultId] = useState<number | null>(null);
+  const [runErrors, setRunErrors] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -684,23 +724,37 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
 
   async function runOne(ruleId: number) {
     setRunningId(ruleId);
+    setRunErrors((prev) => { const n = { ...prev }; delete n[ruleId]; return n; });
     try {
-      await fetch("/api/dq/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleId }) });
+      const res = await fetch("/api/dq/run", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleId }),
+      });
+      const result = await res.json();
+      if (result.statusCode === "ERROR" && result.message) {
+        setRunErrors((prev) => ({ ...prev, [ruleId]: result.message }));
+      }
       await load();
+    } catch {
+      setRunErrors((prev) => ({ ...prev, [ruleId]: "Failed to connect to run service" }));
     } finally { setRunningId(null); }
   }
 
-  // Group rules by dimension for list display
+  // Split ERROR rules from threshold-result rules
+  const thresholdRules = rules.filter((r) => r.lastStatusCode !== "ERROR");
+  const errorRules     = rules.filter((r) => r.lastStatusCode === "ERROR");
+
+  // Group threshold-result rules by dimension
   const byDimension: Record<string, DqRule[]> = {};
-  for (const r of rules) {
+  for (const r of thresholdRules) {
     const key = r.dimensionName ?? r.dimensionCode ?? "Other";
     if (!byDimension[key]) byDimension[key] = [];
     byDimension[key].push(r);
   }
 
-  const passingCount = rules.filter((r) => r.lastStatusCode === "PASSED").length;
-  const failingCount = rules.filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "ERROR").length;
-  const warnCount    = rules.filter((r) => r.lastStatusCode === "WARNING").length;
+  const passingCount = thresholdRules.filter((r) => r.lastStatusCode === "PASSED").length;
+  const failingCount = thresholdRules.filter((r) => r.lastStatusCode === "FAILED").length;
+  const warnCount    = thresholdRules.filter((r) => r.lastStatusCode === "WARNING").length;
 
   return (
     <div className="space-y-5">
@@ -713,7 +767,10 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-bold text-ink">DQ Rules — {entityName}</h3>
-              <p className="text-[11px] text-muted mt-0.5">{rules.length} rule{rules.length !== 1 ? "s" : ""} defined across {Object.keys(byDimension).length} dimension{Object.keys(byDimension).length !== 1 ? "s" : ""}</p>
+              <p className="text-[11px] text-muted mt-0.5">
+                {rules.length} rule{rules.length !== 1 ? "s" : ""} across {Object.keys(byDimension).length} dimension{Object.keys(byDimension).length !== 1 ? "s" : ""}
+                {errorRules.length > 0 && <span className="text-amber-600 ml-1">· {errorRules.length} execution error{errorRules.length !== 1 ? "s" : ""}</span>}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {rules.length > 0 && (
@@ -794,15 +851,14 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
         </div>
       )}
 
-      {/* ── Rules list grouped by dimension ──────────────────────────────── */}
+      {/* ── Rules list grouped by dimension (threshold results only) ──────── */}
       {!loading && rules.length > 0 && Object.entries(byDimension).map(([dim, dimRules]) => (
         <div key={dim} className="card overflow-hidden">
           <div className="px-5 py-3 bg-canvas-soft border-b border-line flex items-center gap-3">
             <h4 className="font-bold text-sm text-ink">{dim}</h4>
             <span className="text-xs text-muted">{dimRules.length} rule{dimRules.length !== 1 ? "s" : ""}</span>
-            {/* Dimension aggregate score */}
             {(() => {
-              const scored = dimRules.filter((r) => r.lastScore != null);
+              const scored = dimRules.filter((r) => r.lastScore != null && r.lastStatusCode !== "ERROR");
               if (scored.length === 0) return null;
               const avg = scored.reduce((s, r) => s + Number(r.lastScore!), 0) / scored.length;
               return (
@@ -819,81 +875,142 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
               const prev   = rule.previousScore != null ? Number(rule.previousScore) : null;
               const delta  = score != null && prev != null ? score - prev : null;
               const status = rule.lastStatusCode;
+              const runErr = runErrors[rule.ruleId];
+              // Threshold label
+              const thresholdLabel =
+                status === "PASSED"  ? { text: "Above threshold", cls: "bg-emerald-100 text-emerald-700" } :
+                status === "FAILED"  ? { text: "Below threshold", cls: "bg-red-100 text-red-700" } :
+                status === "WARNING" ? { text: "Near threshold",  cls: "bg-amber-100 text-amber-700" } :
+                null;
               return (
-                <div key={rule.ruleId} className="px-5 py-3.5 flex items-center gap-4 hover:bg-canvas-soft transition-colors">
-                  {/* Mini gauge */}
-                  <div className="shrink-0 w-9 h-9 relative">
-                    {score != null ? (
-                      <>
-                        <MiniGauge value={Math.round(score)} size={36} />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-[8px] font-bold text-ink">{Math.round(score)}</span>
+                <div key={rule.ruleId} className="flex flex-col hover:bg-canvas-soft transition-colors">
+                  <div className="px-5 py-3.5 flex items-center gap-4">
+                    {/* Mini gauge */}
+                    <div className="shrink-0 w-9 h-9 relative">
+                      {score != null ? (
+                        <>
+                          <MiniGauge value={Math.round(score)} size={36} />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[8px] font-bold text-ink">{Math.round(score)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="w-9 h-9 rounded-full border-2 border-line flex items-center justify-center">
+                          <span className="text-[8px] text-muted">—</span>
                         </div>
-                      </>
-                    ) : (
-                      <div className="w-9 h-9 rounded-full border-2 border-line flex items-center justify-center">
-                        <span className="text-[8px] text-muted">—</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rule info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-ink">{rule.ruleName}</span>
-                      {rule.ruleTemplateCode && (
-                        <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
-                      )}
-                      {rule.severityLevelCode && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_RING[rule.severityLevelCode] ?? ""}`}>{rule.severityLevelCode}</span>
                       )}
                     </div>
-                    <div className="text-[11px] text-muted mt-0.5 flex items-center gap-3 flex-wrap">
-                      {rule.thresholdFail != null && <span>Fail &lt; {rule.thresholdFail}%</span>}
-                      {rule.thresholdWarn != null && <span>Warn &lt; {rule.thresholdWarn}%</span>}
-                      {rule.scheduleCron && <span className="font-mono">{rule.scheduleCron}</span>}
-                      {rule.notifyOwners && <span>🔔</span>}
-                      {rule.openIssueOnFail && <span>🎫</span>}
-                      {latest?.executionTimestamp && (
-                        <span>Last: {new Date(latest.executionTimestamp).toLocaleDateString()}</span>
-                      )}
+
+                    {/* Rule info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-ink">{rule.ruleName}</span>
+                        {rule.ruleTemplateCode && (
+                          <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
+                        )}
+                        {rule.severityLevelCode && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_RING[rule.severityLevelCode] ?? ""}`}>{rule.severityLevelCode}</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-muted mt-0.5 flex items-center gap-3 flex-wrap">
+                        {rule.thresholdFail != null && <span>Fail &lt; {rule.thresholdFail}%</span>}
+                        {rule.thresholdWarn != null && <span>Warn &lt; {rule.thresholdWarn}%</span>}
+                        {latest?.executionTimestamp && (
+                          <span>Last: {new Date(latest.executionTimestamp).toLocaleDateString()}</span>
+                        )}
+                        {latest?.recordsScanned != null && <span>Scanned: {Number(latest.recordsScanned).toLocaleString()}</span>}
+                        {latest?.recordsFailed != null && latest.recordsFailed > 0 && (
+                          <span className="text-red-600">{Number(latest.recordsFailed).toLocaleString()} failed records</span>
+                        )}
+                      </div>
                     </div>
-                    {latest && (
-                      <div className="text-[11px] text-muted mt-0.5 flex items-center gap-3">
-                        {latest.recordsScanned != null && <span>Scanned: {Number(latest.recordsScanned).toLocaleString()}</span>}
-                        {latest.recordsFailed != null && <span className="text-red-600">Failed: {Number(latest.recordsFailed).toLocaleString()}</span>}
-                        {latest.message && <span className="truncate max-w-[200px]">{latest.message}</span>}
+
+                    {/* Delta */}
+                    {delta != null && (
+                      <div className={`text-[11px] font-semibold shrink-0 ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}%
                       </div>
                     )}
+
+                    {/* Threshold result + actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {thresholdLabel ? (
+                        <Badge text={thresholdLabel.text} className={thresholdLabel.cls} />
+                      ) : (
+                        <span className="text-[11px] text-muted italic">Not yet run</span>
+                      )}
+                      {latest && (status === "FAILED" || status === "WARNING") && (
+                        <button
+                          onClick={() => setSamplesResultId(latest.resultId)}
+                          className="btn btn-sm text-[11px] px-2 py-1 text-red-600 border-red-200 hover:bg-red-50"
+                          title="View records that failed this check"
+                        >
+                          Failing Records
+                        </button>
+                      )}
+                      <button
+                        onClick={() => runOne(rule.ruleId)}
+                        disabled={runningId === rule.ruleId}
+                        className="btn btn-sm text-[11px] px-2 py-1"
+                      >
+                        {runningId === rule.ruleId ? "…" : "▶ Run"}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Delta */}
-                  {delta != null && (
-                    <div className={`text-[11px] font-semibold shrink-0 ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                      {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}%
+                  {/* Inline run error */}
+                  {runErr && (
+                    <div className="mx-5 mb-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-[11px] text-amber-800">
+                      <span className="shrink-0 font-bold">Execution error:</span>
+                      <span className="flex-1">{runErr}</span>
+                      <button
+                        onClick={() => setRunErrors((prev) => { const n = { ...prev }; delete n[rule.ruleId]; return n; })}
+                        className="shrink-0 text-amber-500 hover:text-amber-700"
+                      >×</button>
                     </div>
                   )}
-
-                  {/* Status + actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {status ? (
-                      <Badge text={status} className={STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600"} />
-                    ) : (
-                      <span className="text-[11px] text-muted">Never run</span>
-                    )}
-                    {latest && (
-                      <button onClick={() => setSamplesResultId(latest.resultId)} className="btn btn-sm text-[11px] px-2 py-1">Samples</button>
-                    )}
-                    <button onClick={() => runOne(rule.ruleId)} disabled={runningId === rule.ruleId} className="btn btn-sm text-[11px] px-2 py-1">
-                      {runningId === rule.ruleId ? "…" : "▶"}
-                    </button>
-                  </div>
                 </div>
               );
             })}
           </div>
         </div>
       ))}
+
+      {/* ── Execution error rules (separate section) ─────────────────────── */}
+      {!loading && errorRules.length > 0 && (
+        <div className="card overflow-hidden border-amber-200">
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
+            <span className="text-sm font-bold text-amber-700">Execution Errors ({errorRules.length})</span>
+            <span className="text-[11px] text-amber-600 flex-1">
+              These rules failed to execute. Review their configuration in the DQ Dashboard.
+            </span>
+          </div>
+          <div className="divide-y divide-line-soft">
+            {errorRules.map((rule) => {
+              const runErr = runErrors[rule.ruleId];
+              return (
+                <div key={rule.ruleId} className="px-5 py-3 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-ink">{rule.ruleName}</div>
+                    {rule.ruleTemplateCode && (
+                      <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
+                    )}
+                    {runErr && <div className="text-[11px] text-amber-700 mt-1 truncate max-w-lg">{runErr}</div>}
+                  </div>
+                  <Badge text="Execution Error" className="bg-amber-100 text-amber-700 shrink-0" />
+                  <button
+                    onClick={() => runOne(rule.ruleId)}
+                    disabled={runningId === rule.ruleId}
+                    className="btn btn-sm text-[11px] px-2 py-1 shrink-0"
+                  >
+                    {runningId === rule.ruleId ? "…" : "▶ Retry"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       {showAdd && <AddRulePanel entityId={entityId} entityName={entityName} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
