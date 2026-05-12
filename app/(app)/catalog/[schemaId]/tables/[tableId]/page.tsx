@@ -15,6 +15,7 @@ import { ProfilingPanel } from "@/components/catalog/ProfilingPanel";
 import { ActivityTab } from "@/components/catalog/ActivityTab";
 import { LineageTab } from "@/components/catalog/LineageTab";
 import { fmtNumber } from "@/lib/utils";
+import { trackAssetVisit } from "@/lib/queries/dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,13 @@ export default async function TablePage({
 
   const canEdit = await canEditMetadata(user);
   const dq = computeDqAggregates(entity.attributes);
+
+  // Fire-and-forget — don't block page render
+  void trackAssetVisit(
+    user.userId, "TABLE", String(entity.entityId),
+    entity.entityName, entity.schema?.schemaName,
+    entity.rowCount ?? undefined,
+  ).catch(() => {});
 
   return (
     <>

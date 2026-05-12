@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { getSchemaById } from "@/lib/queries/catalog";
+import { trackAssetVisit } from "@/lib/queries/dashboard";
 import { HighlightScroll } from "@/components/catalog/HighlightScroll";
 import { SchemaHero } from "@/components/catalog/SchemaHero";
 import { SchemaTableList } from "@/components/catalog/SchemaTableList";
@@ -25,6 +26,7 @@ export default async function SchemaPage({
   if (!schema) notFound();
 
   const canEdit = await canEditMetadata(user);
+  void trackAssetVisit(user.userId, "TABLE", String(id), schema.schemaName, schema.sourceName).catch(() => {});
   const highlightId = searchParams.highlight ? Number(searchParams.highlight) : null;
 
   const tables    = schema.entities.filter((e) => !e.isView);

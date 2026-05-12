@@ -8,7 +8,8 @@ import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
-import { useState, useEffect } from "react";
+import type { SearchResult } from "@/app/api/catalog/search/route";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export type Crumb = { label: string; href?: string };
 
@@ -39,9 +40,38 @@ function HeaderIconBtn({
 export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
-  const [menuOpen, setMenuOpen]     = useState(false);
-  const [notifOpen, setNotifOpen]   = useState(false);
+  const [menuOpen,    setMenuOpen]    = useState(false);
+  const [notifOpen,   setNotifOpen]   = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Global search state
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchRef   = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runSearch = useCallback(async (q: string) => {
+    if (q.length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const r = await fetch(`/api/catalog/search?q=${encodeURIComponent(q)}`);
+      if (r.ok) setSearchResults(await r.json());
+    } finally { setSearchLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => runSearch(searchQuery), 250);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchQuery, runSearch]);
+
+  function submitSearch() {
+    if (!searchQuery.trim()) return;
+    setSearchFocused(false);
+    router.push(`/catalog?q=${encodeURIComponent(searchQuery.trim())}`);
+  }
 
   useEffect(() => {
     fetch("/api/notifications/count")
@@ -84,13 +114,50 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
         })}
       </nav>
 
-      {/* Search */}
-      <div className="ml-3 flex-1 max-w-lg flex items-center gap-2 bg-canvas border border-line rounded-md px-3 py-2 hover:border-brand-purple/40 transition-colors">
-        <IconSearch className="w-4 h-4 text-muted shrink-0" />
-        <input
-          className="bg-transparent border-0 outline-none text-sm text-ink placeholder:text-muted flex-1 min-w-0"
-          placeholder="Search assets, schemas, tables, columns…"
-        />
+      {/* Global search */}
+      <div className="ml-3 flex-1 max-w-lg relative">
+        <div className={`flex items-center gap-2 bg-canvas border rounded-md px-3 py-2 transition-colors ${searchFocused ? "border-brand-purple ring-1 ring-brand-purple/20" : "border-line hover:border-brand-purple/40"}`}>
+          <IconSearch className="w-4 h-4 text-muted shrink-0" />
+          <input
+            ref={searchRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            onKeyDown={(e) => { if (e.key === "Enter") submitSearch(); }}
+            className="bg-transparent border-0 outline-none text-sm text-ink placeholder:text-muted flex-1 min-w-0"
+            placeholder="Search assets, schemas, tables, columns…"
+          />
+          {searchQuery && (
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => { setSearchQuery(""); setSearchResults([]); }} className="text-muted hover:text-ink text-base leading-none">×</button>
+          )}
+        </div>
+
+        {/* Results dropdown */}
+        {searchFocused && searchQuery.length >= 2 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto">
+            {searchLoading && <div className="px-4 py-3 text-sm text-muted">Searching…</div>}
+            {!searchLoading && searchResults.length === 0 && (
+              <div className="px-4 py-3 text-sm text-muted">No results for "{searchQuery}"</div>
+            )}
+            {searchResults.map((r) => (
+              <button
+                key={`${r.type}-${r.id}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-canvas text-left border-b border-line-soft last:border-b-0 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-semibold text-ink truncate">{r.name}</span>
+                    <span className="text-[10px] text-muted bg-canvas-soft px-1.5 py-0.5 rounded shrink-0">{r.type}</span>
+                  </div>
+                  {r.meta && <div className="text-[11px] text-muted truncate">{r.meta}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Right actions: Language · Notification · History · Collaboration */}
