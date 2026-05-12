@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { DqDimension, DqRule, DqResult, DqDashboardStats } from "@/lib/queries/dq";
 import { DQ_TEMPLATES } from "@/lib/dq-templates";
+import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 
@@ -81,8 +82,7 @@ function StatCard({ label, value, sub, color = "blue" }: { label: string; value:
 type RuleFormData = {
   ruleName: string;
   dimensionCode: string;
-  assetTypeCode: string;
-  assetId: string;
+  selectedAssets: SelectedAsset[];
   ruleTemplateCode: string;
   ruleConfig: Record<string, string>;
   ruleDefinitionText: string;
@@ -97,8 +97,7 @@ type RuleFormData = {
 const DEFAULT_FORM: RuleFormData = {
   ruleName: "",
   dimensionCode: "COMP",
-  assetTypeCode: "DATA_ENTITIES",
-  assetId: "",
+  selectedAssets: [],
   ruleTemplateCode: "ROW_COUNT_THRESHOLD",
   ruleConfig: {},
   ruleDefinitionText: "",
@@ -126,8 +125,13 @@ function RuleFormModal({
       ? {
           ruleName: editRule.ruleName,
           dimensionCode: editRule.dimensionCode ?? "COMP",
-          assetTypeCode: editRule.assetTypeCode,
-          assetId: String(editRule.assetId),
+          selectedAssets: [{
+            assetType: editRule.assetTypeCode as "DATA_ENTITIES" | "DATA_ATTRIBUTES",
+            assetId: editRule.assetId,
+            assetName: editRule.assetName ?? String(editRule.assetId),
+            path: editRule.assetName ?? String(editRule.assetId),
+            breadcrumb: [editRule.assetName ?? String(editRule.assetId)],
+          }],
           ruleTemplateCode: editRule.ruleTemplateCode ?? "CUSTOM_SQL",
           ruleConfig: Object.fromEntries(Object.entries(editRule.ruleConfig).map(([k, v]) => [k, String(v)])),
           ruleDefinitionText: editRule.ruleDefinitionText,
@@ -142,22 +146,25 @@ function RuleFormModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showAssetPicker, setShowAssetPicker] = useState(false);
 
   const selectedTemplate = DQ_TEMPLATES.find((t) => t.code === form.ruleTemplateCode);
 
   async function handleSave() {
-    if (!form.ruleName.trim() || !form.assetId.trim()) {
-      setError("Rule name and Asset ID are required.");
+    if (!form.ruleName.trim()) {
+      setError("Rule name is required.");
+      return;
+    }
+    if (form.selectedAssets.length === 0) {
+      setError("Select at least one asset using the asset browser.");
       return;
     }
     setSaving(true);
     setError("");
     try {
-      const payload = {
+      const base = {
         ruleName: form.ruleName,
         dimensionCode: form.dimensionCode || null,
-        assetTypeCode: form.assetTypeCode,
-        assetId: Number(form.assetId),
         ruleTemplateCode: form.ruleTemplateCode !== "CUSTOM_SQL" ? form.ruleTemplateCode : null,
         ruleConfig: Object.fromEntries(
           Object.entries(form.ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])
@@ -171,17 +178,22 @@ function RuleFormModal({
         openIssueOnFail: form.openIssueOnFail,
       };
       if (editRule) {
+        const asset = form.selectedAssets[0];
         await fetch(`/api/dq/rules/${editRule.ruleId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...base, assetTypeCode: asset.assetType, assetId: asset.assetId }),
         });
       } else {
-        await fetch("/api/dq/rules", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await Promise.all(
+          form.selectedAssets.map((asset) =>
+            fetch("/api/dq/rules", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...base, assetTypeCode: asset.assetType, assetId: asset.assetId }),
+            })
+          )
+        );
       }
       onSaved();
     } catch {
@@ -192,6 +204,7 @@ function RuleFormModal({
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-10">
       <div className="bg-white rounded-xl shadow-2xl w-[680px] border border-line">
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
@@ -219,19 +232,58 @@ function RuleFormModal({
           </div>
 
           {/* Asset targeting */}
-          <div className="grid grid-cols-[1fr_1fr_160px] gap-4">
+          <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Asset Type *</label>
-              <select className="input w-full" value={form.assetTypeCode} onChange={(e) => setForm((f) => ({ ...f, assetTypeCode: e.target.value }))}>
-                <option value="DATA_ENTITIES">Table</option>
-                <option value="DATA_ATTRIBUTES">Column</option>
-              </select>
+              <label className="block text-xs font-semibold text-muted mb-2">
+                Target Assets *
+                {!editRule && form.selectedAssets.length > 1 && (
+                  <span className="ml-2 font-normal text-brand-purple">
+                    — will create {form.selectedAssets.length} rules
+                  </span>
+                )}
+              </label>
+
+              {form.selectedAssets.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2.5 p-2.5 bg-canvas-soft rounded-lg border border-line">
+                  {form.selectedAssets.map((a) => (
+                    <div
+                      key={`${a.assetType}-${a.assetId}`}
+                      className="flex items-center gap-1.5 bg-white border border-line rounded-md pl-2.5 pr-1.5 py-1 text-[11px]"
+                    >
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${a.assetType === "DATA_ENTITIES" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                        {a.assetType === "DATA_ENTITIES" ? "TABLE" : "COL"}
+                      </span>
+                      {a.breadcrumb.length > 1 && (
+                        <span className="text-muted text-[10px]">{a.breadcrumb.slice(0, -1).join(" › ")} › </span>
+                      )}
+                      <span className="font-semibold text-ink">{a.assetName}</span>
+                      {!editRule && (
+                        <button
+                          type="button"
+                          onClick={() => setForm((f) => ({
+                            ...f,
+                            selectedAssets: f.selectedAssets.filter((s) => !(s.assetType === a.assetType && s.assetId === a.assetId)),
+                          }))}
+                          className="ml-0.5 text-muted hover:text-red-500 text-sm leading-none"
+                        >×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowAssetPicker(true)}
+                className="btn btn-sm border-brand-purple/40 text-brand-purple hover:bg-brand-purple/5"
+              >
+                {form.selectedAssets.length > 0
+                  ? editRule ? "Change Asset" : "Change / Add Assets"
+                  : "Browse & Select Assets…"}
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Asset ID *</label>
-              <input className="input w-full" type="number" value={form.assetId} onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))} placeholder="Entity or Attribute ID" />
-            </div>
-            <div>
+
+            <div className="w-52">
               <label className="block text-xs font-semibold text-muted mb-1">DQ Dimension</label>
               <select className="input w-full" value={form.dimensionCode} onChange={(e) => setForm((f) => ({ ...f, dimensionCode: e.target.value }))}>
                 {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
@@ -339,11 +391,26 @@ function RuleFormModal({
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-line">
           <button onClick={onClose} className="btn btn-sm">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="btn btn-primary btn-sm">
-            {saving ? "Saving…" : editRule ? "Save Changes" : "Create Rule"}
+            {saving
+              ? "Saving…"
+              : editRule
+                ? "Save Changes"
+                : form.selectedAssets.length > 1
+                  ? `Create ${form.selectedAssets.length} Rules`
+                  : "Create Rule"}
           </button>
         </div>
       </div>
     </div>
+
+    {showAssetPicker && (
+      <AssetPicker
+        selected={form.selectedAssets}
+        onChange={(assets) => setForm((f) => ({ ...f, selectedAssets: assets }))}
+        onClose={() => setShowAssetPicker(false)}
+      />
+    )}
+    </>
   );
 }
 

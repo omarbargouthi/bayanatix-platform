@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { DqRule, DqResult, DqSample } from "@/lib/queries/dq";
 import { DQ_TEMPLATES } from "@/lib/dq-templates";
+import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
 
@@ -441,7 +442,7 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
 
 // ── Add rule mini-form ────────────────────────────────────────────────────────
 
-function AddRulePanel({ entityId, onClose, onSaved }: { entityId: number; onClose: () => void; onSaved: () => void }) {
+function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: number; entityName: string; onClose: () => void; onSaved: () => void }) {
   const [ruleName, setRuleName] = useState("");
   const [dimensionCode, setDimensionCode] = useState("COMP");
   const [ruleTemplateCode, setRuleTemplateCode] = useState("ROW_COUNT_THRESHOLD");
@@ -453,31 +454,48 @@ function AddRulePanel({ entityId, onClose, onSaved }: { entityId: number; onClos
   const [openIssueOnFail, setOpenIssue] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([{
+    assetType: "DATA_ENTITIES",
+    assetId: entityId,
+    assetName: entityName,
+    path: entityName,
+    breadcrumb: [entityName],
+  }]);
+  const [showPicker, setShowPicker] = useState(false);
 
   const template = DQ_TEMPLATES.find((t) => t.code === ruleTemplateCode);
 
   async function save() {
     if (!ruleName.trim()) { setError("Rule name is required"); return; }
+    if (selectedAssets.length === 0) { setError("Select at least one asset"); return; }
     setSaving(true); setError("");
     try {
-      const res = await fetch("/api/dq/rules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ruleName, dimensionCode, assetTypeCode: "DATA_ENTITIES", assetId: entityId,
-          ruleTemplateCode, ruleConfig: Object.fromEntries(Object.entries(ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])),
-          ruleDefinitionText: "", severityLevelCode,
-          thresholdWarn: thresholdWarn ? Number(thresholdWarn) : null,
-          thresholdFail: thresholdFail ? Number(thresholdFail) : null,
-          scheduleCron: null, notifyOwners, openIssueOnFail,
-        }),
-      });
-      if (!res.ok) throw new Error("Save failed");
+      const results = await Promise.all(
+        selectedAssets.map((asset) =>
+          fetch("/api/dq/rules", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ruleName, dimensionCode,
+              assetTypeCode: asset.assetType,
+              assetId: asset.assetId,
+              ruleTemplateCode,
+              ruleConfig: Object.fromEntries(Object.entries(ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])),
+              ruleDefinitionText: "", severityLevelCode,
+              thresholdWarn: thresholdWarn ? Number(thresholdWarn) : null,
+              thresholdFail: thresholdFail ? Number(thresholdFail) : null,
+              scheduleCron: null, notifyOwners, openIssueOnFail,
+            }),
+          })
+        )
+      );
+      if (results.some((r) => !r.ok)) throw new Error("Some rules failed to save");
       onSaved();
-    } catch { setError("Failed to create rule"); } finally { setSaving(false); }
+    } catch { setError("Failed to create rule(s)"); } finally { setSaving(false); }
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-10">
       <div className="bg-white rounded-xl shadow-2xl w-[560px] border border-line">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
@@ -500,6 +518,43 @@ function AddRulePanel({ entityId, onClose, onSaved }: { entityId: number; onClos
               </select>
             </div>
           </div>
+          {/* Asset targeting */}
+          <div>
+            <label className="block text-[11px] font-semibold text-muted mb-2">
+              Target Assets
+              {selectedAssets.length > 1 && (
+                <span className="ml-2 font-normal text-brand-purple">— will create {selectedAssets.length} rules</span>
+              )}
+            </label>
+            {selectedAssets.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedAssets.map((a) => (
+                  <div key={`${a.assetType}-${a.assetId}`} className="flex items-center gap-1.5 bg-canvas-soft border border-line rounded pl-2 pr-1 py-0.5 text-[11px]">
+                    <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${a.assetType === "DATA_ENTITIES" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                      {a.assetType === "DATA_ENTITIES" ? "TABLE" : "COL"}
+                    </span>
+                    {a.breadcrumb.length > 1 && (
+                      <span className="text-muted text-[10px]">{a.breadcrumb.slice(0, -1).join(" › ")} › </span>
+                    )}
+                    <span className="font-semibold text-ink">{a.assetName}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAssets((prev) => prev.filter((s) => !(s.assetType === a.assetType && s.assetId === a.assetId)))}
+                      className="ml-0.5 text-muted hover:text-red-500 leading-none"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowPicker(true)}
+              className="btn btn-sm text-[11px] border-brand-purple/40 text-brand-purple hover:bg-brand-purple/5"
+            >
+              {selectedAssets.length > 0 ? "Change / Add Columns" : "Select Target Assets…"}
+            </button>
+          </div>
+
           <div>
             <label className="block text-[11px] font-semibold text-muted mb-2">Template</label>
             <div className="grid grid-cols-3 gap-1.5">
@@ -548,10 +603,23 @@ function AddRulePanel({ entityId, onClose, onSaved }: { entityId: number; onClos
         </div>
         <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
           <button onClick={onClose} className="btn btn-sm">Cancel</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : "Add Rule"}</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">
+            {saving ? "Saving…" : selectedAssets.length > 1 ? `Add ${selectedAssets.length} Rules` : "Add Rule"}
+          </button>
         </div>
       </div>
     </div>
+
+    {showPicker && (
+      <AssetPicker
+        selected={selectedAssets}
+        onChange={setSelectedAssets}
+        preFilterEntityId={entityId}
+        preFilterEntityName={entityName}
+        onClose={() => setShowPicker(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -828,7 +896,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
       ))}
 
       {/* Modals */}
-      {showAdd && <AddRulePanel entityId={entityId} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
+      {showAdd && <AddRulePanel entityId={entityId} entityName={entityName} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
       {samplesResultId != null && <SamplesPanel resultId={samplesResultId} onClose={() => setSamplesResultId(null)} />}
     </div>
   );
