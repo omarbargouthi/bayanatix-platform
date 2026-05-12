@@ -30,6 +30,7 @@ export type DqRule = {
   lastRunAt: string | null;
   lastStatusCode: string | null;
   lastScore: number | null;
+  previousScore: number | null;
   createdAt: string;
 };
 
@@ -123,6 +124,12 @@ export async function getDqRules(filters?: {
       r.last_run_at          AS "lastRunAt",
       r.last_status_code     AS "lastStatusCode",
       r.last_score           AS "lastScore",
+      (
+        SELECT res2.score FROM bayanat.dq_results res2
+        WHERE res2.rule_id = r.rule_id
+        ORDER BY res2.execution_timestamp DESC
+        LIMIT 1 OFFSET 1
+      )                      AS "previousScore",
       r.created_at_timestamp AS "createdAt"
     FROM bayanat.dq_rules r
     LEFT JOIN bayanat.dq_dimensions d ON d.dimension_code = r.dimension_code
@@ -136,13 +143,14 @@ export async function getDqRules(filters?: {
   `;
   return rows.map((r) => ({
     ...r,
-    thresholdWarn: r.thresholdWarn != null ? Number(r.thresholdWarn) : null,
-    thresholdFail: r.thresholdFail != null ? Number(r.thresholdFail) : null,
-    lastScore:     r.lastScore     != null ? Number(r.lastScore)     : null,
-    ruleConfig:    typeof r.ruleConfig === "object" && r.ruleConfig !== null ? r.ruleConfig : {},
-    notifyOwners:  Boolean(r.notifyOwners),
+    thresholdWarn:  r.thresholdWarn  != null ? Number(r.thresholdWarn)  : null,
+    thresholdFail:  r.thresholdFail  != null ? Number(r.thresholdFail)  : null,
+    lastScore:      r.lastScore      != null ? Number(r.lastScore)      : null,
+    previousScore:  r.previousScore  != null ? Number(r.previousScore)  : null,
+    ruleConfig:     typeof r.ruleConfig === "object" && r.ruleConfig !== null ? r.ruleConfig : {},
+    notifyOwners:   Boolean(r.notifyOwners),
     openIssueOnFail: Boolean(r.openIssueOnFail),
-    isActive:      Boolean(r.isActive),
+    isActive:       Boolean(r.isActive),
   }));
 }
 
