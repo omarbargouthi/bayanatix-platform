@@ -545,8 +545,17 @@ async function saveCrawlResults(
     SELECT data_source_id AS id FROM bayanat.data_sources WHERE connection_id = ${connectionId}
   `;
   let sourceId: number;
+  // Snapshot row counts before the cascade-delete so we can store prev_row_count
+  const prevCounts = new Map<string, number | null>();
   if (existing.length > 0) {
     sourceId = existing[0].id;
+    const snapRows = await sql<{ name: string; cnt: string | null }[]>`
+      SELECT e.entity_name_text AS name, e.row_count_estimate::text AS cnt
+      FROM bayanat.data_entities e
+      JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+      WHERE s.data_source_id = ${sourceId}
+    `;
+    for (const r of snapRows) prevCounts.set(r.name, r.cnt != null ? Number(r.cnt) : null);
     await sql`DELETE FROM bayanat.data_schemas WHERE data_source_id = ${sourceId}`;
   } else {
     const [row] = await sql<{ id: number }[]>`
@@ -567,7 +576,7 @@ async function saveCrawlResults(
     for (const table of schema.tables) {
       const [entRow] = await sql<{ id: number }[]>`
         INSERT INTO bayanat.data_entities
-          (schema_id, entity_name_text, display_name_text, is_view_indicator, description_text)
+          (schema_id, entity_name_text, display_name_text, is_view_indicator, source_description_text)
         VALUES (${schRow.id}, ${table.name}, ${table.name}, ${table.isView}, ${table.comment ?? null})
         RETURNING entity_id AS id
       `;
@@ -576,16 +585,17 @@ async function saveCrawlResults(
       // Save profiling metadata if collected
       let profileId: number | null = null;
       if (table.rowCount !== undefined) {
-        // Keep row_count_estimate in sync with actual measured count
+        const prevRowCount = prevCounts.get(table.name) ?? null;
         await sql`
           UPDATE bayanat.data_entities SET row_count_estimate = ${table.rowCount}
           WHERE entity_id = ${entityId}
         `;
         const [profRow] = await sql<{ id: number }[]>`
           INSERT INTO bayanat.entity_profile
-            (entity_id, job_id, row_count, sample_size, profiling_mode, profiling_limit)
+            (entity_id, job_id, row_count, prev_row_count, sample_size, profiling_mode, profiling_limit)
           VALUES (
-            ${entityId}, ${jobId}, ${table.rowCount}, ${table.sampleSize ?? null},
+            ${entityId}, ${jobId}, ${table.rowCount}, ${prevRowCount},
+            ${table.sampleSize ?? null},
             ${result.profilingMode ?? null}, ${result.profilingLimit ?? null}
           ) RETURNING profile_id AS id
         `;
@@ -596,7 +606,7 @@ async function saveCrawlResults(
         const [attrRow] = await sql<{ id: number }[]>`
           INSERT INTO bayanat.data_attributes
             (entity_id, physical_name_text, friendly_name_text, data_type_text,
-             is_nullable_indicator, is_primary_key_indicator, description_text)
+             is_nullable_indicator, is_primary_key_indicator, source_description_text)
           VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey}, ${col.comment ?? null})
           RETURNING attribute_id AS id
         `;

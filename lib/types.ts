@@ -52,6 +52,7 @@ export type DataEntity = {
   displayName: string | null;
   category: string | null;
   description: string | null;
+  sourceDescription: string | null;
   isView: boolean;
   certCode?: string | null;
   dataCertCode?: string | null;
@@ -102,6 +103,7 @@ export type DataAttribute = {
   isPrimaryKey: boolean;
   isNullable: boolean;
   description: string | null;
+  sourceDescription: string | null;
   classificationCode?: string | null;
   glossaryTerm?: string | null;
   qualityScore?: number | null;

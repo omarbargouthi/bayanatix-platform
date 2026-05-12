@@ -225,6 +225,7 @@ export async function getEntityById(entityId: number): Promise<
       e.display_name_text as "displayName",
       e.entity_category_code as "category",
       e.description_text as "description",
+      e.source_description_text as "sourceDescription",
       coalesce(e.is_view_indicator, false) as "isView",
       e.row_count_estimate as "rowCount",
       e.trust_score as "trustScore",
@@ -248,6 +249,7 @@ export async function getEntityById(entityId: number): Promise<
       coalesce(a.is_primary_key_indicator, false) as "isPrimaryKey",
       coalesce(a.is_nullable_indicator, true)     as "isNullable",
       a.description_text as "description",
+      a.source_description_text as "sourceDescription",
       a.classification_code as "classificationCode",
       a.glossary_term_text as "glossaryTerm",
       a.quality_score as "qualityScore",
@@ -318,19 +320,20 @@ export type EntityProfileData = {
 export async function getEntityProfile(entityId: number): Promise<EntityProfileData | null> {
   const rows = await sql<{
     profileId: number; profiledAt: string;
-    rowCount: number | null; sampleSize: number | null;
+    rowCount: number | null; prevRowCount: number | null;
+    sampleSize: number | null;
     profilingMode: string | null; profilingLimit: number | null;
   }[]>`
     SELECT profile_id AS "profileId", profiled_at::text AS "profiledAt",
-           row_count AS "rowCount", sample_size AS "sampleSize",
+           row_count AS "rowCount", prev_row_count AS "prevRowCount",
+           sample_size AS "sampleSize",
            profiling_mode AS "profilingMode", profiling_limit AS "profilingLimit"
     FROM bayanat.entity_profile
     WHERE entity_id = ${entityId}
-    ORDER BY profiled_at DESC LIMIT 2
+    ORDER BY profiled_at DESC LIMIT 1
   `;
   if (!rows[0]) return null;
   const prof = rows[0];
-  const prev = rows[1] ?? null;
 
   const attrRows = await sql<{
     attributeId: number; nullCount: number; nullPct: number; distinctCount: number;
@@ -347,9 +350,9 @@ export async function getEntityProfile(entityId: number): Promise<EntityProfileD
   return {
     profileId:      prof.profileId,
     profiledAt:     prof.profiledAt,
-    rowCount:       prof.rowCount != null ? Number(prof.rowCount) : null,
-    prevRowCount:   prev?.rowCount != null ? Number(prev.rowCount) : null,
-    sampleSize:     prof.sampleSize != null ? Number(prof.sampleSize) : null,
+    rowCount:       prof.rowCount     != null ? Number(prof.rowCount)     : null,
+    prevRowCount:   prof.prevRowCount != null ? Number(prof.prevRowCount) : null,
+    sampleSize:     prof.sampleSize   != null ? Number(prof.sampleSize)   : null,
     profilingMode:  prof.profilingMode,
     profilingLimit: prof.profilingLimit != null ? Number(prof.profilingLimit) : null,
     attributes: attrRows.map(a => ({

@@ -12,14 +12,15 @@ const ENTITY_TYPE_OPTIONS = [
 ];
 
 interface Props {
-  entityId:    number;
-  description: string | null;
-  displayName: string | null;
-  category:    string | null;
-  canEdit:     boolean;
+  entityId:          number;
+  description:       string | null;
+  sourceDescription: string | null;
+  displayName:       string | null;
+  category:          string | null;
+  canEdit:           boolean;
 }
 
-export function TableEditPanel({ entityId, description, displayName, category, canEdit }: Props) {
+export function TableEditPanel({ entityId, description, sourceDescription, displayName, category, canEdit }: Props) {
   const router = useRouter();
   const [editing,     setEditing]     = useState(false);
   const [desc,        setDesc]        = useState(description ?? "");
@@ -121,6 +122,15 @@ export function TableEditPanel({ entityId, description, displayName, category, c
         <p className="text-ink-soft text-[14px] leading-relaxed">
           {description ?? "No description provided yet."}
         </p>
+      )}
+
+      {sourceDescription && (
+        <div className="mt-3 rounded-md bg-canvas-soft border border-line px-3.5 py-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1">
+            From source system
+          </div>
+          <p className="text-[13px] text-ink-soft leading-relaxed">{sourceDescription}</p>
+        </div>
       )}
     </>
   );

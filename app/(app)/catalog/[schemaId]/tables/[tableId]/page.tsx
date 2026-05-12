@@ -82,6 +82,7 @@ export default async function TablePage({
             <TableEditPanel
               entityId={entity.entityId}
               description={entity.description}
+              sourceDescription={entity.sourceDescription}
               displayName={entity.displayName}
               category={entity.category}
               canEdit={canEdit}
