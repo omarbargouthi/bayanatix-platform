@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { DqRule, DqResult, DqSample } from "@/lib/queries/dq";
 import { DQ_TEMPLATES } from "@/lib/dq-templates";
-import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
 
@@ -453,7 +452,15 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
 
 // ── Add rule mini-form ────────────────────────────────────────────────────────
 
+type ColumnItem = { id: number; name: string; dataType: string | null; isPk: boolean };
+
 function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: number; entityName: string; onClose: () => void; onSaved: () => void }) {
+  const [ruleLevel, setRuleLevel] = useState<"table" | "column">("table");
+  const [availableCols, setAvailableCols] = useState<ColumnItem[]>([]);
+  const [selectedColIds, setSelectedColIds] = useState<number[]>([]);
+  const [loadingCols, setLoadingCols] = useState(false);
+  const [entityCtx, setEntityCtx] = useState<{ sourceName: string; schemaName: string } | null>(null);
+
   const [ruleName, setRuleName] = useState("");
   const [dimensionCode, setDimensionCode] = useState("COMP");
   const [ruleTemplateCode, setRuleTemplateCode] = useState("ROW_COUNT_THRESHOLD");
@@ -465,39 +472,60 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
   const [openIssueOnFail, setOpenIssue] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([{
-    assetType: "DATA_ENTITIES",
-    assetId: entityId,
-    assetName: entityName,
-    path: entityName,
-    breadcrumb: [entityName],
-  }]);
-  const [showPicker, setShowPicker] = useState(false);
-
-  const assetKind: "table" | "column" | null =
-    selectedAssets.length > 0
-      ? (selectedAssets[0].assetType === "DATA_ENTITIES" ? "table" : "column")
-      : null;
 
   const applicableTemplates = DQ_TEMPLATES.filter(
-    (t) => !assetKind || t.assetType === assetKind || t.assetType === "any"
+    (t) => t.assetType === ruleLevel || t.assetType === "any"
   );
-
   const template = applicableTemplates.find((t) => t.code === ruleTemplateCode) ?? applicableTemplates[0];
+
+  function switchLevel(level: "table" | "column") {
+    if (level === ruleLevel) return;
+    setRuleLevel(level);
+    setSelectedColIds([]);
+    // Auto-switch template if current one doesn't apply to new level
+    const valid = DQ_TEMPLATES.find(
+      (t) => t.code === ruleTemplateCode && (t.assetType === level || t.assetType === "any")
+    );
+    if (!valid) {
+      const fallback = DQ_TEMPLATES.find((t) => t.assetType === level || t.assetType === "any");
+      if (fallback) { setRuleTemplateCode(fallback.code); setRuleConfig({}); }
+    }
+    if (level === "column" && availableCols.length === 0) {
+      setLoadingCols(true);
+      fetch(`/api/catalog/browse?type=columns&entityId=${entityId}`)
+        .then((r) => r.json())
+        .then((d) => { setAvailableCols(d); setLoadingCols(false); })
+        .catch(() => setLoadingCols(false));
+      fetch(`/api/catalog/entities/${entityId}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((e) => { if (e) setEntityCtx({ sourceName: e.sourceName ?? "—", schemaName: e.schemaName ?? "—" }); })
+        .catch(() => {});
+    }
+  }
+
+  function toggleCol(id: number) {
+    setSelectedColIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
+
+  // Compute assets to save
+  const assetsToSave =
+    ruleLevel === "table"
+      ? [{ assetTypeCode: "DATA_ENTITIES", assetId: entityId }]
+      : selectedColIds.map((id) => ({ assetTypeCode: "DATA_ATTRIBUTES", assetId: id }));
 
   async function save() {
     if (!ruleName.trim()) { setError("Rule name is required"); return; }
-    if (selectedAssets.length === 0) { setError("Select at least one asset"); return; }
+    if (ruleLevel === "column" && selectedColIds.length === 0) { setError("Select at least one column"); return; }
     setSaving(true); setError("");
     try {
       const results = await Promise.all(
-        selectedAssets.map((asset) =>
+        assetsToSave.map((asset) =>
           fetch("/api/dq/rules", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ruleName, dimensionCode,
-              assetTypeCode: asset.assetType,
+              assetTypeCode: asset.assetTypeCode,
               assetId: asset.assetId,
               ruleTemplateCode,
               ruleConfig: Object.fromEntries(Object.entries(ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])),
@@ -514,16 +542,127 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
     } catch { setError("Failed to create rule(s)"); } finally { setSaving(false); }
   }
 
+  const sourceName = entityCtx?.sourceName ?? "—";
+  const schemaName = entityCtx?.schemaName ?? "—";
+
   return (
-    <>
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-10">
       <div className="bg-white rounded-xl shadow-2xl w-[560px] border border-line">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
-          <h3 className="font-bold text-ink">Add DQ Rule to This Table</h3>
+          <div>
+            <h3 className="font-bold text-ink">Add DQ Rule</h3>
+            <p className="text-[11px] text-muted mt-0.5">{entityName}</p>
+          </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
+
         <div className="px-5 py-5 space-y-4">
           {error && <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{error}</div>}
+
+          {/* ── Level selector ── */}
+          <div>
+            <label className="block text-[11px] font-semibold text-muted mb-2">Apply Rule At</label>
+            <div className="flex rounded-lg border border-line overflow-hidden text-[12px] font-semibold w-fit">
+              <button
+                type="button"
+                onClick={() => switchLevel("table")}
+                className={`px-4 py-1.5 transition-colors ${ruleLevel === "table" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas"}`}
+              >
+                Table level
+              </button>
+              <button
+                type="button"
+                onClick={() => switchLevel("column")}
+                className={`px-4 py-1.5 transition-colors border-l border-line ${ruleLevel === "column" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas"}`}
+              >
+                Column level
+              </button>
+            </div>
+            <p className="text-[11px] text-muted mt-1.5">
+              {ruleLevel === "table"
+                ? `Rule applies to the entire ${entityName} table (row counts, freshness, etc.)`
+                : `Select one or more columns — creates one rule per column`}
+            </p>
+          </div>
+
+          {/* ── Table level: entity chip ── */}
+          {ruleLevel === "table" && (
+            <div className="flex items-center gap-2.5 px-3 py-2.5 bg-canvas-soft rounded-lg border border-line">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">TABLE</span>
+              <span className="font-semibold text-sm text-ink">{entityName}</span>
+              <span className="text-[11px] text-muted ml-auto italic">pre-selected</span>
+            </div>
+          )}
+
+          {/* ── Column level: inline column picker ── */}
+          {ruleLevel === "column" && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[11px] font-semibold text-muted">
+                  Select Columns *
+                  {selectedColIds.length > 0 && (
+                    <span className="ml-2 font-normal text-brand-purple">
+                      {selectedColIds.length} selected — {selectedColIds.length} rule{selectedColIds.length !== 1 ? "s" : ""} will be created
+                    </span>
+                  )}
+                </label>
+                {availableCols.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setSelectedColIds(availableCols.map((c) => c.id))} className="text-[10px] text-brand-purple hover:underline">All</button>
+                    <button type="button" onClick={() => setSelectedColIds([])} className="text-[10px] text-muted hover:underline">None</button>
+                  </div>
+                )}
+              </div>
+              <div className="border border-line rounded-lg max-h-52 overflow-y-auto nice-scroll">
+                {loadingCols && <div className="px-3 py-4 text-xs text-muted">Loading columns…</div>}
+                {!loadingCols && availableCols.length === 0 && (
+                  <div className="px-3 py-4 text-xs text-muted">No columns found</div>
+                )}
+                {!loadingCols && availableCols.map((col) => {
+                  const checked = selectedColIds.includes(col.id);
+                  return (
+                    <label
+                      key={col.id}
+                      className="flex items-center gap-2.5 px-3 py-2 border-b border-line-soft last:border-b-0 hover:bg-canvas cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCol(col.id)}
+                        className="w-3.5 h-3.5 accent-brand-purple shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[12px] font-semibold truncate ${checked ? "text-brand-purple" : "text-ink"}`}>{col.name}</span>
+                          {col.isPk && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-brand-purple/10 text-brand-purple border border-brand-purple/20">PK</span>
+                          )}
+                        </div>
+                        {col.dataType && <div className="text-[10px] text-muted font-mono">{col.dataType}</div>}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              {selectedColIds.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {selectedColIds.map((id) => {
+                    const col = availableCols.find((c) => c.id === id);
+                    if (!col) return null;
+                    return (
+                      <div key={id} className="flex items-center gap-1 bg-brand-purple/5 border border-brand-purple/20 rounded px-2 py-0.5 text-[11px]">
+                        <span className="text-muted text-[10px]">{sourceName} › {schemaName} › {entityName} › </span>
+                        <span className="font-semibold text-brand-purple">{col.name}</span>
+                        <button type="button" onClick={() => toggleCol(id)} className="ml-0.5 text-muted hover:text-red-500 leading-none">×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Rule name + severity ── */}
           <div className="grid grid-cols-[1fr_140px] gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-muted mb-1">Rule Name *</label>
@@ -538,49 +677,12 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               </select>
             </div>
           </div>
-          {/* Asset targeting */}
-          <div>
-            <label className="block text-[11px] font-semibold text-muted mb-2">
-              Target Assets
-              {selectedAssets.length > 1 && (
-                <span className="ml-2 font-normal text-brand-purple">— will create {selectedAssets.length} rules</span>
-              )}
-            </label>
-            {selectedAssets.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {selectedAssets.map((a) => (
-                  <div key={`${a.assetType}-${a.assetId}`} className="flex items-center gap-1.5 bg-canvas-soft border border-line rounded pl-2 pr-1 py-0.5 text-[11px]">
-                    <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${a.assetType === "DATA_ENTITIES" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
-                      {a.assetType === "DATA_ENTITIES" ? "TABLE" : "COL"}
-                    </span>
-                    {a.breadcrumb.length > 1 && (
-                      <span className="text-muted text-[10px]">{a.breadcrumb.slice(0, -1).join(" › ")} › </span>
-                    )}
-                    <span className="font-semibold text-ink">{a.assetName}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAssets((prev) => prev.filter((s) => !(s.assetType === a.assetType && s.assetId === a.assetId)))}
-                      className="ml-0.5 text-muted hover:text-red-500 leading-none"
-                    >×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowPicker(true)}
-              className="btn btn-sm text-[11px] border-brand-purple/40 text-brand-purple hover:bg-brand-purple/5"
-            >
-              {selectedAssets.length > 0 ? "Change / Add Columns" : "Select Target Assets…"}
-            </button>
-          </div>
 
+          {/* ── Template picker ── */}
           <div>
             <div className="flex items-baseline gap-2 mb-2">
               <label className="block text-[11px] font-semibold text-muted">Template</label>
-              {assetKind && (
-                <span className="text-[10px] text-muted">{assetKind}-level rules only</span>
-              )}
+              <span className="text-[10px] text-muted">{ruleLevel}-level rules only</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {applicableTemplates.map((t) => (
@@ -593,6 +695,8 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               ))}
             </div>
           </div>
+
+          {/* ── Template config ── */}
           {template && template.configFields.length > 0 && (
             <div className="grid grid-cols-2 gap-3 p-3 bg-canvas-soft rounded-lg border border-line">
               {template.configFields.map((f) => (
@@ -605,6 +709,8 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               ))}
             </div>
           )}
+
+          {/* ── Thresholds ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] text-muted mb-1">Warn below (%)</label>
@@ -615,6 +721,8 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               <input className="input w-full text-sm" type="number" value={thresholdFail} onChange={(e) => setFail(e.target.value)} />
             </div>
           </div>
+
+          {/* ── Notifications ── */}
           <div className="rounded-lg bg-canvas-soft border border-line p-3.5 space-y-2.5">
             <label className="flex items-center gap-3 cursor-pointer text-sm">
               <input type="checkbox" checked={notifyOwners} onChange={(e) => setNotify(e.target.checked)} className="w-4 h-4 accent-brand-purple" />
@@ -626,39 +734,19 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
             </label>
           </div>
         </div>
+
         <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
           <button onClick={onClose} className="btn btn-sm">Cancel</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">
-            {saving ? "Saving…" : selectedAssets.length > 1 ? `Add ${selectedAssets.length} Rules` : "Add Rule"}
+          <button
+            onClick={save}
+            disabled={saving || (ruleLevel === "column" && selectedColIds.length === 0)}
+            className="btn btn-primary btn-sm"
+          >
+            {saving ? "Saving…" : assetsToSave.length > 1 ? `Add ${assetsToSave.length} Rules` : "Add Rule"}
           </button>
         </div>
       </div>
     </div>
-
-    {showPicker && (
-      <AssetPicker
-        selected={selectedAssets}
-        onChange={(assets) => {
-          setSelectedAssets(assets);
-          // Auto-switch template if type changed
-          const kind = assets.length > 0
-            ? (assets[0].assetType === "DATA_ENTITIES" ? "table" : "column")
-            : null;
-          const valid = DQ_TEMPLATES.find(
-            (t) => t.code === ruleTemplateCode && (!kind || t.assetType === kind || t.assetType === "any")
-          );
-          if (!valid) {
-            const fallback = DQ_TEMPLATES.find((t) => !kind || t.assetType === kind || t.assetType === "any");
-            if (fallback) { setRuleTemplateCode(fallback.code); setRuleConfig({}); }
-          }
-        }}
-        preFilterEntityId={entityId}
-        preFilterEntityName={entityName}
-        defaultMode="column"
-        onClose={() => setShowPicker(false)}
-      />
-    )}
-    </>
   );
 }
 
