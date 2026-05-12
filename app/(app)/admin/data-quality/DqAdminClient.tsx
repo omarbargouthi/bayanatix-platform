@@ -1,0 +1,803 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import type { DqDimension, DqRule, DqResult, DqDashboardStats } from "@/lib/queries/dq";
+import { DQ_TEMPLATES } from "@/lib/dq-templates";
+
+// ── Severity helpers ──────────────────────────────────────────────────────────
+
+const SEVERITY_COLORS: Record<string, string> = {
+  CRITICAL: "bg-red-100 text-red-700",
+  WARNING:  "bg-amber-100 text-amber-700",
+  INFO:     "bg-blue-100 text-blue-700",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  PASSED:  "bg-emerald-100 text-emerald-700",
+  FAILED:  "bg-red-100 text-red-700",
+  ERROR:   "bg-gray-200 text-gray-600",
+  WARNING: "bg-amber-100 text-amber-700",
+};
+
+function Badge({ text, className }: { text: string; className: string }) {
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${className}`}>{text}</span>;
+}
+
+// ── Micro sparkline bar chart ─────────────────────────────────────────────────
+
+function TrendBar({ trend }: { trend: { date: string; passed: number; failed: number; avgScore: number | null }[] }) {
+  if (trend.length === 0) {
+    return <div className="text-sm text-muted text-center py-8">No run history yet. Run a rule to see trends.</div>;
+  }
+  const maxTotal = Math.max(...trend.map((t) => t.passed + t.failed), 1);
+  return (
+    <div className="flex items-end gap-1 h-28">
+      {trend.map((t) => {
+        const total = t.passed + t.failed;
+        const passH = total > 0 ? Math.round((t.passed / maxTotal) * 112) : 0;
+        const failH = total > 0 ? Math.round((t.failed / maxTotal) * 112) : 0;
+        return (
+          <div key={t.date} className="flex flex-col items-center gap-0.5 flex-1 group relative">
+            <div className="flex flex-col-reverse w-full gap-0" title={`${t.date}: ${t.passed} passed, ${t.failed} failed`}>
+              {failH > 0 && <div className="w-full bg-red-400 rounded-t" style={{ height: failH }} />}
+              {passH > 0 && <div className="w-full bg-emerald-400 rounded-b" style={{ height: passH }} />}
+              {total === 0 && <div className="w-full bg-line rounded" style={{ height: 4 }} />}
+            </div>
+            <div className="text-[9px] text-muted opacity-0 group-hover:opacity-100 absolute -bottom-4 whitespace-nowrap">
+              {t.date.slice(5)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, color = "blue" }: { label: string; value: string | number; sub?: string; color?: "blue" | "green" | "red" | "purple" | "amber" }) {
+  const colors = {
+    blue:   "border-l-blue-400 bg-blue-50/50 text-blue-600",
+    green:  "border-l-emerald-400 bg-emerald-50/50 text-emerald-600",
+    red:    "border-l-red-400 bg-red-50/50 text-red-600",
+    purple: "border-l-brand-purple bg-brand-purple/5 text-brand-purple",
+    amber:  "border-l-amber-400 bg-amber-50/50 text-amber-600",
+  }[color];
+  const [bg, text] = colors.split(" ").reduce<[string, string]>(
+    (acc, cls) => cls.startsWith("text-") ? [acc[0], cls] : [`${acc[0]} ${cls}`, acc[1]],
+    ["", ""]
+  );
+  return (
+    <div className={`card border-l-4 ${bg} px-5 py-4`}>
+      <div className={`text-2xl font-extrabold ${text}`}>{value}</div>
+      <div className="text-[11px] text-muted mt-0.5 uppercase tracking-wider">{label}</div>
+      {sub && <div className="text-xs text-muted mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+// ── Rule form modal ───────────────────────────────────────────────────────────
+
+type RuleFormData = {
+  ruleName: string;
+  dimensionCode: string;
+  assetTypeCode: string;
+  assetId: string;
+  ruleTemplateCode: string;
+  ruleConfig: Record<string, string>;
+  ruleDefinitionText: string;
+  severityLevelCode: string;
+  thresholdWarn: string;
+  thresholdFail: string;
+  scheduleCron: string;
+  notifyOwners: boolean;
+  openIssueOnFail: boolean;
+};
+
+const DEFAULT_FORM: RuleFormData = {
+  ruleName: "",
+  dimensionCode: "COMP",
+  assetTypeCode: "DATA_ENTITIES",
+  assetId: "",
+  ruleTemplateCode: "ROW_COUNT_THRESHOLD",
+  ruleConfig: {},
+  ruleDefinitionText: "",
+  severityLevelCode: "WARNING",
+  thresholdWarn: "95",
+  thresholdFail: "80",
+  scheduleCron: "",
+  notifyOwners: true,
+  openIssueOnFail: false,
+};
+
+function RuleFormModal({
+  dimensions,
+  editRule,
+  onClose,
+  onSaved,
+}: {
+  dimensions: DqDimension[];
+  editRule: DqRule | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<RuleFormData>(
+    editRule
+      ? {
+          ruleName: editRule.ruleName,
+          dimensionCode: editRule.dimensionCode ?? "COMP",
+          assetTypeCode: editRule.assetTypeCode,
+          assetId: String(editRule.assetId),
+          ruleTemplateCode: editRule.ruleTemplateCode ?? "CUSTOM_SQL",
+          ruleConfig: Object.fromEntries(Object.entries(editRule.ruleConfig).map(([k, v]) => [k, String(v)])),
+          ruleDefinitionText: editRule.ruleDefinitionText,
+          severityLevelCode: editRule.severityLevelCode ?? "WARNING",
+          thresholdWarn: editRule.thresholdWarn != null ? String(editRule.thresholdWarn) : "",
+          thresholdFail: editRule.thresholdFail != null ? String(editRule.thresholdFail) : "",
+          scheduleCron: editRule.scheduleCron ?? "",
+          notifyOwners: editRule.notifyOwners,
+          openIssueOnFail: editRule.openIssueOnFail,
+        }
+      : DEFAULT_FORM
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const selectedTemplate = DQ_TEMPLATES.find((t) => t.code === form.ruleTemplateCode);
+
+  async function handleSave() {
+    if (!form.ruleName.trim() || !form.assetId.trim()) {
+      setError("Rule name and Asset ID are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const payload = {
+        ruleName: form.ruleName,
+        dimensionCode: form.dimensionCode || null,
+        assetTypeCode: form.assetTypeCode,
+        assetId: Number(form.assetId),
+        ruleTemplateCode: form.ruleTemplateCode !== "CUSTOM_SQL" ? form.ruleTemplateCode : null,
+        ruleConfig: Object.fromEntries(
+          Object.entries(form.ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])
+        ),
+        ruleDefinitionText: form.ruleDefinitionText || "",
+        severityLevelCode: form.severityLevelCode,
+        thresholdWarn: form.thresholdWarn ? Number(form.thresholdWarn) : null,
+        thresholdFail: form.thresholdFail ? Number(form.thresholdFail) : null,
+        scheduleCron: form.scheduleCron || null,
+        notifyOwners: form.notifyOwners,
+        openIssueOnFail: form.openIssueOnFail,
+      };
+      if (editRule) {
+        await fetch(`/api/dq/rules/${editRule.ruleId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch("/api/dq/rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+      onSaved();
+    } catch {
+      setError("Failed to save rule. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-10">
+      <div className="bg-white rounded-xl shadow-2xl w-[680px] border border-line">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+          <h2 className="font-bold text-brand-deep">{editRule ? "Edit DQ Rule" : "New DQ Rule"}</h2>
+          <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          {error && <div className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</div>}
+
+          {/* Name + Severity */}
+          <div className="grid grid-cols-[1fr_160px] gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-1">Rule Name *</label>
+              <input className="input w-full" value={form.ruleName} onChange={(e) => setForm((f) => ({ ...f, ruleName: e.target.value }))} placeholder="e.g. Customer ID Not Null" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-1">Severity</label>
+              <select className="input w-full" value={form.severityLevelCode} onChange={(e) => setForm((f) => ({ ...f, severityLevelCode: e.target.value }))}>
+                <option value="INFO">Info</option>
+                <option value="WARNING">Warning</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Asset targeting */}
+          <div className="grid grid-cols-[1fr_1fr_160px] gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-1">Asset Type *</label>
+              <select className="input w-full" value={form.assetTypeCode} onChange={(e) => setForm((f) => ({ ...f, assetTypeCode: e.target.value }))}>
+                <option value="DATA_ENTITIES">Table</option>
+                <option value="DATA_ATTRIBUTES">Column</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-1">Asset ID *</label>
+              <input className="input w-full" type="number" value={form.assetId} onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))} placeholder="Entity or Attribute ID" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-1">DQ Dimension</label>
+              <select className="input w-full" value={form.dimensionCode} onChange={(e) => setForm((f) => ({ ...f, dimensionCode: e.target.value }))}>
+                {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Template picker */}
+          <div>
+            <label className="block text-xs font-semibold text-muted mb-2">Rule Template</label>
+            <div className="grid grid-cols-3 gap-2">
+              {DQ_TEMPLATES.map((t) => (
+                <button
+                  key={t.code}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, ruleTemplateCode: t.code, ruleConfig: {} }))}
+                  className={`text-left px-3 py-2.5 rounded-lg border text-[12px] transition-colors ${
+                    form.ruleTemplateCode === t.code
+                      ? "border-brand-purple bg-brand-purple/5 text-brand-purple"
+                      : "border-line hover:border-brand-purple/40 text-ink-soft"
+                  }`}
+                >
+                  <div className="font-semibold">{t.label}</div>
+                  <div className="text-[10px] text-muted mt-0.5 line-clamp-2">{t.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Template config fields */}
+          {selectedTemplate && "configFields" in selectedTemplate && selectedTemplate.configFields.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-2">Template Configuration</label>
+              <div className="grid grid-cols-2 gap-3 p-3 bg-canvas-soft rounded-lg border border-line">
+                {selectedTemplate.configFields.map((f) => (
+                  <div key={f.key}>
+                    <label className="block text-[11px] text-muted mb-1">{f.label}</label>
+                    <input
+                      className="input w-full text-sm"
+                      type={f.type === "number" ? "number" : "text"}
+                      value={form.ruleConfig[f.key] ?? ""}
+                      onChange={(e) => setForm((prev) => ({ ...prev, ruleConfig: { ...prev.ruleConfig, [f.key]: e.target.value } }))}
+                      placeholder={String(f.default ?? "")}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Custom SQL */}
+          {form.ruleTemplateCode === "CUSTOM_SQL" && (
+            <div>
+              <label className="block text-xs font-semibold text-muted mb-1">Custom SQL</label>
+              <p className="text-[11px] text-muted mb-2">Query must return <code>total_rows</code> and <code>failed_rows</code> columns.</p>
+              <textarea
+                className="input w-full font-mono text-xs h-28 resize-none"
+                value={form.ruleDefinitionText}
+                onChange={(e) => setForm((f) => ({ ...f, ruleDefinitionText: e.target.value }))}
+                placeholder="SELECT COUNT(*) AS total_rows, COUNT(*) FILTER (WHERE col IS NULL) AS failed_rows FROM schema.table"
+              />
+            </div>
+          )}
+
+          {/* Thresholds */}
+          <div>
+            <label className="block text-xs font-semibold text-muted mb-2">Score Thresholds (%)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-muted mb-1">Warn below</label>
+                <input className="input w-full" type="number" min="0" max="100" value={form.thresholdWarn} onChange={(e) => setForm((f) => ({ ...f, thresholdWarn: e.target.value }))} placeholder="95" />
+              </div>
+              <div>
+                <label className="block text-[11px] text-muted mb-1">Fail below</label>
+                <input className="input w-full" type="number" min="0" max="100" value={form.thresholdFail} onChange={(e) => setForm((f) => ({ ...f, thresholdFail: e.target.value }))} placeholder="80" />
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule */}
+          <div>
+            <label className="block text-xs font-semibold text-muted mb-1">Schedule (cron expression)</label>
+            <input className="input w-full font-mono text-sm" value={form.scheduleCron} onChange={(e) => setForm((f) => ({ ...f, scheduleCron: e.target.value }))} placeholder="0 6 * * * (daily at 6am)" />
+            <div className="flex gap-3 mt-2">
+              {["0 6 * * *", "0 * * * *", "*/30 * * * *"].map((c) => (
+                <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, scheduleCron: c }))} className="text-[11px] text-brand-purple hover:underline font-mono">{c}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notification + issue config */}
+          <div className="rounded-lg bg-canvas-soft border border-line p-4 space-y-3">
+            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Actions on Failure</div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={form.notifyOwners} onChange={(e) => setForm((f) => ({ ...f, notifyOwners: e.target.checked }))} className="w-4 h-4 accent-brand-purple" />
+              <span className="text-sm text-ink">Notify asset owners when rule fails</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={form.openIssueOnFail} onChange={(e) => setForm((f) => ({ ...f, openIssueOnFail: e.target.checked }))} className="w-4 h-4 accent-brand-purple" />
+              <span className="text-sm text-ink">Auto-open Data Fix request when rule fails</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-line">
+          <button onClick={onClose} className="btn btn-sm">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="btn btn-primary btn-sm">
+            {saving ? "Saving…" : editRule ? "Save Changes" : "Create Rule"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Run result detail modal ───────────────────────────────────────────────────
+
+function RunDetailModal({ result, onClose }: { result: DqResult; onClose: () => void }) {
+  const [samples, setSamples] = useState<{ sampleId: number; sampleValue: string; isValid: boolean; sampleCount: number }[]>([]);
+  const [loadingSamples, setLoadingSamples] = useState(true);
+
+  useState(() => {
+    fetch(`/api/dq/results/${result.resultId}/samples`)
+      .then((r) => r.json())
+      .then((d) => { setSamples(d); setLoadingSamples(false); })
+      .catch(() => setLoadingSamples(false));
+  });
+
+  const validSamples   = samples.filter((s) => s.isValid);
+  const invalidSamples = samples.filter((s) => !s.isValid);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-xl shadow-2xl w-[640px] border border-line max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+          <div>
+            <h2 className="font-bold text-brand-deep">{result.ruleName}</h2>
+            <div className="text-xs text-muted">{new Date(result.executionTimestamp).toLocaleString()}</div>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Summary grid */}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              ["Status",  result.statusCode ?? "—"],
+              ["Score",   result.score != null ? `${Number(result.score).toFixed(1)}%` : "—"],
+              ["Scanned", result.recordsScanned?.toLocaleString() ?? "—"],
+              ["Failed",  result.recordsFailed?.toLocaleString() ?? "—"],
+            ].map(([label, val]) => (
+              <div key={label} className="bg-canvas-soft rounded-lg px-3 py-2.5 text-center">
+                <div className="font-bold text-ink text-base">{val}</div>
+                <div className="text-[10px] text-muted">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {result.message && (
+            <div className="bg-canvas-soft rounded-lg px-4 py-3 text-sm text-ink-soft border border-line">
+              {result.message}
+            </div>
+          )}
+
+          {/* Samples */}
+          <div>
+            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Value Samples</div>
+            {loadingSamples && <div className="text-sm text-muted">Loading samples…</div>}
+            {!loadingSamples && samples.length === 0 && (
+              <div className="text-sm text-muted">No value samples captured for this run.</div>
+            )}
+            {!loadingSamples && samples.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold text-emerald-600 mb-2">Valid Values ({validSamples.length})</div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {validSamples.map((s) => (
+                      <div key={s.sampleId} className="flex items-center justify-between bg-emerald-50 rounded px-3 py-1.5 text-xs">
+                        <span className="font-mono text-ink">{s.sampleValue}</span>
+                        <span className="text-muted">×{s.sampleCount}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-red-600 mb-2">Invalid Values ({invalidSamples.length})</div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {invalidSamples.map((s) => (
+                      <div key={s.sampleId} className="flex items-center justify-between bg-red-50 rounded px-3 py-1.5 text-xs">
+                        <span className="font-mono text-ink">{s.sampleValue}</span>
+                        <span className="text-muted">×{s.sampleCount}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main client ───────────────────────────────────────────────────────────────
+
+type Tab = "dashboard" | "rules" | "runs";
+
+export function DqAdminClient({
+  dimensions,
+  initialRules,
+  stats,
+  trend,
+  recentRuns,
+  userRole,
+}: {
+  dimensions: DqDimension[];
+  initialRules: DqRule[];
+  stats: DqDashboardStats;
+  trend: { date: string; passed: number; failed: number; avgScore: number | null }[];
+  recentRuns: DqResult[];
+  userRole: string;
+}) {
+  const [tab, setTab] = useState<Tab>("dashboard");
+  const [rules, setRules] = useState(initialRules);
+  const [showForm, setShowForm] = useState(false);
+  const [editRule, setEditRule] = useState<DqRule | null>(null);
+  const [runningRuleId, setRunningRuleId] = useState<number | null>(null);
+  const [runResults, setRunResults] = useState<Record<number, { status: string; score: number | null }>>({});
+  const [detailResult, setDetailResult] = useState<DqResult | null>(null);
+  const [runs, setRuns] = useState(recentRuns);
+  const [filterDimension, setFilterDimension] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const canEdit = userRole === "ADMIN" || userRole === "STEWARD";
+
+  const loadRules = useCallback(async () => {
+    const r = await fetch("/api/dq/rules");
+    setRules(await r.json());
+  }, []);
+
+  const loadRuns = useCallback(async () => {
+    const r = await fetch("/api/dq/rules");
+    const newRules: DqRule[] = await r.json();
+    setRules(newRules);
+    // fetch recent results
+    const recent: DqResult[] = [];
+    for (const rule of newRules.slice(0, 10)) {
+      const res = await fetch(`/api/dq/rules/${rule.ruleId}`);
+      if (!res.ok) continue;
+      const { results } = await res.json();
+      recent.push(...results.slice(0, 3));
+    }
+    setRuns(recent.sort((a, b) => new Date(b.executionTimestamp).getTime() - new Date(a.executionTimestamp).getTime()));
+  }, []);
+
+  async function runRule(ruleId: number) {
+    setRunningRuleId(ruleId);
+    try {
+      const res = await fetch("/api/dq/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleId }),
+      });
+      const result = await res.json();
+      setRunResults((prev) => ({ ...prev, [ruleId]: { status: result.statusCode, score: result.score } }));
+      await loadRules();
+    } catch {
+      setRunResults((prev) => ({ ...prev, [ruleId]: { status: "ERROR", score: null } }));
+    } finally {
+      setRunningRuleId(null);
+    }
+  }
+
+  async function toggleActive(rule: DqRule) {
+    await fetch(`/api/dq/rules/${rule.ruleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !rule.isActive }),
+    });
+    loadRules();
+  }
+
+  async function deleteRule(ruleId: number) {
+    if (!confirm("Delete this rule? All run history will be lost.")) return;
+    await fetch(`/api/dq/rules/${ruleId}`, { method: "DELETE" });
+    loadRules();
+  }
+
+  const filteredRules = rules.filter((r) => {
+    if (filterDimension && r.dimensionCode !== filterDimension) return false;
+    if (filterStatus === "active" && !r.isActive) return false;
+    if (filterStatus === "failing" && r.lastStatusCode !== "FAILED") return false;
+    if (filterStatus === "passing" && r.lastStatusCode !== "PASSED") return false;
+    return true;
+  });
+
+  return (
+    <div>
+      {/* Tab nav */}
+      <div className="border-b border-line bg-white px-8">
+        <nav className="flex items-center gap-0">
+          {(["dashboard", "rules", "runs"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); if (t === "runs") loadRuns(); }}
+              className={`px-5 py-3 text-sm font-medium border-b-2 capitalize transition-colors ${
+                tab === t
+                  ? "text-brand-purple border-brand-purple"
+                  : "text-ink-soft border-transparent hover:text-brand-deep hover:border-brand-purple/30"
+              }`}
+            >
+              {t === "dashboard" ? "Dashboard" : t === "rules" ? "Rule Library" : "Run History"}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* ── Dashboard ── */}
+      {tab === "dashboard" && (
+        <main className="px-8 py-7 pb-14">
+          {/* Stats row */}
+          <div className="grid grid-cols-6 gap-4 mb-7">
+            <StatCard label="Total Rules"    value={stats.totalRules}   color="blue" />
+            <StatCard label="Active Rules"   value={stats.activeRules}  color="purple" />
+            <StatCard label="Runs Today"     value={stats.runsToday}    color="blue" />
+            <StatCard label="Passing"        value={stats.passingRules} color="green" />
+            <StatCard label="Failing"        value={stats.failingRules} color="red" />
+            <StatCard label="Avg Score"      value={stats.avgScore != null ? `${stats.avgScore.toFixed(1)}%` : "—"} color="purple" />
+          </div>
+
+          <div className="grid grid-cols-[1.6fr_1fr] gap-5 mb-5">
+            {/* Trend chart */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-ink">Run Trends (14 days)</h3>
+                <div className="flex items-center gap-4 text-[11px] text-muted">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400 inline-block" /> Passed</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400 inline-block" /> Failed</span>
+                </div>
+              </div>
+              <TrendBar trend={trend} />
+            </div>
+
+            {/* DQ by dimension */}
+            <div className="card p-5">
+              <h3 className="font-bold text-ink mb-4">Rules by Dimension</h3>
+              <div className="space-y-2">
+                {dimensions.map((d) => {
+                  const count = rules.filter((r) => r.dimensionCode === d.code).length;
+                  const passing = rules.filter((r) => r.dimensionCode === d.code && r.lastStatusCode === "PASSED").length;
+                  return (
+                    <div key={d.code} className="flex items-center gap-3">
+                      <div className="w-24 text-[11px] text-muted truncate">{d.name}</div>
+                      <div className="flex-1 h-2 bg-line rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-brand-purple"
+                          style={{ width: count > 0 ? `${(passing / count) * 100}%` : "0%" }}
+                        />
+                      </div>
+                      <div className="text-[11px] text-muted w-12 text-right">{count} rules</div>
+                    </div>
+                  );
+                })}
+                {dimensions.every((d) => rules.filter((r) => r.dimensionCode === d.code).length === 0) && (
+                  <p className="text-sm text-muted text-center py-4">No rules defined yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Failing rules heatmap */}
+          <div className="card p-5">
+            <h3 className="font-bold text-ink mb-4">Failing & Warning Rules</h3>
+            {rules.filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "WARNING" || r.lastStatusCode === "ERROR").length === 0 ? (
+              <div className="text-sm text-muted text-center py-6">All rules passing — no issues detected.</div>
+            ) : (
+              <div className="space-y-2">
+                {rules
+                  .filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "WARNING" || r.lastStatusCode === "ERROR")
+                  .map((r) => (
+                    <div key={r.ruleId} className="flex items-center gap-4 px-4 py-3 rounded-lg bg-red-50/70 border border-red-100">
+                      <Badge text={r.lastStatusCode ?? "—"} className={STATUS_COLORS[r.lastStatusCode ?? "ERROR"] ?? "bg-gray-100 text-gray-600"} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-ink">{r.ruleName}</div>
+                        <div className="text-[11px] text-muted">{r.assetTypeCode === "DATA_ENTITIES" ? "Table" : "Column"} · ID {r.assetId} · {r.dimensionName}</div>
+                      </div>
+                      {r.lastScore != null && (
+                        <div className="text-sm font-bold text-red-600">{r.lastScore.toFixed(1)}%</div>
+                      )}
+                      <button onClick={() => runRule(r.ruleId)} disabled={runningRuleId === r.ruleId} className="btn btn-sm text-xs">
+                        {runningRuleId === r.ruleId ? "Running…" : "Re-run"}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* ── Rule Library ── */}
+      {tab === "rules" && (
+        <main className="px-8 py-7 pb-14">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <select
+                className="input text-sm"
+                value={filterDimension}
+                onChange={(e) => setFilterDimension(e.target.value)}
+              >
+                <option value="">All Dimensions</option>
+                {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
+              </select>
+              <select
+                className="input text-sm"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                <option value="active">Active only</option>
+                <option value="passing">Passing</option>
+                <option value="failing">Failing</option>
+              </select>
+              <span className="text-sm text-muted">{filteredRules.length} rules</span>
+            </div>
+            {canEdit && (
+              <button onClick={() => { setEditRule(null); setShowForm(true); }} className="btn btn-primary btn-sm">
+                + New Rule
+              </button>
+            )}
+          </div>
+
+          <div className="card overflow-hidden">
+            <div className="grid grid-cols-[2fr_1fr_1fr_80px_80px_80px_90px_110px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
+              <div>Rule</div>
+              <div>Dimension</div>
+              <div>Asset</div>
+              <div>Severity</div>
+              <div>Score</div>
+              <div>Status</div>
+              <div>Schedule</div>
+              <div>Actions</div>
+            </div>
+
+            {filteredRules.length === 0 && (
+              <div className="py-16 text-center text-muted text-sm">
+                No rules match the current filters.{" "}
+                {canEdit && (
+                  <button onClick={() => { setEditRule(null); setShowForm(true); }} className="text-brand-purple hover:underline">Create the first rule</button>
+                )}
+              </div>
+            )}
+
+            {filteredRules.map((rule) => {
+              const runStatus = runResults[rule.ruleId];
+              const displayStatus = runStatus?.status ?? rule.lastStatusCode;
+              const displayScore = runStatus?.score ?? rule.lastScore;
+              return (
+                <div key={rule.ruleId} className={`grid grid-cols-[2fr_1fr_1fr_80px_80px_80px_90px_110px] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft ${!rule.isActive ? "opacity-50" : ""}`}>
+                  <div>
+                    <div className="font-semibold text-ink leading-tight">{rule.ruleName}</div>
+                    <div className="text-[11px] text-muted mt-0.5 flex items-center gap-2">
+                      {rule.ruleTemplateCode && <span className="font-mono bg-canvas-soft px-1.5 rounded">{rule.ruleTemplateCode}</span>}
+                      {rule.notifyOwners && <span title="Notify owners">🔔</span>}
+                      {rule.openIssueOnFail && <span title="Auto-open issue">🎫</span>}
+                    </div>
+                  </div>
+                  <div className="text-[12px] text-ink-soft">{rule.dimensionName ?? rule.dimensionCode ?? "—"}</div>
+                  <div className="text-[12px] text-muted font-mono truncate">
+                    {rule.assetTypeCode === "DATA_ENTITIES" ? "TABLE" : "COL"} #{rule.assetId}
+                    {rule.assetName && <div className="truncate">{rule.assetName}</div>}
+                  </div>
+                  <div>
+                    {rule.severityLevelCode && (
+                      <Badge text={rule.severityLevelCode} className={SEVERITY_COLORS[rule.severityLevelCode] ?? "bg-gray-100 text-gray-600"} />
+                    )}
+                  </div>
+                  <div className="font-bold text-ink tabular-nums">
+                    {displayScore != null ? `${Number(displayScore).toFixed(1)}%` : "—"}
+                  </div>
+                  <div>
+                    {displayStatus ? (
+                      <Badge text={displayStatus} className={STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-600"} />
+                    ) : <span className="text-muted text-xs">Never run</span>}
+                  </div>
+                  <div className="text-[11px] font-mono text-muted truncate">{rule.scheduleCron || "—"}</div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => runRule(rule.ruleId)}
+                      disabled={runningRuleId === rule.ruleId}
+                      className="btn btn-sm text-[11px] px-2 py-1"
+                      title="Run now"
+                    >
+                      {runningRuleId === rule.ruleId ? "…" : "▶ Run"}
+                    </button>
+                    {canEdit && (
+                      <>
+                        <button onClick={() => { setEditRule(rule); setShowForm(true); }} className="btn btn-sm text-[11px] px-2 py-1" title="Edit">Edit</button>
+                        <button onClick={() => toggleActive(rule)} className="btn btn-sm text-[11px] px-2 py-1 text-ink-soft" title={rule.isActive ? "Deactivate" : "Activate"}>
+                          {rule.isActive ? "Pause" : "Enable"}
+                        </button>
+                        <button onClick={() => deleteRule(rule.ruleId)} className="btn btn-sm text-[11px] px-2 py-1 text-red-600 hover:bg-red-50" title="Delete">Del</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
+      )}
+
+      {/* ── Run History ── */}
+      {tab === "runs" && (
+        <main className="px-8 py-7 pb-14">
+          <div className="card overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+              <h3 className="font-bold">Recent Runs</h3>
+              <button onClick={loadRuns} className="btn btn-sm text-xs">Refresh</button>
+            </div>
+            <div className="grid grid-cols-[2fr_1fr_80px_80px_80px_80px_80px_80px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
+              <div>Rule</div>
+              <div>Timestamp</div>
+              <div>Status</div>
+              <div>Score</div>
+              <div>Scanned</div>
+              <div>Passed</div>
+              <div>Failed</div>
+              <div>Detail</div>
+            </div>
+            {runs.length === 0 && (
+              <div className="py-16 text-center text-muted text-sm">
+                No runs yet. Go to Rule Library and click "▶ Run" to execute a rule.
+              </div>
+            )}
+            {runs.map((r) => (
+              <div key={r.resultId} className="grid grid-cols-[2fr_1fr_80px_80px_80px_80px_80px_80px] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft">
+                <div>
+                  <div className="font-semibold text-ink">{r.ruleName}</div>
+                  {r.message && <div className="text-[11px] text-muted truncate max-w-xs">{r.message}</div>}
+                </div>
+                <div className="text-[11px] text-muted">{new Date(r.executionTimestamp).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</div>
+                <div>{r.statusCode && <Badge text={r.statusCode} className={STATUS_COLORS[r.statusCode] ?? "bg-gray-100 text-gray-600"} />}</div>
+                <div className="font-bold tabular-nums">{r.score != null ? `${Number(r.score).toFixed(1)}%` : "—"}</div>
+                <div className="tabular-nums text-muted">{r.recordsScanned?.toLocaleString() ?? "—"}</div>
+                <div className="tabular-nums text-emerald-600">{r.recordsPassed?.toLocaleString() ?? "—"}</div>
+                <div className="tabular-nums text-red-600">{r.recordsFailed?.toLocaleString() ?? "—"}</div>
+                <div>
+                  <button onClick={() => setDetailResult(r)} className="btn btn-sm text-[11px] px-2 py-1">Detail</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {/* Modals */}
+      {showForm && (
+        <RuleFormModal
+          dimensions={dimensions}
+          editRule={editRule}
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); loadRules(); }}
+        />
+      )}
+      {detailResult && <RunDetailModal result={detailResult} onClose={() => setDetailResult(null)} />}
+    </div>
+  );
+}

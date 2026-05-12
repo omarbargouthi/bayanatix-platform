@@ -265,7 +265,21 @@ export function ColumnsTable({
                 ? <Tag variant="blue">{a.glossaryTerm}</Tag>
                 : <span className="text-muted">—</span>}
             </div>
-            <div className="font-bold">{a.qualityScore != null ? `${Number(a.qualityScore).toFixed(1)}%` : "—"}</div>
+            <div>
+              {a.qualityScore != null ? (
+                <div>
+                  <div className={`text-sm font-bold ${Number(a.qualityScore) >= 90 ? "text-emerald-600" : Number(a.qualityScore) >= 70 ? "text-amber-600" : "text-red-600"}`}>
+                    {Number(a.qualityScore).toFixed(1)}%
+                  </div>
+                  <div className="mt-1 h-1 bg-line rounded-full overflow-hidden w-14">
+                    <div
+                      className={`h-full rounded-full ${Number(a.qualityScore) >= 90 ? "bg-emerald-500" : Number(a.qualityScore) >= 70 ? "bg-amber-500" : "bg-red-500"}`}
+                      style={{ width: `${Math.min(100, Number(a.qualityScore))}%` }}
+                    />
+                  </div>
+                </div>
+              ) : <span className="text-muted">—</span>}
+            </div>
             {canEdit && (
               <div>
                 <button

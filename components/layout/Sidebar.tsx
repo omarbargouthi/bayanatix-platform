@@ -37,6 +37,7 @@ const NAV_DOMAINS: Item[] = [
 
 const NAV_ADMIN: Item[] = [
   { href: "/admin/user-management", label: "User Management", Icon: IconShield },
+  { href: "/admin/data-quality",    label: "Data Quality",    Icon: IconCheck },
   { href: "/admin/workflows",       label: "Workflows",       Icon: IconLines },
   { href: "/admin/sources",         label: "Data Sources",    Icon: IconShare },
   { href: "/admin/audit-logs",      label: "Audit & Logs",    Icon: IconHistory },

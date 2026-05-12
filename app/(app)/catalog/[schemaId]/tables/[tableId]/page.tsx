@@ -14,6 +14,8 @@ import { TablePageActions } from "@/components/catalog/TablePageActions";
 import { ProfilingPanel } from "@/components/catalog/ProfilingPanel";
 import { ActivityTab } from "@/components/catalog/ActivityTab";
 import { LineageTab } from "@/components/catalog/LineageTab";
+import { TableDqTab } from "@/components/catalog/TableDqTab";
+import { getDqRules } from "@/lib/queries/dq";
 import { fmtNumber } from "@/lib/utils";
 import { trackAssetVisit } from "@/lib/queries/dashboard";
 
@@ -26,7 +28,7 @@ const ENTITY_TYPE_LABEL: Record<string, string> = {
   SYSTEM:        "System / Setup",
 };
 
-const VALID_TABS = ["Schema", "Activity", "Lineage", "Sample Data", "Custom Properties"] as const;
+const VALID_TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof VALID_TABS[number];
 
 function isValidTab(s: string | undefined): s is Tab {
@@ -48,10 +50,11 @@ export default async function TablePage({
 
   const activeTab: Tab = isValidTab(searchParams.tab) ? searchParams.tab : "Schema";
 
-  // Always fetch entity; only fetch profile on Schema tab
-  const [entity, profile] = await Promise.all([
+  // Always fetch entity; only fetch profile and DQ rules on Schema tab
+  const [entity, profile, schemaTabDqRules] = await Promise.all([
     getEntityById(id),
     activeTab === "Schema" ? getEntityProfile(id) : Promise.resolve(null),
+    activeTab === "Schema" ? getDqRules({ assetTypeCode: "DATA_ENTITIES", assetId: id }) : Promise.resolve([]),
   ]);
   if (!entity) notFound();
 
@@ -128,15 +131,47 @@ export default async function TablePage({
                   ) : null}
                 </div>
 
-                <h4 className="mt-6 mb-2 font-bold text-sm">Data Quality</h4>
-                <div className="grid grid-cols-3 gap-3.5">
-                  <DqItem label="Completeness"    value={dq.completeness} />
-                  <DqItem label="Validity"         value={dq.validity} />
-                  <DqItem label="Uniqueness (PK)"  value={dq.uniqueness} />
-                  <DqItem label="Timeliness"       value={82.4} />
-                  <DqItem label="Consistency"      value={100} />
-                  <DqItem label="Accuracy"         value={88.6} />
+                <div className="mt-6 flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-sm">Data Quality</h4>
+                  <a href="?tab=Data+Quality" className="text-[11px] text-brand-purple hover:underline">
+                    {schemaTabDqRules.length} rule{schemaTabDqRules.length !== 1 ? "s" : ""} → manage
+                  </a>
                 </div>
+                {schemaTabDqRules.length > 0 ? (
+                  <div className="space-y-2">
+                    {schemaTabDqRules.slice(0, 4).map((r) => (
+                      <div key={r.ruleId} className="flex items-center justify-between bg-canvas-soft rounded-md px-3 py-2">
+                        <div className="text-[12px] font-medium text-ink truncate">{r.ruleName}</div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {r.lastScore != null && (
+                            <span className={`text-[11px] font-bold ${Number(r.lastScore) >= 90 ? "text-emerald-600" : Number(r.lastScore) >= 70 ? "text-amber-600" : "text-red-600"}`}>
+                              {Number(r.lastScore).toFixed(1)}%
+                            </span>
+                          )}
+                          {r.lastStatusCode ? (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                              r.lastStatusCode === "PASSED" ? "bg-emerald-100 text-emerald-700" :
+                              r.lastStatusCode === "FAILED" ? "bg-red-100 text-red-700" :
+                              r.lastStatusCode === "WARNING" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
+                            }`}>{r.lastStatusCode}</span>
+                          ) : <span className="text-[10px] text-muted">Not run</span>}
+                        </div>
+                      </div>
+                    ))}
+                    {schemaTabDqRules.length > 4 && (
+                      <div className="text-[11px] text-muted text-center">+{schemaTabDqRules.length - 4} more rules</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3.5">
+                    <DqItem label="Completeness"    value={dq.completeness} />
+                    <DqItem label="Validity"         value={dq.validity} />
+                    <DqItem label="Uniqueness (PK)"  value={dq.uniqueness} />
+                    <DqItem label="Timeliness"       value={82.4} />
+                    <DqItem label="Consistency"      value={100} />
+                    <DqItem label="Accuracy"         value={88.6} />
+                  </div>
+                )}
               </div>
 
               {/* Compliance gauge */}
@@ -162,6 +197,11 @@ export default async function TablePage({
               <ProfilingPanel profile={profile} attributes={entity.attributes} />
             )}
           </>
+        )}
+
+        {/* ── Data Quality tab ─────────────────────────────────────────── */}
+        {activeTab === "Data Quality" && (
+          <TableDqTab entityId={entity.entityId} entityName={entity.entityName} canEdit={canEdit} />
         )}
 
         {/* ── Activity tab ─────────────────────────────────────────────── */}
