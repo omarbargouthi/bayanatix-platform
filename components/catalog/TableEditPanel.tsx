@@ -124,14 +124,15 @@ export function TableEditPanel({ entityId, description, sourceDescription, displ
         </p>
       )}
 
-      {sourceDescription && (
-        <div className="mt-3 rounded-md bg-canvas-soft border border-line px-3.5 py-2.5">
-          <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1">
-            From source system
-          </div>
-          <p className="text-[13px] text-ink-soft leading-relaxed">{sourceDescription}</p>
+      <div className="mt-3 rounded-md bg-canvas-soft border border-line px-3.5 py-2.5">
+        <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1">
+          From source system
         </div>
-      )}
+        {sourceDescription
+          ? <p className="text-[13px] text-ink-soft leading-relaxed">{sourceDescription}</p>
+          : <p className="text-[13px] text-muted italic">No comment found in source database.</p>
+        }
+      </div>
     </>
   );
 }

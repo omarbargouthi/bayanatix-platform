@@ -88,6 +88,15 @@ function AttributeEditModal({
                 className="input-field resize-none"
                 placeholder="Describe this column…"
               />
+              <div className="mt-2 rounded-md bg-canvas-soft border border-line px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-0.5">
+                  From source system
+                </div>
+                {attr.sourceDescription
+                  ? <p className="text-[12px] text-ink-soft leading-relaxed">{attr.sourceDescription}</p>
+                  : <p className="text-[12px] text-muted italic">No comment found in source database.</p>
+                }
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -246,7 +255,7 @@ export function ColumnsTable({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-muted">{a.description ?? a.friendlyName ?? "—"}</div>
+              <div className="text-[11px] text-muted">{a.description ?? a.sourceDescription ?? a.friendlyName ?? "—"}</div>
             </div>
             <div className="font-mono text-[12px] text-ink-soft">{a.dataType}</div>
             <div>{a.nullPercentage != null ? `${Number(a.nullPercentage).toFixed(1)}%` : "—"}</div>
