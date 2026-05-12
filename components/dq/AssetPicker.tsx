@@ -181,9 +181,7 @@ export function AssetPicker({
   function switchMode(mode: SelectionMode) {
     if (mode === selectionMode) return;
     setSelectionMode(mode);
-    onChange([]);
-    setActiveTable(null);
-    setColumns(preFilterEntityId ? columns : []);
+    onChange([]); // clear selection only — keep navigation state intact
   }
 
   // ── Selection helpers ──

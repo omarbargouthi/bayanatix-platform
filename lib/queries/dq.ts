@@ -205,6 +205,8 @@ export async function createDqRule(data: {
 export async function updateDqRule(ruleId: number, data: Partial<{
   ruleName: string;
   dimensionCode: string | null;
+  assetTypeCode: string;
+  assetId: number;
   ruleTemplateCode: string | null;
   ruleConfig: Record<string, unknown>;
   ruleDefinitionText: string;
@@ -220,7 +222,14 @@ export async function updateDqRule(ruleId: number, data: Partial<{
     UPDATE bayanat.dq_rules SET
       rule_name_text       = COALESCE(${data.ruleName ?? null}, rule_name_text),
       dimension_code       = COALESCE(${data.dimensionCode ?? null}, dimension_code),
-      rule_template_code   = COALESCE(${data.ruleTemplateCode ?? null}, rule_template_code),
+      asset_type_code      = COALESCE(${data.assetTypeCode ?? null}, asset_type_code),
+      asset_id             = COALESCE(${data.assetId ?? null}, asset_id),
+      rule_logic_type_code = ${data.ruleTemplateCode !== undefined
+        ? (data.ruleTemplateCode ? "TEMPLATE" : "CUSTOM_SQL")
+        : sql`rule_logic_type_code`},
+      rule_template_code   = ${data.ruleTemplateCode !== undefined
+        ? data.ruleTemplateCode
+        : sql`rule_template_code`},
       rule_config          = COALESCE(${data.ruleConfig != null ? JSON.stringify(data.ruleConfig) : null}::jsonb, rule_config),
       rule_definition_text = COALESCE(${data.ruleDefinitionText ?? null}, rule_definition_text),
       severity_level_code  = COALESCE(${data.severityLevelCode ?? null}, severity_level_code),
