@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
              null_percentage AS "nullPct"
       FROM bayanat.data_attributes
       WHERE entity_id = ${entityId}
-      ORDER BY ordinal_position_number, physical_name_text
+      ORDER BY attribute_id
     `;
     return NextResponse.json(rows.map((r) => ({ ...r, isPk: Boolean(r.isPk), isNullable: Boolean(r.isNullable), nullPct: r.nullPct != null ? Number(r.nullPct) : null })));
   }
