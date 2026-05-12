@@ -1,17 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 const TABS = ["Schema", "Activity", "Lineage", "Sample Data", "Custom Properties"] as const;
+type Tab = typeof TABS[number];
 
-export function TableTabs() {
-  const [active, setActive] = useState<typeof TABS[number]>("Schema");
+export function TableTabs({ active }: { active: Tab }) {
+  const router   = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function navigate(tab: Tab) {
+    const p = new URLSearchParams(searchParams.toString());
+    if (tab === "Schema") p.delete("tab"); else p.set("tab", tab);
+    router.replace(`${pathname}?${p.toString()}`);
+  }
+
   return (
     <div className="flex gap-1 border-b border-line mb-5">
       {TABS.map((t) => (
         <button
           key={t}
-          onClick={() => setActive(t)}
+          onClick={() => navigate(t)}
           className={
             "px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 " +
             (active === t
