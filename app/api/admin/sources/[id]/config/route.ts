@@ -22,6 +22,10 @@ export async function PUT(req: Request, { params }: Params) {
     profilingEnabled:     !!body.profilingEnabled,
     profilingMode:        body.profilingMode        ?? "TOP_N",
     profilingLimit:       Number(body.profilingLimit ?? 1000),
+    defaultOwnerUserId:   body.defaultOwnerUserId   ?? null,
+    defaultBizStewardId:  body.defaultBizStewardId  ?? null,
+    defaultTechStewardId: body.defaultTechStewardId ?? null,
+    defaultCustodianId:   body.defaultCustodianId   ?? null,
   });
   return NextResponse.json({ ok: true });
 }

@@ -1,14 +1,19 @@
 import { sql } from "../db";
 
 export type CrawlConfig = {
-  configId:             number | null;
-  connectionId:         number;
-  schemaIncludeList:    string[] | null;
-  schemaExcludeList:    string[];
-  tableExcludePatterns: string[];
-  profilingEnabled:     boolean;
-  profilingMode:        "TOP_N" | "TOP_PCT" | "FULL";
-  profilingLimit:       number;
+  configId:              number | null;
+  connectionId:          number;
+  schemaIncludeList:     string[] | null;
+  schemaExcludeList:     string[];
+  tableExcludePatterns:  string[];
+  profilingEnabled:      boolean;
+  profilingMode:         "TOP_N" | "TOP_PCT" | "FULL";
+  profilingLimit:        number;
+  // Default governance assignments applied to all newly discovered entities
+  defaultOwnerUserId:    string | null;
+  defaultBizStewardId:   string | null;
+  defaultTechStewardId:  string | null;
+  defaultCustodianId:    string | null;
 };
 
 export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig> {
@@ -19,13 +24,18 @@ export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig>
            coalesce(table_exclude_patterns, ARRAY[]::TEXT[]) AS "tableExcludePatterns",
            profiling_enabled AS "profilingEnabled",
            profiling_mode    AS "profilingMode",
-           profiling_limit   AS "profilingLimit"
+           profiling_limit   AS "profilingLimit",
+           default_owner_user_id   AS "defaultOwnerUserId",
+           default_biz_steward_id  AS "defaultBizStewardId",
+           default_tech_steward_id AS "defaultTechStewardId",
+           default_custodian_user_id AS "defaultCustodianId"
     FROM bayanat.crawl_config WHERE connection_id = ${connectionId}
   `;
   return rows[0] ?? {
     configId: null, connectionId,
     schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
     profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
+    defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null, defaultCustodianId: null,
   };
 }
 
@@ -36,7 +46,9 @@ export async function saveCrawlConfig(
   await sql`
     INSERT INTO bayanat.crawl_config
       (connection_id, schema_include_list, schema_exclude_list, table_exclude_patterns,
-       profiling_enabled, profiling_mode, profiling_limit, updated_at)
+       profiling_enabled, profiling_mode, profiling_limit,
+       default_owner_user_id, default_biz_steward_id, default_tech_steward_id, default_custodian_user_id,
+       updated_at)
     VALUES
       (${connectionId},
        ${cfg.schemaIncludeList ?? null},
@@ -45,15 +57,23 @@ export async function saveCrawlConfig(
        ${cfg.profilingEnabled},
        ${cfg.profilingMode},
        ${cfg.profilingLimit},
+       ${cfg.defaultOwnerUserId   ?? null},
+       ${cfg.defaultBizStewardId  ?? null},
+       ${cfg.defaultTechStewardId ?? null},
+       ${cfg.defaultCustodianId   ?? null},
        NOW())
     ON CONFLICT (connection_id) DO UPDATE SET
-      schema_include_list    = EXCLUDED.schema_include_list,
-      schema_exclude_list    = EXCLUDED.schema_exclude_list,
-      table_exclude_patterns = EXCLUDED.table_exclude_patterns,
-      profiling_enabled      = EXCLUDED.profiling_enabled,
-      profiling_mode         = EXCLUDED.profiling_mode,
-      profiling_limit        = EXCLUDED.profiling_limit,
-      updated_at             = NOW()
+      schema_include_list       = EXCLUDED.schema_include_list,
+      schema_exclude_list       = EXCLUDED.schema_exclude_list,
+      table_exclude_patterns    = EXCLUDED.table_exclude_patterns,
+      profiling_enabled         = EXCLUDED.profiling_enabled,
+      profiling_mode            = EXCLUDED.profiling_mode,
+      profiling_limit           = EXCLUDED.profiling_limit,
+      default_owner_user_id     = EXCLUDED.default_owner_user_id,
+      default_biz_steward_id    = EXCLUDED.default_biz_steward_id,
+      default_tech_steward_id   = EXCLUDED.default_tech_steward_id,
+      default_custodian_user_id = EXCLUDED.default_custodian_user_id,
+      updated_at                = NOW()
   `;
 }
 

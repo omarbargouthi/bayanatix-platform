@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { sql } from "./db";
+import { applyGovernanceDefaults } from "./queries/stakeholders";
 type CrawlConfig = {
   schemaIncludeList:    string[] | null;
   schemaExcludeList:    string[];
@@ -536,10 +537,18 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
 
 // ── Save crawl results to catalog ─────────────────────────────────────────────
 
+type GovernanceDefaults = {
+  defaultOwnerUserId:   string | null;
+  defaultBizStewardId:  string | null;
+  defaultTechStewardId: string | null;
+  defaultCustodianId:   string | null;
+};
+
 async function saveCrawlResults(
   connectionId: number, connectionName: string, dbTypeCode: string,
   hostAddress: string, databaseName: string | null,
   result: CrawlResult, jobId: number,
+  govDefaults: GovernanceDefaults,
 ): Promise<void> {
   const existing = await sql<{ id: number }[]>`
     SELECT data_source_id AS id FROM bayanat.data_sources WHERE connection_id = ${connectionId}
@@ -581,6 +590,15 @@ async function saveCrawlResults(
         RETURNING entity_id AS id
       `;
       const entityId = entRow.id;
+
+      // Apply default governance roles from crawl config (fire-and-forget — non-blocking)
+      void applyGovernanceDefaults(
+        entityId,
+        govDefaults.defaultOwnerUserId,
+        govDefaults.defaultBizStewardId,
+        govDefaults.defaultTechStewardId,
+        govDefaults.defaultCustodianId,
+      ).catch(() => {});
 
       // Save profiling metadata if collected
       let profileId: number | null = null;
@@ -643,21 +661,33 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
   `;
   if (!cfgRow) throw new Error("Connection not found");
 
-  // Load crawl config (schema/table filters, profiling settings)
+  // Load crawl config (schema/table filters, profiling settings, governance defaults)
   const [configRow] = await sql<{
     schemaIncludeList: string[] | null; schemaExcludeList: string[];
     tableExcludePatterns: string[]; profilingEnabled: boolean;
     profilingMode: string; profilingLimit: number;
+    defaultOwnerUserId: string | null; defaultBizStewardId: string | null;
+    defaultTechStewardId: string | null; defaultCustodianId: string | null;
   }[]>`
     SELECT schema_include_list AS "schemaIncludeList",
            coalesce(schema_exclude_list, ARRAY[]::TEXT[]) AS "schemaExcludeList",
            coalesce(table_exclude_patterns, ARRAY[]::TEXT[]) AS "tableExcludePatterns",
            profiling_enabled AS "profilingEnabled",
            profiling_mode    AS "profilingMode",
-           profiling_limit   AS "profilingLimit"
+           profiling_limit   AS "profilingLimit",
+           default_owner_user_id   AS "defaultOwnerUserId",
+           default_biz_steward_id  AS "defaultBizStewardId",
+           default_tech_steward_id AS "defaultTechStewardId",
+           default_custodian_user_id AS "defaultCustodianId"
     FROM bayanat.crawl_config WHERE connection_id = ${connectionId}
   `;
   const config = configRow ?? null;
+  const govDefaults: GovernanceDefaults = {
+    defaultOwnerUserId:   configRow?.defaultOwnerUserId   ?? null,
+    defaultBizStewardId:  configRow?.defaultBizStewardId  ?? null,
+    defaultTechStewardId: configRow?.defaultTechStewardId ?? null,
+    defaultCustodianId:   configRow?.defaultCustodianId   ?? null,
+  };
 
   const logger = await makeJobLogger(connectionId, cfgRow.connectionName);
   await logger.info(`Starting crawl of ${cfgRow.connectionName} (${cfgRow.dbTypeCode})`);
@@ -677,7 +707,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     else throw new Error(`Unsupported DB type: ${cfgRow.dbTypeCode}`);
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);
-    await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId);
+    await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId, govDefaults);
     await finishJob(logger.jobId, result);
 
     await sql`

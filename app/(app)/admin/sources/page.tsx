@@ -24,7 +24,13 @@ type CrawlCfg = {
   schemaIncludeList: string[] | null; schemaExcludeList: string[];
   tableExcludePatterns: string[]; profilingEnabled: boolean;
   profilingMode: string; profilingLimit: number;
+  defaultOwnerUserId:   string | null;
+  defaultBizStewardId:  string | null;
+  defaultTechStewardId: string | null;
+  defaultCustodianId:   string | null;
 };
+
+type UserOption = { userId: string; fullName: string | null; email: string };
 
 const DB_TYPES = [
   { value: "POSTGRES", label: "PostgreSQL", port: 5432 },
@@ -53,7 +59,11 @@ const CRAWL_DOT: Record<string, string> = {
 
 const BLANK_FORM = { connectionName: "", dbTypeCode: "POSTGRES", hostAddress: "localhost", portNumber: 5432, databaseName: "", serviceName: "", defaultSchema: "", usernameText: "", passwordText: "", sslEnabled: false };
 
-const BLANK_CFG: CrawlCfg = { schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [], profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000 };
+const BLANK_CFG: CrawlCfg = {
+  schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
+  profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
+  defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null, defaultCustodianId: null,
+};
 
 function arr2str(a: string[] | null | undefined) { return (a ?? []).join(", "); }
 function str2arr(s: string) { return s.split(",").map(x => x.trim()).filter(Boolean); }
@@ -79,6 +89,10 @@ export default function DataSourcesPage() {
   const [cfgExcludes, setCfgExcludes] = useState("");
   const [cfgPatterns, setCfgPatterns] = useState("");
 
+  // Governance default user picker state (per field)
+  const [govSearch, setGovSearch]     = useState<Record<string, string>>({});
+  const [govResults, setGovResults]   = useState<Record<string, UserOption[]>>({});
+
   // Job history state
   const [jobs, setJobs]               = useState<CrawlJob[]>([]);
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
@@ -89,6 +103,19 @@ export default function DataSourcesPage() {
     if (r.ok) setConnections(await r.json());
   }
 
+  async function searchGovUsers(field: string, q: string) {
+    setGovSearch((p) => ({ ...p, [field]: q }));
+    if (!q.trim()) { setGovResults((p) => ({ ...p, [field]: [] })); return; }
+    const r = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+    if (r.ok) { const data = await r.json(); setGovResults((p) => ({ ...p, [field]: data })); }
+  }
+
+  function setGovUser(field: keyof CrawlCfg, userId: string | null, displayName: string) {
+    setCrawlCfg((c) => ({ ...c, [field]: userId }));
+    setGovSearch((p) => ({ ...p, [field]: displayName }));
+    setGovResults((p) => ({ ...p, [field]: [] }));
+  }
+
   async function loadCrawlConfig(id: number) {
     const r = await fetch(`/api/admin/sources/${id}/config`);
     if (!r.ok) return;
@@ -97,6 +124,25 @@ export default function DataSourcesPage() {
     setCfgIncludes(arr2str(cfg.schemaIncludeList));
     setCfgExcludes(arr2str(cfg.schemaExcludeList));
     setCfgPatterns(arr2str(cfg.tableExcludePatterns));
+    // Resolve display names for governance defaults
+    const govFields: { field: string; userId: string | null }[] = [
+      { field: "defaultOwnerUserId",  userId: cfg.defaultOwnerUserId },
+      { field: "defaultBizStewardId", userId: cfg.defaultBizStewardId },
+      { field: "defaultTechStewardId",userId: cfg.defaultTechStewardId },
+      { field: "defaultCustodianId",  userId: cfg.defaultCustodianId },
+    ];
+    const labels: Record<string, string> = {};
+    for (const { field, userId } of govFields) {
+      if (userId) {
+        const u = await fetch(`/api/users/search?q=${encodeURIComponent(userId)}`);
+        if (u.ok) {
+          const users: UserOption[] = await u.json();
+          const match = users.find((x) => x.userId === userId);
+          if (match) labels[field] = match.fullName ?? match.email;
+        }
+      }
+    }
+    setGovSearch(labels);
   }
 
   async function loadJobs(id: number) {
@@ -127,6 +173,10 @@ export default function DataSourcesPage() {
           profilingEnabled:     crawlCfg.profilingEnabled,
           profilingMode:        crawlCfg.profilingMode,
           profilingLimit:       crawlCfg.profilingLimit,
+          defaultOwnerUserId:   crawlCfg.defaultOwnerUserId,
+          defaultBizStewardId:  crawlCfg.defaultBizStewardId,
+          defaultTechStewardId: crawlCfg.defaultTechStewardId,
+          defaultCustodianId:   crawlCfg.defaultCustodianId,
         }),
       });
       setCfgSaved(true);
@@ -444,6 +494,60 @@ export default function DataSourcesPage() {
                         </div>
                       )}
                     </div>
+                    {/* Default Governance */}
+                    <div className="border-t border-line pt-4 space-y-3">
+                      <div>
+                        <div className="text-xs font-semibold text-ink mb-0.5">Default Governance Roles</div>
+                        <p className="text-[11px] text-muted mb-3">Assigned automatically to every table discovered during crawl. Leave blank to skip.</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { label: "Default Owner",            field: "defaultOwnerUserId"   as keyof CrawlCfg },
+                            { label: "Default Business Steward", field: "defaultBizStewardId"  as keyof CrawlCfg },
+                            { label: "Default Tech. Steward",    field: "defaultTechStewardId" as keyof CrawlCfg },
+                            { label: "Default Custodian",        field: "defaultCustodianId"   as keyof CrawlCfg },
+                          ].map(({ label, field }) => (
+                            <div key={field} className="relative">
+                              <label className="block text-[11px] font-semibold text-ink mb-1">{label}</label>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  className="flex-1 border border-line rounded-lg px-3 py-1.5 text-[13px] text-ink focus:outline-none focus:border-brand-purple min-w-0"
+                                  placeholder="Search user…"
+                                  value={govSearch[field] ?? ""}
+                                  onChange={(e) => searchGovUsers(field, e.target.value)}
+                                />
+                                {crawlCfg[field] && (
+                                  <button
+                                    onClick={() => setGovUser(field, null, "")}
+                                    className="shrink-0 w-6 h-6 rounded-full bg-gray-100 hover:bg-red-100 text-muted hover:text-red-600 flex items-center justify-center text-[11px] transition-colors"
+                                    title="Clear"
+                                  >✕</button>
+                                )}
+                              </div>
+                              {(govResults[field] ?? []).length > 0 && (
+                                <div className="absolute z-50 left-0 right-8 top-full mt-1 bg-white border border-line rounded-xl shadow-xl overflow-hidden">
+                                  {(govResults[field] ?? []).map((u) => (
+                                    <button
+                                      key={u.userId}
+                                      onMouseDown={() => setGovUser(field, u.userId, u.fullName ?? u.email)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-canvas-soft text-left border-b border-line-soft last:border-b-0"
+                                    >
+                                      <div className="w-6 h-6 rounded-full bg-brand-purple/10 text-brand-purple text-[10px] font-bold flex items-center justify-center shrink-0">
+                                        {((u.fullName ?? u.userId).slice(0, 1)).toUpperCase()}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="text-[12px] font-medium text-ink truncate">{u.fullName ?? u.userId}</div>
+                                        <div className="text-[10px] text-muted truncate">{u.email}</div>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="flex items-center gap-3 pt-1">
                       <button onClick={handleSaveConfig} disabled={cfgSaving} className="btn btn-primary btn-sm">
                         {cfgSaving ? "Saving…" : "Save Crawl Settings"}
