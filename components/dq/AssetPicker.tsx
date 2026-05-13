@@ -47,8 +47,21 @@ function PkBadge() {
   );
 }
 
+function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="px-2 py-1.5 border-b border-line bg-white">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Filter…"
+        className="w-full text-[11px] px-2 py-1 border border-line rounded bg-canvas-soft outline-none focus:border-brand-purple/60 focus:bg-white transition-colors"
+      />
+    </div>
+  );
+}
+
 function ColPane<T>({
-  title, items, activeId, onSelect, loading, renderItem, headerExtra,
+  title, items, activeId, onSelect, loading, renderItem, headerExtra, search, onSearch,
 }: {
   title: string;
   items: T[];
@@ -57,6 +70,8 @@ function ColPane<T>({
   loading: boolean;
   renderItem: (item: T, active: boolean) => React.ReactNode;
   headerExtra?: React.ReactNode;
+  search?: string;
+  onSearch?: (v: string) => void;
 }) {
   return (
     <div className="flex flex-col border-r border-line last:border-r-0 w-[200px] shrink-0">
@@ -64,6 +79,7 @@ function ColPane<T>({
         <span>{title}</span>
         {headerExtra}
       </div>
+      {onSearch && <SearchInput value={search ?? ""} onChange={onSearch} />}
       <div className="flex-1 overflow-y-auto nice-scroll">
         {loading && <div className="px-3 py-4 text-xs text-muted">Loading…</div>}
         {!loading && items.length === 0 && <div className="px-3 py-4 text-xs text-muted">None found</div>}
@@ -114,6 +130,11 @@ export function AssetPicker({
   const [loadingTbl, setLoadingTbl] = useState(false);
   const [loadingCol, setLoadingCol] = useState(false);
 
+  const [searchSrc, setSearchSrc] = useState("");
+  const [searchSch, setSearchSch] = useState("");
+  const [searchTbl, setSearchTbl] = useState("");
+  const [searchCol, setSearchCol] = useState("");
+
   const [preFilterContext, setPreFilterContext] = useState<{ sourceName: string; schemaName: string } | null>(null);
 
   // ── Load on mount ──
@@ -142,9 +163,17 @@ export function AssetPicker({
 
   // ── Navigation helpers ──
 
+  // ── Derived: search-filtered lists ──
+  const q = (s: string) => s.toLowerCase();
+  const filteredSources = sources.filter((s) => !searchSrc || s.name.toLowerCase().includes(q(searchSrc)));
+  const filteredSchemas = schemas.filter((s) => !searchSch || s.name.toLowerCase().includes(q(searchSch)));
+  const filteredTables  = tables.filter((t)  => !searchTbl || t.name.toLowerCase().includes(q(searchTbl)));
+  const filteredColumns = columns.filter((c) => !searchCol || c.name.toLowerCase().includes(q(searchCol)));
+
   function loadColumnsForTable(table: BrowseTable) {
     setActiveTable(table);
     setColumns([]);
+    setSearchCol("");
     setLoadingCol(true);
     fetch(`/api/catalog/browse?type=columns&entityId=${table.id}`)
       .then((r) => r.json())
@@ -159,6 +188,9 @@ export function AssetPicker({
     setSchemas([]);
     setTables([]);
     setColumns([]);
+    setSearchSch("");
+    setSearchTbl("");
+    setSearchCol("");
     setLoadingSch(true);
     fetch(`/api/catalog/browse?type=schemas&sourceId=${src.id}`)
       .then((r) => r.json())
@@ -171,6 +203,8 @@ export function AssetPicker({
     setActiveTable(null);
     setTables([]);
     setColumns([]);
+    setSearchTbl("");
+    setSearchCol("");
     setLoadingTbl(true);
     fetch(`/api/catalog/browse?type=tables&schemaId=${schema.id}`)
       .then((r) => r.json())
@@ -258,7 +292,7 @@ export function AssetPicker({
   }
 
   const showColumnSelectAll =
-    selectionMode === "column" && columns.length > 0 && (activeTable != null || !!preFilterEntityId);
+    selectionMode === "column" && filteredColumns.length > 0 && (activeTable != null || !!preFilterEntityId);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
@@ -310,10 +344,12 @@ export function AssetPicker({
           {!preFilterEntityId && (
             <ColPane
               title="Source"
-              items={sources}
+              items={filteredSources}
               activeId={activeSource?.id ?? null}
               loading={loadingSrc}
               onSelect={selectSource}
+              search={searchSrc}
+              onSearch={setSearchSrc}
               renderItem={(src, active) => (
                 <div>
                   <div className={`text-[12px] font-semibold truncate ${active ? "text-brand-purple" : "text-ink"}`}>{src.name}</div>
@@ -328,10 +364,12 @@ export function AssetPicker({
           {!preFilterEntityId && (
             <ColPane
               title="Schema"
-              items={schemas}
+              items={filteredSchemas}
               activeId={activeSchema?.id ?? null}
               loading={loadingSch}
               onSelect={selectSchema}
+              search={searchSch}
+              onSearch={activeSource ? setSearchSch : undefined}
               renderItem={(sch, active) => (
                 <div>
                   <div className={`text-[12px] font-semibold truncate ${active ? "text-brand-purple" : "text-ink"}`}>{sch.name}</div>
@@ -347,14 +385,15 @@ export function AssetPicker({
               <div className="px-3 py-2 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider font-bold text-muted">
                 Table / View
               </div>
+              {activeSchema && <SearchInput value={searchTbl} onChange={setSearchTbl} />}
               <div className="flex-1 overflow-y-auto nice-scroll">
                 {loadingTbl && <div className="px-3 py-4 text-xs text-muted">Loading…</div>}
-                {!loadingTbl && tables.length === 0 && (
+                {!loadingTbl && filteredTables.length === 0 && (
                   <div className="px-3 py-4 text-xs text-muted">
-                    {activeSchema ? "No tables" : "Select a schema"}
+                    {activeSchema ? (searchTbl ? "No match" : "No tables") : "Select a schema"}
                   </div>
                 )}
-                {!loadingTbl && tables.map((tbl) => {
+                {!loadingTbl && filteredTables.map((tbl) => {
                   const checked = isTableSelected(tbl);
                   const active  = activeTable?.id === tbl.id;
                   return (
@@ -408,18 +447,21 @@ export function AssetPicker({
                 </div>
               )}
             </div>
+            {(activeTable || preFilterEntityId) && columns.length > 0 && (
+              <SearchInput value={searchCol} onChange={setSearchCol} />
+            )}
             <div className="flex-1 overflow-y-auto nice-scroll">
               {loadingCol && <div className="px-3 py-4 text-xs text-muted">Loading…</div>}
-              {!loadingCol && columns.length === 0 && (
+              {!loadingCol && filteredColumns.length === 0 && (
                 <div className="px-3 py-4 text-xs text-muted">
                   {(activeTable || preFilterEntityId)
-                    ? "No columns found"
+                    ? (searchCol ? "No columns match" : "No columns found")
                     : selectionMode === "column"
                       ? "Click a table to browse its columns"
                       : "Click a table to preview its columns"}
                 </div>
               )}
-              {!loadingCol && columns.map((col) => (
+              {!loadingCol && filteredColumns.map((col) => (
                 selectionMode === "column" ? (
                   <label
                     key={col.id}

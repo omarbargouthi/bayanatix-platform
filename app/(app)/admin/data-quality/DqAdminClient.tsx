@@ -716,7 +716,15 @@ export function DqAdminClient({
                       <Badge text={r.lastStatusCode ?? "—"} className={STATUS_COLORS[r.lastStatusCode ?? "ERROR"] ?? "bg-gray-100 text-gray-600"} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-ink">{r.ruleName}</div>
-                        <div className="text-[11px] text-muted">{r.assetTypeCode === "DATA_ENTITIES" ? "Table" : "Column"} · ID {r.assetId} · {r.dimensionName}</div>
+                        <div className="text-[11px] text-muted">
+                          {r.assetTypeCode === "DATA_ENTITIES" ? "Table" : "Column"}
+                          {r.assetTypeCode === "DATA_ATTRIBUTES" && r.parentEntityName
+                            ? ` · ${r.parentEntityName} › ${r.assetName ?? r.assetId}`
+                            : r.assetName
+                              ? ` · ${r.assetName}`
+                              : ` · #${r.assetId}`}
+                          {r.dimensionName && ` · ${r.dimensionName}`}
+                        </div>
                       </div>
                       {r.lastScore != null && (
                         <div className="text-sm font-bold text-red-600">{r.lastScore.toFixed(1)}%</div>
@@ -801,9 +809,16 @@ export function DqAdminClient({
                     </div>
                   </div>
                   <div className="text-[12px] text-ink-soft">{rule.dimensionName ?? rule.dimensionCode ?? "—"}</div>
-                  <div className="text-[12px] text-muted font-mono truncate">
-                    {rule.assetTypeCode === "DATA_ENTITIES" ? "TABLE" : "COL"} #{rule.assetId}
-                    {rule.assetName && <div className="truncate">{rule.assetName}</div>}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${rule.assetTypeCode === "DATA_ENTITIES" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                        {rule.assetTypeCode === "DATA_ENTITIES" ? "TABLE" : "COL"}
+                      </span>
+                      <span className="text-[12px] font-semibold text-ink truncate">{rule.assetName ?? `#${rule.assetId}`}</span>
+                    </div>
+                    {rule.assetTypeCode === "DATA_ATTRIBUTES" && rule.parentEntityName && (
+                      <div className="text-[10px] text-muted truncate mt-0.5">{rule.parentEntityName} › {rule.assetName}</div>
+                    )}
                   </div>
                   <div>
                     {rule.severityLevelCode && (

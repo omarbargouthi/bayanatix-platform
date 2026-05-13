@@ -8,10 +8,11 @@ export async function GET(req: NextRequest) {
 
   const sp = req.nextUrl.searchParams;
   const assetTypeCode = sp.get("assetTypeCode") ?? undefined;
-  const assetId = sp.get("assetId") ? Number(sp.get("assetId")) : undefined;
+  const assetId   = sp.get("assetId")   ? Number(sp.get("assetId"))   : undefined;
+  const entityId  = sp.get("entityId")  ? Number(sp.get("entityId"))  : undefined;
   const activeOnly = sp.get("activeOnly") === "true";
 
-  const rules = await getDqRules({ assetTypeCode, assetId, activeOnly });
+  const rules = await getDqRules({ assetTypeCode, assetId, entityId, activeOnly });
   return NextResponse.json(rules);
 }
 

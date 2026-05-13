@@ -783,7 +783,8 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const tableRules: DqRule[] = await fetch(`/api/dq/rules?assetTypeCode=DATA_ENTITIES&assetId=${entityId}`).then((r) => r.json());
+      // Fetch both table-level and column-level rules for this entity
+      const tableRules: DqRule[] = await fetch(`/api/dq/rules?entityId=${entityId}`).then((r) => r.json());
       setRules(tableRules);
 
       // Fetch latest result per rule (for Samples button)
@@ -993,6 +994,9 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-ink">{rule.ruleName}</span>
+                        {rule.assetTypeCode === "DATA_ATTRIBUTES" && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">COL</span>
+                        )}
                         {rule.ruleTemplateCode && (
                           <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
                         )}
@@ -1000,6 +1004,11 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_RING[rule.severityLevelCode] ?? ""}`}>{rule.severityLevelCode}</span>
                         )}
                       </div>
+                      {rule.assetTypeCode === "DATA_ATTRIBUTES" && rule.assetName && (
+                        <div className="text-[11px] text-brand-purple/80 mt-0.5 font-mono">
+                          {entityName} › {rule.assetName}
+                        </div>
+                      )}
                       <div className="text-[11px] text-muted mt-0.5 flex items-center gap-3 flex-wrap">
                         {rule.thresholdFail != null && <span>Fail &lt; {rule.thresholdFail}%</span>}
                         {rule.thresholdWarn != null && <span>Warn &lt; {rule.thresholdWarn}%</span>}

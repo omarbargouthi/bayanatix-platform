@@ -16,6 +16,8 @@ export type DqRule = {
   assetTypeCode: string;
   assetId: number;
   assetName: string | null;
+  /** For column-level rules: the table that owns the column */
+  parentEntityName: string | null;
   ruleLogicTypeCode: string | null;
   ruleTemplateCode: string | null;
   ruleConfig: Record<string, unknown>;
@@ -95,6 +97,8 @@ export async function getDqDimensions(): Promise<DqDimension[]> {
 export async function getDqRules(filters?: {
   assetTypeCode?: string;
   assetId?: number;
+  /** Fetch all rules tied to this entity — both table-level (asset_id = entityId) and column-level (a.entity_id = entityId) */
+  entityId?: number;
   activeOnly?: boolean;
 }): Promise<DqRule[]> {
   const rows = await sql<any[]>`
@@ -110,6 +114,7 @@ export async function getDqRules(filters?: {
         WHEN r.asset_type_code = 'DATA_ATTRIBUTES' THEN a.physical_name_text
         ELSE NULL
       END                    AS "assetName",
+      ep.entity_name_text    AS "parentEntityName",
       r.rule_logic_type_code AS "ruleLogicTypeCode",
       r.rule_template_code   AS "ruleTemplateCode",
       COALESCE(r.rule_config, '{}')::jsonb AS "ruleConfig",
@@ -133,24 +138,34 @@ export async function getDqRules(filters?: {
       r.created_at_timestamp AS "createdAt"
     FROM bayanat.dq_rules r
     LEFT JOIN bayanat.dq_dimensions d ON d.dimension_code = r.dimension_code
-    LEFT JOIN bayanat.data_entities e ON r.asset_type_code = 'DATA_ENTITIES' AND e.entity_id = r.asset_id
+    LEFT JOIN bayanat.data_entities e  ON r.asset_type_code = 'DATA_ENTITIES'   AND e.entity_id    = r.asset_id
     LEFT JOIN bayanat.data_attributes a ON r.asset_type_code = 'DATA_ATTRIBUTES' AND a.attribute_id = r.asset_id
+    LEFT JOIN bayanat.data_entities ep ON r.asset_type_code = 'DATA_ATTRIBUTES' AND ep.entity_id   = a.entity_id
     WHERE 1=1
-      ${filters?.assetTypeCode ? sql`AND r.asset_type_code = ${filters.assetTypeCode}` : sql``}
-      ${filters?.assetId != null ? sql`AND r.asset_id = ${filters.assetId}` : sql``}
+      ${filters?.entityId != null ? sql`
+        AND (
+          (r.asset_type_code = 'DATA_ENTITIES'   AND r.asset_id = ${filters.entityId})
+          OR
+          (r.asset_type_code = 'DATA_ATTRIBUTES' AND a.entity_id = ${filters.entityId})
+        )
+      ` : sql`
+        ${filters?.assetTypeCode ? sql`AND r.asset_type_code = ${filters.assetTypeCode}` : sql``}
+        ${filters?.assetId != null ? sql`AND r.asset_id = ${filters.assetId}` : sql``}
+      `}
       ${filters?.activeOnly ? sql`AND r.is_active_indicator = true` : sql``}
-    ORDER BY r.created_at_timestamp DESC
+    ORDER BY r.asset_type_code DESC, r.created_at_timestamp DESC
   `;
   return rows.map((r) => ({
     ...r,
-    thresholdWarn:  r.thresholdWarn  != null ? Number(r.thresholdWarn)  : null,
-    thresholdFail:  r.thresholdFail  != null ? Number(r.thresholdFail)  : null,
-    lastScore:      r.lastScore      != null ? Number(r.lastScore)      : null,
-    previousScore:  r.previousScore  != null ? Number(r.previousScore)  : null,
-    ruleConfig:     typeof r.ruleConfig === "object" && r.ruleConfig !== null ? r.ruleConfig : {},
-    notifyOwners:   Boolean(r.notifyOwners),
-    openIssueOnFail: Boolean(r.openIssueOnFail),
-    isActive:       Boolean(r.isActive),
+    thresholdWarn:    r.thresholdWarn    != null ? Number(r.thresholdWarn)    : null,
+    thresholdFail:    r.thresholdFail    != null ? Number(r.thresholdFail)    : null,
+    lastScore:        r.lastScore        != null ? Number(r.lastScore)        : null,
+    previousScore:    r.previousScore    != null ? Number(r.previousScore)    : null,
+    parentEntityName: r.parentEntityName ?? null,
+    ruleConfig:       typeof r.ruleConfig === "object" && r.ruleConfig !== null ? r.ruleConfig : {},
+    notifyOwners:     Boolean(r.notifyOwners),
+    openIssueOnFail:  Boolean(r.openIssueOnFail),
+    isActive:         Boolean(r.isActive),
   }));
 }
 
