@@ -5,6 +5,7 @@
  *                 RANGE_CHECK, UNIQUE, ROW_COUNT_THRESHOLD, FRESHNESS_CHECK, CUSTOM_SQL
  */
 
+import postgres from "postgres";
 import { sql } from "./db";
 import { getDqRuleById, saveDqResult } from "./queries/dq";
 import type { DqRule } from "./queries/dq";
@@ -25,6 +26,33 @@ export type RunResult = {
 import { DQ_TEMPLATES } from "./dq-templates";
 import type { TemplateCode } from "./dq-templates";
 
+// ── Source connection helper ──────────────────────────────────────────────────
+
+async function getSourceSql(rule: DqRule): Promise<ReturnType<typeof postgres> | null> {
+  const rows = await sql<{
+    host: string; port: number; dbName: string; username: string; password: string;
+  }[]>`
+    SELECT cr.host_address AS host, cr.port_number::int AS port,
+           cr.database_name AS "dbName",
+           cr.username_text AS username, cr.password_text AS password
+    FROM bayanat.connection_registry cr
+    JOIN bayanat.data_sources ds ON ds.connection_id = cr.connection_id
+    JOIN bayanat.data_schemas  s  ON s.data_source_id = ds.data_source_id
+    JOIN bayanat.data_entities e  ON e.schema_id      = s.schema_id
+    ${rule.assetTypeCode === "DATA_ATTRIBUTES"
+      ? sql`JOIN bayanat.data_attributes a ON a.entity_id = e.entity_id AND a.attribute_id = ${rule.assetId}`
+      : sql`AND e.entity_id = ${rule.assetId}`}
+    WHERE cr.host_address IS NOT NULL
+    LIMIT 1
+  `;
+  if (rows.length === 0 || !rows[0].host) return null;
+  const { host, port, dbName, username, password } = rows[0];
+  return postgres(
+    `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${dbName}`,
+    { max: 1, connect_timeout: 5, ssl: "prefer", transform: { undefined: null } }
+  );
+}
+
 // ── Engine: run a single rule ─────────────────────────────────────────────────
 
 export async function runDqRule(ruleId: number): Promise<RunResult> {
@@ -34,7 +62,6 @@ export async function runDqRule(ruleId: number): Promise<RunResult> {
   const start = Date.now();
 
   try {
-    // Resolve the table/column metadata for column-level rules
     const meta = await resolveAssetMeta(rule);
     const engineResult = await executeTemplate(rule, meta);
     const durationMs = Date.now() - start;
@@ -128,27 +155,33 @@ type EngineResult = {
   samples?: { value: string; isValid: boolean; count: number }[];
 };
 
+// Quote an identifier safely (double-quote, escape internal double quotes)
+function qi(name: string) {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
 async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineResult> {
   const cfg = rule.ruleConfig as Record<string, unknown>;
   const tpl = rule.ruleTemplateCode ?? "CUSTOM_SQL";
 
-  // For schema-resident rules without a real live connection, we use profiling data
-  // as a proxy. In production, connect to source via connection_registry.
   switch (tpl) {
+
+    // ── Uses catalog profiling data ───────────────────────────────────────────
+
     case "NOT_NULL": {
-      if (!meta.qualifiedTable || !meta.columnName) return simErr("Asset metadata missing");
+      if (!meta.columnName) return simErr("Column not specified");
       const rows = await sql<any[]>`
         SELECT null_percentage AS "nullPct", row_count_estimate AS "rowCount"
         FROM bayanat.data_attributes a
         JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
         WHERE a.physical_name_text = ${meta.columnName}
-          AND e.entity_name_text = ${meta.tableName}
+          AND e.entity_name_text   = ${meta.tableName}
         LIMIT 1
       `;
       if (rows.length === 0) return simErr("Column profiling data not available");
-      const nullPct = Number(rows[0].nullPct ?? 0);
+      const nullPct  = Number(rows[0].nullPct ?? 0);
       const rowCount = Number(rows[0].rowCount ?? 0);
-      const failed = Math.round((nullPct / 100) * rowCount);
+      const failed   = Math.round((nullPct / 100) * rowCount);
       return {
         recordsScanned: rowCount, recordsPassed: rowCount - failed, recordsFailed: failed,
         failurePct: nullPct, message: `${nullPct.toFixed(2)}% null values found`,
@@ -164,13 +197,13 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
         FROM bayanat.data_attributes a
         JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
         WHERE a.physical_name_text = ${meta.columnName}
-          AND e.entity_name_text = ${meta.tableName}
+          AND e.entity_name_text   = ${meta.tableName}
         LIMIT 1
       `;
       if (rows.length === 0) return simErr("Column profiling data not available");
-      const nullPct = Number(rows[0].nullPct ?? 0);
+      const nullPct  = Number(rows[0].nullPct ?? 0);
       const rowCount = Number(rows[0].rowCount ?? 0);
-      const failed = Math.round((nullPct / 100) * rowCount);
+      const failed   = Math.round((nullPct / 100) * rowCount);
       return {
         recordsScanned: rowCount, recordsPassed: rowCount - failed, recordsFailed: failed,
         failurePct: nullPct,
@@ -185,12 +218,12 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
         FROM bayanat.data_attributes a
         JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
         WHERE a.physical_name_text = ${meta.columnName}
-          AND e.entity_name_text = ${meta.tableName}
+          AND e.entity_name_text   = ${meta.tableName}
         LIMIT 1
       `;
       if (rows.length === 0) return simErr("Column profiling data not available");
-      const distinct = Number(rows[0].distinctCount ?? 0);
-      const rowCount = Number(rows[0].rowCount ?? 0);
+      const distinct  = Number(rows[0].distinctCount ?? 0);
+      const rowCount  = Number(rows[0].rowCount ?? 0);
       const duplicates = Math.max(0, rowCount - distinct);
       const failurePct = rowCount > 0 ? (duplicates / rowCount) * 100 : 0;
       return {
@@ -216,101 +249,258 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
       };
     }
 
+    // ── Live source queries ───────────────────────────────────────────────────
+
+    case "VALUE_IN_LIST": {
+      const allowed = String(cfg.allowed_values ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (allowed.length === 0) return simErr("No allowed values configured");
+      if (!meta.qualifiedTable || !meta.columnName) return simErr("Asset metadata missing");
+
+      const srcSql = await getSourceSql(rule);
+      if (!srcSql) return simErr("No source connection configured for this asset");
+
+      try {
+        const col = qi(meta.columnName);
+        const tbl = meta.qualifiedTable;
+
+        // Count: failed = NULL or value not in allowed list (case-sensitive)
+        const countRows = await srcSql.unsafe(`
+          SELECT
+            COUNT(*)::int               AS total,
+            COUNT(*) FILTER (
+              WHERE ${col} IS NULL
+                 OR ${col}::text != ALL(ARRAY[${allowed.map(() => "?").join(",")}])
+            )::int AS failed
+          FROM ${tbl}
+        `, allowed) as any[];
+
+        const total  = Number(countRows[0]?.total  ?? 0);
+        const failed = Number(countRows[0]?.failed ?? 0);
+        const failurePct = total > 0 ? (failed / total) * 100 : 0;
+
+        // Capture samples of invalid values
+        const badRows = await srcSql.unsafe(`
+          SELECT COALESCE(${col}::text, '(null)') AS value, COUNT(*)::int AS cnt
+          FROM ${tbl}
+          WHERE ${col} IS NULL
+             OR ${col}::text != ALL(ARRAY[${allowed.map(() => "?").join(",")}])
+          GROUP BY ${col}::text
+          ORDER BY cnt DESC
+          LIMIT 20
+        `, allowed) as any[];
+
+        const goodRows = await srcSql.unsafe(`
+          SELECT ${col}::text AS value, COUNT(*)::int AS cnt
+          FROM ${tbl}
+          WHERE ${col}::text = ANY(ARRAY[${allowed.map(() => "?").join(",")}])
+          GROUP BY ${col}::text
+          ORDER BY cnt DESC
+          LIMIT 10
+        `, allowed) as any[];
+
+        const samples = [
+          ...badRows.map((r: any)  => ({ value: String(r.value), isValid: false, count: Number(r.cnt) })),
+          ...goodRows.map((r: any) => ({ value: String(r.value), isValid: true,  count: Number(r.cnt) })),
+        ];
+
+        return {
+          recordsScanned: total, recordsPassed: total - failed, recordsFailed: failed,
+          failurePct,
+          message: `Allowed: [${allowed.join(", ")}] — ${failed} of ${total} values outside list or null`,
+          samples,
+        };
+      } finally {
+        await srcSql.end();
+      }
+    }
+
     case "REGEX_MATCH": {
       const pattern = String(cfg.pattern ?? "");
       if (!pattern) return simErr("No regex pattern configured");
-      if (!meta.columnName) return simErr("Column not specified");
-      const rows = await sql<any[]>`
-        SELECT distinct_count AS "distinctCount", row_count_estimate AS "rowCount"
-        FROM bayanat.data_attributes a
-        JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
-        WHERE a.physical_name_text = ${meta.columnName}
-          AND e.entity_name_text = ${meta.tableName}
-        LIMIT 1
-      `;
-      if (rows.length === 0) return simErr("Profiling data not available");
-      const rowCount = Number(rows[0].rowCount ?? 0);
-      // Simulate: pattern validation requires live query — approximate as 98% pass
-      const failPct = 2.0;
-      const failed = Math.round((failPct / 100) * rowCount);
-      return {
-        recordsScanned: rowCount, recordsPassed: rowCount - failed, recordsFailed: failed,
-        failurePct: failPct,
-        message: `Pattern /${pattern}/ — simulated: ${failPct}% invalid values`,
-      };
-    }
+      if (!meta.qualifiedTable || !meta.columnName) return simErr("Asset metadata missing");
 
-    case "VALUE_IN_LIST": {
-      const allowed = String(cfg.allowed_values ?? "").split(",").map((v) => v.trim()).filter(Boolean);
-      if (allowed.length === 0) return simErr("No allowed values configured");
-      if (!meta.columnName) return simErr("Column not specified");
-      const rows = await sql<any[]>`
-        SELECT row_count_estimate AS "rowCount"
-        FROM bayanat.data_entities WHERE entity_id = ${rule.assetId}
-      `;
-      const rowCount = Number(rows[0]?.rowCount ?? 0);
-      const failPct = 1.5;
-      const failed = Math.round((failPct / 100) * rowCount);
-      return {
-        recordsScanned: rowCount, recordsPassed: rowCount - failed, recordsFailed: failed,
-        failurePct: failPct,
-        message: `Allowed: [${allowed.join(", ")}] — ${failPct}% values outside list`,
-        samples: [
-          ...allowed.slice(0, 5).map((v) => ({ value: v, isValid: true, count: Math.floor(rowCount / allowed.length) })),
-        ],
-      };
+      const srcSql = await getSourceSql(rule);
+      if (!srcSql) return simErr("No source connection configured for this asset");
+
+      try {
+        const col = qi(meta.columnName);
+        const tbl = meta.qualifiedTable;
+
+        const countRows = await srcSql.unsafe(`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (
+              WHERE ${col} IS NULL OR ${col}::text !~ $1
+            )::int AS failed
+          FROM ${tbl}
+        `, [pattern]) as any[];
+
+        const total  = Number(countRows[0]?.total  ?? 0);
+        const failed = Number(countRows[0]?.failed ?? 0);
+        const failurePct = total > 0 ? (failed / total) * 100 : 0;
+
+        const badRows = await srcSql.unsafe(`
+          SELECT COALESCE(${col}::text, '(null)') AS value, COUNT(*)::int AS cnt
+          FROM ${tbl}
+          WHERE ${col} IS NULL OR ${col}::text !~ $1
+          GROUP BY ${col}::text
+          ORDER BY cnt DESC
+          LIMIT 20
+        `, [pattern]) as any[];
+
+        return {
+          recordsScanned: total, recordsPassed: total - failed, recordsFailed: failed,
+          failurePct,
+          message: `Pattern /${pattern}/ — ${failed} of ${total} values invalid or null`,
+          samples: badRows.map((r: any) => ({ value: String(r.value), isValid: false, count: Number(r.cnt) })),
+        };
+      } finally {
+        await srcSql.end();
+      }
     }
 
     case "RANGE_CHECK": {
-      const minVal = cfg.min_value != null ? Number(cfg.min_value) : null;
-      const maxVal = cfg.max_value != null ? Number(cfg.max_value) : null;
-      if (!meta.columnName) return simErr("Column not specified");
-      const rows = await sql<any[]>`
-        SELECT min_value AS "minVal", max_value AS "maxVal", row_count_estimate AS "rowCount"
-        FROM bayanat.data_attributes a
-        JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
-        WHERE a.physical_name_text = ${meta.columnName}
-          AND e.entity_name_text = ${meta.tableName}
-        LIMIT 1
-      `;
-      if (rows.length === 0) return simErr("Profiling data not available");
-      const rowCount = Number(rows[0].rowCount ?? 0);
-      const actualMin = rows[0].minVal != null ? Number(rows[0].minVal) : null;
-      const actualMax = rows[0].maxVal != null ? Number(rows[0].maxVal) : null;
-      const outOfRange =
-        (minVal != null && actualMin != null && actualMin < minVal) ||
-        (maxVal != null && actualMax != null && actualMax > maxVal);
-      const failPct = outOfRange ? 3.5 : 0;
-      const failed = Math.round((failPct / 100) * rowCount);
-      return {
-        recordsScanned: rowCount, recordsPassed: rowCount - failed, recordsFailed: failed,
-        failurePct: failPct,
-        message: `Range [${minVal ?? "—"}, ${maxVal ?? "—"}] — actual [${actualMin ?? "?"}, ${actualMax ?? "?"}]`,
-      };
+      const minVal = cfg.min_value != null && cfg.min_value !== "" ? Number(cfg.min_value) : null;
+      const maxVal = cfg.max_value != null && cfg.max_value !== "" ? Number(cfg.max_value) : null;
+      if (minVal === null && maxVal === null) return simErr("No range bounds configured");
+      if (!meta.qualifiedTable || !meta.columnName) return simErr("Asset metadata missing");
+
+      const srcSql = await getSourceSql(rule);
+      if (!srcSql) {
+        // Fall back to profiling data
+        const rows = await sql<any[]>`
+          SELECT min_value AS "minVal", max_value AS "maxVal", row_count_estimate AS "rowCount"
+          FROM bayanat.data_attributes a
+          JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+          WHERE a.physical_name_text = ${meta.columnName}
+            AND e.entity_name_text   = ${meta.tableName}
+          LIMIT 1
+        `;
+        if (rows.length === 0) return simErr("Profiling data not available");
+        const rowCount  = Number(rows[0].rowCount ?? 0);
+        const actualMin = rows[0].minVal != null ? Number(rows[0].minVal) : null;
+        const actualMax = rows[0].maxVal != null ? Number(rows[0].maxVal) : null;
+        const outOfRange =
+          (minVal != null && actualMin != null && actualMin < minVal) ||
+          (maxVal != null && actualMax != null && actualMax > maxVal);
+        const failPct = outOfRange ? 100 : 0;
+        return {
+          recordsScanned: rowCount, recordsPassed: outOfRange ? 0 : rowCount, recordsFailed: outOfRange ? rowCount : 0,
+          failurePct: failPct,
+          message: `Range [${minVal ?? "—"}, ${maxVal ?? "—"}] — actual [${actualMin ?? "?"}, ${actualMax ?? "?"}]`,
+        };
+      }
+
+      try {
+        const col = qi(meta.columnName);
+        const tbl = meta.qualifiedTable;
+        const conditions: string[] = [`${col} IS NULL`];
+        const params: number[] = [];
+        if (minVal !== null) { params.push(minVal); conditions.push(`${col}::numeric < $${params.length}`); }
+        if (maxVal !== null) { params.push(maxVal); conditions.push(`${col}::numeric > $${params.length}`); }
+
+        const countRows = await srcSql.unsafe(`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE ${conditions.join(" OR ")})::int AS failed
+          FROM ${tbl}
+        `, params) as any[];
+
+        const total  = Number(countRows[0]?.total  ?? 0);
+        const failed = Number(countRows[0]?.failed ?? 0);
+        const failurePct = total > 0 ? (failed / total) * 100 : 0;
+
+        return {
+          recordsScanned: total, recordsPassed: total - failed, recordsFailed: failed,
+          failurePct,
+          message: `Range [${minVal ?? "—"}, ${maxVal ?? "—"}] — ${failed} of ${total} values out of range or null`,
+        };
+      } finally {
+        await srcSql.end();
+      }
     }
 
     case "FRESHNESS_CHECK": {
       const maxAgeHours = Number(cfg.max_age_hours ?? 24);
-      if (!meta.columnName) return simErr("Column not specified");
-      const rows = await sql<any[]>`
-        SELECT max_value AS "maxDate", row_count_estimate AS "rowCount"
-        FROM bayanat.data_attributes a
-        JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
-        WHERE a.physical_name_text = ${meta.columnName}
-          AND e.entity_name_text = ${meta.tableName}
-        LIMIT 1
-      `;
-      if (rows.length === 0) return simErr("Profiling data not available");
-      const rowCount = Number(rows[0].rowCount ?? 0);
-      return {
-        recordsScanned: rowCount, recordsPassed: rowCount, recordsFailed: 0,
-        failurePct: 0,
-        message: `Latest value: ${rows[0].maxDate ?? "unknown"} (max age: ${maxAgeHours}h)`,
-      };
+      if (!meta.qualifiedTable || !meta.columnName) return simErr("Asset metadata missing");
+
+      const srcSql = await getSourceSql(rule);
+      if (!srcSql) return simErr("No source connection configured for this asset");
+
+      try {
+        const col = qi(meta.columnName);
+        const tbl = meta.qualifiedTable;
+
+        const countRows = await srcSql.unsafe(`
+          SELECT
+            COUNT(*)::int AS total,
+            MAX(${col}::timestamp)::text AS latest,
+            COUNT(*) FILTER (
+              WHERE ${col} IS NULL
+                 OR ${col}::timestamp < NOW() - ($1 || ' hours')::interval
+            )::int AS failed
+          FROM ${tbl}
+        `, [String(maxAgeHours)]) as any[];
+
+        const total   = Number(countRows[0]?.total ?? 0);
+        const failed  = Number(countRows[0]?.failed ?? 0);
+        const latest  = countRows[0]?.latest ?? "unknown";
+        const failurePct = total > 0 ? (failed / total) * 100 : 0;
+
+        return {
+          recordsScanned: total, recordsPassed: total - failed, recordsFailed: failed,
+          failurePct,
+          message: `Latest: ${latest} — ${failed} of ${total} records older than ${maxAgeHours}h or null`,
+        };
+      } finally {
+        await srcSql.end();
+      }
+    }
+
+    case "REFERENTIAL_CHECK": {
+      const refTable  = String(cfg.ref_table  ?? "");
+      const refColumn = String(cfg.ref_column ?? "");
+      if (!refTable || !refColumn) return simErr("Reference table and column are required");
+      if (!meta.qualifiedTable || !meta.columnName) return simErr("Asset metadata missing");
+
+      const srcSql = await getSourceSql(rule);
+      if (!srcSql) return simErr("No source connection configured for this asset");
+
+      try {
+        const col    = qi(meta.columnName);
+        const tbl    = meta.qualifiedTable;
+        const refCol = qi(refColumn);
+        // refTable comes from RefIntegrityPicker → "schema.table" or "table" — already trusted catalog data
+        const refTbl = refTable.includes(".") ? refTable : qi(refTable);
+
+        const countRows = await srcSql.unsafe(`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (
+              WHERE ${col} IS NULL
+                 OR ${col}::text NOT IN (SELECT DISTINCT ${refCol}::text FROM ${refTbl} WHERE ${refCol} IS NOT NULL)
+            )::int AS failed
+          FROM ${tbl}
+        `) as any[];
+
+        const total  = Number(countRows[0]?.total  ?? 0);
+        const failed = Number(countRows[0]?.failed ?? 0);
+        const failurePct = total > 0 ? (failed / total) * 100 : 0;
+
+        return {
+          recordsScanned: total, recordsPassed: total - failed, recordsFailed: failed,
+          failurePct,
+          message: `FK: ${meta.columnName} → ${refTable}.${refColumn} — ${failed} of ${total} violations or null`,
+        };
+      } finally {
+        await srcSql.end();
+      }
     }
 
     case "CUSTOM_SQL": {
-      // rule_definition_text should be a SQL query returning total_rows and failed_rows
       const rawSql = rule.ruleDefinitionText;
       if (!rawSql?.trim()) return simErr("No SQL query configured");
       try {
@@ -339,7 +529,7 @@ function simErr(msg: string): EngineResult {
 
 function determineStatus(rule: DqRule, failurePct: number | null, score: number | null): "PASSED" | "FAILED" | "WARNING" | "ERROR" {
   if (failurePct === null) return "ERROR";
-  const threshold = rule.thresholdFail;
+  const threshold     = rule.thresholdFail;
   const warnThreshold = rule.thresholdWarn;
   if (threshold != null && score != null && score < threshold) return "FAILED";
   if (warnThreshold != null && score != null && score < warnThreshold) return "WARNING";

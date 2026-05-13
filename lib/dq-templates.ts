@@ -93,3 +93,27 @@ export const DQ_TEMPLATES = [
 ] as const;
 
 export type TemplateCode = typeof DQ_TEMPLATES[number]["code"];
+
+/**
+ * Converts raw string form values into properly-typed config for storage.
+ * Empty strings are omitted. Numbers are parsed. Text fields are kept as-is.
+ */
+export function buildRuleConfig(
+  rawConfig: Record<string, string>,
+  templateCode: string
+): Record<string, unknown> {
+  const template = DQ_TEMPLATES.find((t) => t.code === templateCode);
+  if (!template) return {};
+  const result: Record<string, unknown> = {};
+  for (const field of template.configFields as { key: string; type: string }[]) {
+    const raw = rawConfig[field.key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (field.type === "number") {
+      const n = Number(raw);
+      if (!isNaN(n)) result[field.key] = n;
+    } else {
+      result[field.key] = raw;
+    }
+  }
+  return result;
+}
