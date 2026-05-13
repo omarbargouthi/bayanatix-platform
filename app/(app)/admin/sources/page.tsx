@@ -356,13 +356,13 @@ export default function DataSourcesPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1">Username</label>
-                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.usernameText} onChange={e => setForm(f => ({ ...f, usernameText: e.target.value }))} placeholder="postgres" />
+                  <input autoComplete="off" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.usernameText} onChange={e => setForm(f => ({ ...f, usernameText: e.target.value }))} placeholder="postgres" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1">Password {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
                   <div className="relative">
-                    <input type={showPwd ? "text" : "password"} className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} placeholder={isEditing ? "unchanged" : "••••••••"} />
+                    <input type={showPwd ? "text" : "password"} autoComplete="new-password" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} placeholder={isEditing ? "unchanged" : "••••••••"} />
                     <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
                   </div>
                 </div>
