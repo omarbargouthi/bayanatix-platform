@@ -175,8 +175,6 @@ export default function DataSourcesPage() {
   function startAdd() {
     setSelected(null); setIsAdding(true); setTestResult(null); setDeleteConfirm(false); setShowPwd(false);
     setForm({ ...BLANK_FORM });
-    setCrawlCfg({ ...BLANK_CFG });
-    setCfgIncludes(""); setCfgExcludes(""); setCfgPatterns("");
   }
 
   function setDbType(type: string) {
@@ -193,22 +191,12 @@ export default function DataSourcesPage() {
           body: JSON.stringify({ ...form, portNumber: Number(form.portNumber) }),
         });
         if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+        await load();
         const data = await r.json();
-        await fetch(`/api/admin/sources/${data.connectionId}/config`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            schemaIncludeList:    str2arr(cfgIncludes).length ? str2arr(cfgIncludes) : null,
-            schemaExcludeList:    str2arr(cfgExcludes),
-            tableExcludePatterns: str2arr(cfgPatterns),
-            profilingEnabled:     crawlCfg.profilingEnabled,
-            profilingMode:        crawlCfg.profilingMode,
-            profilingLimit:       crawlCfg.profilingLimit,
-          }),
-        });
         setIsAdding(false);
         const fresh = await (await fetch(`/api/admin/sources/${data.connectionId}`)).json();
         setSelected(fresh);
-        await load();
+        setConnections(prev => [...prev, fresh]);
       } else if (selected) {
         const body: Record<string, unknown> = { ...form, portNumber: Number(form.portNumber) };
         if (!form.passwordText) delete body.passwordText;
@@ -397,75 +385,70 @@ export default function DataSourcesPage() {
               </div>
             </div>
 
-            {/* ── Crawl Settings — visible when adding OR editing ── */}
-            <div className="mt-6 bg-white border border-line rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-ink mb-1">Crawl Settings</h3>
-              <p className="text-xs text-muted mb-5">Control which schemas and tables are discovered, and optionally capture column profiling statistics.</p>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-ink mb-1">Include Schemas <span className="text-muted font-normal">(comma-separated, blank = all)</span></label>
-                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgIncludes} onChange={e => setCfgIncludes(e.target.value)} placeholder="crm, finance, hr" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-ink mb-1">Exclude Schemas <span className="text-muted font-normal">(comma-separated)</span></label>
-                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgExcludes} onChange={e => setCfgExcludes(e.target.value)} placeholder="staging, test" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-ink mb-1">Exclude Table Patterns <span className="text-muted font-normal">(LIKE patterns, comma-separated)</span></label>
-                  <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgPatterns} onChange={e => setCfgPatterns(e.target.value)} placeholder="tmp_%, _bak, %_archive" />
-                </div>
-                <div className="border-t border-line pt-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => setCrawlCfg(c => ({ ...c, profilingEnabled: !c.profilingEnabled }))}
-                      className={`relative w-10 h-5 rounded-full transition-colors ${crawlCfg.profilingEnabled ? "bg-brand-purple" : "bg-gray-300"}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${crawlCfg.profilingEnabled ? "left-5" : "left-0.5"}`} />
-                    </button>
-                    <label className="text-sm text-ink font-medium">Enable Column Profiling</label>
-                    <span className="text-xs text-muted">(null%, distinct count, min/max, top values)</span>
-                  </div>
-                  {crawlCfg.profilingEnabled && (
-                    <div className="grid grid-cols-2 gap-4 pl-13">
+            {/* Actions panel — only for saved connections */}
+            {isEditing && selected && (
+              <div className="mt-6 space-y-4">
+
+                {/* ── Crawl Settings ── */}
+                <div className="bg-white border border-line rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-ink mb-1">Crawl Settings</h3>
+                  <p className="text-xs text-muted mb-5">Control which schemas and tables are discovered, and optionally capture column profiling statistics.</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-ink mb-1">Profiling Mode</label>
-                        <select className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand-purple"
-                          value={crawlCfg.profilingMode} onChange={e => setCrawlCfg(c => ({ ...c, profilingMode: e.target.value }))}>
-                          <option value="TOP_N">Top N rows</option>
-                          <option value="TOP_PCT">Top N% (TABLESAMPLE)</option>
-                          <option value="FULL">Full table scan</option>
-                        </select>
+                        <label className="block text-xs font-semibold text-ink mb-1">Include Schemas <span className="text-muted font-normal">(comma-separated, blank = all)</span></label>
+                        <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgIncludes} onChange={e => setCfgIncludes(e.target.value)} placeholder="crm, finance, hr" />
                       </div>
-                      {crawlCfg.profilingMode !== "FULL" && (
-                        <div>
-                          <label className="block text-xs font-semibold text-ink mb-1">
-                            {crawlCfg.profilingMode === "TOP_N" ? "Row Limit" : "Sample %"}
-                          </label>
-                          <input type="number" min={1} max={crawlCfg.profilingMode === "TOP_PCT" ? 100 : undefined}
-                            className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-purple"
-                            value={crawlCfg.profilingLimit} onChange={e => setCrawlCfg(c => ({ ...c, profilingLimit: Number(e.target.value) }))} />
+                      <div>
+                        <label className="block text-xs font-semibold text-ink mb-1">Exclude Schemas <span className="text-muted font-normal">(comma-separated)</span></label>
+                        <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgExcludes} onChange={e => setCfgExcludes(e.target.value)} placeholder="staging, test" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-ink mb-1">Exclude Table Patterns <span className="text-muted font-normal">(LIKE patterns, comma-separated)</span></label>
+                      <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgPatterns} onChange={e => setCfgPatterns(e.target.value)} placeholder="tmp_%, _bak, %_archive" />
+                    </div>
+                    <div className="border-t border-line pt-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setCrawlCfg(c => ({ ...c, profilingEnabled: !c.profilingEnabled }))}
+                          className={`relative w-10 h-5 rounded-full transition-colors ${crawlCfg.profilingEnabled ? "bg-brand-purple" : "bg-gray-300"}`}>
+                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${crawlCfg.profilingEnabled ? "left-5" : "left-0.5"}`} />
+                        </button>
+                        <label className="text-sm text-ink font-medium">Enable Column Profiling</label>
+                        <span className="text-xs text-muted">(null%, distinct count, min/max, top values)</span>
+                      </div>
+                      {crawlCfg.profilingEnabled && (
+                        <div className="grid grid-cols-2 gap-4 pl-13">
+                          <div>
+                            <label className="block text-xs font-semibold text-ink mb-1">Profiling Mode</label>
+                            <select className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand-purple"
+                              value={crawlCfg.profilingMode} onChange={e => setCrawlCfg(c => ({ ...c, profilingMode: e.target.value }))}>
+                              <option value="TOP_N">Top N rows</option>
+                              <option value="TOP_PCT">Top N% (TABLESAMPLE)</option>
+                              <option value="FULL">Full table scan</option>
+                            </select>
+                          </div>
+                          {crawlCfg.profilingMode !== "FULL" && (
+                            <div>
+                              <label className="block text-xs font-semibold text-ink mb-1">
+                                {crawlCfg.profilingMode === "TOP_N" ? "Row Limit" : "Sample %"}
+                              </label>
+                              <input type="number" min={1} max={crawlCfg.profilingMode === "TOP_PCT" ? 100 : undefined}
+                                className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-purple"
+                                value={crawlCfg.profilingLimit} onChange={e => setCrawlCfg(c => ({ ...c, profilingLimit: Number(e.target.value) }))} />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 pt-1">
-                  {isEditing && (
-                    <>
+                    <div className="flex items-center gap-3 pt-1">
                       <button onClick={handleSaveConfig} disabled={cfgSaving} className="btn btn-primary btn-sm">
                         {cfgSaving ? "Saving…" : "Save Crawl Settings"}
                       </button>
                       {cfgSaved && <span className="text-xs text-green-700 font-semibold">✓ Saved</span>}
-                    </>
-                  )}
-                  {isAdding && <span className="text-xs text-muted">Saved together with the connection above.</span>}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Actions panel — only for saved connections */}
-            {isEditing && selected && (
-              <div className="mt-6 space-y-4">
 
                 {/* Test Connection */}
                 <div className="bg-white border border-line rounded-xl p-6">
