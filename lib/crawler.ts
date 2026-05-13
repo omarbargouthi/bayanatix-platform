@@ -541,7 +541,6 @@ type GovernanceDefaults = {
   defaultOwnerUserId:   string | null;
   defaultBizStewardId:  string | null;
   defaultTechStewardId: string | null;
-  defaultCustodianId:   string | null;
 };
 
 async function saveCrawlResults(
@@ -597,7 +596,6 @@ async function saveCrawlResults(
         govDefaults.defaultOwnerUserId,
         govDefaults.defaultBizStewardId,
         govDefaults.defaultTechStewardId,
-        govDefaults.defaultCustodianId,
       ).catch(() => {});
 
       // Save profiling metadata if collected
@@ -667,7 +665,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     tableExcludePatterns: string[]; profilingEnabled: boolean;
     profilingMode: string; profilingLimit: number;
     defaultOwnerUserId: string | null; defaultBizStewardId: string | null;
-    defaultTechStewardId: string | null; defaultCustodianId: string | null;
+    defaultTechStewardId: string | null;
   }[]>`
     SELECT schema_include_list AS "schemaIncludeList",
            coalesce(schema_exclude_list, ARRAY[]::TEXT[]) AS "schemaExcludeList",
@@ -677,8 +675,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
            profiling_limit   AS "profilingLimit",
            default_owner_user_id   AS "defaultOwnerUserId",
            default_biz_steward_id  AS "defaultBizStewardId",
-           default_tech_steward_id AS "defaultTechStewardId",
-           default_custodian_user_id AS "defaultCustodianId"
+           default_tech_steward_id AS "defaultTechStewardId"
     FROM bayanat.crawl_config WHERE connection_id = ${connectionId}
   `;
   const config = configRow ?? null;
@@ -686,7 +683,6 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     defaultOwnerUserId:   configRow?.defaultOwnerUserId   ?? null,
     defaultBizStewardId:  configRow?.defaultBizStewardId  ?? null,
     defaultTechStewardId: configRow?.defaultTechStewardId ?? null,
-    defaultCustodianId:   configRow?.defaultCustodianId   ?? null,
   };
 
   const logger = await makeJobLogger(connectionId, cfgRow.connectionName);

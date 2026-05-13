@@ -9,6 +9,8 @@ type AppLookup = {
 
 type GroupEntry = { group: string; count: number };
 
+type GovRole = { roleCode: string; name: string; description: string | null };
+
 const GROUP_LABELS: Record<string, string> = {
   TABLE_TYPE:     "Table Type",
   ASSET_TYPE:     "Asset Type",
@@ -17,11 +19,14 @@ const GROUP_LABELS: Record<string, string> = {
   DQ_DIMENSION:   "DQ Dimension",
 };
 
+const GOV_ROLE_ORDER = ["OWNER", "BIZ_STEWARD", "TECH_STEWARD"];
+
 const BLANK = { lookupCode: "", lookupLabel: "", description: "", sortOrder: 0, isActive: true };
 
 export default function ConfigurationPage() {
   const [groups, setGroups]       = useState<GroupEntry[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [showGovRoles, setShowGovRoles]   = useState(false);
   const [newGroupName, setNewGroupName]   = useState("");
   const [lookups, setLookups]     = useState<AppLookup[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -30,9 +35,44 @@ export default function ConfigurationPage() {
   const [addForm, setAddForm]     = useState({ ...BLANK });
   const [saving, setSaving]       = useState(false);
 
+  // Governance role label state
+  const [govRoles, setGovRoles]         = useState<GovRole[]>([]);
+  const [govEditCode, setGovEditCode]   = useState<string | null>(null);
+  const [govEditForm, setGovEditForm]   = useState({ name: "", description: "" });
+  const [govSaving, setGovSaving]       = useState(false);
+  const [govSaved, setGovSaved]         = useState<string | null>(null);
+
   async function loadGroups() {
     const r = await fetch("/api/admin/lookups?groupsOnly=true");
     setGroups(await r.json());
+  }
+
+  async function loadGovRoles() {
+    const r = await fetch("/api/admin/governance-roles");
+    if (r.ok) {
+      const data: GovRole[] = await r.json();
+      setGovRoles(data.sort((a, b) => GOV_ROLE_ORDER.indexOf(a.roleCode) - GOV_ROLE_ORDER.indexOf(b.roleCode)));
+    }
+  }
+
+  function startGovEdit(role: GovRole) {
+    setGovEditCode(role.roleCode);
+    setGovEditForm({ name: role.name, description: role.description ?? "" });
+  }
+
+  async function saveGovRole(roleCode: string) {
+    setGovSaving(true);
+    try {
+      const r = await fetch(`/api/admin/governance-roles/${roleCode}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: govEditForm.name, description: govEditForm.description || null }),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+      setGovEditCode(null);
+      setGovSaved(roleCode);
+      setTimeout(() => setGovSaved(null), 2000);
+      await loadGovRoles();
+    } finally { setGovSaving(false); }
   }
 
   async function loadLookups(group: string) {
@@ -40,7 +80,7 @@ export default function ConfigurationPage() {
     setLookups(await r.json());
   }
 
-  useEffect(() => { loadGroups(); }, []);
+  useEffect(() => { loadGroups(); loadGovRoles(); }, []);
 
   useEffect(() => {
     if (selectedGroup) {
@@ -107,29 +147,107 @@ export default function ConfigurationPage() {
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside className="w-56 shrink-0 border-r border-line bg-canvas flex flex-col">
         <div className="p-4 border-b border-line flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted uppercase tracking-wider">Lookup Groups</span>
-          <button onClick={() => { setSelectedGroup(null); setAdding(true); setAddForm({ ...BLANK }); }}
-            className="text-[11px] font-semibold text-brand-purple hover:underline">+ Add</button>
+          <span className="text-xs font-semibold text-muted uppercase tracking-wider">Configuration</span>
         </div>
         <div className="flex-1 overflow-y-auto">
+
+          {/* ── Governance Roles (pinned) */}
+          <button
+            onClick={() => { setShowGovRoles(true); setSelectedGroup(null); setAdding(false); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showGovRoles ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Governance Roles</div>
+            <div className="text-[10px] text-muted mt-0.5">Owner · Business Steward · Tech Steward</div>
+          </button>
+
+          {/* Divider */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-line bg-canvas-soft flex items-center justify-between">
+            <span>Lookup Groups</span>
+            <button onClick={() => { setSelectedGroup(null); setShowGovRoles(false); setAdding(true); setAddForm({ ...BLANK }); }}
+              className="text-brand-purple hover:underline font-semibold text-[11px]">+ Add</button>
+          </div>
+
           {groups.map(g => (
-            <button key={g.group} onClick={() => { setSelectedGroup(g.group); setAdding(false); }}
+            <button key={g.group} onClick={() => { setSelectedGroup(g.group); setShowGovRoles(false); setAdding(false); }}
               className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${selectedGroup === g.group ? "bg-white border-l-2 border-l-brand-purple" : ""}`}>
               <div className="font-medium text-ink truncate">{GROUP_LABELS[g.group] ?? g.group}</div>
               <div className="text-[10px] text-muted mt-0.5 font-mono">{g.group} · {g.count} values</div>
             </button>
           ))}
-          {groups.length === 0 && <div className="p-4 text-xs text-muted">No groups yet</div>}
+          {groups.length === 0 && <div className="p-4 text-xs text-muted">No lookup groups yet</div>}
         </div>
       </aside>
 
       {/* ── Main panel ───────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto p-8">
-        {!selectedGroup && !adding && (
+
+        {/* ── Governance Roles panel ── */}
+        {showGovRoles && (
+          <div className="max-w-2xl">
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-ink">Governance Roles</h2>
+              <p className="text-xs text-muted mt-1">
+                Customize the display names for the three governance roles used across assets, workflows, and data sources.
+                The underlying role codes (OWNER, BIZ_STEWARD, TECH_STEWARD) remain fixed; only the names shown in the UI change.
+              </p>
+            </div>
+            <div className="card divide-y divide-line">
+              {govRoles.map((role) => (
+                <div key={role.roleCode} className="px-5 py-4">
+                  {govEditCode === role.roleCode ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="font-mono text-[11px] text-brand-deep font-semibold bg-brand-purple/10 px-2 py-0.5 rounded">{role.roleCode}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Display Name *</label>
+                          <input className="input w-full" value={govEditForm.name}
+                            onChange={e => setGovEditForm(f => ({ ...f, name: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Description</label>
+                          <input className="input w-full" value={govEditForm.description}
+                            onChange={e => setGovEditForm(f => ({ ...f, description: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <button onClick={() => saveGovRole(role.roleCode)} disabled={govSaving} className="btn btn-primary btn-sm">
+                          {govSaving ? "Saving…" : "Save"}
+                        </button>
+                        <button onClick={() => setGovEditCode(null)} className="btn btn-sm">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-4">
+                      <span className="font-mono text-[11px] text-brand-deep font-semibold bg-brand-purple/10 px-2 py-0.5 rounded mt-0.5 shrink-0">{role.roleCode}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[15px] font-semibold text-ink">{role.name}</span>
+                          {govSaved === role.roleCode && <span className="text-xs text-green-600 font-semibold">✓ Saved</span>}
+                        </div>
+                        {role.description && <p className="text-[12px] text-muted mt-0.5">{role.description}</p>}
+                      </div>
+                      <button onClick={() => startGovEdit(role)} className="btn btn-sm shrink-0">Edit</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {govRoles.length === 0 && (
+                <div className="px-5 py-8 text-center text-sm text-muted">Loading…</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!selectedGroup && !adding && !showGovRoles && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="text-6xl">⚙️</div>
             <h2 className="text-xl font-semibold text-ink">Application Configuration</h2>
-            <p className="text-muted text-sm max-w-md">Manage lookup values used across the platform — table types, asset classifications, data domains, and more. Changes take effect immediately without code changes.</p>
+            <p className="text-muted text-sm max-w-md">
+              Configure governance role names, lookup values, and other platform-wide settings.
+              Select a section from the sidebar to get started.
+            </p>
           </div>
         )}
 

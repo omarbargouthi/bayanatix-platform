@@ -27,7 +27,6 @@ type CrawlCfg = {
   defaultOwnerUserId:   string | null;
   defaultBizStewardId:  string | null;
   defaultTechStewardId: string | null;
-  defaultCustodianId:   string | null;
 };
 
 type UserOption = { userId: string; fullName: string | null; email: string };
@@ -62,7 +61,7 @@ const BLANK_FORM = { connectionName: "", dbTypeCode: "POSTGRES", hostAddress: "l
 const BLANK_CFG: CrawlCfg = {
   schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
   profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
-  defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null, defaultCustodianId: null,
+  defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null,
 };
 
 function arr2str(a: string[] | null | undefined) { return (a ?? []).join(", "); }
@@ -126,10 +125,9 @@ export default function DataSourcesPage() {
     setCfgPatterns(arr2str(cfg.tableExcludePatterns));
     // Resolve display names for governance defaults
     const govFields: { field: string; userId: string | null }[] = [
-      { field: "defaultOwnerUserId",  userId: cfg.defaultOwnerUserId },
-      { field: "defaultBizStewardId", userId: cfg.defaultBizStewardId },
-      { field: "defaultTechStewardId",userId: cfg.defaultTechStewardId },
-      { field: "defaultCustodianId",  userId: cfg.defaultCustodianId },
+      { field: "defaultOwnerUserId",   userId: cfg.defaultOwnerUserId },
+      { field: "defaultBizStewardId",  userId: cfg.defaultBizStewardId },
+      { field: "defaultTechStewardId", userId: cfg.defaultTechStewardId },
     ];
     const labels: Record<string, string> = {};
     for (const { field, userId } of govFields) {
@@ -176,7 +174,6 @@ export default function DataSourcesPage() {
           defaultOwnerUserId:   crawlCfg.defaultOwnerUserId,
           defaultBizStewardId:  crawlCfg.defaultBizStewardId,
           defaultTechStewardId: crawlCfg.defaultTechStewardId,
-          defaultCustodianId:   crawlCfg.defaultCustodianId,
         }),
       });
       setCfgSaved(true);
@@ -502,9 +499,8 @@ export default function DataSourcesPage() {
                         <div className="grid grid-cols-2 gap-3">
                           {[
                             { label: "Default Owner",            field: "defaultOwnerUserId"   as keyof CrawlCfg },
-                            { label: "Default Business Steward", field: "defaultBizStewardId"  as keyof CrawlCfg },
-                            { label: "Default Tech. Steward",    field: "defaultTechStewardId" as keyof CrawlCfg },
-                            { label: "Default Custodian",        field: "defaultCustodianId"   as keyof CrawlCfg },
+                            { label: "Default Business Steward",  field: "defaultBizStewardId"  as keyof CrawlCfg },
+                            { label: "Default Technical Steward", field: "defaultTechStewardId" as keyof CrawlCfg },
                           ].map(({ label, field }) => (
                             <div key={field} className="relative">
                               <label className="block text-[11px] font-semibold text-ink mb-1">{label}</label>

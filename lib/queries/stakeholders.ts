@@ -89,7 +89,7 @@ export async function notifyAssetStewards(
     FROM bayanat.asset_stakeholders
     WHERE asset_type_code = ${assetTypeCode}
       AND asset_id = ${assetId}
-      AND role_code IN ('BIZ_STEWARD', 'TECH_STEWARD', 'CUSTODIAN')
+      AND role_code IN ('BIZ_STEWARD', 'TECH_STEWARD')
   `;
   for (const s of stewards) {
     await sql`
@@ -103,17 +103,15 @@ export async function notifyAssetStewards(
 
 // Bulk-assign governance defaults to a newly discovered entity (called during crawl)
 export async function applyGovernanceDefaults(
-  entityId:            number,
-  defaultOwnerId:      string | null,
-  defaultBizStewardId: string | null,
+  entityId:             number,
+  defaultOwnerId:       string | null,
+  defaultBizStewardId:  string | null,
   defaultTechStewardId: string | null,
-  defaultCustodianId:  string | null,
 ): Promise<void> {
   const assignments: { userId: string; roleCode: string }[] = [
-    ...(defaultOwnerId      ? [{ userId: defaultOwnerId,      roleCode: "OWNER" }]       : []),
-    ...(defaultBizStewardId ? [{ userId: defaultBizStewardId, roleCode: "BIZ_STEWARD" }] : []),
-    ...(defaultTechStewardId? [{ userId: defaultTechStewardId,roleCode: "TECH_STEWARD" }]: []),
-    ...(defaultCustodianId  ? [{ userId: defaultCustodianId,  roleCode: "CUSTODIAN" }]   : []),
+    ...(defaultOwnerId       ? [{ userId: defaultOwnerId,       roleCode: "OWNER" }]       : []),
+    ...(defaultBizStewardId  ? [{ userId: defaultBizStewardId,  roleCode: "BIZ_STEWARD" }] : []),
+    ...(defaultTechStewardId ? [{ userId: defaultTechStewardId, roleCode: "TECH_STEWARD" }]: []),
   ];
   for (const a of assignments) {
     await sql`

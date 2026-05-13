@@ -10,10 +10,9 @@ export type CrawlConfig = {
   profilingMode:         "TOP_N" | "TOP_PCT" | "FULL";
   profilingLimit:        number;
   // Default governance assignments applied to all newly discovered entities
-  defaultOwnerUserId:    string | null;
-  defaultBizStewardId:   string | null;
-  defaultTechStewardId:  string | null;
-  defaultCustodianId:    string | null;
+  defaultOwnerUserId:   string | null;
+  defaultBizStewardId:  string | null;
+  defaultTechStewardId: string | null;
 };
 
 export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig> {
@@ -27,15 +26,14 @@ export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig>
            profiling_limit   AS "profilingLimit",
            default_owner_user_id   AS "defaultOwnerUserId",
            default_biz_steward_id  AS "defaultBizStewardId",
-           default_tech_steward_id AS "defaultTechStewardId",
-           default_custodian_user_id AS "defaultCustodianId"
+           default_tech_steward_id AS "defaultTechStewardId"
     FROM bayanat.crawl_config WHERE connection_id = ${connectionId}
   `;
   return rows[0] ?? {
     configId: null, connectionId,
     schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
     profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
-    defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null, defaultCustodianId: null,
+    defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null,
   };
 }
 
@@ -47,7 +45,7 @@ export async function saveCrawlConfig(
     INSERT INTO bayanat.crawl_config
       (connection_id, schema_include_list, schema_exclude_list, table_exclude_patterns,
        profiling_enabled, profiling_mode, profiling_limit,
-       default_owner_user_id, default_biz_steward_id, default_tech_steward_id, default_custodian_user_id,
+       default_owner_user_id, default_biz_steward_id, default_tech_steward_id,
        updated_at)
     VALUES
       (${connectionId},
@@ -60,7 +58,6 @@ export async function saveCrawlConfig(
        ${cfg.defaultOwnerUserId   ?? null},
        ${cfg.defaultBizStewardId  ?? null},
        ${cfg.defaultTechStewardId ?? null},
-       ${cfg.defaultCustodianId   ?? null},
        NOW())
     ON CONFLICT (connection_id) DO UPDATE SET
       schema_include_list       = EXCLUDED.schema_include_list,
@@ -72,7 +69,6 @@ export async function saveCrawlConfig(
       default_owner_user_id     = EXCLUDED.default_owner_user_id,
       default_biz_steward_id    = EXCLUDED.default_biz_steward_id,
       default_tech_steward_id   = EXCLUDED.default_tech_steward_id,
-      default_custodian_user_id = EXCLUDED.default_custodian_user_id,
       updated_at                = NOW()
   `;
 }

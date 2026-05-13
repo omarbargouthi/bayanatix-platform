@@ -25,7 +25,6 @@ export async function PUT(req: Request, { params }: Params) {
     defaultOwnerUserId:   body.defaultOwnerUserId   ?? null,
     defaultBizStewardId:  body.defaultBizStewardId  ?? null,
     defaultTechStewardId: body.defaultTechStewardId ?? null,
-    defaultCustodianId:   body.defaultCustodianId   ?? null,
   });
   return NextResponse.json({ ok: true });
 }
