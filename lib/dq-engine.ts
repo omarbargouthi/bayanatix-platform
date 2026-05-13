@@ -9,6 +9,7 @@ import postgres from "postgres";
 import { sql } from "./db";
 import { getDqRuleById, saveDqResult } from "./queries/dq";
 import type { DqRule } from "./queries/dq";
+import { startWorkflow } from "./workflow";
 
 export type RunResult = {
   ruleId: number;
@@ -85,6 +86,10 @@ export async function runDqRule(ruleId: number): Promise<RunResult> {
       samples: engineResult.samples ?? [],
     });
 
+    if (statusCode === "FAILED") {
+      void handleFailureActions(rule, engineResult.message).catch(() => {});
+    }
+
     return { ruleId, resultId, statusCode, score, durationMs, ...engineResult };
   } catch (err: unknown) {
     const durationMs = Date.now() - start;
@@ -104,6 +109,71 @@ export async function runDqRule(ruleId: number): Promise<RunResult> {
     });
 
     return { ruleId, resultId, statusCode: "ERROR", score: null, recordsScanned: null, recordsPassed: null, recordsFailed: null, failurePct: null, message, durationMs };
+  }
+}
+
+// ── Post-run failure actions ──────────────────────────────────────────────────
+
+async function handleFailureActions(rule: DqRule, message: string): Promise<void> {
+  const title = `DQ Failure: ${rule.ruleName}`;
+
+  if (rule.openIssueOnFail) {
+    // Skip if an open FIX_DATA_ISSUE for this exact rule already exists (avoid duplicate tickets)
+    const existing = await sql<{ id: number }[]>`
+      SELECT ar.request_id AS id
+      FROM bayanat.asset_requests ar
+      JOIN bayanat.asset_request_targets art ON art.request_id = ar.request_id
+      WHERE ar.request_type_code = 'FIX_DATA_ISSUE'
+        AND ar.status_code IN ('OPEN','IN_PROGRESS')
+        AND art.asset_type_code = ${rule.assetTypeCode}
+        AND art.asset_id = ${rule.assetId}
+        AND ar.title = ${title}
+      LIMIT 1
+    `;
+
+    if (existing.length === 0) {
+      const priority = rule.severityLevelCode === "CRITICAL" ? "HIGH"
+        : rule.severityLevelCode === "INFO"    ? "LOW" : "MEDIUM";
+
+      const [req] = await sql<{ requestId: number }[]>`
+        INSERT INTO bayanat.asset_requests
+          (request_type_code, title, description_text, priority_code, raised_by_user_id)
+        VALUES (
+          'FIX_DATA_ISSUE', ${title},
+          ${"Automated: DQ rule \"" + rule.ruleName + "\" failed — " + message},
+          ${priority}, 'SYSTEM'
+        )
+        RETURNING request_id AS "requestId"
+      `;
+
+      await sql`
+        INSERT INTO bayanat.asset_request_targets (request_id, asset_type_code, asset_id, asset_name)
+        VALUES (${req.requestId}, ${rule.assetTypeCode}, ${rule.assetId}, ${rule.assetName ?? null})
+      `;
+
+      await startWorkflow(req.requestId, "FIX_DATA_ISSUE", title).catch(() => {});
+    }
+  }
+
+  if (rule.notifyOwners) {
+    const stakeholders = await sql<{ userId: string }[]>`
+      SELECT user_id AS "userId"
+      FROM bayanat.asset_stakeholders
+      WHERE asset_type_code = ${rule.assetTypeCode}
+        AND asset_id = ${rule.assetId}
+    `;
+    for (const s of stakeholders) {
+      await sql`
+        INSERT INTO bayanat.notifications
+          (user_id, type, title, body, severity, action_label, action_href)
+        VALUES (
+          ${s.userId}, 'WORKFLOW',
+          ${"DQ Rule Failed: " + rule.ruleName},
+          ${message},
+          'WARNING', 'View Rules', '/quality'
+        )
+      `.catch(() => {});
+    }
   }
 }
 
