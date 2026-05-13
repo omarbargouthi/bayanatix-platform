@@ -321,6 +321,8 @@ export default function DataSourcesPage() {
             <div className="bg-white border border-line rounded-xl p-6 space-y-5">
               <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">Connection Details</h3>
 
+              {/* autoComplete="off" on the wrapping form stops Chrome from autofilling DB credentials with app login */}
+              <form autoComplete="off" onSubmit={e => e.preventDefault()}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-semibold text-ink mb-1">Connection Name *</label>
@@ -383,6 +385,7 @@ export default function DataSourcesPage() {
                   <button onClick={() => setIsAdding(false)} className="px-4 py-2 text-sm text-muted hover:text-ink border border-line rounded-lg transition-colors">Cancel</button>
                 )}
               </div>
+              </form>
             </div>
 
             {/* Actions panel — only for saved connections */}
