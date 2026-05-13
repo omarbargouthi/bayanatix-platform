@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from "react";
 import type { DqDimension, DqRule, DqResult, DqDashboardStats } from "@/lib/queries/dq";
-import { DQ_TEMPLATES } from "@/lib/dq-templates";
+import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
+import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 
@@ -129,8 +130,8 @@ function RuleFormModal({
             assetType: editRule.assetTypeCode as "DATA_ENTITIES" | "DATA_ATTRIBUTES",
             assetId: editRule.assetId,
             assetName: editRule.assetName ?? String(editRule.assetId),
-            path: editRule.assetName ?? String(editRule.assetId),
-            breadcrumb: [editRule.assetName ?? String(editRule.assetId)],
+            path: [editRule.sourceName, editRule.schemaName, editRule.assetTypeCode === "DATA_ATTRIBUTES" ? editRule.parentEntityName : null, editRule.assetName ?? String(editRule.assetId)].filter(Boolean).join(" › "),
+            breadcrumb: [editRule.sourceName, editRule.schemaName, editRule.assetTypeCode === "DATA_ATTRIBUTES" ? editRule.parentEntityName : null, editRule.assetName ?? String(editRule.assetId)].filter(Boolean) as string[],
           }],
           ruleTemplateCode: editRule.ruleTemplateCode ?? "CUSTOM_SQL",
           ruleConfig: Object.fromEntries(Object.entries(editRule.ruleConfig).map(([k, v]) => [k, String(v)])),
@@ -177,9 +178,7 @@ function RuleFormModal({
         ruleName: form.ruleName,
         dimensionCode: form.dimensionCode || null,
         ruleTemplateCode: form.ruleTemplateCode !== "CUSTOM_SQL" ? form.ruleTemplateCode : null,
-        ruleConfig: Object.fromEntries(
-          Object.entries(form.ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])
-        ),
+        ruleConfig: buildRuleConfig(form.ruleConfig, form.ruleTemplateCode),
         ruleDefinitionText: form.ruleDefinitionText || "",
         severityLevelCode: form.severityLevelCode,
         thresholdWarn: form.thresholdWarn ? Number(form.thresholdWarn) : null,
@@ -317,7 +316,7 @@ function RuleFormModal({
                 <button
                   key={t.code}
                   type="button"
-                  onClick={() => setForm((f) => ({ ...f, ruleTemplateCode: t.code, ruleConfig: {} }))}
+                  onClick={() => setForm((f) => ({ ...f, ruleTemplateCode: t.code, ruleConfig: f.ruleTemplateCode === t.code ? f.ruleConfig : {} }))}
                   className={`text-left px-3 py-2.5 rounded-lg border text-[12px] transition-colors ${
                     form.ruleTemplateCode === t.code
                       ? "border-brand-purple bg-brand-purple/5 text-brand-purple"
@@ -336,18 +335,38 @@ function RuleFormModal({
             <div>
               <label className="block text-xs font-semibold text-muted mb-2">Template Configuration</label>
               <div className="grid grid-cols-2 gap-3 p-3 bg-canvas-soft rounded-lg border border-line">
-                {selectedTemplate.configFields.map((f) => (
-                  <div key={f.key}>
-                    <label className="block text-[11px] text-muted mb-1">{f.label}</label>
-                    <input
-                      className="input w-full text-sm"
-                      type={f.type === "number" ? "number" : "text"}
-                      value={form.ruleConfig[f.key] ?? ""}
-                      onChange={(e) => setForm((prev) => ({ ...prev, ruleConfig: { ...prev.ruleConfig, [f.key]: e.target.value } }))}
-                      placeholder={String(f.default ?? "")}
-                    />
-                  </div>
-                ))}
+                {selectedTemplate.code === "REFERENTIAL_CHECK" ? (
+                  <RefIntegrityPicker
+                    refTable={form.ruleConfig["ref_table"] ?? ""}
+                    refColumn={form.ruleConfig["ref_column"] ?? ""}
+                    onChange={(t, c) => setForm((f) => ({ ...f, ruleConfig: { ...f.ruleConfig, ref_table: t, ref_column: c } }))}
+                  />
+                ) : (
+                  selectedTemplate.configFields.map((f) => (
+                    <div key={f.key} className={f.key === "allowed_values" ? "col-span-2" : ""}>
+                      <label className="block text-[11px] text-muted mb-1">{f.label}</label>
+                      {f.key === "allowed_values" ? (
+                        <>
+                          <textarea
+                            className="input w-full text-sm h-16 resize-none font-mono"
+                            value={form.ruleConfig[f.key] ?? ""}
+                            onChange={(e) => setForm((prev) => ({ ...prev, ruleConfig: { ...prev.ruleConfig, [f.key]: e.target.value } }))}
+                            placeholder="active, inactive, pending"
+                          />
+                          <p className="text-[10px] text-muted mt-1">Comma-separated list of allowed values (e.g. active, inactive, pending)</p>
+                        </>
+                      ) : (
+                        <input
+                          className="input w-full text-sm"
+                          type={f.type === "number" ? "number" : "text"}
+                          value={form.ruleConfig[f.key] ?? ""}
+                          onChange={(e) => setForm((prev) => ({ ...prev, ruleConfig: { ...prev.ruleConfig, [f.key]: e.target.value } }))}
+                          placeholder={String(f.default ?? "")}
+                        />
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -437,7 +456,7 @@ function RuleFormModal({
               ...f,
               selectedAssets: assets,
               ruleTemplateCode: valid ? f.ruleTemplateCode : (fallback?.code ?? f.ruleTemplateCode),
-              ruleConfig: valid ? f.ruleConfig : {},
+              ruleConfig: f.ruleConfig,
             };
           });
         }}
@@ -816,8 +835,10 @@ export function DqAdminClient({
                       </span>
                       <span className="text-[12px] font-semibold text-ink truncate">{rule.assetName ?? `#${rule.assetId}`}</span>
                     </div>
-                    {rule.assetTypeCode === "DATA_ATTRIBUTES" && rule.parentEntityName && (
-                      <div className="text-[10px] text-muted truncate mt-0.5">{rule.parentEntityName} › {rule.assetName}</div>
+                    {(rule.sourceName || rule.schemaName || rule.parentEntityName) && (
+                      <div className="text-[10px] text-muted truncate mt-0.5">
+                        {[rule.sourceName, rule.schemaName, rule.assetTypeCode === "DATA_ATTRIBUTES" ? rule.parentEntityName : null].filter(Boolean).join(" › ")}
+                      </div>
                     )}
                   </div>
                   <div>

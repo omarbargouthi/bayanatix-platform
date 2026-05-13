@@ -76,5 +76,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(rows.map((r) => ({ ...r, isPk: Boolean(r.isPk), isNullable: Boolean(r.isNullable), nullPct: r.nullPct != null ? Number(r.nullPct) : null })));
   }
 
+  if (type === "all-tables") {
+    const q = sp.get("q") ?? "";
+    const rows = await sql<{ id: number; name: string; schemaName: string; sourceName: string }[]>`
+      SELECT e.entity_id AS id, e.entity_name_text AS name,
+             s.schema_name_text AS "schemaName",
+             ds.source_name_text AS "sourceName"
+      FROM bayanat.data_entities e
+      JOIN bayanat.data_schemas  s  ON s.schema_id        = e.schema_id
+      JOIN bayanat.data_sources  ds ON ds.data_source_id  = s.data_source_id
+      ${q ? sql`WHERE LOWER(e.entity_name_text) LIKE ${'%' + q.toLowerCase() + '%'}
+             OR LOWER(s.schema_name_text)  LIKE ${'%' + q.toLowerCase() + '%'}
+             OR LOWER(ds.source_name_text) LIKE ${'%' + q.toLowerCase() + '%'}` : sql``}
+      ORDER BY ds.source_name_text, s.schema_name_text, e.entity_name_text
+      LIMIT 100
+    `;
+    return NextResponse.json(rows);
+  }
+
   return NextResponse.json({ error: "Invalid type" }, { status: 400 });
 }

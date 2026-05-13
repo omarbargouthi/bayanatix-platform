@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { DqRule, DqResult, DqSample } from "@/lib/queries/dq";
-import { DQ_TEMPLATES } from "@/lib/dq-templates";
+import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
+import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
 
@@ -528,7 +529,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               assetTypeCode: asset.assetTypeCode,
               assetId: asset.assetId,
               ruleTemplateCode,
-              ruleConfig: Object.fromEntries(Object.entries(ruleConfig).map(([k, v]) => [k, isNaN(Number(v)) ? v : Number(v)])),
+              ruleConfig: buildRuleConfig(ruleConfig, ruleTemplateCode),
               ruleDefinitionText: "", severityLevelCode,
               thresholdWarn: thresholdWarn ? Number(thresholdWarn) : null,
               thresholdFail: thresholdFail ? Number(thresholdFail) : null,
@@ -687,7 +688,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
             <div className="grid grid-cols-3 gap-1.5">
               {applicableTemplates.map((t) => (
                 <button key={t.code} type="button"
-                  onClick={() => { setRuleTemplateCode(t.code); setRuleConfig({}); }}
+                  onClick={() => { if (ruleTemplateCode !== t.code) { setRuleTemplateCode(t.code); setRuleConfig({}); } }}
                   className={`text-left px-2.5 py-2 rounded-lg border text-[11px] transition-colors ${ruleTemplateCode === t.code ? "border-brand-purple bg-brand-purple/5 text-brand-purple" : "border-line hover:border-brand-purple/40 text-ink-soft"}`}
                 >
                   <div className="font-semibold">{t.label}</div>
@@ -699,14 +700,34 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           {/* ── Template config ── */}
           {template && template.configFields.length > 0 && (
             <div className="grid grid-cols-2 gap-3 p-3 bg-canvas-soft rounded-lg border border-line">
-              {template.configFields.map((f) => (
-                <div key={f.key}>
-                  <label className="block text-[11px] text-muted mb-1">{f.label}</label>
-                  <input className="input w-full text-sm" type={f.type === "number" ? "number" : "text"}
-                    value={ruleConfig[f.key] ?? ""} placeholder={String(f.default ?? "")}
-                    onChange={(e) => setRuleConfig((prev) => ({ ...prev, [f.key]: e.target.value }))} />
-                </div>
-              ))}
+              {template.code === "REFERENTIAL_CHECK" ? (
+                <RefIntegrityPicker
+                  refTable={ruleConfig["ref_table"] ?? ""}
+                  refColumn={ruleConfig["ref_column"] ?? ""}
+                  onChange={(t, c) => setRuleConfig((prev) => ({ ...prev, ref_table: t, ref_column: c }))}
+                />
+              ) : (
+                template.configFields.map((f) => (
+                  <div key={f.key} className={f.key === "allowed_values" ? "col-span-2" : ""}>
+                    <label className="block text-[11px] text-muted mb-1">{f.label}</label>
+                    {f.key === "allowed_values" ? (
+                      <>
+                        <textarea
+                          className="input w-full text-sm h-16 resize-none font-mono"
+                          value={ruleConfig[f.key] ?? ""}
+                          placeholder="active, inactive, pending"
+                          onChange={(e) => setRuleConfig((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                        />
+                        <p className="text-[10px] text-muted mt-1">Comma-separated list of allowed values (e.g. active, inactive, pending)</p>
+                      </>
+                    ) : (
+                      <input className="input w-full text-sm" type={f.type === "number" ? "number" : "text"}
+                        value={ruleConfig[f.key] ?? ""} placeholder={String(f.default ?? "")}
+                        onChange={(e) => setRuleConfig((prev) => ({ ...prev, [f.key]: e.target.value }))} />
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           )}
 

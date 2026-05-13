@@ -18,6 +18,8 @@ export type DqRule = {
   assetName: string | null;
   /** For column-level rules: the table that owns the column */
   parentEntityName: string | null;
+  schemaName: string | null;
+  sourceName: string | null;
   ruleLogicTypeCode: string | null;
   ruleTemplateCode: string | null;
   ruleConfig: Record<string, unknown>;
@@ -115,6 +117,8 @@ export async function getDqRules(filters?: {
         ELSE NULL
       END                    AS "assetName",
       ep.entity_name_text    AS "parentEntityName",
+      s.schema_name_text     AS "schemaName",
+      ds.source_name_text    AS "sourceName",
       r.rule_logic_type_code AS "ruleLogicTypeCode",
       r.rule_template_code   AS "ruleTemplateCode",
       COALESCE(r.rule_config, '{}')::jsonb AS "ruleConfig",
@@ -141,6 +145,11 @@ export async function getDqRules(filters?: {
     LEFT JOIN bayanat.data_entities e  ON r.asset_type_code = 'DATA_ENTITIES'   AND e.entity_id    = r.asset_id
     LEFT JOIN bayanat.data_attributes a ON r.asset_type_code = 'DATA_ATTRIBUTES' AND a.attribute_id = r.asset_id
     LEFT JOIN bayanat.data_entities ep ON r.asset_type_code = 'DATA_ATTRIBUTES' AND ep.entity_id   = a.entity_id
+    LEFT JOIN bayanat.data_schemas   s  ON s.schema_id = CASE
+      WHEN r.asset_type_code = 'DATA_ENTITIES'   THEN e.schema_id
+      WHEN r.asset_type_code = 'DATA_ATTRIBUTES' THEN ep.schema_id
+      END
+    LEFT JOIN bayanat.data_sources   ds ON ds.data_source_id = s.data_source_id
     WHERE 1=1
       ${filters?.entityId != null ? sql`
         AND (
@@ -162,6 +171,8 @@ export async function getDqRules(filters?: {
     lastScore:        r.lastScore        != null ? Number(r.lastScore)        : null,
     previousScore:    r.previousScore    != null ? Number(r.previousScore)    : null,
     parentEntityName: r.parentEntityName ?? null,
+    schemaName:       r.schemaName ?? null,
+    sourceName:       r.sourceName ?? null,
     ruleConfig:       typeof r.ruleConfig === "object" && r.ruleConfig !== null ? r.ruleConfig : {},
     notifyOwners:     Boolean(r.notifyOwners),
     openIssueOnFail:  Boolean(r.openIssueOnFail),
@@ -245,7 +256,7 @@ export async function updateDqRule(ruleId: number, data: Partial<{
       rule_template_code   = ${data.ruleTemplateCode !== undefined
         ? data.ruleTemplateCode
         : sql`rule_template_code`},
-      rule_config          = COALESCE(${data.ruleConfig != null ? JSON.stringify(data.ruleConfig) : null}::jsonb, rule_config),
+      rule_config          = COALESCE(${(data.ruleConfig != null && Object.keys(data.ruleConfig).length > 0) ? JSON.stringify(data.ruleConfig) : null}::jsonb, rule_config),
       rule_definition_text = COALESCE(${data.ruleDefinitionText ?? null}, rule_definition_text),
       severity_level_code  = COALESCE(${data.severityLevelCode ?? null}, severity_level_code),
       threshold_warn       = ${data.thresholdWarn !== undefined ? data.thresholdWarn : sql`threshold_warn`},
