@@ -213,7 +213,7 @@ export async function createDqRule(data: {
       ${data.assetId},
       ${data.ruleTemplateCode ? "TEMPLATE" : "CUSTOM_SQL"},
       ${data.ruleTemplateCode},
-      ${JSON.stringify(data.ruleConfig)}::jsonb,
+      ${data.ruleConfig as any},
       ${data.ruleDefinitionText},
       ${data.severityLevelCode},
       ${data.thresholdWarn},
@@ -256,7 +256,7 @@ export async function updateDqRule(ruleId: number, data: Partial<{
       rule_template_code   = ${data.ruleTemplateCode !== undefined
         ? data.ruleTemplateCode
         : sql`rule_template_code`},
-      rule_config          = COALESCE(${(data.ruleConfig != null && Object.keys(data.ruleConfig).length > 0) ? JSON.stringify(data.ruleConfig) : null}::jsonb, rule_config),
+      rule_config          = ${(data.ruleConfig != null && Object.keys(data.ruleConfig).length > 0) ? sql`${data.ruleConfig as any}` : sql`rule_config`},
       rule_definition_text = COALESCE(${data.ruleDefinitionText ?? null}, rule_definition_text),
       severity_level_code  = COALESCE(${data.severityLevelCode ?? null}, severity_level_code),
       threshold_warn       = ${data.thresholdWarn !== undefined ? data.thresholdWarn : sql`threshold_warn`},
