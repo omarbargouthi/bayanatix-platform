@@ -70,7 +70,7 @@ export async function runDqRule(ruleId: number): Promise<RunResult> {
       ? Math.max(0, Math.min(100, 100 - (engineResult.failurePct ?? 0)))
       : null;
 
-    const statusCode = determineStatus(rule, engineResult.failurePct, score);
+    const statusCode = engineResult.statusOverride ?? determineStatus(rule, engineResult.failurePct, score);
 
     const resultId = await saveDqResult({
       ruleId,
@@ -153,6 +153,7 @@ type EngineResult = {
   failurePct: number | null;
   message: string;
   samples?: { value: string; isValid: boolean; count: number }[];
+  statusOverride?: "PASSED" | "FAILED" | "WARNING" | "ERROR";
 };
 
 // Quote an identifier safely (double-quote, escape internal double quotes)
@@ -191,7 +192,34 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
 
     case "COMPLETENESS_RATE": {
       const maxNullPct = Number(cfg.max_null_pct ?? 5);
-      if (!meta.columnName) return simErr("Column not specified");
+      if (!meta.columnName || !meta.qualifiedTable) return simErr("Column not specified");
+
+      const srcSql = await getSourceSql(rule);
+      if (srcSql) {
+        try {
+          const col = qi(meta.columnName);
+          const tbl = meta.qualifiedTable;
+          const countRows = await srcSql.unsafe(`
+            SELECT COUNT(*)::int AS total,
+                   COUNT(*) FILTER (WHERE ${col} IS NULL)::int AS nulls
+            FROM ${tbl}
+          `) as any[];
+          const total  = Number(countRows[0]?.total ?? 0);
+          const nulls  = Number(countRows[0]?.nulls ?? 0);
+          const nullPct = total > 0 ? (nulls / total) * 100 : 0;
+          const statusOverride: EngineResult["statusOverride"] = nullPct > maxNullPct ? "FAILED" : "PASSED";
+          return {
+            recordsScanned: total, recordsPassed: total - nulls, recordsFailed: nulls,
+            failurePct: nullPct, statusOverride,
+            message: `Null rate: ${nullPct.toFixed(2)}% (max allowed: ${maxNullPct}%)`,
+            samples: nulls > 0 ? [{ value: "(null)", isValid: false, count: nulls }] : [],
+          };
+        } finally {
+          await srcSql.end();
+        }
+      }
+
+      // Fallback: catalog profiling data
       const rows = await sql<any[]>`
         SELECT null_percentage AS "nullPct", row_count_estimate AS "rowCount"
         FROM bayanat.data_attributes a
@@ -204,10 +232,11 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
       const nullPct  = Number(rows[0].nullPct ?? 0);
       const rowCount = Number(rows[0].rowCount ?? 0);
       const failed   = Math.round((nullPct / 100) * rowCount);
+      const statusOverride: EngineResult["statusOverride"] = nullPct > maxNullPct ? "FAILED" : "PASSED";
       return {
         recordsScanned: rowCount, recordsPassed: rowCount - failed, recordsFailed: failed,
-        failurePct: nullPct,
-        message: `Null rate: ${nullPct.toFixed(2)}% (threshold: ${maxNullPct}%)`,
+        failurePct: nullPct, statusOverride,
+        message: `Null rate: ${nullPct.toFixed(2)}% (max allowed: ${maxNullPct}%)`,
       };
     }
 
@@ -267,12 +296,13 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
         const tbl = meta.qualifiedTable;
 
         // Count: failed = NULL or value not in allowed list (case-sensitive)
+        const arrayPlaceholders = allowed.map((_, i) => `$${i + 1}`).join(",");
         const countRows = await srcSql.unsafe(`
           SELECT
             COUNT(*)::int               AS total,
             COUNT(*) FILTER (
               WHERE ${col} IS NULL
-                 OR ${col}::text != ALL(ARRAY[${allowed.map(() => "?").join(",")}])
+                 OR ${col}::text != ALL(ARRAY[${arrayPlaceholders}])
             )::int AS failed
           FROM ${tbl}
         `, allowed) as any[];
@@ -286,7 +316,7 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
           SELECT COALESCE(${col}::text, '(null)') AS value, COUNT(*)::int AS cnt
           FROM ${tbl}
           WHERE ${col} IS NULL
-             OR ${col}::text != ALL(ARRAY[${allowed.map(() => "?").join(",")}])
+             OR ${col}::text != ALL(ARRAY[${arrayPlaceholders}])
           GROUP BY ${col}::text
           ORDER BY cnt DESC
           LIMIT 20
@@ -295,7 +325,7 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
         const goodRows = await srcSql.unsafe(`
           SELECT ${col}::text AS value, COUNT(*)::int AS cnt
           FROM ${tbl}
-          WHERE ${col}::text = ANY(ARRAY[${allowed.map(() => "?").join(",")}])
+          WHERE ${col}::text = ANY(ARRAY[${arrayPlaceholders}])
           GROUP BY ${col}::text
           ORDER BY cnt DESC
           LIMIT 10
@@ -413,10 +443,20 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
         const failed = Number(countRows[0]?.failed ?? 0);
         const failurePct = total > 0 ? (failed / total) * 100 : 0;
 
+        const badRows = await srcSql.unsafe(`
+          SELECT COALESCE(${col}::text, '(null)') AS value, COUNT(*)::int AS cnt
+          FROM ${tbl}
+          WHERE ${conditions.join(" OR ")}
+          GROUP BY ${col}::text
+          ORDER BY cnt DESC
+          LIMIT 20
+        `, params) as any[];
+
         return {
           recordsScanned: total, recordsPassed: total - failed, recordsFailed: failed,
           failurePct,
           message: `Range [${minVal ?? "—"}, ${maxVal ?? "—"}] — ${failed} of ${total} values out of range or null`,
+          samples: badRows.map((r: any) => ({ value: String(r.value), isValid: false, count: Number(r.cnt) })),
         };
       } finally {
         await srcSql.end();
@@ -533,6 +573,5 @@ function determineStatus(rule: DqRule, failurePct: number | null, score: number 
   const warnThreshold = rule.thresholdWarn;
   if (threshold != null && score != null && score < threshold) return "FAILED";
   if (warnThreshold != null && score != null && score < warnThreshold) return "WARNING";
-  if (failurePct === 0) return "PASSED";
-  return "PASSED";
+  return failurePct > 0 ? "FAILED" : "PASSED";
 }
