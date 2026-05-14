@@ -30,7 +30,11 @@ const accentClass: Record<NonNullable<WarnLevel>, string> = {
 };
 
 export function DomainCard({ d }: { d: GovernanceDomain }) {
-  const href         = d.domainCode === "DCAT" ? "/catalog" : "#";
+  const DOMAIN_HREFS: Record<string, string> = {
+    DCAT: "/catalog",
+    DQ:   "/quality",
+  };
+  const href = DOMAIN_HREFS[d.domainCode] ?? "#";
   const requestCount = d.openRequestCount ?? 0;
   const level        = warnLevel(requestCount);
 
