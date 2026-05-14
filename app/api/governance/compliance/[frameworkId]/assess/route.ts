@@ -5,7 +5,13 @@ import { upsertAssessment } from "@/lib/queries/gov-compliance";
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { reqId, levelCode, notes } = await req.json();
-  await upsertAssessment(reqId, levelCode, notes ?? null, session.userId);
+  const body = await req.json();
+  await upsertAssessment(body.reqId, {
+    submissionStatus:     body.submissionStatus,
+    evidentAdminOverride: body.evidentAdminOverride ?? null,
+    domainOwnerOverride:  body.domainOwnerOverride  ?? null,
+    comments:             body.comments             ?? null,
+    assessedBy:           session.userId,
+  });
   return NextResponse.json({ ok: true });
 }

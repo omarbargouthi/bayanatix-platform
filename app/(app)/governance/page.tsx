@@ -32,7 +32,7 @@ export default async function GovernancePage() {
   const totalEntries  = registers.reduce((a, r) => a + r.entryCount, 0);
   const primaryFw     = frameworks[0] ?? null;
   const compliantPct  = primaryFw
-    ? Math.round((primaryFw.compliantCount / Math.max(primaryFw.reqCount, 1)) * 100)
+    ? Math.round((primaryFw.completeCount / Math.max(primaryFw.reqCount, 1)) * 100)
     : 0;
 
   return (
@@ -55,7 +55,7 @@ export default async function GovernancePage() {
         <div className="grid grid-cols-4 gap-4 mb-8">
           <StatCard label="Framework Documents" value={totalFwDocs} sub="across all sections" color="purple" />
           <StatCard label="Active Registers"    value={registers.length} sub={`${totalEntries} entries total`} color="blue" />
-          <StatCard label="NDI Compliance"      value={`${compliantPct}%`} sub={primaryFw ? `${primaryFw.compliantCount} / ${primaryFw.reqCount} requirements` : "No framework loaded"} color="green" />
+          <StatCard label="NDI Compliance"      value={`${compliantPct}%`} sub={primaryFw ? `${primaryFw.completeCount} / ${primaryFw.reqCount} requirements` : "No framework loaded"} color="green" />
           <StatCard label="Frameworks Tracked"  value={frameworks.length} sub="compliance frameworks" color="amber" />
         </div>
 
@@ -138,7 +138,7 @@ export default async function GovernancePage() {
             {frameworks.length > 0 && (
               <div className="space-y-2 mb-5">
                 {frameworks.map((f) => {
-                  const pct = Math.round((f.compliantCount / Math.max(f.reqCount, 1)) * 100);
+                  const pct = Math.round((f.completeCount / Math.max(f.reqCount, 1)) * 100);
                   return (
                     <Link key={f.frameworkId} href={`/governance/compliance?fw=${f.frameworkId}`}
                       className="block px-3 py-2 rounded-lg hover:bg-canvas transition-colors">
