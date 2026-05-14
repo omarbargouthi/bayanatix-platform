@@ -110,7 +110,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Asset not found" }, { status: 404 });
   }
 
-  const asset = entityRows[0];
+  const raw = entityRows[0];
+  const asset = {
+    id:          raw.id,
+    name:        raw.name,
+    rowCount:    raw.rowCount != null ? Number(raw.rowCount) : null,
+    isView:      raw.isView,
+    description: raw.description,
+  };
 
   const groups = [
     {

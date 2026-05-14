@@ -98,7 +98,7 @@ export async function GET(req: Request) {
   const entities = entityRows.map((e) => ({
     entityId: e.entityId,
     entityName: e.entityName,
-    rowCount: e.rowCount,
+    rowCount: e.rowCount != null ? Number(e.rowCount) : null,
     isView: e.isView,
     columns: (attrsByEntity.get(e.entityId) ?? []).map((a) => ({
       attributeId: a.attributeId,
