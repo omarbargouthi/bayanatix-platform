@@ -9,6 +9,7 @@ import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
 import type { SearchResult } from "@/app/api/catalog/search/route";
+import { ALL_TYPES } from "@/app/api/search/route";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export type Crumb = { label: string; href?: string };
@@ -49,6 +50,7 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [quickTypes,    setQuickTypes]    = useState<Set<string>>(new Set(ALL_TYPES));
   const searchRef   = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,7 +72,15 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
   function submitSearch() {
     if (!searchQuery.trim()) return;
     setSearchFocused(false);
-    router.push(`/catalog?q=${encodeURIComponent(searchQuery.trim())}`);
+    const params = new URLSearchParams({ q: searchQuery.trim() });
+    if (quickTypes.size < ALL_TYPES.length) params.set("types", [...quickTypes].join(","));
+    router.push(`/search?${params.toString()}`);
+  }
+
+  function toggleQuickType(type: string) {
+    const next = new Set(quickTypes);
+    if (next.has(type)) { if (next.size > 1) next.delete(type); } else { next.add(type); }
+    setQuickTypes(next);
   }
 
   useEffect(() => {
@@ -134,28 +144,72 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
         </div>
 
         {/* Results dropdown */}
-        {searchFocused && searchQuery.length >= 2 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto">
-            {searchLoading && <div className="px-4 py-3 text-sm text-muted">Searching…</div>}
-            {!searchLoading && searchResults.length === 0 && (
-              <div className="px-4 py-3 text-sm text-muted">No results for "{searchQuery}"</div>
+        {searchFocused && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-lg z-50 overflow-hidden">
+            {/* Quick type filter chips */}
+            <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-line-soft bg-canvas-soft">
+              {[
+                { key: "TABLE",  label: "Tables" },
+                { key: "VIEW",   label: "Views" },
+                { key: "COLUMN", label: "Columns" },
+                { key: "SCHEMA", label: "Schemas" },
+                { key: "SOURCE", label: "Sources" },
+                { key: "TERM",   label: "Terms" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => toggleQuickType(key)}
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${
+                    quickTypes.has(key)
+                      ? "bg-brand-purple text-white border-brand-purple"
+                      : "bg-white text-ink-soft border-line hover:border-brand-purple hover:text-brand-purple"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search results */}
+            {searchQuery.length >= 2 && (
+              <div className="max-h-64 overflow-y-auto">
+                {searchLoading && <div className="px-4 py-3 text-sm text-muted">Searching…</div>}
+                {!searchLoading && searchResults.length === 0 && (
+                  <div className="px-4 py-3 text-sm text-muted">No results for "{searchQuery}"</div>
+                )}
+                {searchResults.map((r) => (
+                  <button
+                    key={`${r.type}-${r.id}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-canvas text-left border-b border-line-soft last:border-b-0 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-semibold text-ink truncate">{r.name}</span>
+                        <span className="text-[10px] text-muted bg-canvas-soft px-1.5 py-0.5 rounded shrink-0">{r.type}</span>
+                      </div>
+                      {r.meta && <div className="text-[11px] text-muted truncate">{r.meta}</div>}
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
-            {searchResults.map((r) => (
+
+            {/* See all results link */}
+            {searchQuery.length >= 2 && !searchLoading && (
               <button
-                key={`${r.type}-${r.id}`}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-canvas text-left border-b border-line-soft last:border-b-0 transition-colors"
+                onClick={submitSearch}
+                className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-brand-purple hover:bg-canvas border-t border-line-soft transition-colors"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-ink truncate">{r.name}</span>
-                    <span className="text-[10px] text-muted bg-canvas-soft px-1.5 py-0.5 rounded shrink-0">{r.type}</span>
-                  </div>
-                  {r.meta && <div className="text-[11px] text-muted truncate">{r.meta}</div>}
-                </div>
+                See all results for "{searchQuery}"
+                <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                  <path fillRule="evenodd" d="M2 8a.75.75 0 01.75-.75h8.69L8.22 4.03a.75.75 0 011.06-1.06l4.5 4.5a.75.75 0 010 1.06l-4.5 4.5a.75.75 0 01-1.06-1.06l3.22-3.22H2.75A.75.75 0 012 8z" clipRule="evenodd" />
+                </svg>
               </button>
-            ))}
+            )}
           </div>
         )}
       </div>
