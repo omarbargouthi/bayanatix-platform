@@ -3,25 +3,27 @@ import { getSession } from "@/lib/auth";
 import { importRequirements } from "@/lib/queries/gov-compliance";
 import * as XLSX from "xlsx";
 
-// Column header → field key mapping (case-insensitive, trimmed)
 const COL_MAP: Record<string, string> = {
-  "domain":                              "domain",
-  "domain code":                         "domainCode",
-  "standard number":                     "reqCode",
-  "question":                            "question",
-  "maturity level":                      "maturityLevel",
-  "supporting evidence":                 "supportingEvidence",
-  "admission criteria":                  "admissionCriteria",
-  "directory code":                      "directoryCode",
-  "directory type":                      "directoryType",
-  "compliance or maturity?":             "complianceOrMaturity",
-  "compliance or maturity":              "complianceOrMaturity",
-  "operational excellence?":             "operationalExcellence",
-  "operational excellence":              "operationalExcellence",
-  "evident administrator":               "evidentAdministrator",
-  "domain owner":                        "domainOwner",
-  "management and supporting sector (if applicable)": "managementSector",
-  "management and supporting sector":    "managementSector",
+  "standard":                                          "standard",
+  "standard code":                                     "standardCode",
+  "standard name":                                     "standard",
+  "domain":                                            "domain",
+  "domain code":                                       "domainCode",
+  "standard number":                                   "reqCode",
+  "question":                                          "question",
+  "maturity level":                                    "maturityLevel",
+  "supporting evidence":                               "supportingEvidence",
+  "admission criteria":                                "admissionCriteria",
+  "directory code":                                    "directoryCode",
+  "directory type":                                    "directoryType",
+  "compliance or maturity?":                           "complianceOrMaturity",
+  "compliance or maturity":                            "complianceOrMaturity",
+  "operational excellence?":                           "operationalExcellence",
+  "operational excellence":                            "operationalExcellence",
+  "evident administrator":                             "evidentAdministrator",
+  "domain owner":                                      "domainOwner",
+  "management and supporting sector (if applicable)":  "managementSector",
+  "management and supporting sector":                  "managementSector",
 };
 
 export async function POST(req: Request, { params }: { params: { frameworkId: string } }) {
@@ -39,7 +41,6 @@ export async function POST(req: Request, { params }: { params: { frameworkId: st
 
   if (rawRows.length === 0) return NextResponse.json({ error: "Empty sheet" }, { status: 400 });
 
-  // Normalise column headers
   const rows = rawRows.map((raw, i) => {
     const norm: Record<string, string> = {};
     for (const [key, val] of Object.entries(raw)) {
@@ -48,6 +49,8 @@ export async function POST(req: Request, { params }: { params: { frameworkId: st
     }
     return {
       reqCode:               norm.reqCode               ?? `REQ-${i + 1}`,
+      standard:              norm.standard              ?? "",
+      standardCode:          norm.standardCode          ?? "",
       domain:                norm.domain                ?? "",
       domainCode:            norm.domainCode            ?? "",
       question:              norm.question              ?? "",

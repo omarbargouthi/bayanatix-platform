@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
-import { listFrameworks, listRequirements } from "@/lib/queries/gov-compliance";
+import {
+  listFrameworks,
+  listRequirements,
+  getLevelConfig,
+  listUsers,
+} from "@/lib/queries/gov-compliance";
 import { ComplianceClient } from "@/components/governance/ComplianceClient";
 
 export const dynamic = "force-dynamic";
@@ -14,17 +19,22 @@ export default async function CompliancePage({
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const frameworks = await listFrameworks();
-  const fwId = searchParams.fw ? Number(searchParams.fw) : (frameworks[0]?.frameworkId ?? null);
-  const requirements = fwId ? await listRequirements(fwId) : [];
+  const frameworks  = await listFrameworks();
+  const fwId        = searchParams.fw ? Number(searchParams.fw) : (frameworks[0]?.frameworkId ?? null);
   const activeFramework = frameworks.find((f) => f.frameworkId === fwId) ?? frameworks[0] ?? null;
+
+  const [requirements, levelConfig, users] = await Promise.all([
+    fwId ? listRequirements(fwId) : Promise.resolve([]),
+    fwId ? getLevelConfig(fwId)   : Promise.resolve([]),
+    listUsers(),
+  ]);
 
   return (
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Governance", href: "/governance" },
+          { label: "Bayanat",          href: "/dashboard" },
+          { label: "Data Governance",  href: "/governance" },
           { label: "Compliance" },
         ]}
         user={user}
@@ -34,6 +44,8 @@ export default async function CompliancePage({
           frameworks={frameworks}
           activeFramework={activeFramework}
           initialRequirements={requirements}
+          initialLevelConfig={levelConfig}
+          users={users}
         />
       </main>
     </>
