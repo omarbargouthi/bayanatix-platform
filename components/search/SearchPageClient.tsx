@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { FullSearchHit, SearchResponse } from "@/app/api/search/route";
-import { ALL_TYPES } from "@/app/api/search/route";
+import type { FullSearchHit, SearchResponse } from "@/lib/search-types";
+import { ALL_TYPES } from "@/lib/search-types";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

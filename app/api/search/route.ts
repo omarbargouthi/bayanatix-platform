@@ -1,34 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import type { FullSearchHit, SearchResponse } from "@/lib/search-types";
+import { ALL_TYPES } from "@/lib/search-types";
 
-export type FullSearchHit = {
-  type: "TABLE" | "VIEW" | "COLUMN" | "SCHEMA" | "SOURCE" | "TERM";
-  id: number;
-  name: string;
-  description: string | null;
-  href: string;
-  path: string[];
-  rowCount?: number | null;
-  dataType?: string | null;
-  tableName?: string;
-  schemaName?: string;
-  sourceName?: string;
-  classification?: string;
-  isView?: boolean;
-  tags: { tagId: number; tagName: string; colorHex: string | null }[];
-  stewards: { userId: string; fullName: string; roleCode: string }[];
-};
-
-export type SearchResponse = {
-  counts: Partial<Record<FullSearchHit["type"], number>>;
-  total: number;
-  results: FullSearchHit[];
-};
-
-export const ALL_TYPES: FullSearchHit["type"][] = [
-  "TABLE", "VIEW", "COLUMN", "SCHEMA", "SOURCE", "TERM",
-];
+export type { FullSearchHit, SearchResponse };
+export { ALL_TYPES };
 
 export async function GET(req: Request) {
   const session = await getSession();

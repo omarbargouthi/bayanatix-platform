@@ -9,7 +9,7 @@ import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import type { SessionUser } from "@/lib/types";
 import type { SearchResult } from "@/app/api/catalog/search/route";
-import { ALL_TYPES } from "@/app/api/search/route";
+import { ALL_TYPES } from "@/lib/search-types";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export type Crumb = { label: string; href?: string };
