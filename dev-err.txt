@@ -1,0 +1,585 @@
+(node:33436) TimeoutNegativeWarning: -7779.056463242261 is a negative number.
+Timeout duration was set to 1.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[DQ] handleFailureActions error: PostgresError: column "system_role" does not exist
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at resolveAssignees (webpack-internal:///(rsc)/./lib/workflow.ts:33:74) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42703',
+  position: '62',
+  file: 'parse_relation.c',
+  line: '3822',
+  routine: 'errorMissingColumn'
+}
+ ⨯ Failed to generate static paths for /api/dq/rules/[id]:
+TypeError: __webpack_require__.C is not a function
+    at C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\.next\server\app\api\dq\rules\[id]\route.js:221:21
+    at Object.<anonymous> (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\.next\server\app\api\dq\rules\[id]\route.js:226:3)
+    at Module._compile (node:internal/modules/cjs/loader:1830:14)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1576:12)
+    at mod.require (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16) {
+  type: 'TypeError'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '855',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '855',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '855',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '855',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '878',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '1052',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ PostgresError: for SELECT DISTINCT, ORDER BY expressions must appear in select list
+    at ErrorResponse (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:803:66)
+    at handle (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (webpack-internal:///(rsc)/./node_modules/postgres/src/connection.js:330:9)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:175:23)
+    at new Query (webpack-internal:///(rsc)/./node_modules/postgres/src/query.js:41:24)
+    at sql (webpack-internal:///(rsc)/./node_modules/postgres/src/index.js:110:11)
+    at GET (webpack-internal:///(rsc)/./app/api/requests/route.ts:30:68) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: '42P10',
+  position: '1052',
+  file: 'parse_clause.c',
+  line: '3013',
+  routine: 'transformDistinctClause'
+}
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/data-model/route.ts:108:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/data-model/route.ts:108:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at serializeJavascriptValueToJSONString (node:internal/deps/undici/undici:4339:27)
+    at Response.json (node:internal/deps/undici/undici:11347:11)
+    at NextResponse.json (webpack-internal:///(rsc)/./node_modules/next/dist/server/web/spec-extension/response.js:91:35)
+    at GET (webpack-internal:///(rsc)/./app/api/catalog/mindmap/route.ts:186:66)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:55759
+    at async eO.execute (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46527)
+    at async eO.handle (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57093)
+    at async doRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1345:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1567:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1475:28)
+    at async DevServer.renderPageComponent (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1901:24)
+    at async DevServer.renderToResponseImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:1939:32)
+    at async DevServer.pipeImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:914:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\base-server.js:810:17)
+    at async C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\lib\start-server.js:141:13)
+ ⨯ ./lib/auth.ts
+Error: 
+  [31mx[0m You're importing a component that needs next/headers. That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/getting-started/
+  [31m|[0m react-essentials#server-components
+  [31m|[0m 
+  [31m|[0m 
+   ,-[[36;1;4mC:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\lib\auth.ts[0m:1:1]
+ [2m1[0m | import { SignJWT, jwtVerify } from "jose";
+ [2m2[0m | import bcrypt from "bcryptjs";
+ [2m3[0m | import { cookies } from "next/headers";
+   : [31;1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m4[0m | import type { SessionUser } from "./types";
+ [2m5[0m | 
+ [2m6[0m | const COOKIE = "bayanatix_session";
+   `----
+
+Import trace for requested module:
+./lib/auth.ts
+./app/api/search/route.ts
+./components/layout/Header.tsx
+ ⨯ ./lib/auth.ts
+Error: 
+  [31mx[0m You're importing a component that needs next/headers. That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/getting-started/
+  [31m|[0m react-essentials#server-components
+  [31m|[0m 
+  [31m|[0m 
+   ,-[[36;1;4mC:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\lib\auth.ts[0m:1:1]
+ [2m1[0m | import { SignJWT, jwtVerify } from "jose";
+ [2m2[0m | import bcrypt from "bcryptjs";
+ [2m3[0m | import { cookies } from "next/headers";
+   : [31;1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m4[0m | import type { SessionUser } from "./types";
+ [2m5[0m | 
+ [2m6[0m | const COOKIE = "bayanatix_session";
+   `----
+
+Import trace for requested module:
+./lib/auth.ts
+./app/api/search/route.ts
+./components/layout/Header.tsx
+ ⨯ ./lib/auth.ts
+Error: 
+  [31mx[0m You're importing a component that needs next/headers. That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/getting-started/
+  [31m|[0m react-essentials#server-components
+  [31m|[0m 
+  [31m|[0m 
+   ,-[[36;1;4mC:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\lib\auth.ts[0m:1:1]
+ [2m1[0m | import { SignJWT, jwtVerify } from "jose";
+ [2m2[0m | import bcrypt from "bcryptjs";
+ [2m3[0m | import { cookies } from "next/headers";
+   : [31;1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m4[0m | import type { SessionUser } from "./types";
+ [2m5[0m | 
+ [2m6[0m | const COOKIE = "bayanatix_session";
+   `----
+
+Import trace for requested module:
+./lib/auth.ts
+./app/api/search/route.ts
+./components/layout/Header.tsx
+ ⨯ ./lib/auth.ts
+Error: 
+  [31mx[0m You're importing a component that needs next/headers. That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/getting-started/
+  [31m|[0m react-essentials#server-components
+  [31m|[0m 
+  [31m|[0m 
+   ,-[[36;1;4mC:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\lib\auth.ts[0m:1:1]
+ [2m1[0m | import { SignJWT, jwtVerify } from "jose";
+ [2m2[0m | import bcrypt from "bcryptjs";
+ [2m3[0m | import { cookies } from "next/headers";
+   : [31;1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m4[0m | import type { SessionUser } from "./types";
+ [2m5[0m | 
+ [2m6[0m | const COOKIE = "bayanatix_session";
+   `----
+
+Import trace for requested module:
+./lib/auth.ts
+./app/api/search/route.ts
+./components/layout/Header.tsx
+ ⨯ ./lib/auth.ts
+Error: 
+  [31mx[0m You're importing a component that needs next/headers. That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/getting-started/
+  [31m|[0m react-essentials#server-components
+  [31m|[0m 
+  [31m|[0m 
+   ,-[[36;1;4mC:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\lib\auth.ts[0m:1:1]
+ [2m1[0m | import { SignJWT, jwtVerify } from "jose";
+ [2m2[0m | import bcrypt from "bcryptjs";
+ [2m3[0m | import { cookies } from "next/headers";
+   : [31;1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m4[0m | import type { SessionUser } from "./types";
+ [2m5[0m | 
+ [2m6[0m | const COOKIE = "bayanatix_session";
+   `----
+
+Import trace for requested module:
+./lib/auth.ts
+./app/api/search/route.ts
+./components/layout/Header.tsx
+ ⨯ ./lib/auth.ts
+Error: 
+  [31mx[0m You're importing a component that needs next/headers. That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/getting-started/
+  [31m|[0m react-essentials#server-components
+  [31m|[0m 
+  [31m|[0m 
+   ,-[[36;1;4mC:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\lib\auth.ts[0m:1:1]
+ [2m1[0m | import { SignJWT, jwtVerify } from "jose";
+ [2m2[0m | import bcrypt from "bcryptjs";
+ [2m3[0m | import { cookies } from "next/headers";
+   : [31;1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+ [2m4[0m | import type { SessionUser } from "./types";
+ [2m5[0m | 
+ [2m6[0m | const COOKIE = "bayanatix_session";
+   `----
+
+Import trace for requested module:
+./lib/auth.ts
+./app/api/search/route.ts
+./components/layout/Header.tsx
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ Failed to generate static paths for /catalog/[schemaId]:
+TypeError: __webpack_require__.C is not a function
+    at C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\.next\server\app\(app)\catalog\[schemaId]\page.js:702:21
+    at Object.<anonymous> (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\.next\server\app\(app)\catalog\[schemaId]\page.js:707:3)
+    at Module._compile (node:internal/modules/cjs/loader:1830:14)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1576:12)
+    at mod.require (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16) {
+  type: 'TypeError'
+}
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⨯ components\catalog\DashboardSearch.tsx (42:12) @ BookIcon
+ ⨯ ReferenceError: BookIcon is not defined
+    at eval (./components/catalog/DashboardSearch.tsx:319:89)
+    at (ssr)/./components/catalog/DashboardSearch.tsx (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\.next\server\app\(app)\dashboard\page.js:227:1)
+    at Object.__webpack_require__ [as require] (C:\Omar\20240415\Omar\Personal\Kenzcom\Bayanatix files\bayanatix-handoff\bayanatix-platform\.next\server\webpack-runtime.js:33:43)
+digest: "2298487792"
+[0m [90m 40 |[39m [36mconst[39m [33mRESULT_ICON[39m[33m:[39m [33mRecord[39m[33m<[39m[33mstring[39m[33m,[39m [33mReact[39m[33m.[39m[33mReactNode[39m[33m>[39m [33m=[39m {[0m
+[0m [90m 41 |[39m   [33mTABLE[39m[33m:[39m [33m<[39m[33mTableIcon[39m [35m/>, VIEW: <TableIcon /[39m[33m>[39m[33m,[39m [33mCOLUMN[39m[33m:[39m [33m<[39m[33mColumnIcon[39m [33m/[39m[33m>[39m[33m,[39m[0m
+[0m[31m[1m>[22m[39m[90m 42 |[39m   [33mSCHEMA[39m[33m:[39m [33m<[39m[33mBookIcon[39m [35m/>, SOURCE: <BookIcon /[39m[33m>[39m[33m,[39m [33mTERM[39m[33m:[39m [33m<[39m[33mBookIcon[39m [33m/[39m[33m>[39m[33m,[39m[0m
+[0m [90m    |[39m            [31m[1m^[22m[39m[0m
+[0m [90m 43 |[39m }[33m;[39m[0m
+[0m [90m 44 |[39m[0m
+[0m [90m 45 |[39m [36mconst[39m [33mTYPE_LABEL[39m[33m:[39m [33mRecord[39m[33m<[39m[33mstring[39m[33m,[39m string[33m>[39m [33m=[39m {[0m
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.

@@ -31,6 +31,7 @@ const accentClass: Record<NonNullable<WarnLevel>, string> = {
 
 export function DomainCard({ d }: { d: GovernanceDomain }) {
   const DOMAIN_HREFS: Record<string, string> = {
+    DG:   "/governance",
     DCAT: "/catalog",
     DQ:   "/quality",
   };

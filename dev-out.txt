@@ -1,0 +1,1496 @@
+
+> bayanatix-platform@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.13
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.4s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 1308ms (152 modules)
+ ○ Compiling /quality ...
+ ✓ Compiled /quality in 11.4s (654 modules)
+ GET /quality 200 in 12121ms
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 3.1s (411 modules)
+ GET /api/notifications/count 200 in 3307ms
+ GET /api/notifications/count 200 in 50ms
+ ○ Compiling /catalog ...
+ ✓ Compiled /catalog in 2.1s (713 modules)
+ GET /api/notifications/count 200 in 57ms
+ GET /api/notifications/count 200 in 42ms
+ ○ Compiling /catalog/[schemaId] ...
+ ✓ Compiled /catalog/[schemaId] in 1744ms (725 modules)
+ ✓ Compiled /api/assets/[assetType]/[assetId]/terms in 451ms (451 modules)
+ ✓ Compiled (459 modules)
+ GET /api/notifications/count 200 in 883ms
+ GET /api/admin/tags 200 in 1051ms
+ GET /api/glossary/picker 200 in 1052ms
+ GET /api/notifications/count 200 in 69ms
+ GET /api/admin/tags 200 in 62ms
+ GET /api/glossary/picker 200 in 64ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1641ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1680ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1725ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 116ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 171ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 126ms
+ GET /api/admin/tags 200 in 150ms
+ GET /api/glossary/picker 200 in 292ms
+ GET /api/assets/DATA_ENTITIES/105/terms 200 in 240ms
+ GET /api/assets/DATA_ENTITIES/105/tags 200 in 251ms
+ GET /api/assets/DATA_ENTITIES/105/rating 200 in 249ms
+ GET /api/admin/tags 200 in 120ms
+ GET /api/glossary/picker 200 in 112ms
+ GET /api/assets/DATA_ENTITIES/105/terms 200 in 97ms
+ GET /api/assets/DATA_ENTITIES/105/tags 200 in 101ms
+ GET /api/assets/DATA_ENTITIES/105/rating 200 in 103ms
+ ○ Compiling /catalog/[schemaId]/tables/[tableId] ...
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 2.6s (768 modules)
+ GET /api/notifications/count 200 in 43ms
+ GET /api/notifications/count 200 in 36ms
+ GET /api/notifications/count 200 in 125ms
+ GET /api/glossary/picker 200 in 198ms
+ GET /api/admin/tags 200 in 305ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 302ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 311ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 320ms
+ GET /api/notifications/count 200 in 179ms
+ GET /api/glossary/picker 200 in 197ms
+ GET /api/admin/tags 200 in 162ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 150ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 154ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 143ms
+ GET /api/admin/tags 200 in 104ms
+ GET /api/glossary/picker 200 in 189ms
+ GET /api/assets/DATA_ENTITIES/87/tags 200 in 188ms
+ GET /api/assets/DATA_ENTITIES/87/terms 200 in 190ms
+ GET /api/admin/tags 200 in 88ms
+ GET /api/glossary/picker 200 in 102ms
+ GET /api/assets/DATA_ENTITIES/87/tags 200 in 89ms
+ GET /api/assets/DATA_ENTITIES/87/terms 200 in 90ms
+ GET /api/notifications/count 200 in 39ms
+ GET /api/notifications/count 200 in 28ms
+ ○ Compiling /api/dq/rules ...
+ ✓ Compiled /api/dq/rules in 943ms (484 modules)
+ GET /api/dq/rules?entityId=105 200 in 1079ms
+ GET /api/dq/rules?entityId=105 200 in 44ms
+ ✓ Compiled /api/dq/rules/[id] in 429ms (486 modules)
+ GET /api/dq/rules/10 200 in 973ms
+ GET /api/dq/rules/10 200 in 108ms
+ ○ Compiling /api/dq/run ...
+ ✓ Compiled /api/dq/run in 804ms (489 modules)
+ POST /api/dq/run 200 in 1069ms
+ GET /api/dq/rules?entityId=105 200 in 50ms
+ GET /api/dq/rules/10 200 in 74ms
+ ○ Compiling /api/dq/results/[resultId]/samples ...
+ ✓ Compiled /api/dq/results/[resultId]/samples in 572ms (491 modules)
+ GET /api/dq/results/20/samples 200 in 996ms
+ GET /api/dq/results/20/samples 200 in 76ms
+ ✓ Compiled /api/notifications in 384ms (494 modules)
+ GET /api/notifications 200 in 784ms
+ GET /api/notifications/count 200 in 786ms
+ GET /api/notifications/count 200 in 59ms
+ GET /api/notifications/count 200 in 73ms
+ GET /api/notifications/count 200 in 70ms
+ GET /api/notifications 200 in 150ms
+ GET /api/notifications/count 200 in 167ms
+ GET /api/notifications/count 200 in 49ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 41ms
+ GET /api/notifications/count 200 in 103ms
+ GET /api/admin/tags 200 in 121ms
+ GET /api/glossary/picker 200 in 123ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 235ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 240ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 301ms
+ GET /api/notifications/count 200 in 152ms
+ GET /api/glossary/picker 200 in 164ms
+ GET /api/admin/tags 200 in 172ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 161ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 177ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 97ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/requests in 510ms (487 modules)
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 991ms
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 87ms
+ GET /api/notifications/count 200 in 32ms
+ GET /api/notifications/count 200 in 45ms
+ ○ Compiling /api/auth/logout ...
+ ✓ Compiled /api/auth/logout in 956ms (489 modules)
+ POST /api/auth/logout 200 in 1040ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1010ms (782 modules)
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 764ms (498 modules)
+ POST /api/auth/login 200 in 1301ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1460ms (798 modules)
+ GET /api/notifications/count 200 in 65ms
+ GET /api/notifications/count 200 in 39ms
+ GET /api/notifications 200 in 72ms
+ GET /api/notifications/count 200 in 85ms
+ GET /api/notifications/count 200 in 56ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 107ms
+ GET /api/admin/tags 403 in 119ms
+ GET /api/glossary/picker 200 in 198ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 232ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 231ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 234ms
+ GET /api/notifications/count 200 in 154ms
+ GET /api/admin/tags 403 in 189ms
+ GET /api/glossary/picker 200 in 204ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 186ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 167ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 173ms
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 104ms
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 51ms
+ GET /api/notifications/count 200 in 35ms
+ GET /api/notifications/count 200 in 33ms
+ ○ Compiling /api/dq/rules ...
+ ✓ Compiled /api/dq/rules in 1608ms (502 modules)
+ GET /api/dq/rules?entityId=105 200 in 1768ms
+ GET /api/dq/rules?entityId=105 200 in 108ms
+ ✓ Compiled /api/dq/rules/[id] in 426ms (504 modules)
+ GET /api/dq/rules/10 200 in 577ms
+ GET /api/dq/rules/10 200 in 54ms
+ ○ Compiling /quality ...
+ ✓ Compiled /quality in 863ms (488 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 578ms (491 modules)
+ GET /api/notifications/count 200 in 654ms
+ GET /api/notifications/count 200 in 49ms
+ ○ Compiling /api/dq/run ...
+ ✓ Compiled /api/dq/run in 924ms (479 modules)
+ POST /api/dq/run 403 in 1062ms
+ ✓ Compiled /api/dq/rules in 418ms (481 modules)
+ GET /api/dq/rules 200 in 540ms
+ GET /api/dq/rules 200 in 57ms
+ ✓ Compiled /api/dq/rules/[id] in 344ms (483 modules)
+ GET /api/dq/rules/1 200 in 450ms
+ GET /api/dq/rules/2 200 in 52ms
+ GET /api/dq/rules/10 200 in 32ms
+ GET /api/dq/rules/9 200 in 33ms
+ GET /api/dq/rules/7 200 in 40ms
+ GET /api/dq/rules/4 200 in 40ms
+ GET /api/dq/rules/3 200 in 33ms
+ ✓ Compiled /api/dq/results/[resultId]/samples in 345ms (485 modules)
+ GET /api/dq/results/20/samples 200 in 484ms
+ GET /api/dq/results/20/samples 200 in 53ms
+ ✓ Compiled /api/notifications/count in 518ms (488 modules)
+ ✓ Compiled (491 modules)
+ GET /api/notifications 200 in 1002ms
+ GET /api/notifications/count 200 in 1005ms
+ GET /api/notifications/count 200 in 53ms
+ ○ Compiling /catalog ...
+ ✓ Compiled /catalog in 1039ms (500 modules)
+ GET /api/notifications/count 200 in 65ms
+ GET /api/notifications/count 200 in 55ms
+ GET /api/notifications/count 200 in 106ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 417ms (502 modules)
+ ✓ Compiled (510 modules)
+ GET /api/admin/tags 403 in 1244ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1229ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1233ms
+ GET /api/glossary/picker 200 in 1261ms
+ GET /api/notifications/count 200 in 1114ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1258ms
+ GET /api/admin/tags 403 in 116ms
+ GET /api/glossary/picker 200 in 155ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 144ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 149ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 148ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/requests in 468ms (489 modules)
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 580ms
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 57ms
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 449ms (512 modules)
+ GET /api/notifications/count 200 in 63ms
+ GET /api/notifications/count 200 in 34ms
+ GET /api/dq/rules?entityId=105 200 in 57ms
+ GET /api/dq/rules?entityId=105 200 in 64ms
+ GET /api/dq/rules/10 200 in 89ms
+ GET /api/dq/rules/10 200 in 37ms
+ GET /api/dq/rules?entityId=105 200 in 94ms
+ GET /api/dq/rules?entityId=105 200 in 68ms
+ GET /api/dq/rules/10 200 in 129ms
+ GET /api/dq/rules/10 200 in 44ms
+ ○ Compiling /api/auth/logout ...
+ ✓ Compiled /api/auth/logout in 872ms (490 modules)
+ POST /api/auth/logout 200 in 979ms
+ ✓ Compiled /login in 347ms (495 modules)
+ ✓ Compiled /api/auth/login in 436ms (484 modules)
+ POST /api/auth/login 200 in 1002ms
+ ✓ Compiled /dashboard in 418ms (494 modules)
+ ✓ Compiled /api/notifications/count in 378ms (497 modules)
+ GET /api/notifications/count 200 in 484ms
+ GET /api/notifications/count 200 in 59ms
+ ✓ Compiled /api/notifications in 311ms (500 modules)
+ GET /api/notifications 200 in 710ms
+ GET /api/notifications/count 200 in 713ms
+ GET /api/notifications/count 200 in 78ms
+ GET /api/notifications/count 200 in 53ms
+ GET /api/notifications/count 200 in 46ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/rating ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 572ms (492 modules)
+ ✓ Compiled (500 modules)
+ GET /api/admin/tags 403 in 1109ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1264ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1269ms
+ GET /api/glossary/picker 200 in 1354ms
+ GET /api/notifications/count 200 in 1383ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1356ms
+ GET /api/admin/tags 403 in 113ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 134ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 135ms
+ GET /api/notifications/count 200 in 116ms
+ GET /api/glossary/picker 200 in 117ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 123ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/requests in 341ms (502 modules)
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 473ms
+ GET /api/assets/DATA_ENTITIES/105/requests 200 in 56ms
+ POST /api/auth/logout 200 in 50ms
+ POST /api/auth/login 200 in 527ms
+ GET /api/notifications/count 200 in 51ms
+ GET /api/notifications/count 200 in 40ms
+ ○ Compiling /admin/workflows ...
+ ✓ Compiled /admin/workflows in 2.1s (800 modules)
+ ✓ Compiled in 528ms (307 modules)
+ ○ Compiling /api/admin/workflows ...
+ ✓ Compiled /api/admin/workflows in 541ms (495 modules)
+ GET /api/notifications/count 200 in 1043ms
+ GET /api/admin/workflows 200 in 1058ms
+ GET /api/notifications/count 200 in 55ms
+ GET /api/admin/workflows 200 in 59ms
+ GET /api/notifications/count 200 in 52ms
+ GET /api/notifications/count 200 in 53ms
+ ✓ Compiled /api/glossary/picker in 391ms (495 modules)
+ ✓ Compiled (503 modules)
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1385ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1400ms
+ GET /api/admin/tags 200 in 1454ms
+ GET /api/notifications/count 200 in 1463ms
+ GET /api/glossary/picker 200 in 1453ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1450ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 64ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 95ms
+ GET /api/admin/tags 200 in 97ms
+ GET /api/notifications/count 200 in 98ms
+ GET /api/glossary/picker 200 in 101ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 111ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/requests in 417ms (475 modules)
+ GET /api/assets/DATA_ENTITIES/106/requests 200 in 522ms
+ GET /api/assets/DATA_ENTITIES/106/requests 200 in 50ms
+ ○ Compiling /admin/user-management ...
+ ✓ Compiled /admin/user-management in 1495ms (782 modules)
+ GET /api/notifications/count 200 in 103ms
+ ✓ Compiled /api/admin/users in 526ms (485 modules)
+ GET /api/admin/users 200 in 1015ms
+ GET /api/notifications/count 200 in 859ms
+ GET /api/admin/users 200 in 55ms
+ GET /api/notifications/count 200 in 52ms
+ GET /api/notifications/count 200 in 59ms
+ GET /api/admin/tags 200 in 89ms
+ GET /api/notifications/count 200 in 225ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 220ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 213ms
+ GET /api/glossary/picker 200 in 298ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 295ms
+ GET /api/admin/tags 200 in 153ms
+ GET /api/notifications/count 200 in 165ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 150ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 177ms
+ GET /api/glossary/picker 200 in 132ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 130ms
+ GET /api/admin/tags 200 in 132ms
+ GET /api/glossary/picker 200 in 204ms
+ GET /api/assets/DATA_ENTITIES/105/rating 200 in 248ms
+ GET /api/assets/DATA_ENTITIES/105/terms 200 in 250ms
+ GET /api/assets/DATA_ENTITIES/105/tags 200 in 253ms
+ GET /api/admin/tags 200 in 77ms
+ GET /api/assets/DATA_ENTITIES/105/rating 200 in 67ms
+ GET /api/glossary/picker 200 in 100ms
+ GET /api/assets/DATA_ENTITIES/105/tags 200 in 69ms
+ GET /api/assets/DATA_ENTITIES/105/terms 200 in 81ms
+ ○ Compiling /catalog/[schemaId]/tables/[tableId] ...
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 1058ms (506 modules)
+ GET /api/notifications/count 200 in 46ms
+ GET /api/notifications/count 200 in 36ms
+ ○ Compiling /quality ...
+ ✓ Compiled /quality in 915ms (500 modules)
+ GET /quality 200 in 1542ms
+ GET /api/notifications/count 200 in 66ms
+ GET /api/notifications/count 200 in 37ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 43ms
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 579ms (484 modules)
+ POST /api/auth/login 200 in 1169ms
+ ✓ Compiled /api/dq/run in 488ms (488 modules)
+[DQ] handleFailureActions rule=10 openIssueOnFail=true notifyOwners=true
+ POST /api/dq/run 200 in 757ms
+[DQ] existing open tickets: 0
+[DQ] created request 12
+[DQ] linked asset target
+ ✓ Compiled in 1265ms (454 modules)
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 1342ms (484 modules)
+ POST /api/auth/login 200 in 1699ms
+ ✓ Compiled /api/dq/run in 295ms (488 modules)
+ POST /api/dq/run 200 in 486ms
+ ○ Compiling /api/dq/rules/[id] ...
+ ✓ Compiled /api/dq/rules/[id] in 669ms (482 modules)
+ PATCH /api/dq/rules/10 200 in 893ms
+ ✓ Compiled /api/dq/rules in 300ms (484 modules)
+ GET /api/dq/rules 200 in 407ms
+ ✓ Compiled /api/dq/run in 262ms (488 modules)
+ POST /api/dq/run 200 in 524ms
+ GET /api/dq/rules 200 in 87ms
+ GET /api/dq/rules 200 in 88ms
+ GET /api/dq/rules/1 200 in 1123ms
+ GET /api/dq/rules/2 200 in 129ms
+ GET /api/dq/rules/10 200 in 56ms
+ GET /api/dq/rules/9 200 in 56ms
+ GET /api/dq/rules/7 200 in 43ms
+ GET /api/dq/rules/4 200 in 40ms
+ GET /api/dq/rules/3 200 in 42ms
+ ✓ Compiled /api/dq/results/[resultId]/samples in 346ms (490 modules)
+ GET /api/dq/results/23/samples 200 in 519ms
+ GET /api/dq/results/23/samples 200 in 87ms
+ ✓ Compiled /api/notifications in 513ms (493 modules)
+ ✓ Compiled (496 modules)
+ GET /api/notifications/count 200 in 1081ms
+ GET /api/notifications 200 in 1081ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 47ms
+ GET /api/notifications/count 200 in 47ms
+ GET /api/notifications/count 200 in 120ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/rating ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 596ms (498 modules)
+ ✓ Compiled (506 modules)
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1678ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1678ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1731ms
+ GET /api/admin/tags 200 in 1756ms
+ GET /api/notifications/count 200 in 1560ms
+ GET /api/glossary/picker 200 in 1764ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 90ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 110ms
+ GET /api/admin/tags 200 in 70ms
+ GET /api/glossary/picker 200 in 84ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 92ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 49ms
+ ✓ Compiled /api/auth/logout in 486ms (504 modules)
+ POST /api/auth/logout 200 in 561ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 677ms (509 modules)
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 577ms (513 modules)
+ POST /api/auth/login 200 in 1292ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 785ms (523 modules)
+ GET /api/notifications/count 200 in 89ms
+ GET /api/notifications/count 200 in 43ms
+ GET /api/notifications/count 200 in 74ms
+ GET /api/notifications 200 in 91ms
+ GET /api/notifications/count 200 in 93ms
+ ○ Compiling /requests/[id] ...
+ ✓ Compiled /requests/[id] in 1441ms (837 modules)
+ ✓ Compiled /api/requests/[id]/workflow in 493ms (523 modules)
+ ✓ Compiled (525 modules)
+ GET /api/requests/13 200 in 1530ms
+ GET /api/requests/13/workflow 200 in 1572ms
+ GET /api/requests/13 200 in 107ms
+ GET /api/requests/13/workflow 200 in 158ms
+ ○ Compiling /api/requests/[id]/advance ...
+ ✓ Compiled /api/requests/[id]/advance in 546ms (484 modules)
+ POST /api/requests/13/advance 200 in 1077ms
+ GET /api/requests/13 200 in 155ms
+ GET /api/requests/13/workflow 200 in 222ms
+ POST /api/requests/13/advance 200 in 183ms
+ GET /api/requests/13 200 in 117ms
+ GET /api/requests/13/workflow 200 in 153ms
+ POST /api/requests/13/advance 200 in 239ms
+ GET /api/requests/13 200 in 72ms
+ GET /api/requests/13/workflow 200 in 140ms
+ POST /api/requests/13/advance 200 in 469ms
+ GET /api/requests/13 200 in 115ms
+ GET /api/requests/13/workflow 200 in 158ms
+ POST /api/requests/13/advance 200 in 121ms
+ GET /api/requests/13 200 in 135ms
+ GET /api/requests/13/workflow 200 in 147ms
+ ○ Compiling /requests ...
+ ✓ Compiled /requests in 1684ms (795 modules)
+ ✓ Compiled /api/requests in 519ms (479 modules)
+ GET /api/requests? 500 in 710ms
+ GET /api/requests? 500 in 56ms
+ GET /requests 200 in 231ms
+ GET /api/requests? 500 in 45ms
+ GET /api/requests? 500 in 83ms
+ GET /api/requests?status=CLOSED 500 in 44ms
+ ✓ Compiled /catalog in 320ms (464 modules)
+ ✓ Compiled /api/notifications/count in 389ms (466 modules)
+ GET /api/notifications/count 200 in 460ms
+ GET /api/notifications/count 200 in 36ms
+ ○ Compiling /catalog/[schemaId] ...
+ ✓ Compiled /catalog/[schemaId] in 1490ms (481 modules)
+ GET /api/notifications/count 200 in 146ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 484ms (483 modules)
+ ✓ Compiled (491 modules)
+ GET /api/admin/tags 403 in 1378ms
+ GET /api/glossary/picker 200 in 1438ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1433ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1436ms
+ GET /api/notifications/count 200 in 1324ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1516ms
+ GET /api/admin/tags 403 in 135ms
+ GET /api/glossary/picker 200 in 169ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 156ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 169ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 104ms
+ ✓ Compiled /api/notifications in 445ms (489 modules)
+ GET /api/notifications/count 200 in 875ms
+ GET /api/notifications 200 in 886ms
+ GET /api/notifications/count 200 in 68ms
+ ○ Compiling /catalog/[schemaId]/tables/[tableId] ...
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 1042ms (512 modules)
+ GET /api/notifications/count 200 in 55ms
+ GET /api/notifications/count 200 in 46ms
+ ✓ Compiled /api/dq/rules in 434ms (498 modules)
+ GET /api/dq/rules?entityId=105 200 in 521ms
+ GET /api/dq/rules?entityId=105 200 in 107ms
+ ✓ Compiled /api/dq/rules/[id] in 406ms (500 modules)
+ GET /api/dq/rules/10 200 in 541ms
+ GET /api/dq/rules/10 200 in 49ms
+ ○ Compiling /api/dq/run ...
+ ✓ Compiled /api/dq/run in 640ms (497 modules)
+ POST /api/dq/run 403 in 723ms
+ GET /api/dq/rules?entityId=105 200 in 49ms
+ GET /api/dq/rules/10 200 in 97ms
+ GET /api/notifications/count 200 in 75ms
+ GET /api/notifications 200 in 97ms
+ GET /api/notifications/count 200 in 66ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 65ms
+ ✓ Compiled /api/auth/logout in 375ms (478 modules)
+ POST /api/auth/logout 200 in 467ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1199ms (483 modules)
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 915ms (480 modules)
+ POST /api/auth/login 200 in 1567ms
+ ✓ Compiled /dashboard in 505ms (490 modules)
+ ✓ Compiled /api/notifications/count in 271ms (493 modules)
+ GET /api/notifications/count 200 in 368ms
+ GET /api/notifications/count 200 in 46ms
+ GET /api/notifications/count 200 in 87ms
+ GET /api/notifications/count 200 in 69ms
+ GET /api/notifications/count 200 in 58ms
+ GET /api/notifications/count 200 in 56ms
+ ○ Compiling /api/dq/rules ...
+ ✓ Compiled /api/dq/rules in 1324ms (489 modules)
+ GET /api/dq/rules 200 in 1453ms
+ ✓ Compiled /api/dq/rules/[id] in 446ms (491 modules)
+ GET /api/dq/rules/1 200 in 615ms
+ GET /api/dq/rules/2 200 in 58ms
+ GET /api/dq/rules/10 200 in 64ms
+ GET /api/dq/rules/9 200 in 56ms
+ GET /api/dq/rules/7 200 in 106ms
+ GET /api/dq/rules/4 200 in 56ms
+ GET /api/dq/rules/3 200 in 110ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1303ms (812 modules)
+ GET /reports 404 in 143ms
+ GET /quality 200 in 197ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 57ms
+ GET /homepage 404 in 51ms
+ GET /quality 200 in 131ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 47ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 41ms
+ ✓ Compiled /api/notifications in 432ms (495 modules)
+ GET /api/notifications/count 200 in 781ms
+ GET /api/notifications 200 in 795ms
+ GET /api/notifications/count 200 in 47ms
+ ○ Compiling /requests ...
+ ✓ Compiled /requests in 1195ms (499 modules)
+ ✓ Compiled /api/requests in 483ms (502 modules)
+ GET /api/requests?domain=DCAT 500 in 569ms
+ GET /api/requests?domain=DCAT 500 in 30ms
+ GET /api/notifications/count 200 in 72ms
+ GET /api/notifications/count 200 in 35ms
+ ○ Compiling /collaboration ...
+ ✓ Compiled /collaboration in 2s (807 modules)
+ ○ Compiling /api/collab/threads ...
+ ✓ Compiled /api/collab/threads in 929ms (485 modules)
+ GET /api/collab/threads 200 in 1123ms
+ GET /api/collab/threads 200 in 49ms
+ ○ Compiling /admin/sources ...
+ ✓ Compiled /admin/sources in 1641ms (783 modules)
+ ○ Compiling /api/admin/sources ...
+ ✓ Compiled /api/admin/sources in 1006ms (461 modules)
+ GET /api/notifications/count 200 in 1489ms
+ GET /api/admin/sources 200 in 1817ms
+ GET /api/notifications/count 200 in 55ms
+ GET /api/admin/sources 200 in 46ms
+ ✓ Compiled /api/admin/sources/[id]/config in 407ms (464 modules)
+ ✓ Compiled (466 modules)
+ GET /api/admin/crawl-jobs?connectionId=1 200 in 981ms
+ GET /api/admin/sources/1/config 200 in 1327ms
+ ○ Compiling /api/users/search ...
+ ✓ Compiled /api/users/search in 595ms (469 modules)
+ GET /api/users/search?q=khaled.almansour 200 in 671ms
+ GET /api/users/search?q=mohammed.nasser 200 in 43ms
+ GET /api/users/search?q=sara.alqahtani 200 in 39ms
+ GET /api/notifications/count 200 in 35ms
+ GET /api/notifications/count 200 in 47ms
+ ○ Compiling /catalog ...
+ ✓ Compiled /catalog in 1576ms (432 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1031ms (461 modules)
+ GET /api/notifications/count 200 in 1201ms
+ GET /api/notifications/count 200 in 55ms
+ ○ Compiling /catalog/[schemaId] ...
+ ✓ Compiled /catalog/[schemaId] in 957ms (476 modules)
+ ○ Compiling /api/assets/[assetType]/[assetId]/tags ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/tags in 548ms (478 modules)
+ ✓ Compiled (486 modules)
+ GET /api/notifications/count 200 in 1647ms
+ GET /api/admin/tags 200 in 1879ms
+ GET /api/glossary/picker 200 in 1896ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1877ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1883ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1885ms
+ GET /api/notifications/count 200 in 98ms
+ GET /api/admin/tags 200 in 127ms
+ GET /api/glossary/picker 200 in 131ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 151ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 152ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 155ms
+ ✓ Compiled in 669ms (325 modules)
+ ✓ Compiled in 335ms (325 modules)
+ ✓ Compiled in 1747ms (892 modules)
+ ✓ Compiled in 854ms (892 modules)
+ ✓ Compiled in 301ms (325 modules)
+ ✓ Compiled in 315ms (325 modules)
+ ✓ Compiled in 288ms (325 modules)
+ ✓ Compiled in 281ms (325 modules)
+ ✓ Compiled in 267ms (325 modules)
+ ✓ Compiled in 845ms (325 modules)
+ ✓ Compiled in 301ms (325 modules)
+ ✓ Compiled in 267ms (325 modules)
+ ✓ Compiled in 271ms (325 modules)
+ ✓ Compiled in 270ms (325 modules)
+ ✓ Compiled in 330ms (325 modules)
+ ✓ Compiled in 321ms (325 modules)
+ ✓ Compiled in 261ms (325 modules)
+ ✓ Compiled in 296ms (325 modules)
+ ✓ Compiled in 304ms (325 modules)
+ ✓ Compiled in 299ms (325 modules)
+ ✓ Compiled in 378ms (325 modules)
+ ○ Compiling /catalog ...
+ ✓ Compiled /catalog in 697ms (432 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1036ms (461 modules)
+ GET /api/notifications/count 200 in 1274ms
+ GET /api/notifications/count 200 in 49ms
+ ○ Compiling /catalog/[schemaId] ...
+ ✓ Compiled /catalog/[schemaId] in 6.8s (1128 modules)
+ ○ Compiling /api/assets/[assetType]/[assetId]/terms ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/terms in 900ms (635 modules)
+ ✓ Compiled (643 modules)
+ GET /api/notifications/count 200 in 2040ms
+ GET /api/admin/tags 200 in 2081ms
+ GET /api/glossary/picker 200 in 2122ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 2106ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 2109ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 2109ms
+ GET /api/notifications/count 200 in 125ms
+ GET /api/admin/tags 200 in 232ms
+ GET /api/glossary/picker 200 in 247ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 270ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 270ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 276ms
+ ○ Compiling /catalog/[schemaId]/tables/[tableId] ...
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 2.8s (1137 modules)
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 43ms
+ GET /catalog/8/tables/87 200 in 482ms
+ GET /api/notifications/count 200 in 49ms
+ GET /api/notifications/count 200 in 73ms
+ ○ Compiling /api/catalog/mindmap ...
+ ✓ Compiled /api/catalog/mindmap in 1210ms (635 modules)
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=87 500 in 1508ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=87 500 in 68ms
+ ○ Compiling /catalog ...
+ ✓ Compiled /catalog in 634ms (634 modules)
+ GET /api/notifications/count 200 in 74ms
+ GET /api/notifications/count 200 in 46ms
+ ○ Compiling /catalog/[schemaId] ...
+ ✓ Compiled /catalog/[schemaId] in 1401ms (650 modules)
+ ○ Compiling /api/glossary/picker ...
+ ✓ Compiled /api/glossary/picker in 1112ms (652 modules)
+ ✓ Compiled (660 modules)
+ GET /api/notifications/count 200 in 2147ms
+ GET /api/glossary/picker 200 in 2277ms
+ GET /api/admin/tags 200 in 2308ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 2266ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 2292ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 2273ms
+ GET /api/notifications/count 200 in 223ms
+ GET /api/admin/tags 200 in 197ms
+ GET /api/glossary/picker 200 in 245ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 216ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 215ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 182ms
+ GET /api/notifications/count 200 in 30ms
+ GET /api/notifications/count 200 in 32ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=107 500 in 37ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=107 500 in 37ms
+ GET /catalog/8/tables/107?tab=Relationships 200 in 323ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=107 500 in 94ms
+ GET /api/notifications/count 200 in 107ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=107 500 in 88ms
+ GET /api/notifications/count 200 in 90ms
+ GET /api/notifications/count 200 in 166ms
+ GET /api/admin/tags 200 in 312ms
+ GET /api/glossary/picker 200 in 287ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 304ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 281ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 351ms
+ GET /api/notifications/count 200 in 182ms
+ GET /api/glossary/picker 200 in 209ms
+ GET /api/admin/tags 200 in 236ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 228ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 234ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 195ms
+ GET /catalog/8?view=data-model 200 in 174ms
+ GET /api/notifications/count 200 in 233ms
+ ○ Compiling /api/catalog/data-model ...
+ ✓ Compiled /api/catalog/data-model in 760ms (651 modules)
+ GET /api/admin/tags 200 in 1673ms
+ GET /api/glossary/picker 200 in 1675ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1678ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1675ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1442ms
+ GET /api/catalog/data-model?schemaId=8 500 in 1814ms
+ GET /api/admin/tags 200 in 158ms
+ GET /api/notifications/count 200 in 211ms
+ GET /api/glossary/picker 200 in 216ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 224ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 203ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 167ms
+ GET /api/catalog/data-model?schemaId=8 500 in 81ms
+ GET /catalog/8 200 in 305ms
+ GET /api/admin/tags 200 in 177ms
+ GET /api/glossary/picker 200 in 308ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 348ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 361ms
+ GET /api/notifications/count 200 in 384ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 373ms
+ GET /api/admin/tags 200 in 134ms
+ GET /api/glossary/picker 200 in 154ms
+ GET /api/notifications/count 200 in 124ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 133ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 136ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 138ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=87 500 in 70ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=87 500 in 48ms
+ ✓ Compiled in 2.9s (1091 modules)
+ ✓ Compiled in 493ms (483 modules)
+ ○ Compiling /api/catalog/mindmap ...
+ ✓ Compiled /api/catalog/mindmap in 1644ms (636 modules)
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=87 200 in 1910ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=87 200 in 50ms
+ ✓ Compiled /api/assets/[assetType]/[assetId]/tags in 363ms (639 modules)
+ ✓ Compiled (649 modules)
+ GET /api/glossary/picker 200 in 1123ms
+ GET /api/notifications/count 200 in 1172ms
+ GET /api/admin/tags 200 in 1161ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1154ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1164ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1201ms
+ GET /api/notifications/count 200 in 320ms
+ GET /api/admin/tags 200 in 324ms
+ GET /api/glossary/picker 200 in 368ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 353ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 266ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 174ms
+ GET /catalog/8?view=data-model 200 in 516ms
+ GET /api/notifications/count 200 in 157ms
+ GET /api/glossary/picker 200 in 326ms
+ GET /api/admin/tags 200 in 330ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 322ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 327ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 329ms
+ ○ Compiling /api/catalog/data-model ...
+ ✓ Compiled /api/catalog/data-model in 1036ms (651 modules)
+ GET /api/glossary/picker 200 in 1706ms
+ GET /api/notifications/count 200 in 1744ms
+ GET /api/admin/tags 200 in 1741ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1739ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1743ms
+ GET /api/catalog/data-model?schemaId=8 200 in 1832ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 91ms
+ GET /api/catalog/data-model?schemaId=8 200 in 132ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 77ms
+ GET /api/admin/tags 200 in 96ms
+ GET /api/glossary/picker 200 in 97ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 219ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 221ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 222ms
+ GET /api/notifications/count 200 in 109ms
+ GET /api/glossary/picker 200 in 124ms
+ GET /api/admin/tags 200 in 132ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 127ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 128ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 136ms
+ GET /catalog/1?view=data-model 200 in 228ms
+ GET /api/notifications/count 200 in 106ms
+ GET /api/admin/tags 200 in 204ms
+ GET /api/glossary/picker 200 in 207ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 198ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 249ms
+ GET /api/catalog/data-model?schemaId=1 200 in 269ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 194ms
+ GET /api/notifications/count 200 in 202ms
+ GET /api/admin/tags 200 in 210ms
+ GET /api/glossary/picker 200 in 214ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 225ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 235ms
+ GET /api/catalog/data-model?schemaId=1 200 in 100ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 86ms
+ GET /catalog/1 200 in 171ms
+ GET /api/notifications/count 200 in 157ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 273ms
+ GET /api/glossary/picker 200 in 291ms
+ GET /api/admin/tags 200 in 294ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 277ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 280ms
+ GET /api/notifications/count 200 in 116ms
+ GET /api/glossary/picker 200 in 133ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 104ms
+ GET /api/admin/tags 200 in 135ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 126ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 109ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=3 200 in 65ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=3 200 in 31ms
+ ○ Compiling /requests/[id] ...
+ ✓ Compiled /requests/[id] in 675ms (655 modules)
+ ✓ Compiled /api/requests/[id]/workflow in 523ms (657 modules)
+ ✓ Compiled (659 modules)
+ GET /api/requests/2/workflow 200 in 1248ms
+ GET /api/requests/2 200 in 1264ms
+ GET /api/requests/2/workflow 200 in 59ms
+ GET /api/requests/2 200 in 60ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 4.9s (1092 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1480ms (636 modules)
+ GET /api/notifications/count 200 in 1631ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 115ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/terms ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/terms in 1122ms (638 modules)
+ ✓ Compiled (646 modules)
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 2299ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 2304ms
+ GET /api/admin/tags 200 in 2345ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 2392ms
+ GET /api/glossary/picker 200 in 2431ms
+ GET /api/notifications/count 200 in 2283ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 165ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 198ms
+ GET /api/glossary/picker 200 in 471ms
+ GET /api/admin/tags 200 in 488ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 644ms
+ GET /catalog/4?view=data-model 200 in 773ms
+ GET /api/notifications/count 200 in 132ms
+ GET /api/admin/tags 200 in 285ms
+ GET /api/glossary/picker 200 in 289ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 291ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 296ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 299ms
+ GET /api/notifications/count 200 in 153ms
+ ○ Compiling /api/catalog/data-model ...
+ ✓ Compiled /api/catalog/data-model in 829ms (648 modules)
+ GET /api/glossary/picker 200 in 1297ms
+ GET /api/admin/tags 200 in 1299ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 1443ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 1190ms
+ GET /api/catalog/data-model?schemaId=4 200 in 1502ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 1513ms
+ GET /api/catalog/data-model?schemaId=4 200 in 64ms
+ GET /catalog/4 200 in 275ms
+ GET /api/notifications/count 200 in 136ms
+ GET /api/admin/tags 200 in 150ms
+ GET /api/glossary/picker 200 in 294ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 290ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 301ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 305ms
+ GET /api/notifications/count 200 in 97ms
+ GET /api/admin/tags 200 in 128ms
+ GET /api/glossary/picker 200 in 109ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 96ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 113ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 107ms
+ GET /api/notifications/count 200 in 43ms
+ GET /api/notifications/count 200 in 42ms
+ GET /api/admin/tags 200 in 100ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 172ms
+ GET /api/glossary/picker 200 in 221ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 216ms
+ GET /api/notifications/count 200 in 243ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 223ms
+ GET /api/admin/tags 200 in 134ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 166ms
+ GET /api/glossary/picker 200 in 169ms
+ GET /api/notifications/count 200 in 172ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 168ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 185ms
+ GET /api/notifications/count 200 in 43ms
+ GET /api/notifications/count 200 in 32ms
+ ✓ Compiled /api/catalog/mindmap in 474ms (650 modules)
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=1 200 in 556ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=1 200 in 60ms
+ GET /api/notifications/count 200 in 56ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 259ms
+ GET /api/glossary/picker 200 in 311ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 302ms
+ GET /api/admin/tags 200 in 331ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 319ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 339ms
+ GET /api/notifications/count 200 in 120ms
+ GET /api/glossary/picker 200 in 139ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 127ms
+ GET /api/admin/tags 200 in 149ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 145ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 164ms
+ GET /api/notifications/count 200 in 34ms
+ GET /api/notifications/count 200 in 27ms
+ GET /api/notifications/count 200 in 122ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 244ms
+ GET /api/admin/tags 200 in 309ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 304ms
+ GET /api/glossary/picker 200 in 321ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 332ms
+ GET /api/notifications/count 200 in 174ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 168ms
+ GET /api/admin/tags 200 in 161ms
+ GET /api/glossary/picker 200 in 188ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 183ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 143ms
+ GET /api/notifications/count 200 in 49ms
+ GET /api/notifications/count 200 in 47ms
+ GET /api/notifications/count 200 in 91ms
+ GET /api/admin/tags 200 in 202ms
+ GET /api/glossary/picker 200 in 193ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 188ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 205ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 201ms
+ GET /api/notifications/count 200 in 144ms
+ GET /api/admin/tags 200 in 192ms
+ GET /api/glossary/picker 200 in 179ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 194ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 198ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 203ms
+ GET /api/notifications/count 200 in 39ms
+ GET /api/notifications/count 200 in 39ms
+ GET /api/notifications/count 200 in 166ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 213ms
+ GET /api/glossary/picker 200 in 253ms
+ GET /api/admin/tags 200 in 241ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 224ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 230ms
+ GET /api/notifications/count 200 in 189ms
+ GET /api/glossary/picker 200 in 221ms
+ GET /api/admin/tags 200 in 228ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 204ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 213ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 216ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 32ms
+ ○ Compiling /admin/configuration ...
+ ✓ Compiled /admin/configuration in 1841ms (1122 modules)
+ ○ Compiling /api/admin/governance-roles ...
+ ✓ Compiled /api/admin/governance-roles in 645ms (654 modules)
+ ✓ Compiled (656 modules)
+ GET /api/notifications/count 200 in 1273ms
+ GET /api/admin/lookups?groupsOnly=true 200 in 1278ms
+ GET /api/admin/governance-roles 200 in 1280ms
+ GET /api/notifications/count 200 in 71ms
+ GET /api/admin/governance-roles 200 in 86ms
+ GET /api/admin/lookups?groupsOnly=true 200 in 88ms
+ GET /api/admin/lookups?group=CLASSIFICATION 200 in 52ms
+ GET /api/admin/lookups?group=DATA_DOMAIN 200 in 51ms
+ ○ Compiling /api/admin/governance-roles/[code] ...
+ ✓ Compiled /api/admin/governance-roles/[code] in 577ms (642 modules)
+ PATCH /api/admin/governance-roles/OWNER 200 in 1151ms
+ GET /api/admin/governance-roles 200 in 49ms
+ ○ Compiling /admin/sources ...
+ ✓ Compiled /admin/sources in 1176ms (640 modules)
+ ○ Compiling /api/admin/sources ...
+ ✓ Compiled /api/admin/sources in 945ms (643 modules)
+ ✓ Compiled (646 modules)
+ GET /api/admin/sources 200 in 1694ms
+ GET /api/notifications/count 200 in 1734ms
+ GET /api/admin/sources 200 in 73ms
+ GET /api/notifications/count 200 in 55ms
+ ✓ Compiled /api/admin/sources/[id]/config in 378ms (649 modules)
+ ✓ Compiled (651 modules)
+ GET /api/admin/crawl-jobs?connectionId=1 200 in 920ms
+ GET /api/admin/sources/1/config 200 in 914ms
+ ✓ Compiled /api/users/search in 510ms (653 modules)
+ GET /api/users/search?q=khaled.almansour 200 in 599ms
+ GET /api/users/search?q=mohammed.nasser 200 in 59ms
+ GET /api/users/search?q=sara.alqahtani 200 in 36ms
+ GET /api/notifications/count 200 in 41ms
+ GET /api/notifications/count 200 in 53ms
+ GET /api/notifications/count 200 in 184ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/terms ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/terms in 1012ms (655 modules)
+ ✓ Compiled (663 modules)
+ GET /api/glossary/picker 200 in 2223ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 2223ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 2274ms
+ GET /api/admin/tags 200 in 2295ms
+ GET /api/notifications/count 200 in 2024ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 2287ms
+ GET /api/glossary/picker 200 in 81ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 82ms
+ GET /api/admin/tags 200 in 71ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 80ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 85ms
+ GET /api/notifications/count 200 in 41ms
+ GET /api/notifications/count 200 in 34ms
+ GET /api/notifications/count 200 in 129ms
+ GET /api/admin/tags 200 in 182ms
+ GET /api/glossary/picker 200 in 298ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 318ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 336ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 352ms
+ GET /api/notifications/count 200 in 158ms
+ GET /api/admin/tags 200 in 160ms
+ GET /api/glossary/picker 200 in 144ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 118ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 121ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 149ms
+ GET /api/notifications/count 200 in 58ms
+ GET /api/notifications/count 200 in 43ms
+ GET /api/admin/tags 200 in 157ms
+ GET /api/glossary/picker 200 in 220ms
+ GET /api/notifications/count 200 in 259ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 289ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 295ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 304ms
+ GET /api/admin/tags 200 in 95ms
+ GET /api/glossary/picker 200 in 121ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 89ms
+ GET /api/notifications/count 200 in 127ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 91ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 105ms
+ GET /api/glossary/picker 200 in 114ms
+ GET /api/admin/tags 200 in 240ms
+ GET /api/assets/DATA_ENTITIES/87/tags 200 in 239ms
+ GET /api/assets/DATA_ENTITIES/87/terms 200 in 242ms
+ GET /api/assets/DATA_ENTITIES/87/rating 200 in 255ms
+ GET /api/glossary/picker 200 in 84ms
+ GET /api/admin/tags 200 in 101ms
+ GET /api/assets/DATA_ENTITIES/87/tags 200 in 84ms
+ GET /api/assets/DATA_ENTITIES/87/terms 200 in 78ms
+ GET /api/assets/DATA_ENTITIES/87/rating 200 in 83ms
+ GET /api/notifications/count 200 in 57ms
+ GET /api/notifications/count 200 in 45ms
+ GET /api/notifications/count 200 in 133ms
+ GET /api/glossary/picker 200 in 230ms
+ GET /api/admin/tags 200 in 232ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 221ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 210ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 290ms
+ GET /api/glossary/picker 200 in 140ms
+ GET /api/admin/tags 200 in 167ms
+ GET /api/notifications/count 200 in 197ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 192ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 198ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 96ms
+ GET /api/notifications/count 200 in 35ms
+ GET /api/notifications/count 200 in 32ms
+ ○ Compiling /api/dq/rules ...
+ ✓ Compiled /api/dq/rules in 870ms (647 modules)
+ GET /api/dq/rules?entityId=105 200 in 1057ms
+ GET /api/dq/rules?entityId=105 200 in 66ms
+ ✓ Compiled /api/dq/rules/[id] in 442ms (649 modules)
+ GET /api/dq/rules/10 200 in 582ms
+ GET /api/dq/rules/10 200 in 55ms
+ GET /api/notifications/count 200 in 97ms
+ GET /api/notifications/count 200 in 55ms
+ ○ Compiling /glossary ...
+ ✓ Compiled /glossary in 2.1s (1111 modules)
+ GET /api/notifications/count 200 in 67ms
+ GET /api/notifications/count 200 in 69ms
+ ○ Compiling /glossary/[termId] ...
+ ✓ Compiled /glossary/[termId] in 1445ms (1095 modules)
+ GET /api/notifications/count 200 in 52ms
+ GET /api/notifications/count 200 in 49ms
+ GET /api/notifications/count 200 in 52ms
+ GET /api/notifications/count 200 in 57ms
+ ○ Compiling /api/glossary/picker ...
+ ✓ Compiled /api/glossary/picker in 767ms (621 modules)
+ ✓ Compiled (629 modules)
+ GET /api/notifications/count 200 in 1302ms
+ GET /api/admin/tags 200 in 1533ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1502ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 1578ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1557ms
+ GET /api/glossary/picker 200 in 1570ms
+ GET /api/notifications/count 200 in 119ms
+ GET /api/admin/tags 200 in 114ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 110ms
+ GET /api/glossary/picker 200 in 111ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 128ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 133ms
+ ○ Compiling /catalog/[schemaId]/tables/[tableId] ...
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 1099ms (657 modules)
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 33ms
+ GET /api/admin/tags 200 in 78ms
+ GET /api/glossary/picker 200 in 152ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 189ms
+ GET /api/notifications/count 200 in 242ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 246ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 256ms
+ GET /api/glossary/picker 200 in 145ms
+ GET /api/admin/tags 200 in 178ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 161ms
+ GET /api/notifications/count 200 in 159ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 128ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 133ms
+ GET /api/notifications/count 200 in 36ms
+ GET /api/notifications/count 200 in 36ms
+ GET /api/notifications/count 200 in 80ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 173ms
+ GET /api/admin/tags 200 in 194ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 193ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 206ms
+ GET /api/glossary/picker 200 in 282ms
+ GET /api/notifications/count 200 in 181ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 203ms
+ GET /api/admin/tags 200 in 205ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 168ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 211ms
+ GET /api/glossary/picker 200 in 130ms
+ GET /api/notifications/count 200 in 29ms
+ GET /api/notifications/count 200 in 28ms
+ GET /api/admin/tags 200 in 121ms
+ GET /api/notifications/count 200 in 243ms
+ GET /api/glossary/picker 200 in 230ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 226ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 228ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 230ms
+ GET /api/admin/tags 200 in 100ms
+ GET /api/notifications/count 200 in 126ms
+ GET /api/glossary/picker 200 in 128ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 115ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 123ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 122ms
+ ○ Compiling /api/catalog/search ...
+ ✓ Compiled /api/catalog/search in 1369ms (649 modules)
+ GET /api/catalog/search?q=address 200 in 1524ms
+ GET /api/catalog/search?q=addre 200 in 1972ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 44ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1023ms (659 modules)
+ GET /api/notifications/count 200 in 54ms
+ GET /api/notifications/count 200 in 41ms
+ GET /api/catalog/search?q=address 200 in 46ms
+ ✓ Compiled /api/catalog/search/save in 446ms (658 modules)
+ POST /api/catalog/search/save 200 in 937ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 62ms
+ GET /api/notifications/count 200 in 33ms
+ GET /api/catalog/search?q=ad 200 in 53ms
+ GET /api/catalog/search?q=adr 200 in 49ms
+ GET /api/catalog/search?q=adre 200 in 29ms
+ GET /api/catalog/search?q=adress 200 in 38ms
+ GET /api/catalog/search?q=adr 200 in 44ms
+ GET /api/catalog/search?q=ad 200 in 46ms
+ GET /api/catalog/search?q=add 200 in 53ms
+ GET /api/catalog/search?q=addre 200 in 46ms
+ GET /api/catalog/search?q=address 200 in 54ms
+ ✓ Compiled in 2.1s (1257 modules)
+ ✓ Compiled in 1525ms (1257 modules)
+ ✓ Compiled in 1442ms (1257 modules)
+ ✓ Compiled in 985ms (490 modules)
+ ✓ Compiled in 684ms (490 modules)
+ ○ Compiling /_error ...
+ GET /dashboard 500 in 5597ms
+ GET / 500 in 1615ms
+ ✓ Compiled /_not-found in 5.1s (1340 modules)
+ GET / 307 in 1185ms
+ ✓ Compiled in 3.4s (1326 modules)
+ GET /dashboard 200 in 1855ms
+ GET /_next/static/webpack/450e323a241c103b.webpack.hot-update.json 404 in 3673ms
+ GET / 307 in 268ms
+ GET /dashboard 200 in 217ms
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 2.1s (690 modules)
+ GET /api/notifications/count 200 in 2336ms
+ GET /api/notifications/count 200 in 60ms
+ GET /dashboard 200 in 319ms
+ GET /api/notifications/count 200 in 45ms
+ GET /api/notifications/count 200 in 51ms
+ ○ Compiling /api/catalog/search ...
+ ✓ Compiled /api/catalog/search in 566ms (688 modules)
+ GET /api/catalog/search?q=customer 200 in 873ms
+ ○ Compiling /search ...
+ ✓ Compiled /search in 2.5s (1358 modules)
+ ✓ Compiled /api/search in 524ms (695 modules)
+ ✓ Compiled (698 modules)
+ GET /api/tags 200 in 1945ms
+ GET /api/notifications/count 200 in 1950ms
+ GET /api/search?q=customer 200 in 2005ms
+ GET /api/tags 200 in 109ms
+ GET /api/notifications/count 200 in 131ms
+ GET /api/search?q=customer 200 in 70ms
+ GET /api/search?q=customer&types=TABLE 200 in 90ms
+ GET /api/search?q=customer&types=TABLE%2CVIEW 200 in 53ms
+ GET /api/search?q=customer&types=TABLE%2CVIEW%2CCOLUMN 200 in 69ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN 200 in 81ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE 200 in 70ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE&tags=5 200 in 84ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE 200 in 42ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE&tags=11 200 in 94ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE 200 in 66ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE%2CSCHEMA 200 in 100ms
+ GET /api/search?q=customer&types=VIEW%2CCOLUMN%2CTABLE%2CSCHEMA%2CSOURCE 200 in 92ms
+ GET /api/search?q=customer 200 in 84ms
+ GET /api/search?q=customer&tags=5 200 in 74ms
+ GET /api/search?q=customer&tags=5%2C1 200 in 93ms
+ GET /api/search?q=customer&tags=5%2C1%2C4 200 in 100ms
+ GET /api/search?q=customer&tags=5%2C1 200 in 84ms
+ GET /api/search?q=customer&tags=1 200 in 88ms
+ GET /api/search?q=customer 200 in 96ms
+ ○ Compiling /api/users/search ...
+ ✓ Compiled /api/users/search in 1394ms (684 modules)
+ GET /api/users/search?q=k 200 in 1485ms
+ GET /api/users/search?q=kh 200 in 1183ms
+ GET /api/search?q=customer&stakeholders=khaled.almansour 200 in 92ms
+ GET /api/search?q=customer&types=TABLE&stakeholders=khaled.almansour 200 in 112ms
+ GET /api/search?q=customer&stakeholders=khaled.almansour 200 in 71ms
+ ✓ Compiled /api/notifications/count in 408ms (687 modules)
+ GET /api/notifications/count 200 in 486ms
+ GET /api/notifications/count 200 in 44ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/tags ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/tags in 1526ms (689 modules)
+ ✓ Compiled (697 modules)
+ GET /api/notifications/count 200 in 2673ms
+ GET /api/glossary/picker 200 in 2819ms
+ GET /api/admin/tags 200 in 2823ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 2807ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 2812ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 2871ms
+ GET /api/notifications/count 200 in 112ms
+ GET /api/glossary/picker 200 in 98ms
+ GET /api/admin/tags 200 in 87ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 84ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 92ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 69ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 39ms
+ GET /api/notifications/count 200 in 130ms
+ GET /api/admin/tags 200 in 187ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 199ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 212ms
+ GET /api/glossary/picker 200 in 291ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 273ms
+ GET /api/notifications/count 200 in 178ms
+ GET /api/admin/tags 200 in 183ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 200ms
+ GET /api/glossary/picker 200 in 158ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 168ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 149ms
+ ✓ Compiled in 3.7s (1332 modules)
+ ✓ Compiled in 1333ms (1332 modules)
+ ✓ Compiled in 4.2s (1332 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1579ms (682 modules)
+ GET /api/notifications/count 200 in 1824ms
+ GET /api/notifications/count 200 in 73ms
+ ✓ Compiled in 1548ms (1361 modules)
+ ✓ Compiled in 1909ms (1361 modules)
+ ✓ Compiled in 1894ms (1332 modules)
+ ✓ Compiled in 1162ms (679 modules)
+ ○ Compiling /api/tags ...
+ ✓ Compiled /api/tags in 1684ms (682 modules)
+ ✓ Compiled (684 modules)
+ GET /api/tags 200 in 2613ms
+ GET /api/notifications/count 200 in 2623ms
+ GET /api/tags 200 in 61ms
+ GET /api/notifications/count 200 in 76ms
+ ✓ Compiled /api/catalog/search in 363ms (686 modules)
+ GET /api/catalog/search?q=addre 200 in 512ms
+ GET /api/catalog/search?q=address 200 in 70ms
+ ○ Compiling /api/catalog/search/save ...
+ ✓ Compiled /api/catalog/search/save in 982ms (688 modules)
+ POST /api/catalog/search/save 200 in 1603ms
+ ○ Compiling /api/search ...
+ ✓ Compiled /api/search in 1041ms (691 modules)
+ ✓ Compiled in 0ms (691 modules)
+ ✓ Compiled in 1ms (691 modules)
+ ✓ Compiled in 0ms (691 modules)
+ GET /api/notifications/count 200 in 2344ms
+ GET /api/search?q=address&types=VIEW%2CSCHEMA%2CSOURCE 200 in 2399ms
+ ✓ Compiled in 0ms (691 modules)
+ GET /api/notifications/count 200 in 955ms
+ GET /api/search?q=address&types=VIEW%2CSCHEMA%2CSOURCE 200 in 920ms
+ GET /api/search?q=address&types=VIEW%2CSCHEMA%2CSOURCE%2CTABLE 200 in 104ms
+ GET /api/notifications/count 200 in 42ms
+ GET /api/notifications/count 200 in 37ms
+ GET /api/notifications/count 200 in 78ms
+ GET /api/tags 200 in 107ms
+ GET /api/notifications/count 200 in 87ms
+ GET /api/tags 200 in 85ms
+ GET /api/notifications/count 200 in 130ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/rating ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 677ms (693 modules)
+ ✓ Compiled (701 modules)
+ GET /api/admin/tags 200 in 1612ms
+ GET /api/notifications/count 200 in 1384ms
+ GET /api/glossary/picker 200 in 1599ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 1599ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 1602ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 1659ms
+ GET /api/admin/tags 200 in 74ms
+ GET /api/glossary/picker 200 in 93ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 83ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 88ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 51ms
+ GET /api/tags 200 in 70ms
+ GET /api/notifications/count 200 in 83ms
+ GET /api/tags 200 in 52ms
+ GET /api/notifications/count 200 in 71ms
+ GET /api/notifications/count 200 in 115ms
+ GET /api/glossary/picker 200 in 176ms
+ GET /api/admin/tags 200 in 179ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 175ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 266ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 281ms
+ GET /api/notifications/count 200 in 140ms
+ GET /api/glossary/picker 200 in 160ms
+ GET /api/admin/tags 200 in 163ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 158ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 131ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 133ms
+ GET /api/notifications/count 200 in 68ms
+ GET /api/tags 200 in 88ms
+ GET /api/notifications/count 200 in 73ms
+ GET /api/tags 200 in 73ms
+ POST /api/catalog/search/save 200 in 181ms
+ GET /api/catalog/search?q=address 200 in 214ms
+ GET /api/notifications/count 200 in 59ms
+ GET /api/search?q=address&types=TABLE%2CCOLUMN%2CSCHEMA%2CSOURCE%2CVIEW 200 in 88ms
+ GET /api/notifications/count 200 in 78ms
+ GET /api/search?q=address&types=TABLE%2CCOLUMN%2CSCHEMA%2CSOURCE%2CVIEW 200 in 89ms
+ GET /api/search?q=address&types=COLUMN%2CSCHEMA%2CSOURCE%2CVIEW 200 in 113ms
+ GET /api/search?q=address&types=COLUMN%2CSCHEMA%2CSOURCE 200 in 59ms
+ GET /api/search?q=address&types=SCHEMA%2CSOURCE 200 in 76ms
+ GET /api/search?q=address&types=SOURCE 200 in 76ms
+ GET /api/search?q=address&types= 200 in 107ms
+ GET /api/search?q=address&types=TERM 200 in 253ms
+ ○ Compiling /glossary/[termId] ...
+ ✓ Compiled /glossary/[termId] in 1232ms (710 modules)
+ GET /api/notifications/count 200 in 63ms
+ GET /api/notifications/count 200 in 46ms
+ GET /api/tags 200 in 68ms
+ GET /api/notifications/count 200 in 85ms
+ GET /api/tags 200 in 82ms
+ GET /api/notifications/count 200 in 79ms
+ GET /api/catalog/search?q=customer%20a 200 in 56ms
+ GET /api/catalog/search?q=customer%20add 200 in 51ms
+ GET /api/catalog/search?q=customer%20 200 in 51ms
+ GET /api/catalog/search?q=emaoil 200 in 42ms
+ GET /api/catalog/search?q=emao 200 in 45ms
+ GET /api/catalog/search?q=ema 200 in 41ms
+ GET /api/catalog/search?q=email 200 in 35ms
+ POST /api/catalog/search/save 200 in 88ms
+ GET /api/search?q=email&types=TERM 200 in 64ms
+ GET /api/notifications/count 200 in 76ms
+ GET /api/search?q=email&types=TERM 200 in 76ms
+ GET /api/notifications/count 200 in 82ms
+ GET /api/notifications/count 200 in 34ms
+ GET /api/notifications/count 200 in 27ms
+ GET /api/tags 200 in 67ms
+ GET /api/notifications/count 200 in 87ms
+ GET /api/tags 200 in 72ms
+ GET /api/notifications/count 200 in 63ms
+ GET /api/notifications/count 200 in 86ms
+ GET /api/admin/tags 200 in 130ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 246ms
+ GET /api/glossary/picker 200 in 285ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 312ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 315ms
+ GET /api/notifications/count 200 in 145ms
+ GET /api/admin/tags 200 in 169ms
+ GET /api/glossary/picker 200 in 131ms
+ GET /api/assets/DATA_SCHEMAS/1/terms 200 in 164ms
+ GET /api/assets/DATA_SCHEMAS/1/rating 200 in 108ms
+ GET /api/assets/DATA_SCHEMAS/1/tags 200 in 111ms
+ GET /api/catalog/search?q=name 200 in 112ms
+ GET /api/notifications/count 200 in 56ms
+ GET /api/search?q=name&types=TABLE%2CVIEW%2CCOLUMN%2CTERM 200 in 98ms
+ GET /api/notifications/count 200 in 68ms
+ GET /api/search?q=name&types=TABLE%2CVIEW%2CCOLUMN%2CTERM 200 in 83ms
+ GET /api/search?q=name&types=TABLE%2CVIEW%2CCOLUMN%2CTERM&stakeholders=sara.alqahtani 200 in 98ms
+ GET /api/search?q=name&types=TABLE%2CVIEW%2CCOLUMN%2CTERM&stakeholders=sara.alqahtani%2Cfahad.harbi 200 in 100ms
+ GET /api/notifications/count 200 in 45ms
+ GET /api/notifications/count 200 in 35ms
+ ○ Compiling /api/catalog/mindmap ...
+ ✓ Compiled /api/catalog/mindmap in 1754ms (687 modules)
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=88 200 in 1966ms
+ GET /api/catalog/mindmap?assetType=DATA_ENTITIES&assetId=88 200 in 53ms
+ GET /api/notifications/count 200 in 231ms
+ ○ Compiling /api/assets/[assetType]/[assetId]/rating ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 559ms (686 modules)
+ ✓ Compiled (694 modules)
+ GET /api/admin/tags 200 in 1989ms
+ GET /api/glossary/picker 200 in 2039ms
+ GET /api/notifications/count 200 in 1694ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 2042ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 2046ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 2055ms
+ GET /api/admin/tags 200 in 105ms
+ GET /api/glossary/picker 200 in 100ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 97ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 108ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 110ms
+ GET /catalog/8?view=data-model 200 in 365ms
+ GET /api/notifications/count 200 in 349ms
+ GET /api/glossary/picker 200 in 356ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 333ms
+ GET /api/admin/tags 200 in 369ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 339ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 345ms
+ ○ Compiling /api/catalog/data-model ...
+ ✓ Compiled /api/catalog/data-model in 909ms (696 modules)
+ GET /api/glossary/picker 200 in 1813ms
+ GET /api/notifications/count 200 in 1816ms
+ GET /api/assets/DATA_SCHEMAS/8/rating 200 in 1793ms
+ GET /api/assets/DATA_SCHEMAS/8/terms 200 in 1810ms
+ GET /api/admin/tags 200 in 1870ms
+ GET /api/catalog/data-model?schemaId=8 200 in 1887ms
+ GET /api/assets/DATA_SCHEMAS/8/tags 200 in 87ms
+ GET /api/catalog/data-model?schemaId=8 200 in 57ms
+ ○ Compiling /api/tags ...
+ ✓ Compiled /api/tags in 598ms (698 modules)
+ GET /api/notifications/count 200 in 1082ms
+ GET /api/tags 200 in 1099ms
+ GET /api/notifications/count 200 in 63ms
+ GET /api/tags 200 in 65ms
+ ✓ Compiled in 1350ms (653 modules)
+ ✓ Compiled in 779ms (653 modules)
+ ✓ Compiled in 1476ms (1332 modules)
+ ○ Compiling /quality ...
+ ✓ Compiled /quality in 1279ms (659 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1871ms (688 modules)
+ GET /api/notifications/count 200 in 2029ms
+ GET /api/notifications/count 200 in 64ms
+ ○ Compiling /api/tags ...
+ ✓ Compiled /api/tags in 589ms (690 modules)
+ GET /api/notifications/count 200 in 1252ms
+ GET /api/tags 200 in 1288ms
+ GET /api/notifications/count 200 in 75ms
+ GET /api/tags 200 in 66ms
+ ○ Compiling /api/catalog/search ...
+ ✓ Compiled /api/catalog/search/save in 996ms (676 modules)
+ ✓ Compiled (678 modules)
+ POST /api/catalog/search/save 200 in 1301ms
+ GET /api/catalog/search?q=crm 200 in 2100ms
+ GET /api/notifications/count 200 in 299ms
+ ○ Compiling /api/search ...
+ ✓ Compiled /api/search in 1388ms (681 modules)
+ GET /api/notifications/count 200 in 1615ms
+ GET /api/search?q=crm 200 in 2139ms
+ GET /api/search?q=crm 200 in 74ms
+ ○ Compiling /catalog/[schemaId] ...
+ ✓ Compiled /catalog/[schemaId] in 1497ms (697 modules)
+ ○ Compiling /api/assets/[assetType]/[assetId]/rating ...
+ ✓ Compiled /api/assets/[assetType]/[assetId]/rating in 734ms (699 modules)
+ ✓ Compiled (707 modules)
+ GET /api/notifications/count 200 in 1438ms
+ GET /api/admin/tags 200 in 1752ms
+ GET /api/glossary/picker 200 in 1738ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 1726ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 1727ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 1730ms
+ GET /api/notifications/count 200 in 102ms
+ GET /api/admin/tags 200 in 105ms
+ GET /api/glossary/picker 200 in 107ms
+ GET /api/assets/DATA_SCHEMAS/4/tags 200 in 103ms
+ GET /api/assets/DATA_SCHEMAS/4/rating 200 in 110ms
+ GET /api/assets/DATA_SCHEMAS/4/terms 200 in 111ms
+ GET /api/notifications/count 200 in 63ms
+ GET /api/tags 200 in 77ms
+ GET /api/notifications/count 200 in 62ms
+ GET /api/tags 200 in 74ms
+ ✓ Compiled in 3s (1312 modules)
+ ✓ Compiled in 1021ms (633 modules)
+ ✓ Compiled in 2.9s (1312 modules)
+ GET /dashboard 500 in 649ms
+ ✓ Compiled in 2.7s (1312 modules)
+ GET /dashboard 200 in 501ms
+ ○ Compiling /api/tags ...
+ ✓ Compiled /api/tags in 1912ms (662 modules)
+ ✓ Compiled (664 modules)
+ GET /api/tags 200 in 2898ms
+ GET /api/notifications/count 200 in 2908ms
+ GET /api/tags 200 in 72ms
+ GET /api/notifications/count 200 in 91ms
+ GET /dashboard 200 in 333ms
+ GET /api/tags 200 in 68ms
+ GET /api/notifications/count 200 in 86ms
+ GET /api/tags 200 in 46ms
+ GET /api/notifications/count 200 in 44ms
+ ○ Compiling /api/catalog/search ...
+ ✓ Compiled /api/catalog/search in 704ms (666 modules)
+ GET /api/catalog/search?q=address 200 in 1128ms
+ GET /api/catalog/search?q=addres 200 in 243ms
+ GET /api/catalog/search?q=first%20name 200 in 46ms
+ ○ Compiling /api/catalog/search/save ...
+ ✓ Compiled /api/catalog/search/save in 1158ms (668 modules)
+ POST /api/catalog/search/save 200 in 1646ms
+ ○ Compiling /api/search ...
+ ✓ Compiled /api/search in 1113ms (671 modules)
+ GET /api/notifications/count 200 in 1735ms
+ GET /api/search?q=first+name 200 in 1796ms
+ GET /api/notifications/count 200 in 55ms
+ GET /api/search?q=first+name 200 in 48ms
+ ○ Compiling /catalog/[schemaId]/tables/[tableId] ...
+ ✓ Compiled /catalog/[schemaId]/tables/[tableId] in 2.1s (697 modules)
+ GET /api/notifications/count 200 in 59ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/tags 200 in 73ms
+ GET /api/notifications/count 200 in 86ms
+ GET /api/tags 200 in 80ms
+ GET /api/notifications/count 200 in 75ms
+ GET /dashboard 200 in 308ms
+ GET /api/notifications/count 200 in 61ms
+ GET /api/tags 200 in 79ms
+ GET /api/notifications/count 200 in 69ms
+ GET /api/tags 200 in 61ms
