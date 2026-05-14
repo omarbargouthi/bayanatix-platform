@@ -32,7 +32,7 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       `;
       if (rows.length > 0) return rows.map((r) => r.userId);
       const fb = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE system_role = 'OFFICER' AND is_active = true LIMIT 3
+        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 3
       `;
       return fb.map((r) => r.userId);
     }
@@ -47,21 +47,21 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       `;
       if (rows.length > 0) return rows.map((r) => r.userId);
       const fb = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE system_role = 'OFFICER' AND is_active = true LIMIT 3
+        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 3
       `;
       return fb.map((r) => r.userId);
     }
 
     case "OFFICER": {
       const rows = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE system_role = 'OFFICER' AND is_active = true LIMIT 5
+        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 5
       `;
       return rows.map((r) => r.userId);
     }
 
     case "ADMIN": {
       const rows = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE system_role = 'ADMIN' AND is_active = true LIMIT 5
+        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'ADMIN' AND is_active = true LIMIT 5
       `;
       return rows.map((r) => r.userId);
     }

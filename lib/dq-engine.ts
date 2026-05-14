@@ -87,7 +87,9 @@ export async function runDqRule(ruleId: number): Promise<RunResult> {
     });
 
     if (statusCode === "FAILED") {
-      void handleFailureActions(rule, engineResult.message).catch(() => {});
+      void handleFailureActions(rule, engineResult.message).catch((err) =>
+        console.error("[DQ] handleFailureActions error:", err)
+      );
     }
 
     return { ruleId, resultId, statusCode, score, durationMs, ...engineResult };
@@ -151,7 +153,7 @@ async function handleFailureActions(rule: DqRule, message: string): Promise<void
         VALUES (${req.requestId}, ${rule.assetTypeCode}, ${rule.assetId}, ${rule.assetName ?? null})
       `;
 
-      await startWorkflow(req.requestId, "FIX_DATA_ISSUE", title).catch(() => {});
+      await startWorkflow(req.requestId, "FIX_DATA_ISSUE", title);
     }
   }
 
@@ -172,7 +174,7 @@ async function handleFailureActions(rule: DqRule, message: string): Promise<void
           ${message},
           'WARNING', 'View Rules', '/quality'
         )
-      `.catch(() => {});
+      `;
     }
   }
 }
