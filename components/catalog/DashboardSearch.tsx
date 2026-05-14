@@ -18,13 +18,15 @@ type UserOption = { userId: string; fullName: string; email: string };
 
 function TableIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>; }
 function ColumnIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>; }
-function BookIcon()   { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>; }
+function SchemaIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>; }
+function TermIcon()   { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>; }
 function SearchIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>; }
 function ClockIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></svg>; }
 
 function AssetIcon({ type }: { type: string }) {
-  if (type === "COLUMN")   return <ColumnIcon />;
-  if (type === "GLOSSARY") return <BookIcon />;
+  if (type === "COLUMN")              return <ColumnIcon />;
+  if (type === "SCHEMA")              return <SchemaIcon />;
+  if (type === "GLOSSARY" || type === "TERM") return <TermIcon />;
   return <TableIcon />;
 }
 
@@ -37,7 +39,7 @@ function fmtCount(n: number | null) {
 
 const RESULT_ICON: Record<string, React.ReactNode> = {
   TABLE: <TableIcon />, VIEW: <TableIcon />, COLUMN: <ColumnIcon />,
-  SCHEMA: <BookIcon />, SOURCE: <BookIcon />, TERM: <BookIcon />,
+  SCHEMA: <SchemaIcon />, SOURCE: <SchemaIcon />, TERM: <TermIcon />,
 };
 
 const TYPE_LABEL: Record<string, string> = {

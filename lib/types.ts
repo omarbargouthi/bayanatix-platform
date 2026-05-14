@@ -160,7 +160,7 @@ export type TrendPoint = {
 };
 
 export type RecentAsset = {
-  assetType: "TABLE" | "COLUMN" | "GLOSSARY";
+  assetType: "TABLE" | "COLUMN" | "GLOSSARY" | "SCHEMA" | "TERM" | "SOURCE";
   assetId:   string;
   assetName: string;
   assetMeta: string | null;

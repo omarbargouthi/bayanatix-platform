@@ -46,6 +46,8 @@ export async function getRecentAssets(userId: string, limit = 6): Promise<Recent
     SELECT
       l.*,
       CASE
+        WHEN l."assetType" = 'SCHEMA' THEN
+          '/catalog/' || l."assetId"
         WHEN l."assetType" = 'TABLE' THEN
           '/catalog/' || COALESCE(s.schema_id::text, '1') || '/tables/' || l."assetId"
         WHEN l."assetType" = 'COLUMN' THEN

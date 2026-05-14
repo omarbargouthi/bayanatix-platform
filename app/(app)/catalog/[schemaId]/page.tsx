@@ -27,7 +27,7 @@ export default async function SchemaPage({
   if (!schema) notFound();
 
   const canEdit = await canEditMetadata(user);
-  void trackAssetVisit(user.userId, "TABLE", String(id), schema.schemaName, schema.sourceName).catch(() => {});
+  void trackAssetVisit(user.userId, "SCHEMA", String(id), schema.schemaName, schema.sourceName).catch(() => {});
   const highlightId = searchParams.highlight ? Number(searchParams.highlight) : null;
   const activeView = searchParams.view ?? "tables";
 
