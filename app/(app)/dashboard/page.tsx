@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     getComplianceSummary(),
     getComplianceSnapshot(),
     getMaturityTrends(2025),
-    getRecentAssets(user.userId, 6),
+    getRecentAssets(user.userId, 10),
     getRecentSearches(user.userId, 5),
   ]);
 

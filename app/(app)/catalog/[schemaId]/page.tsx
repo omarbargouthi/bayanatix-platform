@@ -45,6 +45,7 @@ export default async function SchemaPage({
           { label: schema.schemaName },
         ]}
         user={user}
+        contextTypes={["TABLE", "VIEW", "COLUMN", "TERM"]}
       />
 
       {highlightId && <HighlightScroll entityId={highlightId} />}

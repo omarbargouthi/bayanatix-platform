@@ -38,7 +38,7 @@ function HeaderIconBtn({
   );
 }
 
-export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser }) {
+export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[] }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
   const [menuOpen,    setMenuOpen]    = useState(false);
@@ -50,7 +50,9 @@ export function Header({ crumbs, user }: { crumbs: Crumb[]; user: SessionUser })
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [quickTypes,    setQuickTypes]    = useState<Set<string>>(new Set(ALL_TYPES));
+  const [quickTypes,    setQuickTypes]    = useState<Set<string>>(
+    new Set(contextTypes && contextTypes.length > 0 ? contextTypes : ALL_TYPES)
+  );
   const searchRef   = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

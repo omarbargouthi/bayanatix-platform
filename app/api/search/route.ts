@@ -4,9 +4,6 @@ import { sql } from "@/lib/db";
 import type { FullSearchHit, SearchResponse } from "@/lib/search-types";
 import { ALL_TYPES } from "@/lib/search-types";
 
-export type { FullSearchHit, SearchResponse };
-export { ALL_TYPES };
-
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -86,6 +86,7 @@ export default async function TablePage({
           { label: entity.entityName },
         ]}
         user={user}
+        contextTypes={["COLUMN", "TERM"]}
       />
 
       <main className="px-8 py-7 pb-14">
