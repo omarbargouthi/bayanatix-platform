@@ -21,6 +21,7 @@ import { trackAssetVisit } from "@/lib/queries/dashboard";
 import { getStakeholders } from "@/lib/queries/stakeholders";
 import { getGovernanceRoleLabels } from "@/lib/queries/governance-config";
 import { GovernancePanel } from "@/components/catalog/GovernancePanel";
+import { MindMapTab } from "@/components/catalog/MindMapTab";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ const ENTITY_TYPE_LABEL: Record<string, string> = {
   SYSTEM:        "System / Setup",
 };
 
-const VALID_TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Sample Data", "Custom Properties"] as const;
+const VALID_TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Relationships", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof VALID_TABS[number];
 
 function isValidTab(s: string | undefined): s is Tab {
@@ -229,6 +230,11 @@ export default async function TablePage({
         {/* ── Lineage tab ──────────────────────────────────────────────── */}
         {activeTab === "Lineage" && (
           <LineageTab entityId={entity.entityId} entityName={entity.entityName} />
+        )}
+
+        {/* ── Relationships tab ────────────────────────────────────────── */}
+        {activeTab === "Relationships" && (
+          <MindMapTab assetId={entity.entityId} assetType="DATA_ENTITIES" entityName={entity.entityName} />
         )}
 
         {/* ── Sample Data tab ──────────────────────────────────────────── */}

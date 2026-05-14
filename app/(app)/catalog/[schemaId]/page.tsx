@@ -7,6 +7,7 @@ import { trackAssetVisit } from "@/lib/queries/dashboard";
 import { HighlightScroll } from "@/components/catalog/HighlightScroll";
 import { SchemaHero } from "@/components/catalog/SchemaHero";
 import { SchemaTableList } from "@/components/catalog/SchemaTableList";
+import { DataModelTab } from "@/components/catalog/DataModelTab";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function SchemaPage({
   searchParams,
 }: {
   params:       { schemaId: string };
-  searchParams: { highlight?: string };
+  searchParams: { highlight?: string; view?: string };
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
@@ -28,6 +29,7 @@ export default async function SchemaPage({
   const canEdit = await canEditMetadata(user);
   void trackAssetVisit(user.userId, "TABLE", String(id), schema.schemaName, schema.sourceName).catch(() => {});
   const highlightId = searchParams.highlight ? Number(searchParams.highlight) : null;
+  const activeView = searchParams.view ?? "tables";
 
   const tables    = schema.entities.filter((e) => !e.isView);
   const views     = schema.entities.filter((e) => e.isView);
@@ -56,11 +58,40 @@ export default async function SchemaPage({
           canEdit={canEdit}
         />
 
-        <SchemaTableList
-          entities={schema.entities}
-          schemaId={schema.schemaId}
-          canEdit={canEdit}
-        />
+        <div className="flex gap-1 border-b border-line mb-6">
+          <a
+            href={`/catalog/${id}`}
+            className={
+              "px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 " +
+              (activeView === "tables"
+                ? "text-brand-purple border-brand-purple"
+                : "text-ink-soft border-transparent hover:text-brand-purple")
+            }
+          >
+            Tables
+          </a>
+          <a
+            href={`/catalog/${id}?view=data-model`}
+            className={
+              "px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 " +
+              (activeView === "data-model"
+                ? "text-brand-purple border-brand-purple"
+                : "text-ink-soft border-transparent hover:text-brand-purple")
+            }
+          >
+            Data Model
+          </a>
+        </div>
+
+        {activeView === "data-model" ? (
+          <DataModelTab schemaId={id} />
+        ) : (
+          <SchemaTableList
+            entities={schema.entities}
+            schemaId={schema.schemaId}
+            canEdit={canEdit}
+          />
+        )}
       </main>
     </>
   );

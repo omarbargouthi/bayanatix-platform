@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
-const TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Sample Data", "Custom Properties"] as const;
+const TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Relationships", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof TABS[number];
 
 export function TableTabs({ active }: { active: Tab }) {
