@@ -1494,3 +1494,142 @@
  GET /api/tags 200 in 79ms
  GET /api/notifications/count 200 in 69ms
  GET /api/tags 200 in 61ms
+ ✓ Compiled in 597ms (679 modules)
+ ✓ Compiled in 446ms (679 modules)
+ ✓ Compiled in 451ms (679 modules)
+ ✓ Compiled in 476ms (679 modules)
+ ✓ Compiled in 9s (1485 modules)
+ ✓ Compiled in 1180ms (679 modules)
+ ✓ Compiled in 412ms (679 modules)
+ ✓ Compiled in 2.9s (1485 modules)
+ ✓ Compiled in 2.8s (1485 modules)
+ ✓ Compiled in 778ms (679 modules)
+ ✓ Compiled in 377ms (679 modules)
+ ✓ Compiled in 332ms (679 modules)
+ ✓ Compiled in 329ms (679 modules)
+ ✓ Compiled in 2.8s (1485 modules)
+ ✓ Compiled in 441ms (679 modules)
+ ✓ Compiled in 3.4s (1485 modules)
+ ✓ Compiled in 777ms (679 modules)
+ ✓ Compiled in 546ms (679 modules)
+ ✓ Compiled in 3.2s (1485 modules)
+ ✓ Compiled in 2.8s (1485 modules)
+ ✓ Compiled in 3.9s (1485 modules)
+ ✓ Compiled in 2.2s (1485 modules)
+ ✓ Compiled in 3s (1485 modules)
+ ✓ Compiled in 2.7s (1485 modules)
+ ✓ Compiled in 587ms (679 modules)
+ ✓ Compiled in 353ms (679 modules)
+ ✓ Compiled in 408ms (679 modules)
+ ✓ Compiled in 359ms (679 modules)
+ ✓ Compiled in 342ms (679 modules)
+ ✓ Compiled in 461ms (679 modules)
+ ✓ Compiled in 338ms (679 modules)
+ ✓ Compiled in 366ms (679 modules)
+ ✓ Compiled in 333ms (679 modules)
+ ✓ Compiled in 1582ms (1333 modules)
+ ✓ Compiled in 323ms (679 modules)
+ ○ Compiling /governance ...
+ ✓ Compiled /governance in 1815ms (1339 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1538ms (689 modules)
+ GET /api/notifications/count 200 in 1683ms
+ GET /api/notifications/count 200 in 66ms
+ ○ Compiling /governance/compliance ...
+ ✓ Compiled /governance/compliance in 1254ms (1352 modules)
+ GET /api/notifications/count 200 in 68ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 33ms
+ ○ Compiling /governance/registers ...
+ ✓ Compiled /governance/registers in 2s (1353 modules)
+ GET /api/notifications/count 200 in 64ms
+ GET /api/notifications/count 200 in 41ms
+ ○ Compiling /governance/registers/[registerId] ...
+ ✓ Compiled /governance/registers/[registerId] in 1303ms (1360 modules)
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 39ms
+ GET /api/notifications/count 200 in 64ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 45ms
+ GET /api/notifications/count 200 in 38ms
+ ○ Compiling /governance/framework ...
+ ✓ Compiled /governance/framework in 1389ms (1154 modules)
+ GET /api/notifications/count 200 in 64ms
+ GET /api/notifications/count 200 in 56ms
+ ○ Compiling /governance/framework/[section] ...
+ ✓ Compiled /governance/framework/[section] in 1074ms (1147 modules)
+ GET /api/notifications/count 200 in 45ms
+ GET /api/notifications/count 200 in 32ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 62ms
+ GET /api/notifications/count 200 in 50ms
+ ✓ Compiled in 2.1s (1113 modules)
+ ✓ Compiled in 649ms (440 modules)
+ ✓ Compiled in 856ms (687 modules)
+ ✓ Compiled in 450ms (687 modules)
+ ✓ Compiled in 451ms (687 modules)
+ ✓ Compiled in 422ms (687 modules)
+ ✓ Compiled in 424ms (687 modules)
+ ✓ Compiled in 621ms (687 modules)
+ ✓ Compiled in 893ms (687 modules)
+ ✓ Compiled in 1235ms (1127 modules)
+ ✓ Compiled in 766ms (1127 modules)
+ ✓ Compiled in 817ms (1127 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1838ms (469 modules)
+ GET /api/notifications/count 200 in 2043ms
+ GET /api/notifications/count 200 in 43ms
+ ○ Compiling /governance/compliance ...
+ ✓ Compiled /governance/compliance in 783ms (474 modules)
+ GET /api/notifications/count 200 in 62ms
+ GET /api/notifications/count 200 in 50ms
+ ✓ Compiled in 2.6s (440 modules)
+ ✓ Compiled in 1181ms (687 modules)
+ ✓ Compiled in 731ms (687 modules)
+ ✓ Compiled in 549ms (687 modules)
+ ✓ Compiled in 830ms (687 modules)
+ ✓ Compiled in 490ms (687 modules)
+ ✓ Compiled in 781ms (687 modules)
+ ✓ Compiled in 777ms (687 modules)
+ ✓ Compiled in 410ms (687 modules)
+ ○ Compiling /governance/compliance ...
+ ✓ Compiled /governance/compliance in 956ms (445 modules)
+ ○ Compiling /api/notifications/count ...
+ ✓ Compiled /api/notifications/count in 1207ms (474 modules)
+ GET /api/notifications/count 200 in 1553ms
+ GET /api/notifications/count 200 in 46ms
+ GET /governance/compliance 200 in 333ms
+ GET /api/notifications/count 200 in 58ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 44ms
+ GET /api/notifications/count 200 in 54ms
+ GET /api/notifications/count 200 in 49ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 31ms
+ GET /api/notifications/count 200 in 57ms
+ GET /api/notifications/count 200 in 71ms
+ GET /api/notifications/count 200 in 31ms
+ GET /api/notifications/count 200 in 29ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 47ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 29ms
+ GET /api/notifications/count 200 in 64ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 50ms
+ GET /api/notifications/count 200 in 43ms
+ GET /api/notifications/count 200 in 56ms
+ GET /api/notifications/count 200 in 63ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 40ms
+ GET /api/notifications/count 200 in 48ms
+ GET /api/notifications/count 200 in 38ms
+ GET /api/notifications/count 200 in 30ms
+ ○ Compiling /api/governance/registers/[registerId]/entries ...
+ ✓ Compiled /api/governance/registers/[registerId]/entries in 822ms (471 modules)
+ POST /api/governance/registers/1/entries 201 in 1418ms
+ GET /api/governance/registers/1/entries 200 in 79ms

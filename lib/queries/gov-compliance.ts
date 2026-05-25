@@ -18,7 +18,6 @@ export type ComplianceRequirement = {
   reqCode:               string;
   standard:              string | null;
   standardCode:          string | null;
-  // NDI spreadsheet fields (read-only from import)
   domain:                string | null;
   domainCode:            string | null;
   question:              string;
@@ -34,7 +33,7 @@ export type ComplianceRequirement = {
   managementSector:      string | null;
   sortOrder:             number;
   // Assessment fields (editable)
-  submissionStatus:      string;   // COMPLETE | NOT_COMPLETE | NA
+  submissionStatus:      string;
   evidentAdminOverride:  string | null;
   domainOwnerOverride:   string | null;
   managementNotes:       string | null;
@@ -42,6 +41,10 @@ export type ComplianceRequirement = {
   evidenceName:          string | null;
   assessedBy:            string | null;
   assessedAt:            string | null;
+  // Workflow
+  workflowStatus:        string | null;
+  endorsedBy:            string | null;
+  endorsedAt:            string | null;
 };
 
 export type LevelConfig = {
@@ -57,6 +60,43 @@ export type UserOption = {
   userId:   string;
   fullName: string | null;
   email:    string;
+};
+
+export type ConfigItem = {
+  itemId:      number;
+  configGroup: string;
+  code:        string;
+  label:       string;
+  labelAr:     string | null;
+  colorHex:    string | null;
+  sortOrder:   number;
+};
+
+export type MaturitySelection = {
+  standardCode:   string;
+  selectedLevel:  number;
+  selectedBy:     string;
+  selectedAt:     string;
+};
+
+export type HistoryEntry = {
+  historyId:      number;
+  fieldName:      string;
+  fieldLabel:     string;
+  oldValue:       string | null;
+  newValue:       string | null;
+  changedBy:      string;
+  changedByName:  string | null;
+  changedAt:      string;
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  submissionStatus:     "Submission Status",
+  evidentAdminOverride: "Evident Administrator",
+  domainOwnerOverride:  "Domain Owner",
+  managementNotes:      "Management & Supporting Sector",
+  comments:             "Comments",
+  evidenceFile:         "Evidence File",
 };
 
 // ── Frameworks ───────────────────────────────────────────────────────────────
@@ -125,9 +165,13 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       a.comments,
       a.evidence_name           AS "evidenceName",
       a.assessed_by             AS "assessedBy",
-      a.assessed_at::text       AS "assessedAt"
+      a.assessed_at::text       AS "assessedAt",
+      w.status                  AS "workflowStatus",
+      w.endorsed_by             AS "endorsedBy",
+      w.endorsed_at::text       AS "endorsedAt"
     FROM bayanat.gov_compliance_requirements r
     LEFT JOIN bayanat.gov_compliance_assessments a ON a.req_id = r.req_id
+    LEFT JOIN bayanat.compliance_workflow         w ON w.req_id = r.req_id
     WHERE r.framework_id = ${frameworkId}
     ORDER BY r.sort_order, r.req_code
   `;
@@ -166,6 +210,36 @@ export async function importRequirements(
   }
 }
 
+export async function updateRequirement(reqId: number, fields: {
+  standard?: string;
+  question?: string;
+  maturityLevel?: string;
+  supportingEvidence?: string;
+  admissionCriteria?: string;
+  directoryCode?: string;
+  directoryType?: string;
+  complianceOrMaturity?: string;
+  evidentAdministrator?: string;
+  domainOwner?: string;
+  managementSector?: string;
+}): Promise<void> {
+  await sql`
+    UPDATE bayanat.gov_compliance_requirements SET
+      standard               = COALESCE(${fields.standard              ?? null}, standard),
+      req_text               = COALESCE(${fields.question              ?? null}, req_text),
+      maturity_level         = COALESCE(${fields.maturityLevel         ?? null}, maturity_level),
+      supporting_evidence    = COALESCE(${fields.supportingEvidence    ?? null}, supporting_evidence),
+      admission_criteria     = COALESCE(${fields.admissionCriteria     ?? null}, admission_criteria),
+      directory_code         = COALESCE(${fields.directoryCode         ?? null}, directory_code),
+      directory_type         = COALESCE(${fields.directoryType         ?? null}, directory_type),
+      compliance_or_maturity = COALESCE(${fields.complianceOrMaturity  ?? null}, compliance_or_maturity),
+      evident_administrator  = COALESCE(${fields.evidentAdministrator  ?? null}, evident_administrator),
+      domain_owner           = COALESCE(${fields.domainOwner           ?? null}, domain_owner),
+      management_sector      = COALESCE(${fields.managementSector      ?? null}, management_sector)
+    WHERE req_id = ${reqId}
+  `;
+}
+
 // ── Assessment ───────────────────────────────────────────────────────────────
 
 export async function upsertAssessment(reqId: number, fields: {
@@ -175,8 +249,8 @@ export async function upsertAssessment(reqId: number, fields: {
   managementNotes?: string | null;
   comments?: string | null;
   assessedBy: string;
+  assessedByName?: string;
 }): Promise<void> {
-  // Capture old values for history before updating
   const existing = await sql<{
     submission_status: string;
     evident_admin_override: string | null;
@@ -203,7 +277,7 @@ export async function upsertAssessment(reqId: number, fields: {
       NOW()
     )
     ON CONFLICT (req_id) DO UPDATE SET
-      submission_status      = COALESCE(EXCLUDED.submission_status,      gov_compliance_assessments.submission_status),
+      submission_status      = COALESCE(EXCLUDED.submission_status, gov_compliance_assessments.submission_status),
       evident_admin_override = EXCLUDED.evident_admin_override,
       domain_owner_override  = EXCLUDED.domain_owner_override,
       management_notes       = EXCLUDED.management_notes,
@@ -212,11 +286,11 @@ export async function upsertAssessment(reqId: number, fields: {
       assessed_at            = NOW()
   `;
 
-  // Write history for each changed field
   const req = await sql<{ framework_id: number }[]>`
     SELECT framework_id FROM bayanat.gov_compliance_requirements WHERE req_id = ${reqId}
   `;
   const fwId = req[0]?.framework_id ?? 0;
+  const byName = fields.assessedByName ?? fields.assessedBy;
 
   const changes: Array<{ field: string; old: string | null; nw: string | null }> = [
     { field: "submissionStatus",      old: prev?.submission_status      ?? null, nw: fields.submissionStatus      ?? null },
@@ -227,11 +301,13 @@ export async function upsertAssessment(reqId: number, fields: {
   ];
 
   for (const c of changes) {
-    if (c.old !== c.nw && (c.old !== null || c.nw !== null)) {
+    const oldTrimmed = c.old?.trim() ?? null;
+    const newTrimmed = c.nw?.trim()  ?? null;
+    if (oldTrimmed !== newTrimmed && (oldTrimmed !== null || newTrimmed !== null)) {
       await sql`
         INSERT INTO bayanat.gov_compliance_history
           (req_id, framework_id, field_name, old_value, new_value, changed_by)
-        VALUES (${reqId}, ${fwId}, ${c.field}, ${c.old}, ${c.nw}, ${fields.assessedBy})
+        VALUES (${reqId}, ${fwId}, ${c.field}, ${c.old}, ${c.nw}, ${byName})
       `;
     }
   }
@@ -255,6 +331,158 @@ export async function getEvidenceData(reqId: number): Promise<{ evidenceName: st
   return rows[0] ?? null;
 }
 
+// ── Maturity level selection ──────────────────────────────────────────────────
+
+export async function getMaturitySelections(frameworkId: number): Promise<MaturitySelection[]> {
+  return sql<MaturitySelection[]>`
+    SELECT
+      standard_code  AS "standardCode",
+      selected_level AS "selectedLevel",
+      selected_by    AS "selectedBy",
+      selected_at::text AS "selectedAt"
+    FROM bayanat.compliance_maturity_selections
+    WHERE framework_id = ${frameworkId}
+  `;
+}
+
+export async function setMaturitySelection(
+  frameworkId: number,
+  standardCode: string,
+  selectedLevel: number,
+  selectedBy: string
+): Promise<void> {
+  await sql`
+    INSERT INTO bayanat.compliance_maturity_selections
+      (framework_id, standard_code, selected_level, selected_by, selected_at)
+    VALUES (${frameworkId}, ${standardCode}, ${selectedLevel}, ${selectedBy}, NOW())
+    ON CONFLICT (framework_id, standard_code) DO UPDATE SET
+      selected_level = EXCLUDED.selected_level,
+      selected_by    = EXCLUDED.selected_by,
+      selected_at    = NOW()
+  `;
+}
+
+export async function clearStandardAssessments(frameworkId: number, standardCode: string): Promise<void> {
+  // Clear assessments for all requirements of this standard
+  await sql`
+    DELETE FROM bayanat.gov_compliance_assessments
+    WHERE req_id IN (
+      SELECT req_id FROM bayanat.gov_compliance_requirements
+      WHERE framework_id = ${frameworkId} AND standard = ${standardCode}
+    )
+  `;
+  // Clear workflow states
+  await sql`
+    DELETE FROM bayanat.compliance_workflow
+    WHERE req_id IN (
+      SELECT req_id FROM bayanat.gov_compliance_requirements
+      WHERE framework_id = ${frameworkId} AND standard = ${standardCode}
+    )
+  `;
+}
+
+// ── Workflow ──────────────────────────────────────────────────────────────────
+
+export async function getWorkflow(reqId: number) {
+  const rows = await sql<{
+    workflowId: number; status: string;
+    submittedBy: string | null; submittedAt: string | null;
+    confirmedBy: string | null; confirmedAt: string | null;
+    endorsedBy: string | null; endorsedAt: string | null;
+  }[]>`
+    SELECT
+      workflow_id   AS "workflowId",
+      status,
+      submitted_by  AS "submittedBy",
+      submitted_at::text AS "submittedAt",
+      confirmed_by  AS "confirmedBy",
+      confirmed_at::text AS "confirmedAt",
+      endorsed_by   AS "endorsedBy",
+      endorsed_at::text  AS "endorsedAt"
+    FROM bayanat.compliance_workflow WHERE req_id = ${reqId}
+  `;
+  return rows[0] ?? null;
+}
+
+export async function advanceWorkflow(
+  reqId: number,
+  frameworkId: number,
+  action: "submit" | "confirm" | "endorse",
+  byUser: string
+): Promise<void> {
+  const existing = await sql`SELECT workflow_id FROM bayanat.compliance_workflow WHERE req_id = ${reqId}`;
+
+  if (existing.length === 0) {
+    await sql`
+      INSERT INTO bayanat.compliance_workflow (req_id, framework_id, status, updated_at)
+      VALUES (${reqId}, ${frameworkId}, 'DRAFT', NOW())
+    `;
+  }
+
+  if (action === "submit") {
+    await sql`
+      UPDATE bayanat.compliance_workflow
+      SET status = 'SUBMITTED', submitted_by = ${byUser}, submitted_at = NOW(), updated_at = NOW()
+      WHERE req_id = ${reqId} AND status = 'DRAFT'
+    `;
+    await sql`
+      INSERT INTO bayanat.gov_compliance_history
+        (req_id, framework_id, field_name, old_value, new_value, changed_by)
+      VALUES (${reqId}, ${frameworkId}, 'workflowStatus', 'DRAFT', 'SUBMITTED', ${byUser})
+    `;
+  } else if (action === "confirm") {
+    await sql`
+      UPDATE bayanat.compliance_workflow
+      SET status = 'CONFIRMED', confirmed_by = ${byUser}, confirmed_at = NOW(), updated_at = NOW()
+      WHERE req_id = ${reqId} AND status = 'SUBMITTED'
+    `;
+    await sql`
+      INSERT INTO bayanat.gov_compliance_history
+        (req_id, framework_id, field_name, old_value, new_value, changed_by)
+      VALUES (${reqId}, ${frameworkId}, 'workflowStatus', 'SUBMITTED', 'CONFIRMED', ${byUser})
+    `;
+  } else if (action === "endorse") {
+    await sql`
+      UPDATE bayanat.compliance_workflow
+      SET status = 'ENDORSED', endorsed_by = ${byUser}, endorsed_at = NOW(), updated_at = NOW()
+      WHERE req_id = ${reqId} AND status = 'CONFIRMED'
+    `;
+    await sql`
+      INSERT INTO bayanat.gov_compliance_history
+        (req_id, framework_id, field_name, old_value, new_value, changed_by)
+      VALUES (${reqId}, ${frameworkId}, 'workflowStatus', 'CONFIRMED', 'ENDORSED', ${byUser})
+    `;
+  }
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+
+export async function getRequirementHistory(reqId: number): Promise<HistoryEntry[]> {
+  const rows = await sql<{
+    historyId: number; fieldName: string; oldValue: string | null;
+    newValue: string | null; changedBy: string; changedAt: string;
+    changedByName: string | null;
+  }[]>`
+    SELECT
+      h.history_id AS "historyId",
+      h.field_name AS "fieldName",
+      h.old_value  AS "oldValue",
+      h.new_value  AS "newValue",
+      h.changed_by AS "changedBy",
+      h.changed_at::text AS "changedAt",
+      u.full_name  AS "changedByName"
+    FROM bayanat.gov_compliance_history h
+    LEFT JOIN bayanat.users u ON u.user_id = h.changed_by OR u.full_name = h.changed_by
+    WHERE h.req_id = ${reqId}
+    ORDER BY h.changed_at DESC
+    LIMIT 50
+  `;
+  return rows.map((r) => ({
+    ...r,
+    fieldLabel: FIELD_LABELS[r.fieldName] ?? r.fieldName,
+  }));
+}
+
 // ── Level configuration ───────────────────────────────────────────────────────
 
 export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]> {
@@ -270,7 +498,6 @@ export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]
     WHERE framework_id = ${frameworkId}
     ORDER BY level_num
   `;
-  // Fill any missing levels with defaults
   const defaults = [
     { name: "No Capability", colorHex: "#D84848", description: "" },
     { name: "Build",         colorHex: "#E88030", description: "" },
@@ -302,6 +529,50 @@ export async function saveLevelConfig(
   }
 }
 
+// ── Config items ──────────────────────────────────────────────────────────────
+
+export async function getConfigItems(frameworkId: number): Promise<ConfigItem[]> {
+  return sql<ConfigItem[]>`
+    SELECT
+      item_id      AS "itemId",
+      config_group AS "configGroup",
+      code,
+      label,
+      label_ar     AS "labelAr",
+      color_hex    AS "colorHex",
+      sort_order   AS "sortOrder"
+    FROM bayanat.compliance_config_items
+    WHERE framework_id = ${frameworkId}
+    ORDER BY config_group, sort_order
+  `;
+}
+
+export async function upsertConfigItem(frameworkId: number, item: {
+  configGroup: string; code: string; label: string;
+  labelAr?: string | null; colorHex?: string | null; sortOrder?: number;
+}): Promise<void> {
+  await sql`
+    INSERT INTO bayanat.compliance_config_items
+      (framework_id, config_group, code, label, label_ar, color_hex, sort_order)
+    VALUES (
+      ${frameworkId}, ${item.configGroup}, ${item.code}, ${item.label},
+      ${item.labelAr ?? null}, ${item.colorHex ?? null}, ${item.sortOrder ?? 0}
+    )
+    ON CONFLICT (framework_id, config_group, code) DO UPDATE SET
+      label      = EXCLUDED.label,
+      label_ar   = EXCLUDED.label_ar,
+      color_hex  = EXCLUDED.color_hex,
+      sort_order = EXCLUDED.sort_order
+  `;
+}
+
+export async function deleteConfigItem(frameworkId: number, configGroup: string, code: string): Promise<void> {
+  await sql`
+    DELETE FROM bayanat.compliance_config_items
+    WHERE framework_id = ${frameworkId} AND config_group = ${configGroup} AND code = ${code}
+  `;
+}
+
 // ── Users ────────────────────────────────────────────────────────────────────
 
 export async function listUsers(): Promise<UserOption[]> {
@@ -313,7 +584,21 @@ export async function listUsers(): Promise<UserOption[]> {
   `;
 }
 
-// ── Domains (for legacy use) ──────────────────────────────────────────────────
+// ── Collab (compliance-linked threads) ────────────────────────────────────────
+
+export async function getCollabThreadCounts(reqIds: number[]): Promise<Record<number, number>> {
+  if (reqIds.length === 0) return {};
+  const rows = await sql<{ reqId: number; count: number }[]>`
+    SELECT ar.asset_id::int AS "reqId", COUNT(*)::int AS count
+    FROM bayanat.collab_asset_refs ar
+    WHERE ar.asset_type = 'COMPLIANCE_EVIDENCE'
+      AND ar.asset_id::int = ANY(${reqIds})
+    GROUP BY ar.asset_id
+  `;
+  return Object.fromEntries(rows.map((r) => [r.reqId, r.count]));
+}
+
+// ── Domains ──────────────────────────────────────────────────────────────────
 
 export async function listDomains(frameworkId: number): Promise<string[]> {
   const rows = await sql<{ domain: string }[]>`
@@ -323,41 +608,6 @@ export async function listDomains(frameworkId: number): Promise<string[]> {
     ORDER BY domain
   `;
   return rows.map((r) => r.domain);
-}
-
-// ── History ──────────────────────────────────────────────────────────────────
-
-export type HistoryEntry = {
-  historyId:  number;
-  fieldName:  string;
-  oldValue:   string | null;
-  newValue:   string | null;
-  changedBy:  string;
-  changedAt:  string;
-};
-
-const FIELD_LABELS: Record<string, string> = {
-  submissionStatus:     "Submission Status",
-  evidentAdminOverride: "Evident Administrator",
-  domainOwnerOverride:  "Domain Owner",
-  managementNotes:      "Management & Supporting Sector",
-  comments:             "Comments",
-  evidenceFile:         "Evidence File",
-};
-
-export async function getRequirementHistory(reqId: number): Promise<HistoryEntry[]> {
-  return sql<HistoryEntry[]>`
-    SELECT
-      history_id AS "historyId",
-      field_name AS "fieldName",
-      old_value  AS "oldValue",
-      new_value  AS "newValue",
-      changed_by AS "changedBy",
-      changed_at::text AS "changedAt"
-    FROM bayanat.gov_compliance_history
-    WHERE req_id = ${reqId}
-    ORDER BY changed_at DESC
-  `;
 }
 
 export { FIELD_LABELS };
