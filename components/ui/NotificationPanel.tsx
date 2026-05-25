@@ -22,6 +22,7 @@ const TYPE_LABEL: Record<string, string> = {
   CLASSIFICATION: "Classification",
   QUALITY:        "Quality",
   WORKFLOW:       "Workflow",
+  COMPLIANCE:     "Compliance",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -30,6 +31,7 @@ const TYPE_COLOR: Record<string, string> = {
   CLASSIFICATION: "bg-purple-50 text-purple-700",
   QUALITY:        "bg-red-50 text-red-700",
   WORKFLOW:       "bg-amber-50 text-amber-700",
+  COMPLIANCE:     "bg-teal-50 text-teal-700",
 };
 
 function timeAgo(iso: string) {

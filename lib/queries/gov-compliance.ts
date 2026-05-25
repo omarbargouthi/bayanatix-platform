@@ -363,7 +363,6 @@ export async function setMaturitySelection(
 }
 
 export async function clearStandardAssessments(frameworkId: number, standardCode: string): Promise<void> {
-  // Clear assessments for all requirements of this standard
   await sql`
     DELETE FROM bayanat.gov_compliance_assessments
     WHERE req_id IN (
@@ -371,12 +370,39 @@ export async function clearStandardAssessments(frameworkId: number, standardCode
       WHERE framework_id = ${frameworkId} AND standard = ${standardCode}
     )
   `;
-  // Clear workflow states
   await sql`
     DELETE FROM bayanat.compliance_workflow
     WHERE req_id IN (
       SELECT req_id FROM bayanat.gov_compliance_requirements
       WHERE framework_id = ${frameworkId} AND standard = ${standardCode}
+    )
+  `;
+}
+
+// Clear assessments only for levels strictly above keepUpToLevel
+export async function clearAssessmentsAboveLevel(
+  frameworkId: number,
+  standardCode: string,
+  keepUpToLevel: number
+): Promise<void> {
+  await sql`
+    DELETE FROM bayanat.gov_compliance_assessments
+    WHERE req_id IN (
+      SELECT req_id FROM bayanat.gov_compliance_requirements
+      WHERE framework_id = ${frameworkId}
+        AND standard    = ${standardCode}
+        AND CAST(COALESCE(NULLIF(SUBSTRING(COALESCE(maturity_level,'') FROM '\d+'), ''), '0') AS INTEGER)
+            > ${keepUpToLevel}
+    )
+  `;
+  await sql`
+    DELETE FROM bayanat.compliance_workflow
+    WHERE req_id IN (
+      SELECT req_id FROM bayanat.gov_compliance_requirements
+      WHERE framework_id = ${frameworkId}
+        AND standard    = ${standardCode}
+        AND CAST(COALESCE(NULLIF(SUBSTRING(COALESCE(maturity_level,'') FROM '\d+'), ''), '0') AS INTEGER)
+            > ${keepUpToLevel}
     )
   `;
 }

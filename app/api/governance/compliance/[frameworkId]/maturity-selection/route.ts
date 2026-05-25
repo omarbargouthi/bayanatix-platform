@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import {
   getMaturitySelections,
   setMaturitySelection,
-  clearStandardAssessments,
+  clearAssessmentsAboveLevel,
 } from "@/lib/queries/gov-compliance";
 
 export async function GET(
@@ -32,7 +32,8 @@ export async function POST(
   }
 
   if (clear) {
-    await clearStandardAssessments(fwId, standardCode);
+    // Only clear levels ABOVE the newly selected level; keep levels <= selectedLevel
+    await clearAssessmentsAboveLevel(fwId, standardCode, Number(selectedLevel));
   }
   await setMaturitySelection(fwId, standardCode, Number(selectedLevel), session.userId);
   return NextResponse.json({ ok: true });
