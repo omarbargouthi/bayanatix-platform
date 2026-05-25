@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ComplianceFramework,
@@ -10,11 +10,11 @@ import type {
 } from "@/lib/queries/gov-compliance";
 
 type Props = {
-  frameworks:         ComplianceFramework[];
-  activeFramework:    ComplianceFramework | null;
+  frameworks:          ComplianceFramework[];
+  activeFramework:     ComplianceFramework | null;
   initialRequirements: ComplianceRequirement[];
-  initialLevelConfig: LevelConfig[];
-  users:              UserOption[];
+  initialLevelConfig:  LevelConfig[];
+  users:               UserOption[];
 };
 
 const STATUSES = [
@@ -26,7 +26,15 @@ const STATUSES = [
 const DEFAULT_LEVEL_COLORS = ["#D84848","#E88030","#2D4AA0","#3D7EC8","#1E8C76","#5CA85C"];
 const DEFAULT_LEVEL_NAMES  = ["No Capability","Build","Definition","Activation","Managed","Innovation"];
 
-// Parse "Level 2" → 2, "Level 0" → 0, etc.
+const FIELD_LABELS: Record<string, string> = {
+  submissionStatus:     "Submission Status",
+  evidentAdminOverride: "Evident Administrator",
+  domainOwnerOverride:  "Domain Owner",
+  managementNotes:      "Management & Supporting Sector",
+  comments:             "Comments",
+  evidenceFile:         "Evidence File",
+};
+
 function parseLevelNum(ml: string | null): number | null {
   if (!ml) return null;
   const m = ml.match(/(\d+)/);
@@ -34,14 +42,11 @@ function parseLevelNum(ml: string | null): number | null {
   return n !== null && n >= 0 && n <= 5 ? n : null;
 }
 
-// Derive standard grouping from reqCode when standard column is blank
 function deriveStandard(req: ComplianceRequirement): string {
   if (req.standard?.trim()) return req.standard.trim();
   const code = req.reqCode ?? "";
-  // "DG-1.2.3" → take up to first "." → "DG-1"
   const dotIdx = code.indexOf(".");
   if (dotIdx > 0) return code.slice(0, dotIdx);
-  // "DG-1" no dots → strip last dash segment → "DG"
   const lastDash = code.lastIndexOf("-");
   if (lastDash > 0) return code.slice(0, lastDash);
   return req.domainCode ?? "General";
@@ -65,7 +70,6 @@ export function ComplianceClient({
   const importRef = useRef<HTMLInputElement>(null);
   const fwId = activeFramework?.frameworkId;
 
-  // ── level helpers ────────────────────────────────────────────────────────
   const lvlColor = (n: number) =>
     levelCfg.find((c) => c.levelNum === n)?.colorHex ?? DEFAULT_LEVEL_COLORS[n] ?? "#888";
   const lvlName = (n: number) =>
@@ -73,7 +77,6 @@ export function ComplianceClient({
   const lvlDesc = (n: number) =>
     levelCfg.find((c) => c.levelNum === n)?.description ?? "";
 
-  // ── derived data ─────────────────────────────────────────────────────────
   const domains = useMemo(() => {
     const s = new Set(reqs.map((r) => r.domain ?? "Other"));
     return Array.from(s).sort();
@@ -81,10 +84,16 @@ export function ComplianceClient({
 
   const standards = useMemo(() => {
     if (!selDomain) return [];
-    const s = new Set(
-      reqs.filter((r) => (r.domain ?? "Other") === selDomain).map(deriveStandard)
-    );
-    return Array.from(s).sort();
+    const seen = new Map<string, ComplianceRequirement>();
+    reqs
+      .filter((r) => (r.domain ?? "Other") === selDomain)
+      .forEach((r) => {
+        const k = deriveStandard(r);
+        if (!seen.has(k)) seen.set(k, r);
+      });
+    return Array.from(seen.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([std, rep]) => ({ std, question: rep.question }));
   }, [reqs, selDomain]);
 
   const questionsForView = useMemo(() => {
@@ -98,7 +107,7 @@ export function ComplianceClient({
   }, [reqs, selDomain, selStandard, selLevel]);
 
   const overallStats = useMemo(() => {
-    const total   = reqs.length;
+    const total    = reqs.length;
     const complete = reqs.filter((r) => r.submissionStatus === "COMPLETE").length;
     const na       = reqs.filter((r) => r.submissionStatus === "NA").length;
     const notDone  = total - complete - na;
@@ -106,21 +115,20 @@ export function ComplianceClient({
     return { total, complete, na, notDone, pct };
   }, [reqs]);
 
-  // stat helpers
   function domainStats(domain: string) {
-    const d = reqs.filter((r) => (r.domain ?? "Other") === domain);
-    const c = d.filter((r) => r.submissionStatus === "COMPLETE").length;
+    const d  = reqs.filter((r) => (r.domain ?? "Other") === domain);
+    const c  = d.filter((r) => r.submissionStatus === "COMPLETE").length;
     const na = d.filter((r) => r.submissionStatus === "NA").length;
     return { total: d.length, complete: c, na, pct: Math.round(((c + na) / Math.max(d.length, 1)) * 100) };
   }
   function standardStats(domain: string, std: string) {
-    const d = reqs.filter((r) => (r.domain ?? "Other") === domain && deriveStandard(r) === std);
-    const c = d.filter((r) => r.submissionStatus === "COMPLETE").length;
+    const d  = reqs.filter((r) => (r.domain ?? "Other") === domain && deriveStandard(r) === std);
+    const c  = d.filter((r) => r.submissionStatus === "COMPLETE").length;
     const na = d.filter((r) => r.submissionStatus === "NA").length;
     return { total: d.length, complete: c, na, pct: Math.round(((c + na) / Math.max(d.length, 1)) * 100) };
   }
   function levelStats(domain: string | null, std: string | null, ln: number) {
-    const d = reqs.filter(
+    const d  = reqs.filter(
       (r) =>
         (!domain || (r.domain ?? "Other") === domain) &&
         (!std    || deriveStandard(r) === std) &&
@@ -131,19 +139,17 @@ export function ComplianceClient({
     return { total: d.length, complete: c, na, pct: Math.round(((c + na) / Math.max(d.length, 1)) * 100) };
   }
 
-  // ── navigation ───────────────────────────────────────────────────────────
-  function selectDomain(d: string)  { setSelDomain(d); setSelStandard(null); setSelLevel(null); }
-  function selectStandard(s: string){ setSelStandard(s); setSelLevel(null); }
-  function resetAll()               { setSelDomain(null); setSelStandard(null); setSelLevel(null); }
-  function backToStandards()        { setSelStandard(null); setSelLevel(null); }
-  function backToLevels()           { setSelLevel(null); }
+  function selectDomain(d: string)   { setSelDomain(d); setSelStandard(null); setSelLevel(null); setExpanded(null); }
+  function selectStandard(s: string) { setSelStandard(s); setSelLevel(null); setExpanded(null); }
+  function resetAll()                { setSelDomain(null); setSelStandard(null); setSelLevel(null); setExpanded(null); }
+  function backToStandards()         { setSelStandard(null); setSelLevel(null); setExpanded(null); }
+  function backToLevels()            { setSelLevel(null); setExpanded(null); }
 
-  // ── API calls ────────────────────────────────────────────────────────────
   async function handleImport(file: File) {
     if (!fwId) return;
     setImporting(true); setImportMsg("");
     const fd = new FormData(); fd.append("file", file);
-    const res = await fetch(`/api/governance/compliance/${fwId}/import`, { method: "POST", body: fd });
+    const res  = await fetch(`/api/governance/compliance/${fwId}/import`, { method: "POST", body: fd });
     const data = await res.json();
     setImportMsg(res.ok ? `✓ Imported ${data.imported} requirements` : `✗ ${data.error ?? "Import failed"}`);
     setImporting(false);
@@ -162,6 +168,7 @@ export function ComplianceClient({
         submissionStatus:     merged.submissionStatus,
         evidentAdminOverride: merged.evidentAdminOverride,
         domainOwnerOverride:  merged.domainOwnerOverride,
+        managementNotes:      merged.managementNotes,
         comments:             merged.comments,
       }),
     });
@@ -187,12 +194,16 @@ export function ComplianceClient({
     setLevelCfg(rows); setCfgSaving(false);
   }
 
-  // ── render ───────────────────────────────────────────────────────────────
   const { total, complete, na, notDone, pct } = overallStats;
+
+  // Question text for selected standard (same for all rows of a standard)
+  const selectedQuestion = selStandard
+    ? (reqs.find((r) => deriveStandard(r) === selStandard)?.question ?? "")
+    : "";
 
   return (
     <div>
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-start justify-between mb-5 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-brand-deep">Compliance Assessment</h1>
@@ -215,7 +226,8 @@ export function ComplianceClient({
             <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
               onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])} />
           </label>
-          <button onClick={() => fwId && window.open(`/api/governance/compliance/${fwId}/export`, "_blank")}
+          <button
+            onClick={() => fwId && window.open(`/api/governance/compliance/${fwId}/export`, "_blank")}
             className="btn btn-sm btn-primary">
             Export Excel
           </button>
@@ -228,15 +240,15 @@ export function ComplianceClient({
         </div>
       )}
 
-      {/* ── Stats ── */}
+      {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <StatCard label="Total Requirements" value={total}    accent="#6366F1" />
         <StatCard label="Complete"           value={complete} accent="#10B981" />
-        <StatCard label="N/A"               value={na}       accent="#6B7280" />
-        <StatCard label="Not Complete"      value={notDone}  accent="#F59E0B" />
+        <StatCard label="N/A"                value={na}       accent="#6B7280" />
+        <StatCard label="Not Complete"       value={notDone}  accent="#F59E0B" />
       </div>
 
-      {/* ── Progress bar ── */}
+      {/* Progress bar */}
       <div className="card p-4 mb-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-semibold text-ink">Overall Progress</span>
@@ -253,7 +265,7 @@ export function ComplianceClient({
         </div>
       </div>
 
-      {/* ── Tabs ── */}
+      {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-line">
         {(["assessment","config"] as const).map((t) => (
           <button key={t} onClick={() => setActiveTab(t)}
@@ -267,7 +279,7 @@ export function ComplianceClient({
         ))}
       </div>
 
-      {/* ── Assessment tab ── */}
+      {/* Assessment tab */}
       {activeTab === "assessment" && (
         <>
           {reqs.length === 0 ? (
@@ -360,9 +372,8 @@ export function ComplianceClient({
                 <section>
                   <StepHeader n={2} label="Select a Standard" />
                   <div className="grid grid-cols-3 gap-4">
-                    {standards.map((std) => {
+                    {standards.map(({ std, question }) => {
                       const s = standardStats(selDomain, std);
-                      // mini level distribution
                       const lvlCounts = Array.from({ length: 6 }, (_, ln) => ({
                         ln, count: reqs.filter(
                           (r) => (r.domain ?? "Other") === selDomain &&
@@ -373,11 +384,13 @@ export function ComplianceClient({
                       return (
                         <button key={std} onClick={() => selectStandard(std)}
                           className="card p-5 text-left hover:shadow-md hover:border-brand-purple/60 transition-all group border border-line">
-                          <div className="flex items-start justify-between mb-3 gap-2">
-                            <div className="font-bold text-brand-deep group-hover:text-brand-purple text-sm leading-snug">{std}</div>
+                          <div className="flex items-start justify-between mb-1 gap-2">
+                            <div className="font-bold text-brand-deep group-hover:text-brand-purple text-sm font-mono">{std}</div>
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-canvas-soft text-ink-soft shrink-0">{s.total}</span>
                           </div>
-                          {/* Level distribution bar */}
+                          {question && (
+                            <p className="text-[11px] text-ink-soft mb-3 leading-snug line-clamp-2" dir="rtl">{question}</p>
+                          )}
                           <div className="h-2 rounded-full overflow-hidden flex mb-2 gap-px">
                             {lvlCounts.filter((l) => l.count > 0).map((l) => (
                               <div key={l.ln} className="h-full rounded-sm"
@@ -407,8 +420,15 @@ export function ComplianceClient({
               {selDomain && selStandard && selLevel === null && (
                 <section>
                   <StepHeader n={3} label="Select the Maturity Level" />
+                  {/* Show the standard question */}
+                  {selectedQuestion && (
+                    <div className="mb-5 p-4 bg-canvas-soft rounded-xl border border-line">
+                      <div className="text-[11px] uppercase tracking-wide text-muted font-semibold mb-1">{selStandard}</div>
+                      <p className="text-sm text-ink leading-relaxed" dir="rtl">{selectedQuestion}</p>
+                    </div>
+                  )}
                   <p className="text-sm text-ink-soft mb-5">
-                    Choose the level the organisation is currently at. Questions for the selected level will be displayed for assessment.
+                    Choose the level the organisation is currently at. Evidence items for the selected level will be displayed.
                   </p>
                   <div className="grid grid-cols-3 gap-4">
                     {[0, 1, 2, 3, 4, 5].map((ln) => {
@@ -423,9 +443,7 @@ export function ComplianceClient({
                           disabled={!hasSqs}
                           style={{ borderTop: `4px solid ${col}` }}
                           className={`card p-5 text-left transition-all border border-line rounded-xl ${
-                            hasSqs
-                              ? "hover:shadow-md cursor-pointer hover:border-brand-purple/40"
-                              : "opacity-35 cursor-not-allowed"
+                            hasSqs ? "hover:shadow-md cursor-pointer hover:border-brand-purple/40" : "opacity-35 cursor-not-allowed"
                           }`}>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-extrabold text-lg shrink-0"
@@ -436,7 +454,7 @@ export function ComplianceClient({
                           </div>
                           {desc && <p className="text-[12px] text-ink-soft mb-3 leading-snug line-clamp-2">{desc}</p>}
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-muted">{s.total} questions</span>
+                            <span className="text-muted">{s.total} items</span>
                             {hasSqs && (
                               <span className="font-semibold" style={{ color: s.pct > 0 ? "#10B981" : "#9CA3AF" }}>
                                 {s.pct}% done
@@ -455,32 +473,37 @@ export function ComplianceClient({
                 </section>
               )}
 
-              {/* Step 4 — Questions table */}
+              {/* Step 4 — Evidence items table */}
               {selDomain && selStandard && selLevel !== null && (
                 <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                        style={{ backgroundColor: lvlColor(selLevel) }}>
-                        {selLevel}
-                      </span>
-                      <div>
-                        <div className="font-bold text-brand-deep">{lvlName(selLevel)}</div>
-                        <div className="text-[12px] text-muted">{questionsForView.length} questions</div>
+                  {/* Question header */}
+                  {selectedQuestion && (
+                    <div className="mb-4 p-4 bg-canvas-soft rounded-xl border border-line">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[11px] font-mono font-bold text-muted">{selStandard}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-white"
+                          style={{ backgroundColor: lvlColor(selLevel) }}>
+                          Level {selLevel} · {lvlName(selLevel)}
+                        </span>
                       </div>
+                      <p className="text-sm text-ink leading-relaxed" dir="rtl">{selectedQuestion}</p>
                     </div>
+                  )}
+
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3 text-[12px] text-muted">
                       <span className="text-emerald-600 font-semibold">
                         {questionsForView.filter((r) => r.submissionStatus === "COMPLETE").length} complete
                       </span>
                       <span>{questionsForView.filter((r) => r.submissionStatus === "NOT_COMPLETE").length} pending</span>
                       <span className="text-gray-500">{questionsForView.filter((r) => r.submissionStatus === "NA").length} N/A</span>
+                      <span className="text-muted">· {questionsForView.length} evidence items</span>
                     </div>
                   </div>
 
                   {questionsForView.length === 0 ? (
                     <div className="card p-10 text-center text-ink-soft text-sm">
-                      No questions at this level for the selected standard.
+                      No evidence items at this level for the selected standard.
                     </div>
                   ) : (
                     <div className="card overflow-hidden">
@@ -488,8 +511,9 @@ export function ComplianceClient({
                         <table className="w-full text-sm min-w-[1100px]">
                           <thead>
                             <tr className="border-b border-line bg-canvas-soft text-left">
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Std. No.</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Question</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Evidence Code</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Supporting Evidence</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Type</th>
                               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Evident Admin</th>
                               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Domain Owner</th>
                               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Status</th>
@@ -502,26 +526,38 @@ export function ComplianceClient({
                               <>
                                 <tr key={req.reqId}
                                   className={`border-b border-line-soft ${saving === req.reqId ? "opacity-50" : "hover:bg-canvas/40"}`}>
-                                  {/* Req code */}
+                                  {/* Evidence Code */}
                                   <td className="px-3 py-3">
                                     <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded text-white"
                                       style={{ backgroundColor: lvlColor(selLevel) }}>
                                       {req.reqCode}
                                     </span>
-                                  </td>
-
-                                  {/* Question */}
-                                  <td className="px-3 py-3">
-                                    <div className="text-[13px] text-ink leading-snug">{req.question}</div>
-                                    {req.complianceOrMaturity && (
-                                      <div className="text-[10px] text-muted mt-0.5 font-medium">
-                                        {req.complianceOrMaturity}
-                                        {req.operationalExcellence ? ` · ${req.operationalExcellence}` : ""}
-                                      </div>
+                                    {req.directoryType && (
+                                      <div className="text-[10px] text-muted mt-1">{req.directoryType}</div>
                                     )}
                                   </td>
 
-                                  {/* Evident Admin — user picker */}
+                                  {/* Supporting Evidence */}
+                                  <td className="px-3 py-3">
+                                    <div className="text-[13px] text-ink leading-snug" dir="rtl">
+                                      {req.supportingEvidence || <span className="text-muted italic">—</span>}
+                                    </div>
+                                  </td>
+
+                                  {/* Compliance / Maturity type */}
+                                  <td className="px-3 py-3">
+                                    {req.complianceOrMaturity && (
+                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                        req.complianceOrMaturity.includes("امتثال") || req.complianceOrMaturity.toLowerCase().includes("compliance")
+                                          ? "bg-blue-100 text-blue-700"
+                                          : "bg-purple-100 text-purple-700"
+                                      }`}>
+                                        {req.complianceOrMaturity}
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  {/* Evident Admin */}
                                   <td className="px-3 py-3">
                                     <UserPicker
                                       value={req.evidentAdminOverride ?? req.evidentAdministrator ?? ""}
@@ -531,7 +567,7 @@ export function ComplianceClient({
                                     />
                                   </td>
 
-                                  {/* Domain Owner — user picker */}
+                                  {/* Domain Owner */}
                                   <td className="px-3 py-3">
                                     <UserPicker
                                       value={req.domainOwnerOverride ?? req.domainOwner ?? ""}
@@ -549,7 +585,7 @@ export function ComplianceClient({
                                     />
                                   </td>
 
-                                  {/* Evidence */}
+                                  {/* Evidence file */}
                                   <td className="px-3 py-3">
                                     <label className="relative cursor-pointer block">
                                       {req.evidenceName ? (
@@ -570,7 +606,8 @@ export function ComplianceClient({
 
                                   {/* Expand toggle */}
                                   <td className="px-2 py-3">
-                                    <button onClick={() => setExpanded(expanded === req.reqId ? null : req.reqId)}
+                                    <button
+                                      onClick={() => setExpanded(expanded === req.reqId ? null : req.reqId)}
                                       className="text-muted/60 hover:text-ink text-xs leading-none">
                                       {expanded === req.reqId ? "▲" : "▼"}
                                     </button>
@@ -580,22 +617,52 @@ export function ComplianceClient({
                                 {/* Expanded detail row */}
                                 {expanded === req.reqId && (
                                   <tr key={`${req.reqId}-exp`} className="border-b border-line-soft bg-canvas-soft/60">
-                                    <td colSpan={7} className="px-5 py-4">
-                                      <div className="grid grid-cols-3 gap-x-6 gap-y-3 text-[12px] mb-4">
-                                        {req.admissionCriteria     && <Field label="Admission Criteria"              value={req.admissionCriteria} />}
-                                        {req.supportingEvidence    && <Field label="Supporting Evidence"             value={req.supportingEvidence} />}
-                                        {req.directoryCode         && <Field label="Directory Code"                  value={req.directoryCode} />}
-                                        {req.directoryType         && <Field label="Directory Type"                  value={req.directoryType} />}
-                                        {req.operationalExcellence && <Field label="Operational Excellence"          value={req.operationalExcellence} />}
-                                        {req.managementSector      && <Field label="Management & Supporting Sector"  value={req.managementSector} />}
+                                    <td colSpan={8} className="px-5 py-4">
+                                      <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[12px] mb-4">
+                                        {req.admissionCriteria && (
+                                          <Field label="Admission Criteria" value={req.admissionCriteria} rtl />
+                                        )}
+                                        {req.directoryCode && (
+                                          <Field label="Evidence Code" value={req.directoryCode} />
+                                        )}
+                                        {req.directoryType && (
+                                          <Field label="Evidence Type" value={req.directoryType} />
+                                        )}
+                                        {req.operationalExcellence && req.operationalExcellence !== "N/A" && req.operationalExcellence !== "لا" && (
+                                          <Field label="Operational Excellence" value={req.operationalExcellence} />
+                                        )}
                                       </div>
-                                      <div>
+
+                                      {/* Management & Supporting Sector — editable */}
+                                      <div className="mb-4">
+                                        <label className="block text-[11px] font-semibold text-ink-soft mb-1">
+                                          Management &amp; Supporting Sector
+                                        </label>
+                                        {req.managementSector && !req.managementNotes && (
+                                          <p className="text-[11px] text-muted italic mb-1" dir="rtl">{req.managementSector}</p>
+                                        )}
+                                        <CommentEdit
+                                          value={req.managementNotes ?? ""}
+                                          placeholder="Enter management & supporting sector notes…"
+                                          onSave={(v) => patch(req, { managementNotes: v || null })}
+                                        />
+                                      </div>
+
+                                      {/* Comments */}
+                                      <div className="mb-4">
                                         <label className="block text-[11px] font-semibold text-ink-soft mb-1">Comments</label>
                                         <CommentEdit
                                           value={req.comments ?? ""}
+                                          placeholder="Add comments…"
                                           onSave={(v) => patch(req, { comments: v || null })}
                                         />
                                       </div>
+
+                                      {/* Change History */}
+                                      <HistoryPanel
+                                        reqId={req.reqId}
+                                        fwId={fwId ?? 0}
+                                      />
                                     </td>
                                   </tr>
                                 )}
@@ -613,7 +680,7 @@ export function ComplianceClient({
         </>
       )}
 
-      {/* ── Configuration tab ── */}
+      {/* Configuration tab */}
       {activeTab === "config" && (
         <ConfigTab
           levelCfg={levelCfg}
@@ -621,6 +688,103 @@ export function ComplianceClient({
           onSave={saveCfg}
           saving={cfgSaving}
         />
+      )}
+    </div>
+  );
+}
+
+// ── History panel ─────────────────────────────────────────────────────────────
+type HistoryEntry = {
+  historyId:  number;
+  fieldName:  string;
+  fieldLabel: string;
+  oldValue:   string | null;
+  newValue:   string | null;
+  changedBy:  string;
+  changedAt:  string;
+};
+
+function HistoryPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
+  const [history, setHistory]     = useState<HistoryEntry[] | null>(null);
+  const [loading, setLoading]     = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  async function load() {
+    if (loading) return;
+    setLoading(true);
+    const res  = await fetch(`/api/governance/compliance/${fwId}/history/${reqId}`);
+    const data = await res.json();
+    setHistory(data.history ?? []);
+    setLoading(false);
+  }
+
+  function toggle() {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && history === null) load();
+  }
+
+  function formatDate(iso: string) {
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      }).format(new Date(iso));
+    } catch { return iso; }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={toggle}
+        className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-purple hover:text-brand-deep transition-colors mb-2">
+        <span>{showHistory ? "▲" : "▼"}</span>
+        Change History {history !== null ? `(${history.length})` : ""}
+      </button>
+
+      {showHistory && (
+        <div className="border border-line rounded-lg overflow-hidden">
+          {loading && (
+            <div className="px-4 py-3 text-[12px] text-muted italic">Loading history…</div>
+          )}
+          {!loading && history !== null && history.length === 0 && (
+            <div className="px-4 py-3 text-[12px] text-muted italic">No changes recorded yet.</div>
+          )}
+          {!loading && history !== null && history.length > 0 && (
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="bg-canvas-soft border-b border-line text-left">
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Date</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Field</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Previous Value</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">New Value</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Changed By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.historyId} className="border-b border-line-soft hover:bg-canvas/30">
+                    <td className="px-3 py-2 text-muted whitespace-nowrap">{formatDate(h.changedAt)}</td>
+                    <td className="px-3 py-2 font-semibold text-ink">{h.fieldLabel}</td>
+                    <td className="px-3 py-2 text-muted/80 max-w-[180px] truncate" title={h.oldValue ?? ""}>
+                      {h.oldValue ? (
+                        <span className="line-through">{h.oldValue.length > 40 ? h.oldValue.slice(0, 38) + "…" : h.oldValue}</span>
+                      ) : (
+                        <span className="italic text-muted/50">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-ink max-w-[180px] truncate" title={h.newValue ?? ""}>
+                      {h.newValue
+                        ? (h.newValue.length > 40 ? h.newValue.slice(0, 38) + "…" : h.newValue)
+                        : <span className="italic text-muted/50">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-muted whitespace-nowrap">{h.changedBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );
@@ -641,7 +805,6 @@ function ConfigTab({
 
   return (
     <div className="space-y-8">
-      {/* Level config */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -649,8 +812,7 @@ function ConfigTab({
             <p className="text-sm text-ink-soft">Customise names, colours, and descriptions for each maturity level.</p>
           </div>
           {dirty && (
-            <button onClick={() => onSave(rows)} disabled={saving}
-              className="btn btn-primary btn-sm">
+            <button onClick={() => onSave(rows)} disabled={saving} className="btn btn-primary btn-sm">
               {saving ? "Saving…" : "Save Changes"}
             </button>
           )}
@@ -696,10 +858,9 @@ function ConfigTab({
         </div>
       </div>
 
-      {/* Status reference */}
       <div>
         <h2 className="font-bold text-brand-deep mb-1">Submission Statuses</h2>
-        <p className="text-sm text-ink-soft mb-4">Fixed statuses used for each requirement assessment.</p>
+        <p className="text-sm text-ink-soft mb-4">Fixed statuses used for each evidence item.</p>
         <div className="grid grid-cols-3 gap-4">
           {STATUSES.map((s) => (
             <div key={s.code} className="card p-4 flex items-center gap-3">
@@ -733,7 +894,7 @@ function UserPicker({ value, users, placeholder, onSave }: {
   if (!editing) {
     return (
       <button onClick={() => { setSearch(""); setEditing(true); }}
-        className="text-[12px] text-left w-full truncate block text-ink hover:text-brand-purple transition-colors group">
+        className="text-[12px] text-left w-full truncate block text-ink hover:text-brand-purple transition-colors">
         {value
           ? <span className="flex items-center gap-1.5"><UserIcon />{value}</span>
           : <span className="text-muted/50 italic">{placeholder}</span>}
@@ -796,13 +957,17 @@ function StatusSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-// ── Comment edit ──────────────────────────────────────────────────────────────
-function CommentEdit({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+// ── Comment / text edit ───────────────────────────────────────────────────────
+function CommentEdit({ value, onSave, placeholder }: {
+  value: string; onSave: (v: string) => void; placeholder?: string;
+}) {
   const [val, setVal] = useState(value);
+  // sync if parent updates
+  useEffect(() => { setVal(value); }, [value]);
   return (
     <div className="flex items-end gap-2">
       <textarea value={val} onChange={(e) => setVal(e.target.value)} rows={2}
-        className="field text-[12px] flex-1" placeholder="Add comments…" />
+        className="field text-[12px] flex-1" placeholder={placeholder ?? "Add notes…"} />
       {val !== value && (
         <button onClick={() => onSave(val)} className="btn btn-sm btn-primary text-[11px] mb-0.5 shrink-0">Save</button>
       )}
@@ -835,11 +1000,11 @@ function Dot({ hex, label }: { hex: string; label: string }) {
     </span>
   );
 }
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, rtl }: { label: string; value: string; rtl?: boolean }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted mb-0.5 font-semibold">{label}</div>
-      <div className="text-ink text-[12px] leading-snug">{value}</div>
+      <div className="text-ink text-[12px] leading-snug" dir={rtl ? "rtl" : undefined}>{value}</div>
     </div>
   );
 }

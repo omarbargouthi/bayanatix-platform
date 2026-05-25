@@ -10,6 +10,7 @@ export async function POST(req: Request) {
     submissionStatus:     body.submissionStatus,
     evidentAdminOverride: body.evidentAdminOverride ?? null,
     domainOwnerOverride:  body.domainOwnerOverride  ?? null,
+    managementNotes:      body.managementNotes      ?? null,
     comments:             body.comments             ?? null,
     assessedBy:           session.userId,
   });

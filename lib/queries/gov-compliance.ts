@@ -37,6 +37,7 @@ export type ComplianceRequirement = {
   submissionStatus:      string;   // COMPLETE | NOT_COMPLETE | NA
   evidentAdminOverride:  string | null;
   domainOwnerOverride:   string | null;
+  managementNotes:       string | null;
   comments:              string | null;
   evidenceName:          string | null;
   assessedBy:            string | null;
@@ -120,6 +121,7 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       COALESCE(a.submission_status, 'NOT_COMPLETE') AS "submissionStatus",
       a.evident_admin_override  AS "evidentAdminOverride",
       a.domain_owner_override   AS "domainOwnerOverride",
+      a.management_notes        AS "managementNotes",
       a.comments,
       a.evidence_name           AS "evidenceName",
       a.assessed_by             AS "assessedBy",
@@ -170,17 +172,32 @@ export async function upsertAssessment(reqId: number, fields: {
   submissionStatus?: string;
   evidentAdminOverride?: string | null;
   domainOwnerOverride?: string | null;
+  managementNotes?: string | null;
   comments?: string | null;
   assessedBy: string;
 }): Promise<void> {
+  // Capture old values for history before updating
+  const existing = await sql<{
+    submission_status: string;
+    evident_admin_override: string | null;
+    domain_owner_override: string | null;
+    management_notes: string | null;
+    comments: string | null;
+  }[]>`
+    SELECT submission_status, evident_admin_override, domain_owner_override, management_notes, comments
+    FROM bayanat.gov_compliance_assessments WHERE req_id = ${reqId}
+  `;
+  const prev = existing[0] ?? null;
+
   await sql`
     INSERT INTO bayanat.gov_compliance_assessments
-      (req_id, submission_status, evident_admin_override, domain_owner_override, comments, assessed_by, assessed_at)
+      (req_id, submission_status, evident_admin_override, domain_owner_override, management_notes, comments, assessed_by, assessed_at)
     VALUES (
       ${reqId},
       ${fields.submissionStatus ?? 'NOT_COMPLETE'},
       ${fields.evidentAdminOverride ?? null},
       ${fields.domainOwnerOverride  ?? null},
+      ${fields.managementNotes      ?? null},
       ${fields.comments             ?? null},
       ${fields.assessedBy},
       NOW()
@@ -189,10 +206,35 @@ export async function upsertAssessment(reqId: number, fields: {
       submission_status      = COALESCE(EXCLUDED.submission_status,      gov_compliance_assessments.submission_status),
       evident_admin_override = EXCLUDED.evident_admin_override,
       domain_owner_override  = EXCLUDED.domain_owner_override,
+      management_notes       = EXCLUDED.management_notes,
       comments               = EXCLUDED.comments,
       assessed_by            = EXCLUDED.assessed_by,
       assessed_at            = NOW()
   `;
+
+  // Write history for each changed field
+  const req = await sql<{ framework_id: number }[]>`
+    SELECT framework_id FROM bayanat.gov_compliance_requirements WHERE req_id = ${reqId}
+  `;
+  const fwId = req[0]?.framework_id ?? 0;
+
+  const changes: Array<{ field: string; old: string | null; nw: string | null }> = [
+    { field: "submissionStatus",      old: prev?.submission_status      ?? null, nw: fields.submissionStatus      ?? null },
+    { field: "evidentAdminOverride",  old: prev?.evident_admin_override  ?? null, nw: fields.evidentAdminOverride  ?? null },
+    { field: "domainOwnerOverride",   old: prev?.domain_owner_override   ?? null, nw: fields.domainOwnerOverride   ?? null },
+    { field: "managementNotes",       old: prev?.management_notes        ?? null, nw: fields.managementNotes       ?? null },
+    { field: "comments",              old: prev?.comments                ?? null, nw: fields.comments              ?? null },
+  ];
+
+  for (const c of changes) {
+    if (c.old !== c.nw && (c.old !== null || c.nw !== null)) {
+      await sql`
+        INSERT INTO bayanat.gov_compliance_history
+          (req_id, framework_id, field_name, old_value, new_value, changed_by)
+        VALUES (${reqId}, ${fwId}, ${c.field}, ${c.old}, ${c.nw}, ${fields.assessedBy})
+      `;
+    }
+  }
 }
 
 export async function attachEvidence(reqId: number, fileName: string, fileData: Buffer): Promise<void> {
@@ -282,3 +324,40 @@ export async function listDomains(frameworkId: number): Promise<string[]> {
   `;
   return rows.map((r) => r.domain);
 }
+
+// ── History ──────────────────────────────────────────────────────────────────
+
+export type HistoryEntry = {
+  historyId:  number;
+  fieldName:  string;
+  oldValue:   string | null;
+  newValue:   string | null;
+  changedBy:  string;
+  changedAt:  string;
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  submissionStatus:     "Submission Status",
+  evidentAdminOverride: "Evident Administrator",
+  domainOwnerOverride:  "Domain Owner",
+  managementNotes:      "Management & Supporting Sector",
+  comments:             "Comments",
+  evidenceFile:         "Evidence File",
+};
+
+export async function getRequirementHistory(reqId: number): Promise<HistoryEntry[]> {
+  return sql<HistoryEntry[]>`
+    SELECT
+      history_id AS "historyId",
+      field_name AS "fieldName",
+      old_value  AS "oldValue",
+      new_value  AS "newValue",
+      changed_by AS "changedBy",
+      changed_at::text AS "changedAt"
+    FROM bayanat.gov_compliance_history
+    WHERE req_id = ${reqId}
+    ORDER BY changed_at DESC
+  `;
+}
+
+export { FIELD_LABELS };
