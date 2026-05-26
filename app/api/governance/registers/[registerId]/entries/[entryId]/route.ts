@@ -6,13 +6,13 @@ export async function PATCH(req: Request, { params }: { params: { entryId: strin
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data } = await req.json();
-  await updateEntry(Number(params.entryId), data);
+  await updateEntry(Number(params.entryId), data, session.userId);
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_req: Request, { params }: { params: { entryId: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  await deleteEntry(Number(params.entryId));
+  await deleteEntry(Number(params.entryId), session.userId);
   return NextResponse.json({ ok: true });
 }

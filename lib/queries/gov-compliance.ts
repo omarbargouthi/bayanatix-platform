@@ -48,12 +48,14 @@ export type ComplianceRequirement = {
 };
 
 export type LevelConfig = {
-  configId:    number;
-  frameworkId: number;
-  levelNum:    number;
-  name:        string;
-  colorHex:    string;
-  description: string | null;
+  configId:      number;
+  frameworkId:   number;
+  levelNum:      number;
+  name:          string;
+  colorHex:      string;
+  description:   string | null;
+  nameAr:        string | null;
+  descriptionAr: string | null;
 };
 
 export type UserOption = {
@@ -514,23 +516,25 @@ export async function getRequirementHistory(reqId: number): Promise<HistoryEntry
 export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]> {
   const rows = await sql<LevelConfig[]>`
     SELECT
-      config_id    AS "configId",
-      framework_id AS "frameworkId",
-      level_num    AS "levelNum",
+      config_id      AS "configId",
+      framework_id   AS "frameworkId",
+      level_num      AS "levelNum",
       name,
-      color_hex    AS "colorHex",
-      description
+      color_hex      AS "colorHex",
+      description,
+      name_ar        AS "nameAr",
+      description_ar AS "descriptionAr"
     FROM bayanat.gov_compliance_level_config
     WHERE framework_id = ${frameworkId}
     ORDER BY level_num
   `;
   const defaults = [
-    { name: "No Capability", colorHex: "#D84848", description: "" },
-    { name: "Build",         colorHex: "#E88030", description: "" },
-    { name: "Definition",    colorHex: "#2D4AA0", description: "" },
-    { name: "Activation",    colorHex: "#3D7EC8", description: "" },
-    { name: "Managed",       colorHex: "#1E8C76", description: "" },
-    { name: "Innovation",    colorHex: "#5CA85C", description: "" },
+    { name: "No Capability", colorHex: "#D84848", description: "", nameAr: null, descriptionAr: null },
+    { name: "Build",         colorHex: "#E88030", description: "", nameAr: null, descriptionAr: null },
+    { name: "Definition",    colorHex: "#2D4AA0", description: "", nameAr: null, descriptionAr: null },
+    { name: "Activation",    colorHex: "#3D7EC8", description: "", nameAr: null, descriptionAr: null },
+    { name: "Managed",       colorHex: "#1E8C76", description: "", nameAr: null, descriptionAr: null },
+    { name: "Innovation",    colorHex: "#5CA85C", description: "", nameAr: null, descriptionAr: null },
   ];
   return Array.from({ length: 6 }, (_, i) => {
     const existing = rows.find((r) => r.levelNum === i);
@@ -540,17 +544,20 @@ export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]
 
 export async function saveLevelConfig(
   frameworkId: number,
-  levels: Array<{ levelNum: number; name: string; colorHex: string; description: string | null }>
+  levels: Array<{ levelNum: number; name: string; colorHex: string; description: string | null; nameAr: string | null; descriptionAr: string | null }>
 ): Promise<void> {
   for (const l of levels) {
     await sql`
       INSERT INTO bayanat.gov_compliance_level_config
-        (framework_id, level_num, name, color_hex, description)
-      VALUES (${frameworkId}, ${l.levelNum}, ${l.name}, ${l.colorHex}, ${l.description ?? null})
+        (framework_id, level_num, name, color_hex, description, name_ar, description_ar)
+      VALUES (${frameworkId}, ${l.levelNum}, ${l.name}, ${l.colorHex}, ${l.description ?? null},
+              ${l.nameAr ?? null}, ${l.descriptionAr ?? null})
       ON CONFLICT (framework_id, level_num) DO UPDATE SET
-        name        = EXCLUDED.name,
-        color_hex   = EXCLUDED.color_hex,
-        description = EXCLUDED.description
+        name           = EXCLUDED.name,
+        color_hex      = EXCLUDED.color_hex,
+        description    = EXCLUDED.description,
+        name_ar        = EXCLUDED.name_ar,
+        description_ar = EXCLUDED.description_ar
     `;
   }
 }

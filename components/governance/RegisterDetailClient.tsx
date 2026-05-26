@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import type { GovRegister, RegisterColumn, RegisterEntry } from "@/lib/queries/gov-registers";
+import { useState, useCallback, useEffect } from "react";
+import type { GovRegister, RegisterColumn, RegisterEntry, RegisterEntryHistory } from "@/lib/queries/gov-registers";
 
 type Props = {
   register:       GovRegister;
@@ -12,10 +12,32 @@ type Props = {
 
 const DATA_TYPES = ["TEXT","NUMBER","DATE","SELECT","BOOLEAN","URL","EMAIL"];
 
+function fmtDate(iso: string) {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    }).format(new Date(iso));
+  } catch { return iso; }
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  CREATE: "Created",
+  UPDATE: "Updated",
+  DELETE: "Deleted",
+};
+const ACTION_COLOR: Record<string, string> = {
+  CREATE: "bg-emerald-50 text-emerald-700",
+  UPDATE: "bg-blue-50 text-blue-700",
+  DELETE: "bg-red-50 text-red-700",
+};
+
 export function RegisterDetailClient({ register, initialColumns, initialEntries, isAdmin }: Props) {
   const [columns, setColumns]       = useState<RegisterColumn[]>(initialColumns);
   const [entries, setEntries]       = useState<RegisterEntry[]>(initialEntries);
-  const [activeTab, setActiveTab]   = useState<"entries" | "columns">("entries");
+  const [activeTab, setActiveTab]   = useState<"entries" | "columns" | "history">("entries");
+  const [history, setHistory]       = useState<RegisterEntryHistory[] | null>(null);
+  const [histLoading, setHistLoading] = useState(false);
 
   // Entry state
   const [entryModal, setEntryModal] = useState(false);
@@ -38,6 +60,17 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
     const r = await fetch(`/api/governance/registers/${register.registerId}/entries`);
     setEntries(await r.json());
   }, [register.registerId]);
+
+  const refreshHistory = useCallback(async () => {
+    setHistLoading(true);
+    const r = await fetch(`/api/governance/registers/${register.registerId}/history`);
+    setHistory(await r.json());
+    setHistLoading(false);
+  }, [register.registerId]);
+
+  useEffect(() => {
+    if (activeTab === "history" && history === null) refreshHistory();
+  }, [activeTab, history, refreshHistory]);
 
   // ── Entry CRUD ──
   function openNewEntry() {
@@ -71,6 +104,7 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
       });
     }
     await refreshEntries();
+    setHistory(null); // invalidate history so it reloads next time
     setEntryModal(false);
     setSavingEntry(false);
   }
@@ -78,6 +112,7 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
     if (!confirm("Delete this entry?")) return;
     await fetch(`/api/governance/registers/${register.registerId}/entries/${id}`, { method: "DELETE" });
     setEntries((p) => p.filter((e) => e.entryId !== id));
+    setHistory(null); // invalidate history
   }
 
   // ── Column CRUD ──
@@ -125,22 +160,25 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
           <h1 className="text-2xl font-bold text-brand-deep">{register.name}</h1>
           {register.description && <p className="text-sm text-ink-soft mt-0.5">{register.description}</p>}
         </div>
-        {activeTab === "entries" && (
+        {activeTab === "entries" && isAdmin && (
           <button onClick={openNewEntry} className="btn btn-primary">+ Add Entry</button>
         )}
-        {activeTab === "columns" && (
+        {activeTab === "columns" && isAdmin && (
           <button onClick={openNewCol} className="btn btn-primary">+ Add Column</button>
+        )}
+        {activeTab === "history" && history !== null && history.length > 0 && (
+          <button onClick={refreshHistory} className="btn btn-sm">Refresh</button>
         )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-line mb-5">
-        {(["entries", "columns"] as const).map((tab) => (
+        {(["entries", "columns", "history"] as const).map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 capitalize ${
               activeTab === tab ? "text-brand-purple border-brand-purple" : "text-ink-soft border-transparent hover:text-brand-purple"
             }`}>
-            {tab === "entries" ? `Entries (${entries.length})` : `Configure Columns (${columns.length})`}
+            {tab === "entries" ? `Entries (${entries.length})` : tab === "columns" ? `Columns (${columns.length})` : "History"}
           </button>
         ))}
       </div>
@@ -229,6 +267,54 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* History tab */}
+      {activeTab === "history" && (
+        <div className="card overflow-hidden">
+          {histLoading && (
+            <div className="py-10 text-center text-sm text-muted">Loading history…</div>
+          )}
+          {!histLoading && history !== null && history.length === 0 && (
+            <div className="py-14 text-center">
+              <div className="text-3xl mb-2">📜</div>
+              <p className="text-sm text-ink-soft">No changes recorded yet.</p>
+            </div>
+          )}
+          {!histLoading && history !== null && history.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-canvas-soft border-b border-line text-left">
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Date</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Action</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Entry #</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Changed By</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Summary</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => {
+                  const data = h.action === "DELETE" ? h.oldData : h.newData;
+                  const firstVal = data ? Object.values(data).find((v) => v != null && v !== "") : null;
+                  const summary = firstVal != null ? String(firstVal).slice(0, 60) : "—";
+                  return (
+                    <tr key={h.historyId} className="border-b border-line-soft hover:bg-canvas/30">
+                      <td className="px-4 py-2.5 text-muted whitespace-nowrap text-[12px]">{fmtDate(h.changedAt)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ACTION_COLOR[h.action] ?? "bg-gray-50 text-gray-600"}`}>
+                          {ACTION_LABEL[h.action] ?? h.action}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-[11px] text-muted">#{h.entryId}</td>
+                      <td className="px-4 py-2.5 text-[12px] text-ink">{h.changedBy ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-[12px] text-ink-soft max-w-[300px] truncate" title={summary}>{summary}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 

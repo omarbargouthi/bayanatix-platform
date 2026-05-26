@@ -30,6 +30,17 @@ export type RegisterEntry = {
   createdBy:  string | null;
 };
 
+export type RegisterEntryHistory = {
+  historyId:  number;
+  registerId: number;
+  entryId:    number;
+  action:     string;
+  changedBy:  string | null;
+  changedAt:  string;
+  oldData:    Record<string, unknown> | null;
+  newData:    Record<string, unknown> | null;
+};
+
 export async function listRegisters(): Promise<GovRegister[]> {
   return sql<GovRegister[]>`
     SELECT
@@ -139,16 +150,58 @@ export async function listEntries(registerId: number): Promise<RegisterEntry[]> 
 export async function createEntry(registerId: number, data: Record<string, unknown>, createdBy: string): Promise<number> {
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_register_entries (register_id, data, created_by)
-    VALUES (${registerId}, ${JSON.stringify(data)}, ${createdBy})
+    VALUES (${registerId}, ${JSON.stringify(data)}::jsonb, ${createdBy})
     RETURNING entry_id AS id
   `;
-  return rows[0].id;
+  const id = rows[0].id;
+  await sql`
+    INSERT INTO bayanat.gov_register_entry_history (register_id, entry_id, action, changed_by, new_data)
+    VALUES (${registerId}, ${id}, 'CREATE', ${createdBy}, ${JSON.stringify(data)}::jsonb)
+  `;
+  return id;
 }
 
-export async function updateEntry(entryId: number, data: Record<string, unknown>): Promise<void> {
-  await sql`UPDATE bayanat.gov_register_entries SET data=${JSON.stringify(data)}, updated_at=NOW() WHERE entry_id=${entryId}`;
+export async function updateEntry(entryId: number, data: Record<string, unknown>, changedBy?: string): Promise<void> {
+  const [old] = await sql<{ data: unknown; registerId: number }[]>`
+    SELECT data, register_id AS "registerId" FROM bayanat.gov_register_entries WHERE entry_id = ${entryId}
+  `;
+  await sql`UPDATE bayanat.gov_register_entries SET data=${JSON.stringify(data)}::jsonb, updated_at=NOW() WHERE entry_id=${entryId}`;
+  if (old) {
+    await sql`
+      INSERT INTO bayanat.gov_register_entry_history (register_id, entry_id, action, changed_by, old_data, new_data)
+      VALUES (${old.registerId}, ${entryId}, 'UPDATE', ${changedBy ?? null},
+              ${JSON.stringify(old.data)}::jsonb, ${JSON.stringify(data)}::jsonb)
+    `;
+  }
 }
 
-export async function deleteEntry(entryId: number): Promise<void> {
+export async function deleteEntry(entryId: number, changedBy?: string): Promise<void> {
+  const [old] = await sql<{ data: unknown; registerId: number }[]>`
+    SELECT data, register_id AS "registerId" FROM bayanat.gov_register_entries WHERE entry_id = ${entryId}
+  `;
   await sql`DELETE FROM bayanat.gov_register_entries WHERE entry_id=${entryId}`;
+  if (old) {
+    await sql`
+      INSERT INTO bayanat.gov_register_entry_history (register_id, entry_id, action, changed_by, old_data)
+      VALUES (${old.registerId}, ${entryId}, 'DELETE', ${changedBy ?? null}, ${JSON.stringify(old.data)}::jsonb)
+    `;
+  }
+}
+
+export async function getRegisterHistory(registerId: number): Promise<RegisterEntryHistory[]> {
+  return sql<RegisterEntryHistory[]>`
+    SELECT
+      h.history_id  AS "historyId",
+      h.register_id AS "registerId",
+      h.entry_id    AS "entryId",
+      h.action,
+      h.changed_by  AS "changedBy",
+      h.changed_at::text AS "changedAt",
+      h.old_data    AS "oldData",
+      h.new_data    AS "newData"
+    FROM bayanat.gov_register_entry_history h
+    WHERE h.register_id = ${registerId}
+    ORDER BY h.changed_at DESC
+    LIMIT 200
+  `;
 }

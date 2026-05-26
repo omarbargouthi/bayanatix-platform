@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
@@ -44,10 +44,20 @@ const NAV_ADMIN: Item[] = [
   { href: "/admin/configuration",   label: "Configuration",   Icon: IconCog },
 ];
 
+const NAV_COMPLIANCE_ADMIN: Item[] = [
+  { href: "/governance/compliance?tab=config", label: "Configuration",   Icon: IconCog },
+  { href: "/governance/compliance?tab=admin",  label: "Administration",  Icon: IconShield },
+];
+
 export function Sidebar({ user }: { user: SessionUser }) {
   const { collapsed } = useSidebar();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  function isComplianceAdminActive(href: string) {
+    const tab = href.includes("tab=config") ? "config" : "admin";
+    return pathname.includes("/governance/compliance") && searchParams.get("tab") === tab;
+  }
 
   return (
     <aside className="sticky top-0 h-screen shrink-0 z-30 flex flex-col bg-white border-r border-line overflow-hidden">
@@ -91,9 +101,17 @@ export function Sidebar({ user }: { user: SessionUser }) {
                 collapsed={collapsed}
               />
             ) : (
-              NAV_ADMIN.map((it) => (
-                <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={false} indent />
-              ))
+              <>
+                {NAV_ADMIN.map((it) => (
+                  <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={false} indent />
+                ))}
+                <div className="px-3 pt-3 pb-0.5 text-[9px] tracking-[0.14em] uppercase text-muted font-semibold pl-7">
+                  Compliance
+                </div>
+                {NAV_COMPLIANCE_ADMIN.map((it) => (
+                  <NavLink key={it.href} item={it} active={isComplianceAdminActive(it.href)} collapsed={false} indent />
+                ))}
+              </>
             )}
           </>
         )}

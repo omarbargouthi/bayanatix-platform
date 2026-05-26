@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ComplianceFramework, ComplianceRequirement,
   LevelConfig, UserOption, ConfigItem, MaturitySelection,
@@ -68,13 +68,17 @@ export function ComplianceClient({
   users, initialMaturitySelections, initialConfigItems, currentUser,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [reqs, setReqs]                 = useState<ComplianceRequirement[]>(initialRequirements);
   const [levelCfg, setLevelCfg]         = useState<LevelConfig[]>(initialLevelConfig);
   const [configItems, setConfigItems]   = useState<ConfigItem[]>(initialConfigItems);
   const [maturitySels, setMaturitySels] = useState<Record<string, number>>(
     Object.fromEntries(initialMaturitySelections.map((s) => [s.standardCode, s.selectedLevel]))
   );
-  const [activeTab, setActiveTab]       = useState<"assessment"|"config"|"admin">("assessment");
+  const initTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"assessment"|"config"|"admin">(
+    initTab === "config" || initTab === "admin" ? initTab : "assessment"
+  );
   const [selDomain, setSelDomain]       = useState<string | null>(null);
   const [selStandard, setSelStandard]   = useState<string | null>(null);
   const [selLevel, setSelLevel]         = useState<number | null>(null);
@@ -424,16 +428,21 @@ export function ComplianceClient({
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — config/admin accessed via Admin sidebar menu */}
       <div className="flex gap-1 mb-6 border-b border-line">
-        {(["assessment","config","admin"] as const).map((t) => (
-          <button key={t} onClick={() => setActiveTab(t)}
-            className={`px-4 py-2 text-sm font-semibold capitalize transition-colors border-b-2 -mb-px ${
-              activeTab === t ? "border-brand-purple text-brand-purple" : "border-transparent text-ink-soft hover:text-ink"
-            }`}>
-            {t === "assessment" ? "Assessment" : t === "config" ? "Configuration" : "Administration"}
+        <button onClick={() => setActiveTab("assessment")}
+          className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+            activeTab === "assessment" ? "border-brand-purple text-brand-purple" : "border-transparent text-ink-soft hover:text-ink"
+          }`}>
+          Assessment
+        </button>
+        {(activeTab === "config" || activeTab === "admin") && (
+          <button
+            className="px-4 py-2 text-sm font-semibold border-b-2 border-brand-purple text-brand-purple -mb-px"
+          >
+            {activeTab === "config" ? "Configuration" : "Administration"}
           </button>
-        ))}
+        )}
       </div>
 
       {/* ── Assessment ─────────────────────────────────────────────────────── */}
@@ -973,7 +982,7 @@ function EvidenceExpanded({
       {/* Workflow section */}
       <div className="border border-line rounded-xl p-4 bg-white">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-[11px] font-semibold text-ink-soft uppercase tracking-wide">Workflow</div>
+          <div className="text-[11px] font-semibold text-ink-soft uppercase tracking-wide">Approve Workflow</div>
           <WorkflowBadge status={status} />
         </div>
         {req.endorsedBy && req.endorsedAt && (
@@ -1219,14 +1228,16 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
             </button>
           )}
         </div>
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="card overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-line bg-canvas-soft text-left">
-                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Level</th>
-                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-16">Colour</th>
-                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-44">Name</th>
-                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Description</th>
+                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-16">Level</th>
+                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-12">Colour</th>
+                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Name (EN)</th>
+                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">الاسم (AR)</th>
+                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Description (EN)</th>
+                <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الوصف (AR)</th>
               </tr>
             </thead>
             <tbody>
@@ -1243,12 +1254,21 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
                   </td>
                   <td className="px-4 py-2.5">
                     <input value={row.name} onChange={(e) => update(row.levelNum, "name", e.target.value)}
-                      className="field text-sm w-full" />
+                      className="field text-sm w-full" placeholder="Level name…" />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input value={row.nameAr ?? ""} onChange={(e) => update(row.levelNum, "nameAr", e.target.value)}
+                      className="field text-sm w-full text-right" dir="rtl" placeholder="اسم المستوى…" />
                   </td>
                   <td className="px-4 py-2.5">
                     <input value={row.description ?? ""}
                       onChange={(e) => update(row.levelNum, "description", e.target.value)}
                       className="field text-sm w-full" placeholder="Brief description…" />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input value={row.descriptionAr ?? ""}
+                      onChange={(e) => update(row.levelNum, "descriptionAr", e.target.value)}
+                      className="field text-sm w-full text-right" dir="rtl" placeholder="وصف مختصر…" />
                   </td>
                 </tr>
               ))}
