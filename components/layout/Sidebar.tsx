@@ -45,8 +45,8 @@ const NAV_ADMIN: Item[] = [
 ];
 
 const NAV_COMPLIANCE_ADMIN: Item[] = [
-  { href: "/governance/compliance?tab=config", label: "Configuration",   Icon: IconCog },
-  { href: "/governance/compliance?tab=admin",  label: "Administration",  Icon: IconShield },
+  { href: "/governance/compliance?tab=config", label: "Configuration", Icon: IconCog },
+  { href: "/governance/compliance?tab=admin",  label: "Index Setup",   Icon: IconShield },
 ];
 
 export function Sidebar({ user }: { user: SessionUser }) {

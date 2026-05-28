@@ -476,7 +476,7 @@ export function ComplianceClient({
           <button
             className="px-4 py-2 text-sm font-semibold border-b-2 border-brand-purple text-brand-purple -mb-px"
           >
-            {activeTab === "config" ? "Configuration" : "Administration"}
+            {activeTab === "config" ? "Configuration" : "Index Setup"}
           </button>
         )}
       </div>
@@ -1472,11 +1472,12 @@ function ConfigItemsSection({ group, frameworkId, items, onUpdate }: {
 
 // ── Administration tab ────────────────────────────────────────────────────────
 function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOption[] }) {
-  const [reqs,    setReqs]    = useState<ComplianceRequirement[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [q,       setQ]       = useState("");
-  const [editing, setEditing] = useState<ComplianceRequirement | null>(null);
-  const [saving,  setSaving]  = useState(false);
+  const [reqs,        setReqs]        = useState<ComplianceRequirement[] | null>(null);
+  const [loading,     setLoading]     = useState(false);
+  const [translating, setTranslating] = useState(0); // count of in-flight translations
+  const [q,           setQ]           = useState("");
+  const [editing,     setEditing]     = useState<ComplianceRequirement | null>(null);
+  const [saving,      setSaving]      = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -1486,13 +1487,51 @@ function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOpti
       .catch(() => setLoading(false));
   }, [frameworkId]);
 
+  // Auto-translate Arabic fields where English is missing
+  useEffect(() => {
+    if (!reqs || reqs.length === 0) return;
+    const missing = reqs.filter(
+      (r) => !r.supportingEvidenceEn && r.supportingEvidence && hasArabic(r.supportingEvidence)
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    setTranslating(missing.length);
+    (async () => {
+      for (let i = 0; i < missing.length; i += 4) {
+        if (cancelled) break;
+        await Promise.all(missing.slice(i, i + 4).map(async (req) => {
+          if (cancelled) return;
+          try {
+            const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: req.supportingEvidence }),
+            });
+            const data = await res.json();
+            if (data.translation && !cancelled) {
+              const enVal: string = data.translation;
+              await fetch(`/api/governance/compliance/${frameworkId}/admin/requirements/${req.reqId}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ supportingEvidenceEn: enVal }),
+              });
+              setReqs((p) => p ? p.map((r) => r.reqId === req.reqId ? { ...r, supportingEvidenceEn: enVal } : r) : p);
+            }
+          } catch {}
+          setTranslating((n) => Math.max(0, n - 1));
+        }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reqs?.length]); // eslint-disable-line
+
   const filtered = useMemo(() => {
     if (!reqs) return [];
     const lq = q.toLowerCase();
     if (!lq) return reqs;
     return reqs.filter((r) =>
-      r.reqCode.toLowerCase().includes(lq) || r.question.toLowerCase().includes(lq) ||
-      (r.domain ?? "").toLowerCase().includes(lq) || (r.standard ?? "").toLowerCase().includes(lq)
+      r.reqCode.toLowerCase().includes(lq) ||
+      (r.supportingEvidenceEn ?? r.supportingEvidence ?? "").toLowerCase().includes(lq) ||
+      (r.domainEn ?? r.domain ?? "").toLowerCase().includes(lq) ||
+      deriveStandard(r).toLowerCase().includes(lq)
     );
   }, [reqs, q]);
 
@@ -1510,36 +1549,52 @@ function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOpti
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="font-bold text-brand-deep">Requirements Administration</h2>
-          <p className="text-sm text-ink-soft">Edit requirement details, evidence codes, and assignments.</p>
+          <h2 className="font-bold text-brand-deep">Index Setup</h2>
+          <p className="text-sm text-ink-soft">
+            Edit requirement details, evidence codes, domains and assignments.
+            {translating > 0 && (
+              <span className="ml-2 text-brand-purple animate-pulse text-[11px]">
+                Translating {translating} missing EN fields…
+              </span>
+            )}
+          </p>
         </div>
-        <input value={q} onChange={(e) => setQ(e.target.value)} className="field text-sm w-72" placeholder="Search requirements…" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} className="field text-sm w-72" placeholder="Search by code, domain, standard, evidence…" />
       </div>
       {loading && <div className="card p-8 text-center text-muted text-sm">Loading requirements…</div>}
       {!loading && reqs !== null && (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
+            <table className="w-full text-sm min-w-[1000px]">
               <thead>
                 <tr className="border-b border-line bg-canvas-soft text-left">
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Code</th>
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Standard</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Domain</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Supporting Evidence (EN)</th>
+                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-44">Domain</th>
+                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Supporting Evidence</th>
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-16">Level</th>
                   <th className="px-3 py-2.5 w-12" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.slice(0, 200).map((req) => {
-                  const dispEn = req.supportingEvidenceEn ?? req.questionEn ?? req.question;
+                  const evidenceEn = req.supportingEvidenceEn ?? req.questionEn ?? "";
+                  const needsTranslation = !req.supportingEvidenceEn && !!req.supportingEvidence && hasArabic(req.supportingEvidence);
                   return (
                   <tr key={req.reqId} className="border-b border-line-soft hover:bg-canvas/30">
                     <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-muted">{req.reqCode}</td>
-                    <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{req.standard ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-[12px] text-ink">{req.domain ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate" title={dispEn}>
-                      {dispEn.length > 90 ? dispEn.slice(0,88)+"…" : dispEn}
+                    <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{deriveStandard(req)}</td>
+                    <td className="px-3 py-2.5 text-[12px] text-ink">
+                      <div>{req.domainEn ?? req.domain ?? "—"}</div>
+                      {req.domainCode && <div className="text-[10px] text-muted font-mono">{req.domainCode}</div>}
+                    </td>
+                    <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate"
+                      title={evidenceEn || undefined}>
+                      {needsTranslation
+                        ? <span className="text-muted/50 italic text-[11px]">Translating…</span>
+                        : evidenceEn
+                          ? (evidenceEn.length > 90 ? evidenceEn.slice(0, 88) + "…" : evidenceEn)
+                          : <span className="text-muted/40 italic">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-[11px] text-muted">{req.maturityLevel ?? "—"}</td>
                     <td className="px-3 py-2.5">
