@@ -94,6 +94,7 @@ export function ComplianceClient({
   const [importMsg, setImportMsg]       = useState("");
   const [cfgSaving, setCfgSaving]       = useState(false);
   const [levelWarning, setLevelWarning] = useState<{ std: string; newLevel: number } | null>(null);
+  const [lang, setLang]                 = useState<"en"|"ar">("en");
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [collabCounts, setCollabCounts] = useState<Record<string, number>>({});
   const [toastMsg, setToastMsg]         = useState("");
@@ -111,11 +112,28 @@ export function ComplianceClient({
     setTimeout(() => setToastMsg(""), 4000);
   }
 
+  // ── Language helper ──────────────────────────────────────────────────────────
+  function disp(en: string | null | undefined, ar: string | null | undefined): string {
+    return lang === "en" ? (en ?? ar ?? "") : (ar ?? en ?? "");
+  }
+
   // ── Data derived ────────────────────────────────────────────────────────────
+  // Map Arabic domain key → English display name
+  const domainEnMap = useMemo(() => {
+    const map = new Map<string, string>();
+    reqs.forEach((r) => {
+      const key = r.domain ?? "Other";
+      if (!map.has(key)) map.set(key, r.domainEn ?? key);
+    });
+    return map;
+  }, [reqs]);
+
   const domains = useMemo(() => {
     const s = new Set(reqs.map((r) => r.domain ?? "Other"));
-    return Array.from(s).sort();
-  }, [reqs]);
+    return Array.from(s).sort((a, b) =>
+      (domainEnMap.get(a) ?? a).localeCompare(domainEnMap.get(b) ?? b)
+    );
+  }, [reqs, domainEnMap]);
 
   const standards = useMemo(() => {
     if (!selDomain) return [];
@@ -124,8 +142,11 @@ export function ComplianceClient({
         .forEach((r) => { const k = deriveStandard(r); if (!seen.has(k)) seen.set(k, r); });
     return Array.from(seen.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([std, rep]) => ({ std, question: rep.questionEn ?? rep.question }));
-  }, [reqs, selDomain]);
+      .map(([std, rep]) => ({
+        std,
+        question: lang === "en" ? (rep.questionEn ?? rep.question) : (rep.question ?? rep.questionEn ?? ""),
+      }));
+  }, [reqs, selDomain, lang]);
 
   // Cumulative: level 0 → only lvl 0; level N≥1 → levels 1..N
   const questionsForView = useMemo(() => {
@@ -344,7 +365,7 @@ export function ComplianceClient({
 
   const { total, complete, na, notDone, pct } = overallStats;
   const selectedQuestion = selStandard
-    ? (() => { const r = reqs.find((x) => deriveStandard(x) === selStandard); return r ? (r.questionEn ?? r.question) : ""; })()
+    ? (() => { const r = reqs.find((x) => deriveStandard(x) === selStandard); return r ? disp(r.questionEn, r.question) : ""; })()
     : "";
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -395,6 +416,15 @@ export function ComplianceClient({
               {frameworks.map((f) => <option key={f.frameworkId} value={f.frameworkId}>{f.name}</option>)}
             </select>
           )}
+          <button
+            onClick={() => setLang((l) => l === "en" ? "ar" : "en")}
+            title="Toggle display language"
+            className={`btn btn-sm flex items-center gap-1.5 font-semibold ${
+              lang === "ar" ? "bg-brand-purple text-white border-brand-purple" : ""
+            }`}>
+            <GlobeIcon />
+            {lang === "en" ? "EN" : "عر"}
+          </button>
           <label className={`btn btn-sm cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
             {importing ? "Importing…" : "Import Excel"}
             <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
@@ -473,7 +503,7 @@ export function ComplianceClient({
                   <span className="text-muted/50">›</span>
                   <button onClick={backToStandards}
                     className={`font-medium ${selStandard ? "text-brand-purple hover:underline" : "text-ink"}`}>
-                    {selDomain}
+                    {lang === "en" ? (domainEnMap.get(selDomain) ?? selDomain) : selDomain}
                   </button>
                   {selStandard && (<>
                     <span className="text-muted/50">›</span>
@@ -499,14 +529,17 @@ export function ComplianceClient({
                   <div className="grid grid-cols-3 gap-4">
                     {domains.map((domain) => {
                       const s = domainStats(domain);
-                      const dc = reqs.find((r) => (r.domain ?? "Other") === domain)?.domainCode ?? "";
+                      const rep = reqs.find((r) => (r.domain ?? "Other") === domain);
+                      const dc = rep?.domainCode ?? "";
+                      const displayName = lang === "en" ? (rep?.domainEn ?? domain) : domain;
+                      const subtitle    = lang === "en" ? (dc || null) : (rep?.domainEn ?? null);
                       return (
                         <button key={domain} onClick={() => selectDomain(domain)}
                           className="card p-5 text-left hover:shadow-md hover:border-brand-purple/60 transition-all group border border-line">
                           <div className="flex items-start justify-between mb-2 gap-2">
-                            <div>
-                              <div className="font-bold text-brand-deep group-hover:text-brand-purple text-sm">{domain}</div>
-                              {dc && <div className="text-[11px] text-muted font-mono mt-0.5">{dc}</div>}
+                            <div className="min-w-0">
+                              <div className="font-bold text-brand-deep group-hover:text-brand-purple text-sm leading-snug">{displayName}</div>
+                              {subtitle && <div className="text-[11px] text-muted font-mono mt-0.5 truncate">{subtitle}</div>}
                             </div>
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-canvas-soft text-ink-soft shrink-0">{s.total}</span>
                           </div>
@@ -538,7 +571,6 @@ export function ComplianceClient({
                             deriveStandard(r) === std && parseLevelNum(r.maturityLevel) === ln
                         ).length,
                       }));
-                      const translated = translations[question];
                       return (
                         <button key={std} onClick={() => selectStandard(std)}
                           className="card p-5 text-left hover:shadow-md hover:border-brand-purple/60 transition-all group border border-line">
@@ -553,7 +585,8 @@ export function ComplianceClient({
                             </div>
                           </div>
                           {question && (
-                            <p className="text-[11px] text-ink-soft mb-3 leading-snug line-clamp-2">
+                            <p className="text-[11px] text-ink-soft mb-3 leading-snug line-clamp-2"
+                              dir={lang === "ar" ? "rtl" : undefined}>
                               {question}
                             </p>
                           )}
@@ -581,7 +614,7 @@ export function ComplianceClient({
                   {selectedQuestion && (
                     <div className="mb-5 p-4 bg-canvas-soft rounded-xl border border-line">
                       <div className="text-[11px] uppercase tracking-wide text-muted font-semibold mb-1">{selStandard}</div>
-                      <p className="text-sm text-ink leading-relaxed">
+                      <p className="text-sm text-ink leading-relaxed" dir={lang === "ar" ? "rtl" : undefined}>
                         {selectedQuestion}
                       </p>
                     </div>
@@ -665,7 +698,7 @@ export function ComplianceClient({
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-ink leading-relaxed">
+                      <p className="text-sm text-ink leading-relaxed" dir={lang === "ar" ? "rtl" : undefined}>
                         {selectedQuestion}
                       </p>
                     </div>
@@ -735,17 +768,17 @@ export function ComplianceClient({
                                             title="Endorsed">✓</span>
                                         )}
                                       </div>
-                                      {(req.directoryTypeEn ?? req.directoryType) && (
-                                        <div className="text-[10px] text-muted mt-0.5">{req.directoryTypeEn ?? req.directoryType}</div>
+                                      {disp(req.directoryTypeEn, req.directoryType) && (
+                                        <div className="text-[10px] text-muted mt-0.5">{disp(req.directoryTypeEn, req.directoryType)}</div>
                                       )}
                                     </td>
 
                                     {/* Supporting Evidence */}
                                     <td className="px-3 py-3">
-                                      <div className="text-[12px] text-ink leading-snug">
-                                        {(req.supportingEvidenceEn ?? req.supportingEvidence)
-                                          ? (req.supportingEvidenceEn ?? req.supportingEvidence)
-                                          : <span className="text-muted italic">—</span>}
+                                      <div className="text-[12px] text-ink leading-snug"
+                                        dir={lang === "ar" ? "rtl" : undefined}>
+                                        {disp(req.supportingEvidenceEn, req.supportingEvidence)
+                                          || <span className="text-muted italic">—</span>}
                                       </div>
                                     </td>
 
@@ -837,6 +870,7 @@ export function ComplianceClient({
                                           req={req}
                                           fwId={fwId ?? 0}
                                           role={currentUser.role}
+                                          lang={lang}
                                           onPatch={(updates) => patch(req, updates)}
                                           onWorkflow={(action) => advanceWorkflow(req, action)}
                                           translations={translations}
@@ -886,21 +920,27 @@ function WorkflowBadge({ status }: { status: string }) {
 
 // ── Evidence expanded row ─────────────────────────────────────────────────────
 function EvidenceExpanded({
-  req, fwId, role, onPatch, onWorkflow, translations,
+  req, fwId, role, lang, onPatch, onWorkflow, translations,
 }: {
-  req: ComplianceRequirement; fwId: number; role: string;
+  req: ComplianceRequirement; fwId: number; role: string; lang: "en"|"ar";
   onPatch: (u: Partial<ComplianceRequirement>) => void;
   onWorkflow: (action: "submit"|"confirm"|"endorse") => void;
   translations: Record<string, string>;
 }) {
-  const [mgmt,     setMgmt]     = useState(req.managementNotes ?? req.managementSectorEn ?? req.managementSector ?? "");
+  function d(en: string | null | undefined, ar: string | null | undefined) {
+    return lang === "en" ? (en ?? ar ?? "") : (ar ?? en ?? "");
+  }
+
+  const mgmtImported = d(req.managementSectorEn, req.managementSector);
+  const [mgmt,     setMgmt]     = useState(req.managementNotes ?? mgmtImported);
   const [comments, setComments] = useState(req.comments ?? "");
   const [saving,   setSaving]   = useState(false);
 
-  useEffect(() => { setMgmt(req.managementNotes ?? req.managementSectorEn ?? req.managementSector ?? ""); }, [req.managementNotes, req.managementSectorEn, req.managementSector]);
+  useEffect(() => { setMgmt(req.managementNotes ?? d(req.managementSectorEn, req.managementSector)); },
+    [req.managementNotes, req.managementSectorEn, req.managementSector, lang]); // eslint-disable-line
   useEffect(() => { setComments(req.comments ?? ""); }, [req.comments]);
 
-  const isDirty = mgmt   !== (req.managementNotes ?? req.managementSector ?? "") ||
+  const isDirty = mgmt   !== (req.managementNotes ?? d(req.managementSectorEn, req.managementSector)) ||
                   comments !== (req.comments ?? "");
 
   async function saveAll() {
@@ -914,20 +954,19 @@ function EvidenceExpanded({
   const canConfirm = status === "SUBMITTED" && (role === "ADMIN" || role === "STEWARD");
   const canEndorse = status === "CONFIRMED" && role === "ADMIN";
 
-  function t(text: string | null | undefined) {
-    if (!text) return "";
-    return translations[text] ?? text;
-  }
+  const admissionCriteria = d(req.admissionCriteriaEn, req.admissionCriteria);
+  const directoryType     = d(req.directoryTypeEn,     req.directoryType);
+  const isRtl             = lang === "ar";
 
   return (
     <div className="space-y-4">
       {/* Static fields */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[12px]">
-        {(req.admissionCriteriaEn ?? req.admissionCriteria) && (
+        {admissionCriteria && (
           <div>
             <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Admission Criteria</div>
-            <div className="text-ink leading-snug">
-              {req.admissionCriteriaEn ?? req.admissionCriteria}
+            <div className="text-ink leading-snug" dir={isRtl ? "rtl" : undefined}>
+              {admissionCriteria}
             </div>
           </div>
         )}
@@ -937,10 +976,10 @@ function EvidenceExpanded({
             <div className="text-ink font-mono text-[11px]">{req.directoryCode}</div>
           </div>
         )}
-        {(req.directoryTypeEn ?? req.directoryType) && (
+        {directoryType && (
           <div>
             <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Evidence Type</div>
-            <div className="text-ink">{req.directoryTypeEn ?? req.directoryType}</div>
+            <div className="text-ink">{directoryType}</div>
           </div>
         )}
         {req.operationalExcellence && req.operationalExcellence !== "N/A" && req.operationalExcellence !== "لا" && (
@@ -956,9 +995,10 @@ function EvidenceExpanded({
         <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">
           Management &amp; Supporting Sector
         </label>
-        {(req.managementSectorEn ?? req.managementSector) && !req.managementNotes && (
-          <div className="text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5">
-            <span className="text-muted/70">{req.managementSectorEn ?? req.managementSector}</span>
+        {mgmtImported && !req.managementNotes && (
+          <div className={`text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5 ${isRtl ? "text-right" : ""}`}
+            dir={isRtl ? "rtl" : undefined}>
+            <span className="text-muted/70">{mgmtImported}</span>
             <span className="ml-2 text-[10px] text-muted italic">(imported)</span>
           </div>
         )}
@@ -1727,6 +1767,13 @@ function ChatIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" className={`w-3.5 h-3.5 ${className ?? "text-muted"}`}>
       <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414l-2 2A.5.5 0 0 1 1.5 13V2a1 1 0 0 1 1-1h11zm-3 4H5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm0 2H5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1z"/>
+    </svg>
+  );
+}
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+      <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM2.04 4.326c.325 1.329 2.532 2.54 3.717 3.19.48.263.793.434.743.484-.08.08-.162.158-.242.234-.416.396-.787.749-.758 1.266.035.634.618.824 1.214 1.017.577.188 1.168.38 1.286.983.082.417-.075.988-.22 1.52-.215.782-.406 1.48.22 1.48 1.5-.5 3.798-3.186 4-5 .138-1.243-2-2-3.5-2.5-.478-.16-.755.081-.99.284-.172.15-.322.279-.51.216-.445-.148-2.615-2.133-1.626-3.554l.127-.179c.333-.46.728-1.006-.296-1.006-.72.001-1.595.515-2.283 1.57l-.083.131z"/>
     </svg>
   );
 }
