@@ -28,6 +28,24 @@ type CollabThread = {
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DEFAULT_LEVEL_COLORS = ["#D84848","#E88030","#2D4AA0","#3D7EC8","#1E8C76","#5CA85C"];
 const DEFAULT_LEVEL_NAMES  = ["No Capability","Build","Definition","Activation","Managed","Innovation"];
+
+// Fallback English names keyed by NDI domain code (used when domainEn is null in DB)
+const DOMAIN_EN_BY_CODE: Record<string, string> = {
+  DG:  "Data Governance Domain",
+  DSI: "Data Sharing and Integration Domain (DSI)",
+  RMD: "Reference and Master Data Domain (RMD)",
+  DQ:  "Data Quality Domain",
+  BIA: "Business Intelligence and Analytics Domain (BIA)",
+  DAM: "Data Architecture and Modelling Domain",
+  MCM: "Metadata and Data Catalog Management Domain (MCM)",
+  DVR: "Data Value Realisation Domain",
+  OD:  "Open Data Domain",
+  DC:  "Data Classification Domain",
+  FOI: "Freedom of Information Domain",
+  DO:  "Data Operations Domain",
+  DCM: "Documents and Content Management Domain (DCM)",
+  PDP: "Personal Data Protection Domain",
+};
 const WORKFLOW_META: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT:     { label: "Draft",     color: "#6B7280", bg: "#F3F4F6" },
   SUBMITTED: { label: "Submitted", color: "#D97706", bg: "#FEF3C7" },
@@ -43,12 +61,14 @@ function parseLevelNum(ml: string | null): number | null {
   return n !== null && n >= 0 && n <= 5 ? n : null;
 }
 function deriveStandard(req: ComplianceRequirement): string {
-  if (req.standard?.trim()) return req.standard.trim();
+  // Only use req.standard if it is an English/code value (not Arabic)
+  if (req.standard?.trim() && !hasArabic(req.standard)) return req.standard.trim();
+  // Derive "DOMAIN-N" from req_code (e.g. "DG-1-L1-01" → "DG-1")
   const code = req.reqCode ?? "";
+  const m = code.match(/^([A-Z]+-\d+)/);
+  if (m) return m[1];
   const dotIdx = code.indexOf(".");
   if (dotIdx > 0) return code.slice(0, dotIdx);
-  const lastDash = code.lastIndexOf("-");
-  if (lastDash > 0) return code.slice(0, lastDash);
   return req.domainCode ?? "General";
 }
 function fmtDate(iso: string) {
@@ -60,6 +80,13 @@ function fmtDate(iso: string) {
 }
 function hasArabic(text: string): boolean {
   return /[؀-ۿ]/.test(text);
+}
+function complianceTypeLabel(raw: string | null | undefined): { label: string; isCompliance: boolean } | null {
+  if (!raw) return null;
+  const isCompliance = raw.includes("امتثال") || raw.toLowerCase().includes("compliance");
+  const isMaturity   = raw.includes("نضج")    || raw.toLowerCase().includes("maturity");
+  if (!isCompliance && !isMaturity) return null;
+  return { label: isCompliance ? "Compliance" : "Maturity", isCompliance };
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
@@ -118,12 +145,14 @@ export function ComplianceClient({
   }
 
   // ── Data derived ────────────────────────────────────────────────────────────
-  // Map Arabic domain key → English display name
+  // Map Arabic domain key → English display name (domainEn → domain code lookup → Arabic fallback)
   const domainEnMap = useMemo(() => {
     const map = new Map<string, string>();
     reqs.forEach((r) => {
       const key = r.domain ?? "Other";
-      if (!map.has(key)) map.set(key, r.domainEn ?? key);
+      if (!map.has(key)) {
+        map.set(key, r.domainEn ?? DOMAIN_EN_BY_CODE[r.domainCode ?? ""] ?? key);
+      }
     });
     return map;
   }, [reqs]);
@@ -784,12 +813,15 @@ export function ComplianceClient({
 
                                     {/* Compliance/Maturity type */}
                                     <td className="px-3 py-3">
-                                      {req.complianceOrMaturity && (
-                                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                          req.complianceOrMaturity.includes("امتثال") || req.complianceOrMaturity.toLowerCase().includes("compliance")
-                                            ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                                        }`}>{req.complianceOrMaturity}</span>
-                                      )}
+                                      {(() => {
+                                        const t = complianceTypeLabel(req.complianceOrMaturity);
+                                        if (!t) return null;
+                                        return (
+                                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                            t.isCompliance ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                                          }`}>{t.label}</span>
+                                        );
+                                      })()}
                                     </td>
 
                                     {/* Evident Admin */}
@@ -1585,7 +1617,7 @@ function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOpti
                     <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-muted">{req.reqCode}</td>
                     <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{deriveStandard(req)}</td>
                     <td className="px-3 py-2.5 text-[12px] text-ink">
-                      <div>{req.domainEn ?? req.domain ?? "—"}</div>
+                      <div>{req.domainEn ?? DOMAIN_EN_BY_CODE[req.domainCode ?? ""] ?? req.domain ?? "—"}</div>
                       {req.domainCode && <div className="text-[10px] text-muted font-mono">{req.domainCode}</div>}
                     </td>
                     <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate"
