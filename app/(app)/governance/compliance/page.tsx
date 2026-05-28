@@ -8,6 +8,7 @@ import {
   listUsers,
   getMaturitySelections,
   getConfigItems,
+  listDomainConfig,
 } from "@/lib/queries/gov-compliance";
 import { ComplianceClient } from "@/components/governance/ComplianceClient";
 
@@ -25,12 +26,13 @@ export default async function CompliancePage({
   const fwId            = searchParams.fw ? Number(searchParams.fw) : (frameworks[0]?.frameworkId ?? null);
   const activeFramework = frameworks.find((f) => f.frameworkId === fwId) ?? frameworks[0] ?? null;
 
-  const [requirements, levelConfig, users, maturitySelections, configItems] = await Promise.all([
+  const [requirements, levelConfig, users, maturitySelections, configItems, domainConfig] = await Promise.all([
     fwId ? listRequirements(fwId)          : Promise.resolve([]),
     fwId ? getLevelConfig(fwId)            : Promise.resolve([]),
     listUsers(),
     fwId ? getMaturitySelections(fwId)     : Promise.resolve([]),
     fwId ? getConfigItems(fwId)            : Promise.resolve([]),
+    fwId ? listDomainConfig(fwId)          : Promise.resolve([]),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function CompliancePage({
           users={users}
           initialMaturitySelections={maturitySelections}
           initialConfigItems={configItems}
+          initialDomainConfig={domainConfig}
           currentUser={user}
         />
       </main>

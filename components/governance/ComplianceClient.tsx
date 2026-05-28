@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ComplianceFramework, ComplianceRequirement,
-  LevelConfig, UserOption, ConfigItem, MaturitySelection,
+  LevelConfig, UserOption, ConfigItem, MaturitySelection, DomainConfig,
 } from "@/lib/queries/gov-compliance";
 import type { SessionUser } from "@/lib/types";
 
@@ -13,7 +13,8 @@ type Props = {
   frameworks: ComplianceFramework[]; activeFramework: ComplianceFramework | null;
   initialRequirements: ComplianceRequirement[]; initialLevelConfig: LevelConfig[];
   users: UserOption[]; initialMaturitySelections: MaturitySelection[];
-  initialConfigItems: ConfigItem[]; currentUser: SessionUser;
+  initialConfigItems: ConfigItem[]; initialDomainConfig: DomainConfig[];
+  currentUser: SessionUser;
 };
 type HistoryEntry = {
   historyId: number; fieldName: string; fieldLabel: string;
@@ -96,13 +97,14 @@ function complianceTypeLabel(raw: string | null | undefined): { label: string; i
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function ComplianceClient({
   frameworks, activeFramework, initialRequirements, initialLevelConfig,
-  users, initialMaturitySelections, initialConfigItems, currentUser,
+  users, initialMaturitySelections, initialConfigItems, initialDomainConfig, currentUser,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [reqs, setReqs]                 = useState<ComplianceRequirement[]>(initialRequirements);
   const [levelCfg, setLevelCfg]         = useState<LevelConfig[]>(initialLevelConfig);
   const [configItems, setConfigItems]   = useState<ConfigItem[]>(initialConfigItems);
+  const [domainConfig, setDomainConfig] = useState<DomainConfig[]>(initialDomainConfig);
   const [maturitySels, setMaturitySels] = useState<Record<string, number>>(
     Object.fromEntries(initialMaturitySelections.map((s) => [s.standardCode, s.selectedLevel]))
   );
@@ -149,17 +151,19 @@ export function ComplianceClient({
   }
 
   // ── Data derived ────────────────────────────────────────────────────────────
-  // Map Arabic domain key → English display name (domainEn → domain code lookup → Arabic fallback)
+  // Map Arabic domain key → English display name (domainConfig → domainEn → hardcoded fallback → Arabic)
   const domainEnMap = useMemo(() => {
     const map = new Map<string, string>();
+    const cfgByCode = new Map(domainConfig.map((d) => [d.domainCode, d]));
     reqs.forEach((r) => {
       const key = r.domain ?? "Other";
       if (!map.has(key)) {
-        map.set(key, r.domainEn ?? DOMAIN_EN_BY_CODE[r.domainCode ?? ""] ?? key);
+        const cfg = cfgByCode.get(r.domainCode ?? "");
+        map.set(key, cfg?.nameEn ?? r.domainEn ?? DOMAIN_EN_BY_CODE[r.domainCode ?? ""] ?? key);
       }
     });
     return map;
-  }, [reqs]);
+  }, [reqs, domainConfig]);
 
   const domains = useMemo(() => {
     const s = new Set(reqs.map((r) => r.domain ?? "Other"));
@@ -933,12 +937,14 @@ export function ComplianceClient({
       {/* ── Config tab ──────────────────────────────────────────────────── */}
       {activeTab === "config" && (
         <ConfigTab levelCfg={levelCfg} configItems={configItems} frameworkId={fwId ?? 0}
-          onSaveLevels={saveCfg} saving={cfgSaving} onConfigItemsChange={setConfigItems} />
+          onSaveLevels={saveCfg} saving={cfgSaving} onConfigItemsChange={setConfigItems}
+          domainConfig={domainConfig} onDomainConfigChange={setDomainConfig} />
       )}
 
       {/* ── Admin tab ───────────────────────────────────────────────────── */}
       {activeTab === "admin" && (
-        <AdminTab frameworkId={fwId ?? 0} users={users} />
+        <AdminTab frameworkId={fwId ?? 0} users={users} levelCfg={levelCfg}
+          complianceTypeItems={configItems.filter((i) => i.configGroup === "COMPLIANCE_TYPE")} />
       )}
     </div>
   );
@@ -1280,10 +1286,11 @@ function HistoryPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
 }
 
 // ── Configuration tab ─────────────────────────────────────────────────────────
-function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, onConfigItemsChange }: {
+function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, onConfigItemsChange, domainConfig, onDomainConfigChange }: {
   levelCfg: LevelConfig[]; configItems: ConfigItem[]; frameworkId: number;
   onSaveLevels: (r: LevelConfig[]) => void; saving: boolean;
   onConfigItemsChange: (items: ConfigItem[]) => void;
+  domainConfig: DomainConfig[]; onDomainConfigChange: (c: DomainConfig[]) => void;
 }) {
   const [rows, setRows] = useState<LevelConfig[]>(levelCfg);
   const [translating, setTranslating] = useState(false);
@@ -1393,6 +1400,12 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
             onConfigItemsChange([...others, ...updated]);
           }} />
       ))}
+
+      <DomainConfigSection
+        frameworkId={frameworkId}
+        configs={domainConfig}
+        onUpdate={onDomainConfigChange}
+      />
     </div>
   );
 }
@@ -1507,8 +1520,175 @@ function ConfigItemsSection({ group, frameworkId, items, onUpdate }: {
   );
 }
 
+// ── Domain config section ─────────────────────────────────────────────────────
+function DomainConfigSection({ frameworkId, configs, onUpdate }: {
+  frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void;
+}) {
+  const [rows,        setRows]        = useState<DomainConfig[]>(configs);
+  const [dirty,       setDirty]       = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [showAdd,     setShowAdd]     = useState(false);
+  const [addCode,     setAddCode]     = useState("");
+  const [addNameEn,   setAddNameEn]   = useState("");
+  const [addNameAr,   setAddNameAr]   = useState("");
+
+  function updateRow(idx: number, field: "nameEn" | "nameAr", val: string) {
+    setRows((p) => p.map((r, i) => i === idx ? { ...r, [field]: val } : r));
+    setDirty(true);
+  }
+
+  async function saveAll() {
+    setSaving(true);
+    for (const row of rows) {
+      await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domainCode: row.domainCode, nameEn: row.nameEn, nameAr: row.nameAr ?? null, sortOrder: row.sortOrder }),
+      });
+    }
+    onUpdate(rows);
+    setDirty(false);
+    setSaving(false);
+  }
+
+  async function deleteRow(configId: number) {
+    await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ configId }),
+    });
+    const updated = rows.filter((r) => r.configId !== configId);
+    setRows(updated);
+    onUpdate(updated);
+  }
+
+  async function addRow() {
+    if (!addCode.trim() || !addNameEn.trim()) return;
+    const res = await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domainCode: addCode.trim(), nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null, sortOrder: rows.length }),
+    });
+    const data = await res.json();
+    const newRow: DomainConfig = {
+      configId: data.id, frameworkId, domainCode: addCode.trim(),
+      nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null, sortOrder: rows.length,
+    };
+    const updated = [...rows, newRow];
+    setRows(updated);
+    onUpdate(updated);
+    setAddCode(""); setAddNameEn(""); setAddNameAr(""); setShowAdd(false);
+  }
+
+  async function autoTranslateToAr() {
+    setTranslating(true);
+    const updated = [...rows];
+    for (const row of updated) {
+      if (row.nameEn && !row.nameAr) {
+        try {
+          const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: row.nameEn, targetLang: "ar" }),
+          });
+          const d = await res.json();
+          if (d.translation) row.nameAr = d.translation;
+        } catch {}
+      }
+    }
+    setRows([...updated]);
+    setDirty(true);
+    setTranslating(false);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="font-bold text-brand-deep">Domain Configuration</h2>
+          <p className="text-sm text-ink-soft">Manage domain display names in English and Arabic.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={autoTranslateToAr} disabled={translating || saving} className="btn btn-sm"
+            title="Auto-fill empty Arabic names by translating from English">
+            {translating ? "Translating…" : "Auto-translate to AR"}
+          </button>
+          <button onClick={() => setShowAdd((v) => !v)} className="btn btn-sm">
+            {showAdd ? "Cancel" : "+ Add Domain"}
+          </button>
+          {dirty && (
+            <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showAdd && (
+        <div className="card p-4 mb-4 bg-canvas-soft/50 space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Domain Code</label>
+              <input value={addCode} onChange={(e) => setAddCode(e.target.value)}
+                className="field text-sm w-full" placeholder="DG" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Name (EN)</label>
+              <input value={addNameEn} onChange={(e) => setAddNameEn(e.target.value)}
+                className="field text-sm w-full" placeholder="Data Governance Domain" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">الاسم (AR)</label>
+              <input value={addNameAr} onChange={(e) => setAddNameAr(e.target.value)}
+                className="field text-sm w-full text-right" dir="rtl" placeholder="نطاق حوكمة البيانات" />
+            </div>
+          </div>
+          <button onClick={addRow} disabled={!addCode.trim() || !addNameEn.trim()} className="btn btn-sm btn-primary">
+            Add
+          </button>
+        </div>
+      )}
+
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line bg-canvas-soft text-left">
+              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Code</th>
+              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Name (EN)</th>
+              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الاسم (AR)</th>
+              <th className="px-4 py-2.5 w-16" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={row.configId} className="border-b border-line-soft">
+                <td className="px-4 py-2 font-mono text-[11px] font-bold text-muted">{row.domainCode}</td>
+                <td className="px-4 py-2">
+                  <input value={row.nameEn} onChange={(e) => updateRow(idx, "nameEn", e.target.value)}
+                    className="field text-sm w-full" placeholder="English domain name…" />
+                </td>
+                <td className="px-4 py-2">
+                  <input value={row.nameAr ?? ""} onChange={(e) => updateRow(idx, "nameAr", e.target.value)}
+                    className="field text-sm w-full text-right" dir="rtl" placeholder="الاسم بالعربية…" />
+                </td>
+                <td className="px-4 py-2">
+                  <button onClick={() => deleteRow(row.configId)}
+                    className="text-[10px] text-red-500 hover:text-red-700 font-semibold">Delete</button>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-muted italic">No domains configured.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Administration tab ────────────────────────────────────────────────────────
-function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOption[] }) {
+function AdminTab({ frameworkId, users, levelCfg, complianceTypeItems }: {
+  frameworkId: number; users: UserOption[];
+  levelCfg: LevelConfig[]; complianceTypeItems: ConfigItem[];
+}) {
   const [reqs,        setReqs]        = useState<ComplianceRequirement[] | null>(null);
   const [loading,     setLoading]     = useState(false);
   const [translating, setTranslating] = useState(0); // count of in-flight translations
@@ -1656,16 +1836,38 @@ function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOpti
       )}
       {editing && (
         <EditRequirementDialog req={editing} users={users} saving={saving}
+          levelCfg={levelCfg} complianceTypeItems={complianceTypeItems}
           onSave={(u) => saveEdit(editing, u)} onClose={() => setEditing(null)} />
       )}
     </div>
   );
 }
 
-function EditRequirementDialog({ req, saving, onSave, onClose }: {
+function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complianceTypeItems }: {
   req: ComplianceRequirement; users: UserOption[];
   saving: boolean; onSave: (u: Partial<ComplianceRequirement>) => void; onClose: () => void;
+  levelCfg: LevelConfig[]; complianceTypeItems: ConfigItem[];
 }) {
+  // Resolve complianceOrMaturity to an English label for the dropdown
+  function resolveComplianceLabel(raw: string | null | undefined): string {
+    if (!raw) return "";
+    const direct = complianceTypeItems.find((i) => i.label.toLowerCase() === raw.toLowerCase());
+    if (direct) return direct.label;
+    const arMatch = complianceTypeItems.find((i) => i.labelAr === raw);
+    if (arMatch) return arMatch.label;
+    const t = complianceTypeLabel(raw);
+    if (t) {
+      const fb = complianceTypeItems.find((i) =>
+        t.isCompliance ? i.label.toLowerCase().includes("compliance") : i.label.toLowerCase().includes("maturity")
+      );
+      if (fb) return fb.label;
+    }
+    return raw;
+  }
+
+  // Resolve maturityLevel to a digit string for the dropdown
+  const parsedInitLevel = parseLevelNum(req.maturityLevel);
+
   const [v, setV] = useState({
     // Arabic fields
     question:             req.question,
@@ -1674,10 +1876,10 @@ function EditRequirementDialog({ req, saving, onSave, onClose }: {
     managementSector:     req.managementSector    ?? "",
     directoryCode:        req.directoryCode       ?? "",
     directoryType:        req.directoryType       ?? "",
-    complianceOrMaturity: req.complianceOrMaturity ?? "",
+    complianceOrMaturity: resolveComplianceLabel(req.complianceOrMaturity),
     evidentAdministrator: req.evidentAdministrator ?? "",
     domainOwner:          req.domainOwner          ?? "",
-    maturityLevel:        req.maturityLevel        ?? "",
+    maturityLevel:        parsedInitLevel !== null ? String(parsedInitLevel) : "",
     // English fields
     questionEn:            req.questionEn            ?? "",
     supportingEvidenceEn:  req.supportingEvidenceEn  ?? "",
@@ -1736,18 +1938,52 @@ function EditRequirementDialog({ req, saving, onSave, onClose }: {
 
           {/* Other fields */}
           <div className="border-t border-line pt-4 space-y-3">
-            {([
-              ["directoryCode",        "Evidence Code",         false],
-              ["complianceOrMaturity", "Compliance or Maturity", false],
-              ["maturityLevel",        "Maturity Level",         false],
-              ["evidentAdministrator", "Evident Administrator",  false],
-              ["domainOwner",          "Domain Owner",           false],
-            ] as [keyof typeof v, string, boolean][]).map(([k, label]) => (
-              <div key={k}>
-                <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">{label}</label>
-                <input value={v[k]} onChange={(e) => set(k, e.target.value)} className="field text-sm w-full" />
-              </div>
-            ))}
+            <div>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Evidence Code</label>
+              <input value={v.directoryCode} onChange={(e) => set("directoryCode", e.target.value)} className="field text-sm w-full" />
+            </div>
+
+            {/* Compliance or Maturity — dropdown from config */}
+            <div>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Compliance or Maturity</label>
+              {complianceTypeItems.length > 0 ? (
+                <select value={v.complianceOrMaturity} onChange={(e) => set("complianceOrMaturity", e.target.value)}
+                  className="field text-sm w-full">
+                  <option value="">— Select type —</option>
+                  {complianceTypeItems.map((item) => (
+                    <option key={item.code} value={item.label}>
+                      {item.label}{item.labelAr ? ` (${item.labelAr})` : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input value={v.complianceOrMaturity} onChange={(e) => set("complianceOrMaturity", e.target.value)}
+                  className="field text-sm w-full" placeholder="e.g. Compliance or Maturity" />
+              )}
+            </div>
+
+            {/* Maturity Level — dropdown from level config */}
+            <div>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Maturity Level</label>
+              <select value={v.maturityLevel} onChange={(e) => set("maturityLevel", e.target.value)}
+                className="field text-sm w-full">
+                <option value="">— Select level —</option>
+                {levelCfg.map((lc) => (
+                  <option key={lc.levelNum} value={String(lc.levelNum)}>
+                    Level {lc.levelNum} — {lc.name}{lc.nameAr ? ` (${lc.nameAr})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Evident Administrator</label>
+              <input value={v.evidentAdministrator} onChange={(e) => set("evidentAdministrator", e.target.value)} className="field text-sm w-full" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Domain Owner</label>
+              <input value={v.domainOwner} onChange={(e) => set("domainOwner", e.target.value)} className="field text-sm w-full" />
+            </div>
           </div>
         </div>
         <div className="sticky bottom-0 bg-white border-t border-line px-6 py-4 flex gap-3 justify-end rounded-b-2xl">
