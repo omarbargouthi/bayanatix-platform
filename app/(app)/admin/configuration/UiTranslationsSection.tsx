@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
 import { useLang } from "@/lib/lang-context";
 import type { TranslationRow } from "@/lib/lang-context";
 
@@ -37,6 +38,11 @@ const SECTION_LABELS: Record<string, string> = {
   registers:  "Registers",
   governance: "Governance",
 };
+
+// Pre-built map of static AR defaults: "nav.dashboard" → "لوحة التحكم"
+const AR_DEFAULTS: Record<string, string> = Object.fromEntries(
+  flattenKeys(ar).map(({ key, defaultVal }) => [key, defaultVal])
+);
 
 export function UiTranslationsSection() {
   const { reloadTranslations } = useLang();
@@ -144,9 +150,9 @@ export function UiTranslationsSection() {
 
         <div className="card overflow-hidden">
           <div className="grid grid-cols-[2fr_2fr_2fr_64px] gap-3 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-            <div>Key · Default</div>
+            <div>Key · EN Default</div>
             <div>English Override</div>
-            <div>Arabic (AR) ع</div>
+            <div>Arabic — placeholder = static default</div>
             <div></div>
           </div>
 
@@ -166,7 +172,7 @@ export function UiTranslationsSection() {
               <input
                 className="input w-full text-sm"
                 dir="rtl"
-                placeholder="أدخل الترجمة…"
+                placeholder={AR_DEFAULTS[key] ?? "أدخل الترجمة…"}
                 value={getEdit(key, "ar")}
                 onChange={e => setEdit(key, "ar", e.target.value)}
               />

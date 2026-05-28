@@ -79,7 +79,10 @@ export function Sidebar({ user }: { user: SessionUser }) {
   const borderSide = isRtl ? "border-l border-line" : "border-r border-line";
 
   return (
-    <aside className={`sticky top-0 h-screen shrink-0 z-30 flex flex-col bg-white overflow-hidden ${borderSide}`}>
+    <aside
+      style={{ width: collapsed ? 64 : 240 }}
+      className={`sticky top-0 h-screen shrink-0 z-30 flex flex-col bg-white overflow-hidden transition-all duration-300 ${borderSide}`}
+    >
 
       {/* User section */}
       <div className={`flex items-center border-b border-line py-4 ${collapsed ? "justify-center px-2" : "gap-3 px-4"}`}>
