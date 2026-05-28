@@ -7,6 +7,7 @@ import { IconBell, IconSearch, IconLogout, IconMenu, IconGlobe, IconHistory, Ico
 import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
+import { useLang } from "@/lib/lang-context";
 import type { SessionUser } from "@/lib/types";
 import type { SearchResult } from "@/app/api/catalog/search/route";
 import { ALL_TYPES } from "@/lib/search-types";
@@ -41,6 +42,7 @@ function HeaderIconBtn({
 export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[] }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
+  const { lang, setLang, isRtl } = useLang();
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -127,7 +129,7 @@ export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: 
       </nav>
 
       {/* Global search */}
-      <div className="ml-3 flex-1 max-w-lg relative">
+      <div className={`${isRtl ? "mr-3" : "ml-3"} flex-1 max-w-lg relative`}>
         <div className={`flex items-center gap-2 bg-canvas border rounded-md px-3 py-2 transition-colors ${searchFocused ? "border-brand-purple ring-1 ring-brand-purple/20" : "border-line hover:border-brand-purple/40"}`}>
           <IconSearch className="w-4 h-4 text-muted shrink-0" />
           <input
@@ -217,14 +219,18 @@ export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: 
       </div>
 
       {/* Right actions: Language · Notification · History · Collaboration */}
-      <div className="ml-auto flex items-center gap-1">
+      <div className={`${isRtl ? "mr-auto" : "ml-auto"} flex items-center gap-1`}>
         {/* Language */}
         <button
-          aria-label="Language"
-          className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 border border-line rounded-md text-xs font-semibold text-ink-soft hover:border-brand-purple hover:text-brand-purple transition-colors select-none"
+          onClick={() => setLang(lang === "en" ? "ar" : "en")}
+          aria-label="Toggle language"
+          className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 border rounded-md text-xs font-semibold transition-colors select-none
+            ${lang === "ar"
+              ? "border-brand-purple text-brand-purple bg-brand-purple/5"
+              : "border-line text-ink-soft hover:border-brand-purple hover:text-brand-purple"}`}
         >
           <IconGlobe className="w-3.5 h-3.5" />
-          EN
+          {lang === "en" ? "عربي" : "English"}
         </button>
 
         {/* Notification */}
