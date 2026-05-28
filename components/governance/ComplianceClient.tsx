@@ -61,14 +61,18 @@ function parseLevelNum(ml: string | null): number | null {
   return n !== null && n >= 0 && n <= 5 ? n : null;
 }
 function deriveStandard(req: ComplianceRequirement): string {
-  // Only use req.standard if it is an English/code value (not Arabic)
-  if (req.standard?.trim() && !hasArabic(req.standard)) return req.standard.trim();
-  // Derive "DOMAIN-N" from req_code (e.g. "DG-1-L1-01" → "DG-1")
+  // Always derive from req_code first to guarantee an English code (e.g. "DG-1-L1-01" → "DG-1")
   const code = req.reqCode ?? "";
   const m = code.match(/^([A-Z]+-\d+)/);
   if (m) return m[1];
-  const dotIdx = code.indexOf(".");
-  if (dotIdx > 0) return code.slice(0, dotIdx);
+  // Dot-separated code: "DG.1.L0.01" → "DG.1"
+  const dotIdx = code.indexOf(".", code.indexOf(".") + 1); // second dot
+  const firstDot = code.indexOf(".");
+  if (firstDot > 0) {
+    return dotIdx > 0 ? code.slice(0, dotIdx) : code.slice(0, firstDot + 2);
+  }
+  // Last resort: use req.standard only if it is not Arabic
+  if (req.standard?.trim() && !hasArabic(req.standard)) return req.standard.trim();
   return req.domainCode ?? "General";
 }
 function fmtDate(iso: string) {
@@ -560,8 +564,9 @@ export function ComplianceClient({
                       const s = domainStats(domain);
                       const rep = reqs.find((r) => (r.domain ?? "Other") === domain);
                       const dc = rep?.domainCode ?? "";
-                      const displayName = lang === "en" ? (rep?.domainEn ?? domain) : domain;
-                      const subtitle    = lang === "en" ? (dc || null) : (rep?.domainEn ?? null);
+                      const enName = domainEnMap.get(domain) ?? domain;
+                      const displayName = lang === "en" ? enName : domain;
+                      const subtitle    = lang === "en" ? (dc || null) : (enName !== domain ? enName : null);
                       return (
                         <button key={domain} onClick={() => selectDomain(domain)}
                           className="card p-5 text-left hover:shadow-md hover:border-brand-purple/60 transition-all group border border-line">
