@@ -32,6 +32,13 @@ export type ComplianceRequirement = {
   domainOwner:           string | null;
   managementSector:      string | null;
   sortOrder:             number;
+  // English translations (from NDI English file)
+  questionEn:            string | null;
+  supportingEvidenceEn:  string | null;
+  admissionCriteriaEn:   string | null;
+  managementSectorEn:    string | null;
+  domainEn:              string | null;
+  directoryTypeEn:       string | null;
   // Assessment fields (editable)
   submissionStatus:      string;
   evidentAdminOverride:  string | null;
@@ -160,6 +167,12 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       r.domain_owner            AS "domainOwner",
       r.management_sector       AS "managementSector",
       r.sort_order              AS "sortOrder",
+      r.question_en             AS "questionEn",
+      r.supporting_evidence_en  AS "supportingEvidenceEn",
+      r.admission_criteria_en   AS "admissionCriteriaEn",
+      r.management_sector_en    AS "managementSectorEn",
+      r.domain_en               AS "domainEn",
+      r.directory_type_en       AS "directoryTypeEn",
       COALESCE(a.submission_status, 'NOT_COMPLETE') AS "submissionStatus",
       a.evident_admin_override  AS "evidentAdminOverride",
       a.domain_owner_override   AS "domainOwnerOverride",
@@ -224,6 +237,11 @@ export async function updateRequirement(reqId: number, fields: {
   evidentAdministrator?: string;
   domainOwner?: string;
   managementSector?: string;
+  questionEn?: string | null;
+  supportingEvidenceEn?: string | null;
+  admissionCriteriaEn?: string | null;
+  managementSectorEn?: string | null;
+  directoryTypeEn?: string | null;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.gov_compliance_requirements SET
@@ -237,7 +255,12 @@ export async function updateRequirement(reqId: number, fields: {
       compliance_or_maturity = COALESCE(${fields.complianceOrMaturity  ?? null}, compliance_or_maturity),
       evident_administrator  = COALESCE(${fields.evidentAdministrator  ?? null}, evident_administrator),
       domain_owner           = COALESCE(${fields.domainOwner           ?? null}, domain_owner),
-      management_sector      = COALESCE(${fields.managementSector      ?? null}, management_sector)
+      management_sector      = COALESCE(${fields.managementSector      ?? null}, management_sector),
+      question_en            = ${fields.questionEn            !== undefined ? (fields.questionEn            ?? null) : sql`question_en`},
+      supporting_evidence_en = ${fields.supportingEvidenceEn  !== undefined ? (fields.supportingEvidenceEn  ?? null) : sql`supporting_evidence_en`},
+      admission_criteria_en  = ${fields.admissionCriteriaEn   !== undefined ? (fields.admissionCriteriaEn   ?? null) : sql`admission_criteria_en`},
+      management_sector_en   = ${fields.managementSectorEn    !== undefined ? (fields.managementSectorEn    ?? null) : sql`management_sector_en`},
+      directory_type_en      = ${fields.directoryTypeEn       !== undefined ? (fields.directoryTypeEn       ?? null) : sql`directory_type_en`}
     WHERE req_id = ${reqId}
   `;
 }

@@ -160,7 +160,7 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
           <h1 className="text-2xl font-bold text-brand-deep">{register.name}</h1>
           {register.description && <p className="text-sm text-ink-soft mt-0.5">{register.description}</p>}
         </div>
-        {activeTab === "entries" && isAdmin && (
+        {activeTab === "entries" && (
           <button onClick={openNewEntry} className="btn btn-primary">+ Add Entry</button>
         )}
         {activeTab === "columns" && isAdmin && (

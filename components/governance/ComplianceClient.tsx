@@ -79,6 +79,12 @@ export function ComplianceClient({
   const [activeTab, setActiveTab] = useState<"assessment"|"config"|"admin">(
     initTab === "config" || initTab === "admin" ? initTab : "assessment"
   );
+
+  // Sync tab with URL changes (e.g. sidebar navigation)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    setActiveTab(tab === "config" || tab === "admin" ? tab : "assessment");
+  }, [searchParams]);
   const [selDomain, setSelDomain]       = useState<string | null>(null);
   const [selStandard, setSelStandard]   = useState<string | null>(null);
   const [selLevel, setSelLevel]         = useState<number | null>(null);
@@ -118,7 +124,7 @@ export function ComplianceClient({
         .forEach((r) => { const k = deriveStandard(r); if (!seen.has(k)) seen.set(k, r); });
     return Array.from(seen.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([std, rep]) => ({ std, question: rep.question }));
+      .map(([std, rep]) => ({ std, question: rep.questionEn ?? rep.question }));
   }, [reqs, selDomain]);
 
   // Cumulative: level 0 → only lvl 0; level N≥1 → levels 1..N
@@ -338,7 +344,7 @@ export function ComplianceClient({
 
   const { total, complete, na, notDone, pct } = overallStats;
   const selectedQuestion = selStandard
-    ? (reqs.find((r) => deriveStandard(r) === selStandard)?.question ?? "")
+    ? (() => { const r = reqs.find((x) => deriveStandard(x) === selStandard); return r ? (r.questionEn ?? r.question) : ""; })()
     : "";
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -547,9 +553,8 @@ export function ComplianceClient({
                             </div>
                           </div>
                           {question && (
-                            <p className="text-[11px] text-ink-soft mb-3 leading-snug line-clamp-2"
-                              dir={translated ? undefined : "rtl"}>
-                              {translated ?? question}
+                            <p className="text-[11px] text-ink-soft mb-3 leading-snug line-clamp-2">
+                              {question}
                             </p>
                           )}
                           <div className="h-2 rounded-full overflow-hidden flex mb-2 gap-px">
@@ -576,9 +581,8 @@ export function ComplianceClient({
                   {selectedQuestion && (
                     <div className="mb-5 p-4 bg-canvas-soft rounded-xl border border-line">
                       <div className="text-[11px] uppercase tracking-wide text-muted font-semibold mb-1">{selStandard}</div>
-                      <p className="text-sm text-ink leading-relaxed"
-                        dir={translations[selectedQuestion] ? undefined : "rtl"}>
-                        {translations[selectedQuestion] ?? selectedQuestion}
+                      <p className="text-sm text-ink leading-relaxed">
+                        {selectedQuestion}
                       </p>
                     </div>
                   )}
@@ -661,9 +665,8 @@ export function ComplianceClient({
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-ink leading-relaxed"
-                        dir={translations[selectedQuestion] ? undefined : "rtl"}>
-                        {translations[selectedQuestion] ?? selectedQuestion}
+                      <p className="text-sm text-ink leading-relaxed">
+                        {selectedQuestion}
                       </p>
                     </div>
                   )}
@@ -732,17 +735,16 @@ export function ComplianceClient({
                                             title="Endorsed">✓</span>
                                         )}
                                       </div>
-                                      {req.directoryType && (
-                                        <div className="text-[10px] text-muted mt-0.5">{req.directoryType}</div>
+                                      {(req.directoryTypeEn ?? req.directoryType) && (
+                                        <div className="text-[10px] text-muted mt-0.5">{req.directoryTypeEn ?? req.directoryType}</div>
                                       )}
                                     </td>
 
                                     {/* Supporting Evidence */}
                                     <td className="px-3 py-3">
-                                      <div className="text-[12px] text-ink leading-snug"
-                                        dir={translations[req.supportingEvidence ?? ""] ? undefined : "rtl"}>
-                                        {req.supportingEvidence
-                                          ? (translations[req.supportingEvidence] ?? req.supportingEvidence)
+                                      <div className="text-[12px] text-ink leading-snug">
+                                        {(req.supportingEvidenceEn ?? req.supportingEvidence)
+                                          ? (req.supportingEvidenceEn ?? req.supportingEvidence)
                                           : <span className="text-muted italic">—</span>}
                                       </div>
                                     </td>
@@ -891,11 +893,11 @@ function EvidenceExpanded({
   onWorkflow: (action: "submit"|"confirm"|"endorse") => void;
   translations: Record<string, string>;
 }) {
-  const [mgmt,     setMgmt]     = useState(req.managementNotes ?? req.managementSector ?? "");
+  const [mgmt,     setMgmt]     = useState(req.managementNotes ?? req.managementSectorEn ?? req.managementSector ?? "");
   const [comments, setComments] = useState(req.comments ?? "");
   const [saving,   setSaving]   = useState(false);
 
-  useEffect(() => { setMgmt(req.managementNotes ?? req.managementSector ?? ""); }, [req.managementNotes, req.managementSector]);
+  useEffect(() => { setMgmt(req.managementNotes ?? req.managementSectorEn ?? req.managementSector ?? ""); }, [req.managementNotes, req.managementSectorEn, req.managementSector]);
   useEffect(() => { setComments(req.comments ?? ""); }, [req.comments]);
 
   const isDirty = mgmt   !== (req.managementNotes ?? req.managementSector ?? "") ||
@@ -921,12 +923,11 @@ function EvidenceExpanded({
     <div className="space-y-4">
       {/* Static fields */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[12px]">
-        {req.admissionCriteria && (
+        {(req.admissionCriteriaEn ?? req.admissionCriteria) && (
           <div>
             <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Admission Criteria</div>
-            <div className="text-ink leading-snug"
-              dir={t(req.admissionCriteria) !== req.admissionCriteria ? undefined : "rtl"}>
-              {t(req.admissionCriteria) || req.admissionCriteria}
+            <div className="text-ink leading-snug">
+              {req.admissionCriteriaEn ?? req.admissionCriteria}
             </div>
           </div>
         )}
@@ -936,10 +937,10 @@ function EvidenceExpanded({
             <div className="text-ink font-mono text-[11px]">{req.directoryCode}</div>
           </div>
         )}
-        {req.directoryType && (
+        {(req.directoryTypeEn ?? req.directoryType) && (
           <div>
             <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Evidence Type</div>
-            <div className="text-ink">{req.directoryType}</div>
+            <div className="text-ink">{req.directoryTypeEn ?? req.directoryType}</div>
           </div>
         )}
         {req.operationalExcellence && req.operationalExcellence !== "N/A" && req.operationalExcellence !== "لا" && (
@@ -955,9 +956,9 @@ function EvidenceExpanded({
         <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">
           Management &amp; Supporting Sector
         </label>
-        {req.managementSector && !req.managementNotes && (
-          <div className="text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5 text-right" dir="rtl">
-            <span className="text-muted/70">{req.managementSector}</span>
+        {(req.managementSectorEn ?? req.managementSector) && !req.managementNotes && (
+          <div className="text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5">
+            <span className="text-muted/70">{req.managementSectorEn ?? req.managementSector}</span>
             <span className="ml-2 text-[10px] text-muted italic">(imported)</span>
           </div>
         )}
@@ -1208,10 +1209,33 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
   onConfigItemsChange: (items: ConfigItem[]) => void;
 }) {
   const [rows, setRows] = useState<LevelConfig[]>(levelCfg);
+  const [translating, setTranslating] = useState(false);
   const dirty = JSON.stringify(rows) !== JSON.stringify(levelCfg);
 
   function update(ln: number, field: keyof LevelConfig, val: string) {
     setRows((p) => p.map((r) => r.levelNum === ln ? { ...r, [field]: val } : r));
+  }
+
+  async function autoTranslateToArabic() {
+    setTranslating(true);
+    const updated = [...rows];
+    for (const row of updated) {
+      const needsName = row.name && !row.nameAr;
+      const needsDesc = row.description && !row.descriptionAr;
+      if (!needsName && !needsDesc) continue;
+      await Promise.all([
+        needsName ? fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: row.name, targetLang: "ar" }),
+        }).then((r) => r.json()).then((d) => { if (d.translation) row.nameAr = d.translation; }).catch(() => {}) : Promise.resolve(),
+        needsDesc ? fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: row.description, targetLang: "ar" }),
+        }).then((r) => r.json()).then((d) => { if (d.translation) row.descriptionAr = d.translation; }).catch(() => {}) : Promise.resolve(),
+      ]);
+    }
+    setRows([...updated]);
+    setTranslating(false);
   }
 
   return (
@@ -1222,11 +1246,18 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
             <h2 className="font-bold text-brand-deep">Level Configuration</h2>
             <p className="text-sm text-ink-soft">Customise names, colours, and descriptions for each maturity level.</p>
           </div>
-          {dirty && (
-            <button onClick={() => onSaveLevels(rows)} disabled={saving} className="btn btn-primary btn-sm">
-              {saving ? "Saving…" : "Save Changes"}
+          <div className="flex items-center gap-2">
+            <button onClick={autoTranslateToArabic} disabled={translating || saving}
+              className="btn btn-sm"
+              title="Auto-fill empty Arabic fields by translating from English">
+              {translating ? "Translating…" : "Auto-translate to Arabic"}
             </button>
-          )}
+            {dirty && (
+              <button onClick={() => onSaveLevels(rows)} disabled={saving} className="btn btn-primary btn-sm">
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            )}
+          </div>
         </div>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
@@ -1454,19 +1485,21 @@ function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOpti
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Code</th>
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Standard</th>
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Domain</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Question</th>
+                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Supporting Evidence (EN)</th>
                   <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-16">Level</th>
                   <th className="px-3 py-2.5 w-12" />
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 200).map((req) => (
+                {filtered.slice(0, 200).map((req) => {
+                  const dispEn = req.supportingEvidenceEn ?? req.questionEn ?? req.question;
+                  return (
                   <tr key={req.reqId} className="border-b border-line-soft hover:bg-canvas/30">
                     <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-muted">{req.reqCode}</td>
                     <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{req.standard ?? "—"}</td>
                     <td className="px-3 py-2.5 text-[12px] text-ink">{req.domain ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate text-right" dir="rtl" title={req.question}>
-                      {req.question.length > 80 ? req.question.slice(0,78)+"…" : req.question}
+                    <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate" title={dispEn}>
+                      {dispEn.length > 90 ? dispEn.slice(0,88)+"…" : dispEn}
                     </td>
                     <td className="px-3 py-2.5 text-[11px] text-muted">{req.maturityLevel ?? "—"}</td>
                     <td className="px-3 py-2.5">
@@ -1474,7 +1507,8 @@ function AdminTab({ frameworkId, users }: { frameworkId: number; users: UserOpti
                         className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold">Edit</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {filtered.length === 0 && (
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted italic">No requirements match.</td></tr>
                 )}
@@ -1501,16 +1535,23 @@ function EditRequirementDialog({ req, saving, onSave, onClose }: {
   saving: boolean; onSave: (u: Partial<ComplianceRequirement>) => void; onClose: () => void;
 }) {
   const [v, setV] = useState({
+    // Arabic fields
     question:             req.question,
     supportingEvidence:   req.supportingEvidence  ?? "",
     admissionCriteria:    req.admissionCriteria   ?? "",
+    managementSector:     req.managementSector    ?? "",
     directoryCode:        req.directoryCode       ?? "",
     directoryType:        req.directoryType       ?? "",
     complianceOrMaturity: req.complianceOrMaturity ?? "",
     evidentAdministrator: req.evidentAdministrator ?? "",
     domainOwner:          req.domainOwner          ?? "",
-    managementSector:     req.managementSector     ?? "",
     maturityLevel:        req.maturityLevel        ?? "",
+    // English fields
+    questionEn:            req.questionEn            ?? "",
+    supportingEvidenceEn:  req.supportingEvidenceEn  ?? "",
+    admissionCriteriaEn:   req.admissionCriteriaEn   ?? "",
+    managementSectorEn:    req.managementSectorEn    ?? "",
+    directoryTypeEn:       req.directoryTypeEn       ?? "",
   });
   function set(k: keyof typeof v, val: string) { setV((p) => ({ ...p, [k]: val })); }
   function save() {
@@ -1521,9 +1562,18 @@ function EditRequirementDialog({ req, saving, onSave, onClose }: {
     });
     onSave(updates as Partial<ComplianceRequirement>);
   }
+
+  const bilingualFields: Array<[string, string, keyof typeof v, keyof typeof v]> = [
+    ["Question",                       "السؤال",           "questionEn",           "question"],
+    ["Supporting Evidence",            "الدليل الداعم",    "supportingEvidenceEn", "supportingEvidence"],
+    ["Admission Criteria",             "معايير القبول",    "admissionCriteriaEn",  "admissionCriteria"],
+    ["Management & Supporting Sector", "القطاع الداعم",    "managementSectorEn",   "managementSector"],
+    ["Evidence Type",                  "نوع الدليل",       "directoryTypeEn",      "directoryType"],
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-line px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div>
             <h3 className="font-bold text-brand-deep">Edit Requirement</h3>
@@ -1531,29 +1581,42 @@ function EditRequirementDialog({ req, saving, onSave, onClose }: {
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl">×</button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          {([
-            ["question",             "Question",                        true,  true],
-            ["supportingEvidence",   "Supporting Evidence",             true,  true],
-            ["admissionCriteria",    "Admission Criteria",              true,  true],
-            ["managementSector",     "Management & Supporting Sector",  true,  false],
-            ["directoryCode",        "Evidence Code",                   false, false],
-            ["directoryType",        "Evidence Type",                   false, false],
-            ["complianceOrMaturity", "Compliance or Maturity",          false, false],
-            ["maturityLevel",        "Maturity Level",                  false, false],
-            ["evidentAdministrator", "Evident Administrator",           false, false],
-            ["domainOwner",          "Domain Owner",                    false, false],
-          ] as [keyof typeof v, string, boolean, boolean][]).map(([k, label, multi, rtl]) => (
-            <div key={k}>
-              <label className="block text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">{label}</label>
-              {multi ? (
-                <textarea value={v[k]} onChange={(e) => set(k, e.target.value)} rows={2}
-                  dir={rtl ? "rtl" : undefined} className="field text-sm w-full" />
-              ) : (
-                <input value={v[k]} onChange={(e) => set(k, e.target.value)} className="field text-sm w-full" />
-              )}
+        <div className="px-6 py-5 space-y-5">
+          {/* Bilingual EN/AR side-by-side fields */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-b border-line pb-2 mb-1">
+            <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide">English (EN)</div>
+            <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide text-right" dir="rtl">العربية (AR)</div>
+          </div>
+          {bilingualFields.map(([labelEn, labelAr, keyEn, keyAr]) => (
+            <div key={keyEn} className="grid grid-cols-2 gap-x-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">{labelEn}</label>
+                <textarea value={v[keyEn]} onChange={(e) => set(keyEn, e.target.value)} rows={2}
+                  className="field text-sm w-full" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1 text-right" dir="rtl">{labelAr}</label>
+                <textarea value={v[keyAr]} onChange={(e) => set(keyAr, e.target.value)} rows={2}
+                  dir="rtl" className="field text-sm w-full text-right" />
+              </div>
             </div>
           ))}
+
+          {/* Other fields */}
+          <div className="border-t border-line pt-4 space-y-3">
+            {([
+              ["directoryCode",        "Evidence Code",         false],
+              ["complianceOrMaturity", "Compliance or Maturity", false],
+              ["maturityLevel",        "Maturity Level",         false],
+              ["evidentAdministrator", "Evident Administrator",  false],
+              ["domainOwner",          "Domain Owner",           false],
+            ] as [keyof typeof v, string, boolean][]).map(([k, label]) => (
+              <div key={k}>
+                <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">{label}</label>
+                <input value={v[k]} onChange={(e) => set(k, e.target.value)} className="field text-sm w-full" />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="sticky bottom-0 bg-white border-t border-line px-6 py-4 flex gap-3 justify-end rounded-b-2xl">
           <button onClick={onClose} className="btn btn-sm">Cancel</button>

@@ -148,15 +148,17 @@ export async function listEntries(registerId: number): Promise<RegisterEntry[]> 
 }
 
 export async function createEntry(registerId: number, data: Record<string, unknown>, createdBy: string): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jsonData = data as any;
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_register_entries (register_id, data, created_by)
-    VALUES (${registerId}, ${JSON.stringify(data)}::jsonb, ${createdBy})
+    VALUES (${registerId}, ${jsonData}, ${createdBy})
     RETURNING entry_id AS id
   `;
   const id = rows[0].id;
   await sql`
     INSERT INTO bayanat.gov_register_entry_history (register_id, entry_id, action, changed_by, new_data)
-    VALUES (${registerId}, ${id}, 'CREATE', ${createdBy}, ${JSON.stringify(data)}::jsonb)
+    VALUES (${registerId}, ${id}, 'CREATE', ${createdBy}, ${jsonData})
   `;
   return id;
 }
@@ -165,12 +167,15 @@ export async function updateEntry(entryId: number, data: Record<string, unknown>
   const [old] = await sql<{ data: unknown; registerId: number }[]>`
     SELECT data, register_id AS "registerId" FROM bayanat.gov_register_entries WHERE entry_id = ${entryId}
   `;
-  await sql`UPDATE bayanat.gov_register_entries SET data=${JSON.stringify(data)}::jsonb, updated_at=NOW() WHERE entry_id=${entryId}`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jsonData = data as any;
+  await sql`UPDATE bayanat.gov_register_entries SET data=${jsonData}, updated_at=NOW() WHERE entry_id=${entryId}`;
   if (old) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const oldJson = (typeof old.data === "string" ? JSON.parse(old.data) : old.data) as any;
     await sql`
       INSERT INTO bayanat.gov_register_entry_history (register_id, entry_id, action, changed_by, old_data, new_data)
-      VALUES (${old.registerId}, ${entryId}, 'UPDATE', ${changedBy ?? null},
-              ${JSON.stringify(old.data)}::jsonb, ${JSON.stringify(data)}::jsonb)
+      VALUES (${old.registerId}, ${entryId}, 'UPDATE', ${changedBy ?? null}, ${oldJson}, ${jsonData})
     `;
   }
 }
@@ -181,9 +186,11 @@ export async function deleteEntry(entryId: number, changedBy?: string): Promise<
   `;
   await sql`DELETE FROM bayanat.gov_register_entries WHERE entry_id=${entryId}`;
   if (old) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const oldJson = (typeof old.data === "string" ? JSON.parse(old.data) : old.data) as any;
     await sql`
       INSERT INTO bayanat.gov_register_entry_history (register_id, entry_id, action, changed_by, old_data)
-      VALUES (${old.registerId}, ${entryId}, 'DELETE', ${changedBy ?? null}, ${JSON.stringify(old.data)}::jsonb)
+      VALUES (${old.registerId}, ${entryId}, 'DELETE', ${changedBy ?? null}, ${oldJson})
     `;
   }
 }

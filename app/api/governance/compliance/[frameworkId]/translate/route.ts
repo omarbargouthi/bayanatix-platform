@@ -7,10 +7,12 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { text } = await req.json();
+  const { text, targetLang } = await req.json();
   if (!text?.trim()) return NextResponse.json({ error: "text required" }, { status: 400 });
 
-  const hash = crypto.createHash("sha256").update(text.trim()).digest("hex");
+  const direction = targetLang === "ar" ? "ar" : "en";
+  const hashKey = `${direction}:${text.trim()}`;
+  const hash = crypto.createHash("sha256").update(hashKey).digest("hex");
 
   // Check cache first
   const cached = await sql<{ translated_text: string }[]>`
@@ -32,15 +34,14 @@ export async function POST(req: Request) {
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const client = new Anthropic({ apiKey });
 
+  const prompt = direction === "ar"
+    ? `Translate the following English text to Arabic accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`
+    : `Translate the following Arabic text to English accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`;
+
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `Translate the following Arabic text to English accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`,
-      },
-    ],
+    messages: [{ role: "user", content: prompt }],
   });
 
   const block = response.content[0];
