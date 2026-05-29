@@ -189,4 +189,46 @@ export type I18nStrings = {
     registers:          string;
     compliance:         string;
   };
+
+  // ── Dashboard ───────────────────────────────────────────────────────────────
+  dashboard: {
+    welcome:           string;   // supports {name} placeholder
+    overallCompliance: string;
+    overallMaturity:   string;
+    ndomoDomains:      string;
+    lastPeriod:        string;
+    noTrendData:       string;
+    stats: {
+      specsTracked:    string;
+      domainsActive:   string;
+      controlsPassing: string;
+      openFindings:    string;
+    };
+    search: {
+      placeholder:     string;
+      button:          string;
+      filtering:       string;
+      clear:           string;
+      tags:            string;
+      steward:         string;
+      searching:       string;
+      noResults:       string;
+      seeAll:          string;
+      recentSearches:  string;
+      recentlyVisited: string;
+      searchUser:      string;
+      result:          string;
+      results:         string;
+    };
+    domainCard: {
+      compliance: string;
+      maturity:   string;
+    };
+    assetTypes: {
+      table:   string; view:   string; column:  string;
+      schema:  string; source: string; term:    string;
+      tables:  string; views:  string; columns: string;
+      schemas: string; sources: string; terms:  string;
+    };
+  };
 };

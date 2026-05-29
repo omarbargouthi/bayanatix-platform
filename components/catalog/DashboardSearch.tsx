@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { RecentAsset } from "@/lib/types";
 import type { SearchResult } from "@/app/api/catalog/search/route";
 import { ALL_TYPES } from "@/lib/search-types";
+import { useLang } from "@/lib/lang-context";
 
 type Props = {
   recentAssets:   RecentAsset[];
@@ -42,24 +43,25 @@ const RESULT_ICON: Record<string, React.ReactNode> = {
   SCHEMA: <SchemaIcon />, SOURCE: <SchemaIcon />, TERM: <TermIcon />,
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  TABLE: "Table", VIEW: "View", COLUMN: "Column",
-  SCHEMA: "Schema", SOURCE: "Source", TERM: "Term",
-};
-
-const TYPE_CONFIG = [
-  { key: "TABLE",  label: "Tables"  },
-  { key: "VIEW",   label: "Views"   },
-  { key: "COLUMN", label: "Columns" },
-  { key: "SCHEMA", label: "Schemas" },
-  { key: "SOURCE", label: "Sources" },
-  { key: "TERM",   label: "Terms"   },
-];
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function DashboardSearch({ recentAssets, recentSearches }: Props) {
   const router = useRouter();
+  const { t } = useLang();
+
+  const TYPE_LABEL: Record<string, string> = {
+    TABLE: t.dashboard.assetTypes.table, VIEW: t.dashboard.assetTypes.view,
+    COLUMN: t.dashboard.assetTypes.column, SCHEMA: t.dashboard.assetTypes.schema,
+    SOURCE: t.dashboard.assetTypes.source, TERM: t.dashboard.assetTypes.term,
+  };
+  const TYPE_CONFIG = [
+    { key: "TABLE",  label: t.dashboard.assetTypes.tables  },
+    { key: "VIEW",   label: t.dashboard.assetTypes.views   },
+    { key: "COLUMN", label: t.dashboard.assetTypes.columns },
+    { key: "SCHEMA", label: t.dashboard.assetTypes.schemas },
+    { key: "SOURCE", label: t.dashboard.assetTypes.sources },
+    { key: "TERM",   label: t.dashboard.assetTypes.terms   },
+  ];
 
   const [focused,   setFocused]   = useState(false);
   const [query,     setQuery]     = useState("");
@@ -157,18 +159,18 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
           onBlur={() => setTimeout(() => setFocused(false), 180)}
           onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
           className="flex-1 bg-transparent border-0 outline-none text-[15px] placeholder:text-muted"
-          placeholder="Search for Tables, Databases, Schemas, Terms…"
+          placeholder={t.dashboard.search.placeholder}
         />
         {query && (
           <button onMouseDown={(e) => e.preventDefault()} onClick={() => { setQuery(""); setResults([]); inputRef.current?.focus(); }} className="text-muted hover:text-ink text-lg leading-none">×</button>
         )}
-        <button onMouseDown={(e) => e.preventDefault()} onClick={handleSubmit} className="btn btn-primary btn-sm !py-2 !px-4">Search</button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={handleSubmit} className="btn btn-primary btn-sm !py-2 !px-4">{t.dashboard.search.button}</button>
       </div>
 
       {/* Active filter badges (shown when not focused) */}
       {!focused && hasFilters && (
         <div className="flex flex-wrap items-center gap-2 mt-2 max-w-2xl">
-          <span className="text-[11px] text-muted">Filtering:</span>
+          <span className="text-[11px] text-muted">{t.dashboard.search.filtering}</span>
           {activeTypes.size < ALL_TYPES.length && [...activeTypes].map((t) => (
             <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-purple/10 text-brand-purple">{TYPE_LABEL[t]}</span>
           ))}
@@ -177,7 +179,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
             return tag ? <span key={id} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: tag.colorHex + "22", color: tag.colorHex }}>{tag.tagName}</span> : null;
           })}
           {selectedUsers.map((u) => <span key={u.userId} className="text-[10px] text-muted">{u.fullName}</span>)}
-          <button onClick={() => { setActiveTypes(new Set(ALL_TYPES)); setSelectedTags([]); setSelectedUsers([]); }} className="text-[10px] text-brand-purple hover:underline">Clear</button>
+          <button onClick={() => { setActiveTypes(new Set(ALL_TYPES)); setSelectedTags([]); setSelectedUsers([]); }} className="text-[10px] text-brand-purple hover:underline">{t.dashboard.search.clear}</button>
         </div>
       )}
 
@@ -208,7 +210,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
             {/* Tags row */}
             {availableTags.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] text-muted font-bold uppercase tracking-wide mr-0.5">Tags:</span>
+                <span className="text-[10px] text-muted font-bold uppercase tracking-wide mr-0.5">{t.dashboard.search.tags}</span>
                 {availableTags.slice(0, 12).map((tag) => {
                   const active = selectedTags.includes(tag.tagId);
                   return (
@@ -228,7 +230,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
 
             {/* Steward row */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-muted font-bold uppercase tracking-wide mr-0.5">Steward:</span>
+              <span className="text-[10px] text-muted font-bold uppercase tracking-wide mr-0.5">{t.dashboard.search.steward}</span>
               {selectedUsers.map((u) => (
                 <span key={u.userId} className="inline-flex items-center gap-1 text-[11px] bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded-full font-semibold">
                   {u.fullName}
@@ -240,7 +242,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
                   value={userQ}
                   onChange={(e) => setUserQ(e.target.value)}
                   onBlur={() => setTimeout(() => setUserSugg([]), 150)}
-                  placeholder="Search user…"
+                  placeholder={t.dashboard.search.searchUser}
                   className="text-[11px] border border-line rounded-md px-2 py-0.5 bg-white outline-none focus:border-brand-purple w-28"
                 />
                 {userSugg.length > 0 && (
@@ -261,10 +263,10 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
           {showResults && (
             <div className="max-h-56 overflow-y-auto">
               <div className="px-4 py-2 border-b border-line-soft text-[10px] uppercase tracking-wider text-muted font-bold">
-                {loading ? "Searching…" : `${results.length} result${results.length !== 1 ? "s" : ""}`}
+                {loading ? t.dashboard.search.searching : `${results.length} ${results.length !== 1 ? t.dashboard.search.results : t.dashboard.search.result}`}
               </div>
               {results.length === 0 && !loading && (
-                <div className="px-4 py-5 text-sm text-muted text-center">No results for "{query}"</div>
+                <div className="px-4 py-5 text-sm text-muted text-center">{t.dashboard.search.noResults} &ldquo;{query}&rdquo;</div>
               )}
               {results.map((r) => (
                 <button
@@ -293,7 +295,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
                   onClick={handleSubmit}
                   className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-brand-purple hover:bg-canvas border-t border-line transition-colors"
                 >
-                  See all results for "{query}"
+                  {t.dashboard.search.seeAll} &ldquo;{query}&rdquo;
                   <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3"><path fillRule="evenodd" d="M2 8a.75.75 0 01.75-.75h8.69L8.22 4.03a.75.75 0 111.06-1.06l4.5 4.5a.75.75 0 010 1.06l-4.5 4.5a.75.75 0 01-1.06-1.06l3.22-3.22H2.75A.75.75 0 012 8z" clipRule="evenodd" /></svg>
                 </button>
               )}
@@ -305,7 +307,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
             <div>
               {recentSearches.length > 0 && (
                 <div className="px-4 py-2.5 border-b border-line-soft">
-                  <div className="text-[10px] uppercase tracking-wider text-muted mb-2 font-bold">Recent Searches</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted mb-2 font-bold">{t.dashboard.search.recentSearches}</div>
                   {recentSearches.map((q) => (
                     <button key={q} onMouseDown={(e) => e.preventDefault()} onClick={() => { setQuery(q); search(q); }} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-canvas text-sm text-ink-soft hover:text-ink transition-colors text-left w-full">
                       <ClockIcon /><span>{q}</span>
@@ -315,7 +317,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
               )}
               {recentAssets.length > 0 && (
                 <div className="px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-wider text-muted mb-3 font-bold">Recently Visited ({recentAssets.length})</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted mb-3 font-bold">{t.dashboard.search.recentlyVisited} ({recentAssets.length})</div>
                   <div className="grid grid-cols-5 gap-2">
                     {recentAssets.map((a) => (
                       <Link key={`${a.assetType}-${a.assetId}`} href={a.href} onMouseDown={(e) => e.preventDefault()} onClick={() => setFocused(false)} className="flex flex-col items-center gap-1.5 group">

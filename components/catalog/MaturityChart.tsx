@@ -4,7 +4,7 @@ import type { TrendPoint } from "@/lib/types";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-export function MaturityChart({ data }: { data: TrendPoint[] }) {
+export function MaturityChart({ data, noDataLabel = "No trend data available" }: { data: TrendPoint[]; noDataLabel?: string }) {
   const W = 480, H = 180;
   const PAD = { l: 28, r: 14, t: 24, b: 28 };
   const cW = W - PAD.l - PAD.r;
@@ -21,7 +21,7 @@ export function MaturityChart({ data }: { data: TrendPoint[] }) {
   if (data.length === 0) {
     return (
       <div className="h-[150px] flex items-center justify-center text-muted text-sm">
-        No trend data available
+        {noDataLabel}
       </div>
     );
   }

@@ -29,7 +29,7 @@ const accentClass: Record<NonNullable<WarnLevel>, string> = {
   amber: "border-t-2 border-t-amber-400",
 };
 
-export function DomainCard({ d }: { d: GovernanceDomain }) {
+export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { compliance: string; maturity: string } }) {
   const DOMAIN_HREFS: Record<string, string> = {
     DG:   "/governance",
     DCAT: "/catalog",
@@ -76,12 +76,12 @@ export function DomainCard({ d }: { d: GovernanceDomain }) {
 
         <div className="grid grid-cols-2 gap-x-5 pt-3 border-t border-line-soft">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Compliance</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">{labels?.compliance ?? "Compliance"}</div>
             <div className="text-[13px] font-bold text-ink mb-1.5">{d.compliancePct}%</div>
             <ProgressBar value={d.compliancePct} />
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">Maturity</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">{labels?.maturity ?? "Maturity"}</div>
             <Stars value={d.maturityLevel} />
             <div className="mt-1">
               <span className="text-[11px] font-bold text-brand-purple">{d.level}</span>
