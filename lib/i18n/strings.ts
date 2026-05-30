@@ -467,6 +467,35 @@ export type I18nStrings = {
     certGold:         string;
     certSilver:       string;
     certBronze:       string;
+    certUncertified:  string;
+    // Picker / widget labels
+    addTags:           string;
+    loadingTags:       string;
+    noTagsDefined:     string;
+    linkTerms:         string;
+    loadingTerms:      string;
+    searchTerms:       string;
+    noTermsMatch:      string;
+    noRatingsYet:      string;
+    rateAsset:         string;
+    yourRating:        string;
+    submitRating:      string;
+    addCommentOpt:     string;
+    // Classification codes
+    classPublic:       string;
+    classInternal:     string;
+    classConfidential: string;
+    classRestricted:   string;
+    classPii:          string;
+    classSecret:       string;
+    classTopSecret:    string;
+    // Column edit modal
+    fromSource:        string;
+    columnTypeLabel:   string;
+    colBusinessTerm:   string;
+    encryptedField:    string;
+    saveChanges:       string;
+    viewHistory:       string;
   };
 
   // ── Data Quality ─────────────────────────────────────────────────────────────
@@ -561,6 +590,67 @@ export type I18nStrings = {
     invalidValues:    string;
     loadingSamples:   string;
     noSamples:        string;
+    // Status labels
+    statusPassed:     string;
+    statusFailed:     string;
+    statusError:      string;
+    statusWarning:    string;
+    statusPaused:     string;
+  };
+
+  // ── Business Glossary ───────────────────────────────────────────────────────
+  glossary: {
+    pageTitle:          string;
+    pageDesc:           string;
+    exportBtn:          string;
+    newTerm:            string;
+    totalTerms:         string;
+    domains:            string;
+    linkedAttrs:        string;
+    piiTerms:           string;
+    domainsTitle:       string;
+    allTerms:           string;
+    filterBtn:          string;
+    sortBtn:            string;
+    colTerm:            string;
+    colDomain:          string;
+    colDefinition:      string;
+    colClassification:  string;
+    colPii:             string;
+    colAliases:         string;
+    colLinked:          string;
+    noTermsFound:       string;
+    alsoKnownAs:        string;
+    requestChange:      string;
+    follow:             string;
+    sectionDefinition:  string;
+    sectionBizRules:    string;
+    sectionFormat:      string;
+    sectionLinkedAttrs: string;
+    formatLabel:        string;
+    exampleValue:       string;
+    propDomain:         string;
+    propTermType:       string;
+    propPii:            string;
+    propPiCategory:     string;
+    propNpiCategory:    string;
+    propCreated:        string;
+    propLinkedCols:     string;
+    yesPersonalData:    string;
+    noPersonalData:     string;
+    termTypeTerm:       string;
+    termTypeKpi:        string;
+    colColumn:          string;
+    colTable:           string;
+    colType:            string;
+    synonymsTitle:      string;
+    noLinkedColsYet:    string;
+    newTermModalTitle:  string;
+    termNameLabel:      string;
+    termDefLabel:       string;
+    domainLabel:        string;
+    creating:           string;
+    propertiesSection:  string;
   };
 
   // ── Dashboard ───────────────────────────────────────────────────────────────

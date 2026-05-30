@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { TagRecord } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 
 function TagChip({ tag, onRemove }: { tag: TagRecord; onRemove: () => void }) {
   return (
@@ -22,6 +23,9 @@ export function TagPicker({
   assetType: string;
   assetId:   number;
 }) {
+  const { t: strings } = useLang();
+  const c = strings.catalog;
+
   const [allTags,  setAllTags]  = useState<TagRecord[]>([]);
   const [selected, setSelected] = useState<TagRecord[]>([]);
   const [open,     setOpen]     = useState(false);
@@ -72,7 +76,7 @@ export function TagPicker({
     }
   }
 
-  if (loading) return <div className="text-[11px] text-muted">Loading tags…</div>;
+  if (loading) return <div className="text-[11px] text-muted">{c.loadingTags}</div>;
 
   return (
     <div ref={ref} className="relative">
@@ -82,19 +86,19 @@ export function TagPicker({
         onClick={() => setOpen((v) => !v)}
       >
         {selected.length === 0 && (
-          <span className="text-muted text-[13px] self-center">Add tags…</span>
+          <span className="text-muted text-[13px] self-center">{c.addTags}</span>
         )}
-        {selected.map((t) => (
-          <TagChip key={t.tagId} tag={t} onRemove={() => toggle(t)} />
+        {selected.map((sel) => (
+          <TagChip key={sel.tagId} tag={sel} onRemove={() => toggle(sel)} />
         ))}
-        {saving && <span className="text-[11px] text-muted self-center ml-1">Saving…</span>}
+        {saving && <span className="text-[11px] text-muted self-center ml-1">{strings.common.saving}</span>}
       </div>
 
       {/* Dropdown */}
       {open && (
         <div className="absolute z-50 mt-1 w-full min-w-[220px] bg-white border border-line rounded-xl shadow-lg max-h-64 overflow-y-auto py-1.5">
           {roots.length === 0 && (
-            <div className="px-4 py-3 text-sm text-muted">No tags defined yet.</div>
+            <div className="px-4 py-3 text-sm text-muted">{c.noTagsDefined}</div>
           )}
           {roots.map((root) => {
             const children = childMap.get(root.tagId) ?? [];

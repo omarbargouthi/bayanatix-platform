@@ -3,9 +3,11 @@ import { sql } from "../db";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type DqDimension = {
-  code: string;
-  name: string;
-  description: string | null;
+  code:          string;
+  name:          string;
+  nameAr:        string | null;
+  description:   string | null;
+  descriptionAr: string | null;
 };
 
 export type DqRule = {
@@ -86,12 +88,20 @@ export type DqDashboardStats = {
 // ── Dimensions ─────────────────────────────────────────────────────────────────
 
 export async function getDqDimensions(): Promise<DqDimension[]> {
-  const rows = await sql<{ code: string; name: string; desc: string | null }[]>`
-    SELECT dimension_code AS code, dimension_name_text AS name, description_text AS desc
+  const rows = await sql<{ code: string; name: string; nameAr: string | null; desc: string | null; descAr: string | null }[]>`
+    SELECT
+      dimension_code     AS code,
+      dimension_name_text AS name,
+      name_ar_text        AS "nameAr",
+      description_text    AS desc,
+      description_ar_text AS "descAr"
     FROM bayanat.dq_dimensions
     ORDER BY dimension_name_text
   `;
-  return rows.map((r) => ({ code: r.code, name: r.name, description: r.desc }));
+  return rows.map((r) => ({
+    code: r.code, name: r.name, nameAr: r.nameAr,
+    description: r.desc, descriptionAr: r.descAr,
+  }));
 }
 
 // ── Rules ─────────────────────────────────────────────────────────────────────

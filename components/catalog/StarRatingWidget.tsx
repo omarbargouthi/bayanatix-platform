@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { AssetRating } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 
 function Star({ filled, half, onClick, onHover }: { filled: boolean; half?: boolean; onClick: () => void; onHover: () => void }) {
   return (
@@ -12,6 +13,8 @@ function Star({ filled, half, onClick, onHover }: { filled: boolean; half?: bool
 }
 
 export function StarRatingWidget({ assetType, assetId }: { assetType: string; assetId: number }) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [data,    setData]    = useState<AssetRating | null>(null);
   const [hover,   setHover]   = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -63,18 +66,18 @@ export function StarRatingWidget({ assetType, assetId }: { assetType: string; as
           {data?.count ? (
             <span><strong className="text-ink">{avg.toFixed(1)}</strong> ({data.count} rating{data.count !== 1 ? "s" : ""})</span>
           ) : (
-            <span>No ratings yet</span>
+            <span>{c.noRatingsYet}</span>
           )}
         </div>
       </div>
       {myStars > 0 && (
-        <p className="text-[11px] text-muted mt-0.5">Your rating: {myStars}★{data?.myRating?.comment ? ` · "${data.myRating.comment}"` : ""}</p>
+        <p className="text-[11px] text-muted mt-0.5">{c.yourRating} {myStars}★{data?.myRating?.comment ? ` · "${data.myRating.comment}"` : ""}</p>
       )}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm border border-line p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-brand-deep mb-4">Rate this asset</h3>
+            <h3 className="font-bold text-brand-deep mb-4">{c.rateAsset}</h3>
             <div className="flex items-center gap-1 justify-center mb-4">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button key={n} type="button" onClick={() => setPendingStar(n)} className="text-3xl leading-none transition-transform hover:scale-110">
@@ -87,12 +90,12 @@ export function StarRatingWidget({ assetType, assetId }: { assetType: string; as
               onChange={(e) => setComment(e.target.value)}
               rows={3}
               className="input-field resize-none w-full mb-4"
-              placeholder="Add a comment (optional)…"
+              placeholder={c.addCommentOpt}
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowModal(false)} className="btn">Cancel</button>
+              <button onClick={() => setShowModal(false)} className="btn">{t.common.cancel}</button>
               <button onClick={submit} disabled={saving || pendingStar === 0} className="btn btn-primary">
-                {saving ? "Saving…" : "Submit Rating"}
+                {saving ? t.common.saving : c.submitRating}
               </button>
             </div>
           </div>

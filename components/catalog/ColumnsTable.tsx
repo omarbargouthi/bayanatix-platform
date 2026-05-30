@@ -8,6 +8,7 @@ import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { GlossaryTermPicker } from "./GlossaryTermPicker";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
+import { useLang } from "@/lib/lang-context";
 
 const COLUMN_TYPE_OPTIONS = [
   { value: "",          label: "— None —" },
@@ -23,6 +24,8 @@ function AttributeEditModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { t } = useLang();
+  const c = t.catalog;
   const [description,  setDescription]  = useState(attr.description  ?? "");
   const [friendlyName, setFriendlyName] = useState(attr.friendlyName ?? "");
   const [isEncrypted,  setIsEncrypted]  = useState(attr.isEncrypted  ?? false);
@@ -72,7 +75,7 @@ function AttributeEditModal({
                 onClick={() => setShowHistory(true)}
                 className="text-[11px] text-brand-purple hover:underline font-medium"
               >
-                View History
+                {c.viewHistory}
               </button>
               <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none ml-2">&times;</button>
             </div>
@@ -80,7 +83,7 @@ function AttributeEditModal({
 
           <div className="px-6 py-5 space-y-4">
             <div>
-              <label className="field-label">Description</label>
+              <label className="field-label">{t.common.description}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -90,7 +93,7 @@ function AttributeEditModal({
               />
               <div className="mt-2 rounded-md bg-canvas-soft border border-line px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-0.5">
-                  From source system
+                  {c.fromSource}
                 </div>
                 {attr.sourceDescription
                   ? <p className="text-[12px] text-ink-soft leading-relaxed">{attr.sourceDescription}</p>
@@ -101,7 +104,7 @@ function AttributeEditModal({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="field-label">Friendly Name</label>
+                <label className="field-label">{c.editFriendlyName}</label>
                 <input
                   type="text"
                   value={friendlyName}
@@ -111,14 +114,14 @@ function AttributeEditModal({
                 />
               </div>
               <div>
-                <label className="field-label">Business Term</label>
+                <label className="field-label">{c.colBusinessTerm}</label>
                 <GlossaryTermPicker value={glossaryTerm} onChange={setGlossaryTerm} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 items-end">
               <div>
-                <label className="field-label">Column Type</label>
+                <label className="field-label">{c.columnTypeLabel}</label>
                 <select
                   value={columnType}
                   onChange={(e) => setColumnType(e.target.value)}
@@ -138,18 +141,18 @@ function AttributeEditModal({
                   className="w-4 h-4 rounded accent-brand-purple"
                 />
                 <label htmlFor="col-encrypted" className="text-sm text-ink cursor-pointer select-none">
-                  Encrypted Field
+                  {c.encryptedField}
                 </label>
               </div>
             </div>
 
             <div>
-              <label className="field-label">Tags</label>
+              <label className="field-label">{c.tagsLabel}</label>
               <TagPicker assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} />
             </div>
 
             <div>
-              <label className="field-label">Business Terms</label>
+              <label className="field-label">{c.businessTerms}</label>
               <TermMultiPicker assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} />
             </div>
 
@@ -161,9 +164,9 @@ function AttributeEditModal({
           </div>
 
           <div className="flex justify-end gap-2 px-6 py-4 border-t border-line">
-            <button onClick={onClose} className="btn">Cancel</button>
+            <button onClick={onClose} className="btn">{t.common.cancel}</button>
             <button onClick={save} disabled={saving} className="btn btn-primary">
-              {saving ? "Saving…" : "Save Changes"}
+              {saving ? t.common.saving : c.saveChanges}
             </button>
           </div>
         </div>

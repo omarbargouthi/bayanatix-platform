@@ -300,7 +300,7 @@ function RuleFormModal({
             <div className="w-52">
               <label className="block text-xs font-semibold text-muted mb-1">{dq.dqDimensionLabel}</label>
               <select className="input w-full" value={form.dimensionCode} onChange={(e) => setForm((f) => ({ ...f, dimensionCode: e.target.value }))}>
-                {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
+                {dimensions.map((d) => <option key={d.code} value={d.code}>{dimLabel(d)}</option>)}
               </select>
             </div>
           </div>
@@ -503,10 +503,10 @@ function RunDetailModal({ result, onClose }: { result: DqResult; onClose: () => 
           {/* Summary grid */}
           <div className="grid grid-cols-4 gap-3">
             {[
-              ["Status",  result.statusCode ?? "—"],
-              ["Score",   result.score != null ? `${Number(result.score).toFixed(1)}%` : "—"],
-              ["Scanned", result.recordsScanned?.toLocaleString() ?? "—"],
-              ["Failed",  result.recordsFailed?.toLocaleString() ?? "—"],
+              [dq.colStatus,  result.statusCode ? statusLabel(result.statusCode) : "—"],
+              [dq.colScore,   result.score != null ? `${Number(result.score).toFixed(1)}%` : "—"],
+              [dq.colScanned, result.recordsScanned?.toLocaleString() ?? "—"],
+              [dq.colFailed,  result.recordsFailed?.toLocaleString() ?? "—"],
             ].map(([label, val]) => (
               <div key={label} className="bg-canvas-soft rounded-lg px-3 py-2.5 text-center">
                 <div className="font-bold text-ink text-base">{val}</div>
@@ -580,8 +580,27 @@ export function DqAdminClient({
   recentRuns: DqResult[];
   userRole: string;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const dq = t.dq;
+
+  function dimLabel(d: DqDimension) {
+    return lang === "ar" && d.nameAr ? d.nameAr : d.name;
+  }
+  function statusLabel(code: string | null): string {
+    if (!code) return "—";
+    if (code === "PASSED")  return dq.statusPassed;
+    if (code === "FAILED")  return dq.statusFailed;
+    if (code === "ERROR")   return dq.statusError;
+    if (code === "WARNING") return dq.statusWarning;
+    if (code === "PAUSED")  return dq.statusPaused;
+    return code;
+  }
+  function dimLabelByCode(code: string | null): string {
+    if (!code) return "—";
+    const dim = dimensions.find((d) => d.code === code);
+    return dim ? dimLabel(dim) : code;
+  }
+
   const [tab, setTab] = useState<Tab>("dashboard");
   const [rules, setRules] = useState(initialRules);
   const [showForm, setShowForm] = useState(false);
@@ -711,7 +730,7 @@ export function DqAdminClient({
                   const passing = rules.filter((r) => r.dimensionCode === d.code && r.lastStatusCode === "PASSED").length;
                   return (
                     <div key={d.code} className="flex items-center gap-3">
-                      <div className="w-24 text-[11px] text-muted truncate">{d.name}</div>
+                      <div className="w-24 text-[11px] text-muted truncate">{dimLabel(d)}</div>
                       <div className="flex-1 h-2 bg-line rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full bg-brand-purple"
@@ -740,7 +759,7 @@ export function DqAdminClient({
                   .filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "WARNING" || r.lastStatusCode === "ERROR")
                   .map((r) => (
                     <div key={r.ruleId} className="flex items-center gap-4 px-4 py-3 rounded-lg bg-red-50/70 border border-red-100">
-                      <Badge text={r.lastStatusCode ?? "—"} className={STATUS_COLORS[r.lastStatusCode ?? "ERROR"] ?? "bg-gray-100 text-gray-600"} />
+                      <Badge text={statusLabel(r.lastStatusCode)} className={STATUS_COLORS[r.lastStatusCode ?? "ERROR"] ?? "bg-gray-100 text-gray-600"} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-ink">{r.ruleName}</div>
                         <div className="text-[11px] text-muted">
@@ -750,7 +769,7 @@ export function DqAdminClient({
                             : r.assetName
                               ? ` · ${r.assetName}`
                               : ` · #${r.assetId}`}
-                          {r.dimensionName && ` · ${r.dimensionName}`}
+                          {r.dimensionCode && ` · ${dimLabelByCode(r.dimensionCode)}`}
                         </div>
                       </div>
                       {r.lastScore != null && (
@@ -779,7 +798,7 @@ export function DqAdminClient({
                 onChange={(e) => setFilterDimension(e.target.value)}
               >
                 <option value="">{dq.allDimensions}</option>
-                {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
+                {dimensions.map((d) => <option key={d.code} value={d.code}>{dimLabel(d)}</option>)}
               </select>
               <select
                 className="input text-sm"
@@ -835,7 +854,7 @@ export function DqAdminClient({
                       {rule.openIssueOnFail && <span title="Auto-open issue">🎫</span>}
                     </div>
                   </div>
-                  <div className="text-[12px] text-ink-soft">{rule.dimensionName ?? rule.dimensionCode ?? "—"}</div>
+                  <div className="text-[12px] text-ink-soft">{dimLabelByCode(rule.dimensionCode)}</div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${rule.assetTypeCode === "DATA_ENTITIES" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
@@ -859,7 +878,7 @@ export function DqAdminClient({
                   </div>
                   <div>
                     {displayStatus ? (
-                      <Badge text={displayStatus} className={STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-600"} />
+                      <Badge text={statusLabel(displayStatus)} className={STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-600"} />
                     ) : <span className="text-muted text-xs">{dq.neverRun}</span>}
                   </div>
                   <div className="text-[11px] font-mono text-muted truncate">{rule.scheduleCron || "—"}</div>
@@ -919,7 +938,7 @@ export function DqAdminClient({
                   {r.message && <div className="text-[11px] text-muted truncate max-w-xs">{r.message}</div>}
                 </div>
                 <div className="text-[11px] text-muted">{new Date(r.executionTimestamp).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</div>
-                <div>{r.statusCode && <Badge text={r.statusCode} className={STATUS_COLORS[r.statusCode] ?? "bg-gray-100 text-gray-600"} />}</div>
+                <div>{r.statusCode && <Badge text={statusLabel(r.statusCode)} className={STATUS_COLORS[r.statusCode] ?? "bg-gray-100 text-gray-600"} />}</div>
                 <div className="font-bold tabular-nums">{r.score != null ? `${Number(r.score).toFixed(1)}%` : "—"}</div>
                 <div className="tabular-nums text-muted">{r.recordsScanned?.toLocaleString() ?? "—"}</div>
                 <div className="tabular-nums text-emerald-600">{r.recordsPassed?.toLocaleString() ?? "—"}</div>

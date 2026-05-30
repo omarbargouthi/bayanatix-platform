@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { GlossaryPickerDomain } from "@/app/api/glossary/picker/route";
 import type { LinkedTerm } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 
 const CLASS_DOT: Record<string, string> = {
   PUBLIC: "bg-emerald-500", INTERNAL: "bg-blue-500", CONFIDENTIAL: "bg-amber-500",
@@ -16,6 +17,9 @@ export function TermMultiPicker({
   assetType: string;
   assetId:   number;
 }) {
+  const { t: strings } = useLang();
+  const c = strings.catalog;
+
   const [domains,      setDomains]      = useState<GlossaryPickerDomain[]>([]);
   const [selected,     setSelected]     = useState<LinkedTerm[]>([]);
   const [open,         setOpen]         = useState(false);
@@ -67,7 +71,7 @@ export function TermMultiPicker({
       )
     : [];
 
-  if (loading) return <div className="text-[11px] text-muted">Loading terms…</div>;
+  if (loading) return <div className="text-[11px] text-muted">{c.loadingTerms}</div>;
 
   return (
     <div ref={ref} className="relative">
@@ -76,7 +80,7 @@ export function TermMultiPicker({
         className="flex flex-wrap gap-1.5 min-h-[34px] px-2.5 py-1.5 border border-line rounded-md bg-white cursor-pointer hover:border-brand-purple/60 transition-colors"
         onClick={() => { setOpen((v) => !v); setSearch(""); setActiveDomain(null); }}
       >
-        {selected.length === 0 && <span className="text-muted text-[13px] self-center">Link business terms…</span>}
+        {selected.length === 0 && <span className="text-muted text-[13px] self-center">{c.linkTerms}</span>}
         {selected.map((t) => (
           <span key={t.glossaryId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-purple/10 text-brand-deep border border-brand-purple/20">
             {t.termName}
@@ -84,7 +88,7 @@ export function TermMultiPicker({
             <button type="button" onClick={(e) => { e.stopPropagation(); const d = domains.find(d => d.terms.some(tt => tt.glossaryId === t.glossaryId)); const term = d?.terms.find(tt => tt.glossaryId === t.glossaryId); if (d && term) toggle(term, d.domainName); }} className="hover:opacity-70 leading-none text-[13px] ml-0.5">&times;</button>
           </span>
         ))}
-        {saving && <span className="text-[11px] text-muted self-center ml-1">Saving…</span>}
+        {saving && <span className="text-[11px] text-muted self-center ml-1">{strings.common.saving}</span>}
       </div>
 
       {/* Dropdown */}
@@ -93,7 +97,7 @@ export function TermMultiPicker({
           <div className="px-3 py-2 border-b border-line-soft">
             <div className="flex items-center gap-2 bg-canvas rounded-md px-2.5 py-1.5">
               <svg className="w-3.5 h-3.5 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input autoFocus value={search} onChange={(e) => { setSearch(e.target.value); setActiveDomain(null); }} placeholder="Search terms…" className="bg-transparent outline-none border-0 text-sm flex-1 placeholder-muted" />
+              <input autoFocus value={search} onChange={(e) => { setSearch(e.target.value); setActiveDomain(null); }} placeholder={c.searchTerms} className="bg-transparent outline-none border-0 text-sm flex-1 placeholder-muted" />
             </div>
           </div>
           <div className="max-h-64 overflow-y-auto">
@@ -125,7 +129,7 @@ export function TermMultiPicker({
               </>
             )}
             {q && (flatMatches.length === 0
-              ? <div className="py-6 text-center text-sm text-muted">No terms match "{search}"</div>
+              ? <div className="py-6 text-center text-sm text-muted">{c.noTermsMatch} "{search}"</div>
               : flatMatches.map((t) => {
                   const isSel = selected.some((s) => s.glossaryId === t.glossaryId);
                   return (
