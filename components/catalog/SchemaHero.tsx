@@ -10,6 +10,7 @@ import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
 import { StarRatingWidget } from "./StarRatingWidget";
 import { CertifyAssetModal } from "./CertifyAssetModal";
+import { useLang } from "@/lib/lang-context";
 import type { DataSchema, DataSource } from "@/lib/types";
 
 interface Props {
@@ -22,6 +23,8 @@ interface Props {
 
 export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props) {
   const router = useRouter();
+  const { t } = useLang();
+  const c = t.catalog;
   const [editing,     setEditing]     = useState(false);
   const [desc,        setDesc]        = useState(schema.description ?? "");
   const [saving,      setSaving]      = useState(false);
@@ -119,16 +122,16 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditing(false); setDesc(schema.description ?? ""); }} className="btn btn-sm">Cancel</button>
+                  <button onClick={() => { setEditing(false); setDesc(schema.description ?? ""); }} className="btn btn-sm">{t.common.cancel}</button>
                   <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">
-                    {saving ? "Saving…" : "Save"}
+                    {saving ? t.common.saving : t.common.save}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="group flex items-start gap-2 mt-2">
                 <p className="text-sm text-ink-soft leading-relaxed flex-1">
-                  {schema.description || <span className="italic text-muted">No description — add one to improve discoverability.</span>}
+                  {schema.description || <span className="italic text-muted">{c.noDescSchema}</span>}
                 </p>
                 {canEdit && (
                   <button
@@ -163,8 +166,8 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
             <div className="text-3xl font-extrabold text-brand-purple leading-none mb-1">
               {(schema.cdeCount ?? 0).toLocaleString()}
             </div>
-            <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">CDEs</div>
-            <div className="text-[11px] text-muted mt-1">Business-linked columns</div>
+            <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{c.cdes}</div>
+            <div className="text-[11px] text-muted mt-1">{c.businessLinked}</div>
           </div>
 
           {/* Tables tile */}
@@ -172,8 +175,8 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
             <div className="text-3xl font-extrabold text-brand-deep leading-none mb-1">
               {tables.toLocaleString()}
             </div>
-            <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">Tables</div>
-            <div className="text-[11px] text-muted mt-1">in this schema</div>
+            <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{c.tables}</div>
+            <div className="text-[11px] text-muted mt-1">{c.inThisSchema}</div>
           </div>
         </div>
       </div>
@@ -181,15 +184,15 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
       {/* Tags / Terms / Rating row */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="card px-4 py-3">
-          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Tags</h4>
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">{c.tagsLabel}</h4>
           <TagPicker assetType="DATA_SCHEMAS" assetId={schema.schemaId} />
         </div>
         <div className="card px-4 py-3">
-          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Business Terms</h4>
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">{c.businessTerms}</h4>
           <TermMultiPicker assetType="DATA_SCHEMAS" assetId={schema.schemaId} />
         </div>
         <div className="card px-4 py-3">
-          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Rating</h4>
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">{c.ratingLabel}</h4>
           <StarRatingWidget assetType="DATA_SCHEMAS" assetId={schema.schemaId} />
         </div>
       </div>

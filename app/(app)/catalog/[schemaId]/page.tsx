@@ -8,6 +8,7 @@ import { HighlightScroll } from "@/components/catalog/HighlightScroll";
 import { SchemaHero } from "@/components/catalog/SchemaHero";
 import { SchemaTableList } from "@/components/catalog/SchemaTableList";
 import { DataModelTab } from "@/components/catalog/DataModelTab";
+import { SchemaTabNav } from "./SchemaTabNav";
 
 export const dynamic = "force-dynamic";
 
@@ -59,30 +60,7 @@ export default async function SchemaPage({
           canEdit={canEdit}
         />
 
-        <div className="flex gap-1 border-b border-line mb-6">
-          <a
-            href={`/catalog/${id}`}
-            className={
-              "px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 " +
-              (activeView === "tables"
-                ? "text-brand-purple border-brand-purple"
-                : "text-ink-soft border-transparent hover:text-brand-purple")
-            }
-          >
-            Tables
-          </a>
-          <a
-            href={`/catalog/${id}?view=data-model`}
-            className={
-              "px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 " +
-              (activeView === "data-model"
-                ? "text-brand-purple border-brand-purple"
-                : "text-ink-soft border-transparent hover:text-brand-purple")
-            }
-          >
-            Data Model
-          </a>
-        </div>
+        <SchemaTabNav schemaId={id} activeView={activeView} />
 
         {activeView === "data-model" ? (
           <DataModelTab schemaId={id} />

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { DataEntity } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 import { CertTag, Tag } from "@/components/ui/Tag";
 import { AvatarStack } from "@/components/ui/Avatar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -53,35 +54,6 @@ function DeltaBadge({ pct }: { pct: number | null }) {
   );
 }
 
-const ENTITY_TYPE_LABEL: Record<string, string> = {
-  TRANSACTIONAL: "Transactional",
-  MASTER:        "Master",
-  REFERENCE:     "Lookup / Reference",
-  SYSTEM:        "System / Setup",
-};
-
-const ENTITY_TYPE_OPTIONS = [
-  { value: "",              label: "— None —" },
-  { value: "TRANSACTIONAL", label: "Transactional" },
-  { value: "MASTER",        label: "Master" },
-  { value: "REFERENCE",     label: "Lookup / Reference" },
-  { value: "SYSTEM",        label: "System / Setup" },
-];
-
-const FILTER_TYPE_OPTIONS = [
-  { value: "",              label: "All Types" },
-  { value: "TRANSACTIONAL", label: "Transactional" },
-  { value: "MASTER",        label: "Master" },
-  { value: "REFERENCE",     label: "Lookup / Reference" },
-  { value: "SYSTEM",        label: "System / Setup" },
-];
-
-const CERT_OPTIONS = [
-  { value: "",       label: "All Status" },
-  { value: "GOLD",   label: "Gold" },
-  { value: "SILVER", label: "Silver" },
-  { value: "BRONZE", label: "Bronze" },
-];
 
 // ─── Property row inside the expanded panel ────────────────────────────────────
 
@@ -117,6 +89,8 @@ function TableEditModal({
   onClose: () => void;
 }) {
   const router  = useRouter();
+  const { t } = useLang();
+  const c = t.catalog;
   const [dispName, setDispName] = useState(entity.displayName ?? "");
   const [desc,     setDesc]     = useState(entity.description ?? "");
   const [cat,      setCat]      = useState(entity.category    ?? "");
@@ -155,7 +129,7 @@ function TableEditModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
           <div>
-            <h2 className="font-bold text-brand-deep">Edit Table Metadata</h2>
+            <h2 className="font-bold text-brand-deep">{c.editTableMeta}</h2>
             <p className="text-[11px] text-muted font-mono mt-0.5">{entity.entityName}</p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
@@ -172,7 +146,7 @@ function TableEditModal({
         {/* Editable fields */}
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="field-label">Friendly Name</label>
+            <label className="field-label">{c.editFriendlyName}</label>
             <input
               type="text"
               value={dispName}
@@ -181,11 +155,10 @@ function TableEditModal({
               placeholder="Business-friendly name for this table…"
               autoFocus
             />
-            <p className="text-[11px] text-muted mt-1">Shown alongside the physical name in catalog views.</p>
           </div>
 
           <div>
-            <label className="field-label">Description</label>
+            <label className="field-label">{c.editDesc}</label>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
@@ -196,21 +169,23 @@ function TableEditModal({
           </div>
 
           <div>
-            <label className="field-label">Table Type</label>
+            <label className="field-label">{c.tableTypeLabel}</label>
             <select value={cat} onChange={(e) => setCat(e.target.value)} className="input-field">
-              {ENTITY_TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
+              <option value="">{c.typeNone}</option>
+              <option value="TRANSACTIONAL">{c.typeTransactional}</option>
+              <option value="MASTER">{c.typeMaster}</option>
+              <option value="REFERENCE">{c.typeReference}</option>
+              <option value="SYSTEM">{c.typeSystem}</option>
             </select>
           </div>
 
           <div>
-            <label className="field-label">Tags</label>
+            <label className="field-label">{c.tagsLabel}</label>
             <TagPicker assetType="DATA_ENTITIES" assetId={entity.entityId} />
           </div>
 
           <div>
-            <label className="field-label">Business Terms</label>
+            <label className="field-label">{c.businessTerms}</label>
             <TermMultiPicker assetType="DATA_ENTITIES" assetId={entity.entityId} />
           </div>
 
@@ -220,9 +195,9 @@ function TableEditModal({
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-line">
-          <button onClick={onClose} className="btn">Cancel</button>
+          <button onClick={onClose} className="btn">{t.common.cancel}</button>
           <button onClick={save} disabled={saving} className="btn btn-primary">
-            {saving ? "Saving…" : "Save Changes"}
+            {saving ? t.common.saving : t.common.save}
           </button>
         </div>
       </div>
@@ -241,6 +216,8 @@ export function SchemaTableList({
   schemaId: number;
   canEdit:  boolean;
 }) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [search,        setSearch]        = useState("");
   const [filterType,    setFilterType]    = useState("");
   const [filterCert,    setFilterCert]    = useState("");
@@ -279,7 +256,7 @@ export function SchemaTableList({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tables by name or description…"
+            placeholder={c.searchTables}
             className="bg-transparent outline-none border-0 text-sm flex-1 placeholder-muted"
           />
         </div>
@@ -289,7 +266,11 @@ export function SchemaTableList({
           onChange={(e) => setFilterType(e.target.value)}
           className="bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple"
         >
-          {FILTER_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <option value="">{c.allTypes}</option>
+          <option value="TRANSACTIONAL">{c.typeTransactional}</option>
+          <option value="MASTER">{c.typeMaster}</option>
+          <option value="REFERENCE">{c.typeReference}</option>
+          <option value="SYSTEM">{c.typeSystem}</option>
         </select>
 
         <select
@@ -297,11 +278,14 @@ export function SchemaTableList({
           onChange={(e) => setFilterCert(e.target.value)}
           className="bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple"
         >
-          {CERT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <option value="">{c.certAllStatus}</option>
+          <option value="GOLD">{c.certGold}</option>
+          <option value="SILVER">{c.certSilver}</option>
+          <option value="BRONZE">{c.certBronze}</option>
         </select>
 
         <span className="text-sm text-muted ml-auto">
-          <strong className="text-ink">{filtered.length}</strong> of {tables.length} tables
+          <strong className="text-ink">{filtered.length}</strong> {c.ofTables.replace("{n}", String(tables.length))}
         </span>
       </div>
 
@@ -310,18 +294,18 @@ export function SchemaTableList({
         {/* Column header */}
         <div className="grid grid-cols-[32px_2fr_1fr_160px_140px_88px_90px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
           <div />
-          <div>Asset Name</div>
-          <div>Type</div>
-          <div>Certification</div>
-          <div>Stewards</div>
-          <div>Trust</div>
-          <div>Rating</div>
+          <div>{c.colAssetName}</div>
+          <div>{c.colType}</div>
+          <div>{c.colCertification}</div>
+          <div>{c.colStewards}</div>
+          <div>{c.colTrust}</div>
+          <div>{c.colRating}</div>
         </div>
 
         {filtered.length === 0 && (
           <div className="py-14 text-center text-muted text-sm">
             <IconTable className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            No tables match your filters.
+            {c.noTablesFilter}
           </div>
         )}
 
@@ -426,7 +410,7 @@ export function SchemaTableList({
 
                 <div>
                   {entity.category
-                    ? <Tag variant="purple">{ENTITY_TYPE_LABEL[entity.category] ?? entity.category}</Tag>
+                    ? <Tag variant="purple">{({TRANSACTIONAL:c.typeTransactional,MASTER:c.typeMaster,REFERENCE:c.typeReference,SYSTEM:c.typeSystem} as Record<string,string>)[entity.category] ?? entity.category}</Tag>
                     : <span className="text-muted text-[12px]">—</span>}
                 </div>
 
@@ -464,22 +448,22 @@ export function SchemaTableList({
 
                     {/* Left: description + DQ */}
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Description</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.description}</h4>
                       {entity.description ? (
                         <p className="text-[13px] text-ink leading-relaxed mb-4">{entity.description}</p>
                       ) : (
                         <p className="text-[13px] text-muted italic mb-4">
-                          No description provided.{canEdit ? " Click the edit icon above to add one." : ""}
+                          {canEdit ? c.noDescTableEdit : c.noDescTable}
                         </p>
                       )}
 
                       {/* Mini DQ grid */}
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Quality Indicators</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.qualityIndicators}</h4>
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         {([
-                          { label: "Trust Score",   value: trust != null ? `${trust}%` : "—" },
-                          { label: "Completeness",  value: "—" },
-                          { label: "Validity",      value: "—" },
+                          { label: c.trustScore,   value: trust != null ? `${trust}%` : "—" },
+                          { label: c.completeness, value: "—" },
+                          { label: c.validity,     value: "—" },
                         ] as { label: string; value: string }[]).map(({ label, value }) => (
                           <div key={label} className="bg-white border border-line rounded-lg px-3 py-2.5">
                             <div className="text-sm font-bold text-ink">{value}</div>
@@ -489,21 +473,21 @@ export function SchemaTableList({
                       </div>
 
                       {/* Usage metrics */}
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Usage Metrics · 30 days</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.usageMetrics30}</h4>
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         {([
                           {
-                            label: "Queries",
+                            label: c.queries,
                             value: entity.queries30d != null ? fmtNumber(entity.queries30d) : "—",
                             pct:   changePct(entity.queries30d, entity.queryPrev30d),
                           },
                           {
-                            label: "Unique Users",
+                            label: c.uniqueUsers,
                             value: entity.uniqueUsers != null ? String(entity.uniqueUsers) : "—",
                             pct:   changePct(entity.uniqueUsers, entity.uniqueUsersPrev),
                           },
                           {
-                            label: "Avg Query (ms)",
+                            label: c.avgQueryMs,
                             value: entity.avgQueryMs != null ? fmtNumber(Math.round(entity.avgQueryMs)) : "—",
                             pct:   changePct(entity.avgQueryMs, entity.avgQueryMsPrev),
                           },
@@ -521,7 +505,7 @@ export function SchemaTableList({
                       {/* Incident scale */}
                       {(entity.openIncidentCount ?? 0) > 0 && (
                         <>
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Incident Scale</h4>
+                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.incidentScale}</h4>
                           <div className="bg-white border border-line rounded-lg px-3 py-2.5 mb-4 space-y-1.5">
                             {([
                               { label: "High",   count: entity.highIncidents   ?? 0, color: "bg-red-500"   },
@@ -545,19 +529,19 @@ export function SchemaTableList({
                       )}
 
                       {/* Tags */}
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Tags</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.tagsLabel}</h4>
                       <div className="mb-4">
                         <TagPicker assetType="DATA_ENTITIES" assetId={entity.entityId} />
                       </div>
 
                       {/* Business Terms */}
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Business Terms</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.businessTerms}</h4>
                       <div className="mb-4">
                         <TermMultiPicker assetType="DATA_ENTITIES" assetId={entity.entityId} />
                       </div>
 
                       {/* Rating */}
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Asset Rating</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.assetRating}</h4>
                       <div className="bg-white border border-line rounded-lg px-4 py-3 mb-4">
                         <StarRatingWidget assetType="DATA_ENTITIES" assetId={entity.entityId} />
                       </div>
@@ -567,30 +551,29 @@ export function SchemaTableList({
                         className="btn btn-sm"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        View full table →
+                        {c.viewFullTable}
                       </Link>
                     </div>
 
                     {/* Right: properties panel */}
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Properties</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.properties}</h4>
                       <div className="bg-white border border-line rounded-lg px-4 py-1">
                         <dl>
-                          {/* Editable metadata */}
-                          <PropRow label="Physical Name">
+                          <PropRow label={c.physicalName}>
                             <span className="font-mono text-[12px]">{entity.entityName}</span>
                           </PropRow>
-                          <PropRow label="Friendly Name">
+                          <PropRow label={c.friendlyName}>
                             {entity.displayName
                               ? <span>{entity.displayName}</span>
                               : <span className="text-muted italic">—</span>}
                           </PropRow>
-                          <PropRow label="Type">
+                          <PropRow label={c.colType}>
                             {entity.category
-                              ? <Tag variant="purple">{ENTITY_TYPE_LABEL[entity.category] ?? entity.category}</Tag>
+                              ? <Tag variant="purple">{({TRANSACTIONAL:c.typeTransactional,MASTER:c.typeMaster,REFERENCE:c.typeReference,SYSTEM:c.typeSystem} as Record<string,string>)[entity.category] ?? entity.category}</Tag>
                               : <span className="text-muted">—</span>}
                           </PropRow>
-                          <PropRow label="Metadata Cert">
+                          <PropRow label={c.metadataCert}>
                             <div className="flex items-center gap-1.5">
                               <CertTag code={entity.certCode} />
                               {canEdit && (
@@ -598,36 +581,35 @@ export function SchemaTableList({
                                   onClick={() => setCertifyEntity(entity)}
                                   className="text-[10px] text-brand-purple hover:underline"
                                 >
-                                  Edit
+                                  {t.common.edit}
                                 </button>
                               )}
                             </div>
                           </PropRow>
-                          <PropRow label="Data Cert">
+                          <PropRow label={c.dataCert}>
                             <CertTag code={entity.dataCertCode} />
                           </PropRow>
-                          <PropRow label="Stewards">
+                          <PropRow label={c.stewards}>
                             {(entity.stewards ?? []).length > 0
                               ? <AvatarStack users={entity.stewards ?? []} />
                               : <span className="text-muted">—</span>}
                           </PropRow>
 
-                          {/* Divider: Usage (automated) */}
                           <div className="py-1.5">
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-px bg-line-soft" />
-                              <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">Usage · automated</span>
+                              <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">{c.usageAutomated}</span>
                               <div className="flex-1 h-px bg-line-soft" />
                             </div>
                           </div>
 
-                          <PropRow label="Row Count" automated>
+                          <PropRow label={c.rowCount} automated>
                             <span className="font-mono text-[12px]">{fmtNumber(entity.rowCount as number | null)}</span>
                           </PropRow>
-                          <PropRow label="Columns" automated>
+                          <PropRow label={c.columns} automated>
                             <span className="font-mono text-[12px]">{entity.columnCount ?? "—"}</span>
                           </PropRow>
-                          <PropRow label="Trust Score" automated>
+                          <PropRow label={c.trustScore} automated>
                             {trust != null ? (
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-brand-deep text-[12px]">{trust}%</span>
@@ -635,8 +617,8 @@ export function SchemaTableList({
                               </div>
                             ) : <span className="text-muted">—</span>}
                           </PropRow>
-                          <PropRow label="Asset Kind" automated>
-                            <span className="text-[12px]">{entity.isView ? "View" : "Table"}</span>
+                          <PropRow label={c.assetKind} automated>
+                            <span className="text-[12px]">{entity.isView ? c.viewsLabel : c.tables}</span>
                           </PropRow>
                         </dl>
                       </div>

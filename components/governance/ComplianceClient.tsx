@@ -1342,7 +1342,7 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
 
   async function autoTranslateToArabic() {
     setTranslating(true);
-    const updated = [...rows];
+    const updated = rows.map((r) => ({ ...r }));
     for (const row of updated) {
       const needsName = row.name && !row.nameAr;
       const needsDesc = row.description && !row.descriptionAr;
@@ -1358,7 +1358,7 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
         }).then((r) => r.json()).then((d) => { if (d.translation) row.descriptionAr = d.translation; }).catch(() => {}) : Promise.resolve(),
       ]);
     }
-    setRows([...updated]);
+    setRows(updated);
     setTranslating(false);
   }
 
@@ -1634,7 +1634,7 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
 
   async function autoTranslateToAr() {
     setTranslating(true);
-    const updated = [...rows];
+    const updated = rows.map((r) => ({ ...r }));
     for (const row of updated) {
       const translate = async (text: string) => {
         const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {

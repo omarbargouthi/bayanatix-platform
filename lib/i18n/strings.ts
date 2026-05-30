@@ -371,6 +371,198 @@ export type I18nStrings = {
     };
   };
 
+  // ── Data Catalog ────────────────────────────────────────────────────────────
+  catalog: {
+    pageTitle:        string;
+    pageDesc:         string;
+    filterBtn:        string;
+    exportBtn:        string;
+    // Coverage cards
+    sqlCoverage:      string;
+    sqlLinked:        string;
+    metadataQuality:  string;
+    dataQuality:      string;
+    score:            string;
+    descFilled:       string;
+    ownersAssigned:   string;
+    glossaryLinked:   string;
+    completeness:     string;
+    validity:         string;
+    uniqueness:       string;
+    // Asset tree / glossaries
+    dataAssets:       string;
+    glossaries:       string;
+    sortBtn:          string;
+    newTerm:          string;
+    sources:          string;
+    records:          string;
+    tables:           string;
+    schemas:          string;
+    terms:            string;
+    categories:       string;
+    approved:         string;
+    linkedAssets:     string;
+    termsCount:       string;
+    // Schema sub-page tabs
+    tabTables:        string;
+    tabDataModel:     string;
+    // SchemaHero
+    cdes:             string;
+    businessLinked:   string;
+    inThisSchema:     string;
+    tagsLabel:        string;
+    businessTerms:    string;
+    ratingLabel:      string;
+    noDescSchema:     string;
+    // SchemaTableList toolbar
+    searchTables:     string;
+    allTypes:         string;
+    allStatuses:      string;
+    ofTables:         string;
+    noTablesFilter:   string;
+    // Table column headers
+    colAssetName:     string;
+    colType:          string;
+    colCertification: string;
+    colStewards:      string;
+    colTrust:         string;
+    colRating:        string;
+    // Expanded row sections
+    description:      string;
+    qualityIndicators:string;
+    trustScore:       string;
+    usageMetrics30:   string;
+    queries:          string;
+    uniqueUsers:      string;
+    avgQueryMs:       string;
+    incidentScale:    string;
+    properties:       string;
+    physicalName:     string;
+    friendlyName:     string;
+    metadataCert:     string;
+    dataCert:         string;
+    stewards:         string;
+    usageAutomated:   string;
+    rowCount:         string;
+    columns:          string;
+    assetKind:        string;
+    viewFullTable:    string;
+    noDescTable:      string;
+    noDescTableEdit:  string;
+    assetRating:      string;
+    viewsLabel:       string;
+    // Table Edit Modal
+    editTableMeta:    string;
+    editFriendlyName: string;
+    editDesc:         string;
+    tableTypeLabel:   string;
+    // Table type values
+    typeTransactional:string;
+    typeMaster:       string;
+    typeReference:    string;
+    typeSystem:       string;
+    typeNone:         string;
+    // Cert filter
+    certAllStatus:    string;
+    certGold:         string;
+    certSilver:       string;
+    certBronze:       string;
+  };
+
+  // ── Data Quality ─────────────────────────────────────────────────────────────
+  dq: {
+    // Tabs
+    tabDashboard:     string;
+    tabRules:         string;
+    tabRuns:          string;
+    // Dashboard stat cards
+    totalRules:       string;
+    activeRules:      string;
+    runsToday:        string;
+    passing:          string;
+    failing:          string;
+    avgScore:         string;
+    // Dashboard sections
+    runTrends:        string;
+    trendPassed:      string;
+    trendFailed:      string;
+    rulesByDim:       string;
+    rulesCount:       string;
+    failingWarning:   string;
+    allPassing:       string;
+    noRulesYet:       string;
+    noRunHistory:     string;
+    // Rule Library toolbar
+    allDimensions:    string;
+    allStatuses:      string;
+    activeOnly:       string;
+    failingFilter:    string;
+    passingFilter:    string;
+    newRule:          string;
+    noRulesMatch:     string;
+    createFirstRule:  string;
+    // Rule table headers
+    colRule:          string;
+    colDimension:     string;
+    colAsset:         string;
+    colSeverity:      string;
+    colScore:         string;
+    colStatus:        string;
+    colSchedule:      string;
+    colActions:       string;
+    // Row actions
+    runBtn:           string;
+    running:          string;
+    editBtn:          string;
+    pauseBtn:         string;
+    enableBtn:        string;
+    delBtn:           string;
+    rerunBtn:         string;
+    neverRun:         string;
+    // Run History
+    recentRuns:       string;
+    refreshBtn:       string;
+    colTimestamp:     string;
+    colScanned:       string;
+    colPassed:        string;
+    colFailed:        string;
+    colDetail:        string;
+    detailBtn:        string;
+    noRunsYet:        string;
+    // Rule form modal
+    editRuleTitle:    string;
+    newRuleTitle:     string;
+    ruleNameLabel:    string;
+    severityLabel:    string;
+    targetAssets:     string;
+    browseAssets:     string;
+    changeAsset:      string;
+    changeAddAssets:  string;
+    dqDimensionLabel: string;
+    ruleTemplate:     string;
+    customSql:        string;
+    customSqlDesc:    string;
+    scoreThresholds:  string;
+    warnBelow:        string;
+    failBelow:        string;
+    schedCron:        string;
+    actionsOnFail:    string;
+    notifyOwners:     string;
+    autoOpenIssue:    string;
+    createRuleBtn:    string;
+    saveChangesBtn:   string;
+    // Severity options
+    severityInfo:     string;
+    severityWarning:  string;
+    severityCritical: string;
+    // Run detail modal
+    valueSamples:     string;
+    validValues:      string;
+    invalidValues:    string;
+    loadingSamples:   string;
+    noSamples:        string;
+  };
+
   // ── Dashboard ───────────────────────────────────────────────────────────────
   dashboard: {
     welcome:           string;   // supports {name} placeholder

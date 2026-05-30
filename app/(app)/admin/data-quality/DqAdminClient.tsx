@@ -5,6 +5,7 @@ import type { DqDimension, DqRule, DqResult, DqDashboardStats } from "@/lib/quer
 import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
 import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
+import { useLang } from "@/lib/lang-context";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 
@@ -28,8 +29,9 @@ function Badge({ text, className }: { text: string; className: string }) {
 // ── Micro sparkline bar chart ─────────────────────────────────────────────────
 
 function TrendBar({ trend }: { trend: { date: string; passed: number; failed: number; avgScore: number | null }[] }) {
+  const { t } = useLang();
   if (trend.length === 0) {
-    return <div className="text-sm text-muted text-center py-8">No run history yet. Run a rule to see trends.</div>;
+    return <div className="text-sm text-muted text-center py-8">{t.dq.noRunHistory}</div>;
   }
   const maxTotal = Math.max(...trend.map((t) => t.passed + t.failed), 1);
   return (
@@ -121,6 +123,8 @@ function RuleFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useLang();
+  const dq = t.dq;
   const [form, setForm] = useState<RuleFormData>(
     editRule
       ? {
@@ -218,7 +222,7 @@ function RuleFormModal({
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-10">
       <div className="bg-white rounded-xl shadow-2xl w-[680px] border border-line">
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
-          <h2 className="font-bold text-brand-deep">{editRule ? "Edit DQ Rule" : "New DQ Rule"}</h2>
+          <h2 className="font-bold text-brand-deep">{editRule ? dq.editRuleTitle : dq.newRuleTitle}</h2>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
 
@@ -228,15 +232,15 @@ function RuleFormModal({
           {/* Name + Severity */}
           <div className="grid grid-cols-[1fr_160px] gap-4">
             <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Rule Name *</label>
+              <label className="block text-xs font-semibold text-muted mb-1">{dq.ruleNameLabel}</label>
               <input className="input w-full" value={form.ruleName} onChange={(e) => setForm((f) => ({ ...f, ruleName: e.target.value }))} placeholder="e.g. Customer ID Not Null" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Severity</label>
+              <label className="block text-xs font-semibold text-muted mb-1">{dq.severityLabel}</label>
               <select className="input w-full" value={form.severityLevelCode} onChange={(e) => setForm((f) => ({ ...f, severityLevelCode: e.target.value }))}>
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="CRITICAL">Critical</option>
+                <option value="INFO">{dq.severityInfo}</option>
+                <option value="WARNING">{dq.severityWarning}</option>
+                <option value="CRITICAL">{dq.severityCritical}</option>
               </select>
             </div>
           </div>
@@ -245,10 +249,10 @@ function RuleFormModal({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-muted mb-2">
-                Target Assets *
+                {dq.targetAssets}
                 {!editRule && form.selectedAssets.length > 1 && (
                   <span className="ml-2 font-normal text-brand-purple">
-                    — will create {form.selectedAssets.length} rules
+                    — {dq.dqDimensionLabel} {form.selectedAssets.length} rules
                   </span>
                 )}
               </label>
@@ -288,13 +292,13 @@ function RuleFormModal({
                 className="btn btn-sm border-brand-purple/40 text-brand-purple hover:bg-brand-purple/5"
               >
                 {form.selectedAssets.length > 0
-                  ? editRule ? "Change Asset" : "Change / Add Assets"
-                  : "Browse & Select Assets…"}
+                  ? editRule ? dq.changeAsset : dq.changeAddAssets
+                  : dq.browseAssets}
               </button>
             </div>
 
             <div className="w-52">
-              <label className="block text-xs font-semibold text-muted mb-1">DQ Dimension</label>
+              <label className="block text-xs font-semibold text-muted mb-1">{dq.dqDimensionLabel}</label>
               <select className="input w-full" value={form.dimensionCode} onChange={(e) => setForm((f) => ({ ...f, dimensionCode: e.target.value }))}>
                 {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
               </select>
@@ -304,10 +308,10 @@ function RuleFormModal({
           {/* Template picker */}
           <div>
             <div className="flex items-baseline gap-3 mb-2">
-              <label className="text-xs font-semibold text-muted">Rule Template</label>
+              <label className="text-xs font-semibold text-muted">{dq.ruleTemplate}</label>
               {assetKind && (
                 <span className="text-[10px] text-muted">
-                  Showing {applicableTemplates.length} templates for {assetKind}-level rules
+                  {applicableTemplates.length} {dq.rulesCount} · {assetKind}
                 </span>
               )}
             </div>
@@ -374,8 +378,8 @@ function RuleFormModal({
           {/* Custom SQL */}
           {form.ruleTemplateCode === "CUSTOM_SQL" && (
             <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Custom SQL</label>
-              <p className="text-[11px] text-muted mb-2">Query must return <code>total_rows</code> and <code>failed_rows</code> columns.</p>
+              <label className="block text-xs font-semibold text-muted mb-1">{dq.customSql}</label>
+              <p className="text-[11px] text-muted mb-2">{dq.customSqlDesc}</p>
               <textarea
                 className="input w-full font-mono text-xs h-28 resize-none"
                 value={form.ruleDefinitionText}
@@ -387,14 +391,14 @@ function RuleFormModal({
 
           {/* Thresholds */}
           <div>
-            <label className="block text-xs font-semibold text-muted mb-2">Score Thresholds (%)</label>
+            <label className="block text-xs font-semibold text-muted mb-2">{dq.scoreThresholds}</label>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] text-muted mb-1">Warn below</label>
+                <label className="block text-[11px] text-muted mb-1">{dq.warnBelow}</label>
                 <input className="input w-full" type="number" min="0" max="100" value={form.thresholdWarn} onChange={(e) => setForm((f) => ({ ...f, thresholdWarn: e.target.value }))} placeholder="95" />
               </div>
               <div>
-                <label className="block text-[11px] text-muted mb-1">Fail below</label>
+                <label className="block text-[11px] text-muted mb-1">{dq.failBelow}</label>
                 <input className="input w-full" type="number" min="0" max="100" value={form.thresholdFail} onChange={(e) => setForm((f) => ({ ...f, thresholdFail: e.target.value }))} placeholder="80" />
               </div>
             </div>
@@ -402,7 +406,7 @@ function RuleFormModal({
 
           {/* Schedule */}
           <div>
-            <label className="block text-xs font-semibold text-muted mb-1">Schedule (cron expression)</label>
+            <label className="block text-xs font-semibold text-muted mb-1">{dq.schedCron}</label>
             <input className="input w-full font-mono text-sm" value={form.scheduleCron} onChange={(e) => setForm((f) => ({ ...f, scheduleCron: e.target.value }))} placeholder="0 6 * * * (daily at 6am)" />
             <div className="flex gap-3 mt-2">
               {["0 6 * * *", "0 * * * *", "*/30 * * * *"].map((c) => (
@@ -413,28 +417,28 @@ function RuleFormModal({
 
           {/* Notification + issue config */}
           <div className="rounded-lg bg-canvas-soft border border-line p-4 space-y-3">
-            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Actions on Failure</div>
+            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">{dq.actionsOnFail}</div>
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={form.notifyOwners} onChange={(e) => setForm((f) => ({ ...f, notifyOwners: e.target.checked }))} className="w-4 h-4 accent-brand-purple" />
-              <span className="text-sm text-ink">Notify asset owners when rule fails</span>
+              <span className="text-sm text-ink">{dq.notifyOwners}</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={form.openIssueOnFail} onChange={(e) => setForm((f) => ({ ...f, openIssueOnFail: e.target.checked }))} className="w-4 h-4 accent-brand-purple" />
-              <span className="text-sm text-ink">Auto-open Data Fix request when rule fails</span>
+              <span className="text-sm text-ink">{dq.autoOpenIssue}</span>
             </label>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-line">
-          <button onClick={onClose} className="btn btn-sm">Cancel</button>
+          <button onClick={onClose} className="btn btn-sm">{t.common.cancel}</button>
           <button onClick={handleSave} disabled={saving} className="btn btn-primary btn-sm">
             {saving
-              ? "Saving…"
+              ? t.common.saving
               : editRule
-                ? "Save Changes"
+                ? dq.saveChangesBtn
                 : form.selectedAssets.length > 1
-                  ? `Create ${form.selectedAssets.length} Rules`
-                  : "Create Rule"}
+                  ? `${dq.createRuleBtn} (${form.selectedAssets.length})`
+                  : dq.createRuleBtn}
           </button>
         </div>
       </div>
@@ -470,6 +474,8 @@ function RuleFormModal({
 // ── Run result detail modal ───────────────────────────────────────────────────
 
 function RunDetailModal({ result, onClose }: { result: DqResult; onClose: () => void }) {
+  const { t } = useLang();
+  const dq = t.dq;
   const [samples, setSamples] = useState<{ sampleId: number; sampleValue: string; isValid: boolean; sampleCount: number }[]>([]);
   const [loadingSamples, setLoadingSamples] = useState(true);
 
@@ -517,15 +523,15 @@ function RunDetailModal({ result, onClose }: { result: DqResult; onClose: () => 
 
           {/* Samples */}
           <div>
-            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Value Samples</div>
-            {loadingSamples && <div className="text-sm text-muted">Loading samples…</div>}
+            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">{dq.valueSamples}</div>
+            {loadingSamples && <div className="text-sm text-muted">{dq.loadingSamples}</div>}
             {!loadingSamples && samples.length === 0 && (
-              <div className="text-sm text-muted">No value samples captured for this run.</div>
+              <div className="text-sm text-muted">{dq.noSamples}</div>
             )}
             {!loadingSamples && samples.length > 0 && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold text-emerald-600 mb-2">Valid Values ({validSamples.length})</div>
+                  <div className="text-[11px] font-semibold text-emerald-600 mb-2">{dq.validValues} ({validSamples.length})</div>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {validSamples.map((s) => (
                       <div key={s.sampleId} className="flex items-center justify-between bg-emerald-50 rounded px-3 py-1.5 text-xs">
@@ -536,7 +542,7 @@ function RunDetailModal({ result, onClose }: { result: DqResult; onClose: () => 
                   </div>
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold text-red-600 mb-2">Invalid Values ({invalidSamples.length})</div>
+                  <div className="text-[11px] font-semibold text-red-600 mb-2">{dq.invalidValues} ({invalidSamples.length})</div>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {invalidSamples.map((s) => (
                       <div key={s.sampleId} className="flex items-center justify-between bg-red-50 rounded px-3 py-1.5 text-xs">
@@ -574,6 +580,8 @@ export function DqAdminClient({
   recentRuns: DqResult[];
   userRole: string;
 }) {
+  const { t } = useLang();
+  const dq = t.dq;
   const [tab, setTab] = useState<Tab>("dashboard");
   const [rules, setRules] = useState(initialRules);
   const [showForm, setShowForm] = useState(false);
@@ -652,17 +660,17 @@ export function DqAdminClient({
       {/* Tab nav */}
       <div className="border-b border-line bg-white px-8">
         <nav className="flex items-center gap-0">
-          {(["dashboard", "rules", "runs"] as Tab[]).map((t) => (
+          {(["dashboard", "rules", "runs"] as Tab[]).map((tabKey) => (
             <button
-              key={t}
-              onClick={() => { setTab(t); if (t === "runs") loadRuns(); }}
+              key={tabKey}
+              onClick={() => { setTab(tabKey); if (tabKey === "runs") loadRuns(); }}
               className={`px-5 py-3 text-sm font-medium border-b-2 capitalize transition-colors ${
-                tab === t
+                tab === tabKey
                   ? "text-brand-purple border-brand-purple"
                   : "text-ink-soft border-transparent hover:text-brand-deep hover:border-brand-purple/30"
               }`}
             >
-              {t === "dashboard" ? "Dashboard" : t === "rules" ? "Rule Library" : "Run History"}
+              {tabKey === "dashboard" ? dq.tabDashboard : tabKey === "rules" ? dq.tabRules : dq.tabRuns}
             </button>
           ))}
         </nav>
@@ -673,22 +681,22 @@ export function DqAdminClient({
         <main className="px-8 py-7 pb-14">
           {/* Stats row */}
           <div className="grid grid-cols-6 gap-4 mb-7">
-            <StatCard label="Total Rules"    value={stats.totalRules}   color="blue" />
-            <StatCard label="Active Rules"   value={stats.activeRules}  color="purple" />
-            <StatCard label="Runs Today"     value={stats.runsToday}    color="blue" />
-            <StatCard label="Passing"        value={stats.passingRules} color="green" />
-            <StatCard label="Failing"        value={stats.failingRules} color="red" />
-            <StatCard label="Avg Score"      value={stats.avgScore != null ? `${stats.avgScore.toFixed(1)}%` : "—"} color="purple" />
+            <StatCard label={dq.totalRules}  value={stats.totalRules}   color="blue" />
+            <StatCard label={dq.activeRules} value={stats.activeRules}  color="purple" />
+            <StatCard label={dq.runsToday}   value={stats.runsToday}    color="blue" />
+            <StatCard label={dq.passing}     value={stats.passingRules} color="green" />
+            <StatCard label={dq.failing}     value={stats.failingRules} color="red" />
+            <StatCard label={dq.avgScore}    value={stats.avgScore != null ? `${stats.avgScore.toFixed(1)}%` : "—"} color="purple" />
           </div>
 
           <div className="grid grid-cols-[1.6fr_1fr] gap-5 mb-5">
             {/* Trend chart */}
             <div className="card p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-ink">Run Trends (14 days)</h3>
+                <h3 className="font-bold text-ink">{dq.runTrends}</h3>
                 <div className="flex items-center gap-4 text-[11px] text-muted">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400 inline-block" /> Passed</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400 inline-block" /> Failed</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400 inline-block" /> {dq.trendPassed}</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400 inline-block" /> {dq.trendFailed}</span>
                 </div>
               </div>
               <TrendBar trend={trend} />
@@ -696,7 +704,7 @@ export function DqAdminClient({
 
             {/* DQ by dimension */}
             <div className="card p-5">
-              <h3 className="font-bold text-ink mb-4">Rules by Dimension</h3>
+              <h3 className="font-bold text-ink mb-4">{dq.rulesByDim}</h3>
               <div className="space-y-2">
                 {dimensions.map((d) => {
                   const count = rules.filter((r) => r.dimensionCode === d.code).length;
@@ -710,12 +718,12 @@ export function DqAdminClient({
                           style={{ width: count > 0 ? `${(passing / count) * 100}%` : "0%" }}
                         />
                       </div>
-                      <div className="text-[11px] text-muted w-12 text-right">{count} rules</div>
+                      <div className="text-[11px] text-muted w-12 text-right">{count} {dq.rulesCount}</div>
                     </div>
                   );
                 })}
                 {dimensions.every((d) => rules.filter((r) => r.dimensionCode === d.code).length === 0) && (
-                  <p className="text-sm text-muted text-center py-4">No rules defined yet.</p>
+                  <p className="text-sm text-muted text-center py-4">{dq.noRulesYet}</p>
                 )}
               </div>
             </div>
@@ -723,9 +731,9 @@ export function DqAdminClient({
 
           {/* Failing rules heatmap */}
           <div className="card p-5">
-            <h3 className="font-bold text-ink mb-4">Failing & Warning Rules</h3>
+            <h3 className="font-bold text-ink mb-4">{dq.failingWarning}</h3>
             {rules.filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "WARNING" || r.lastStatusCode === "ERROR").length === 0 ? (
-              <div className="text-sm text-muted text-center py-6">All rules passing — no issues detected.</div>
+              <div className="text-sm text-muted text-center py-6">{dq.allPassing}</div>
             ) : (
               <div className="space-y-2">
                 {rules
@@ -749,7 +757,7 @@ export function DqAdminClient({
                         <div className="text-sm font-bold text-red-600">{r.lastScore.toFixed(1)}%</div>
                       )}
                       <button onClick={() => runRule(r.ruleId)} disabled={runningRuleId === r.ruleId} className="btn btn-sm text-xs">
-                        {runningRuleId === r.ruleId ? "Running…" : "Re-run"}
+                        {runningRuleId === r.ruleId ? dq.running : dq.rerunBtn}
                       </button>
                     </div>
                   ))}
@@ -770,7 +778,7 @@ export function DqAdminClient({
                 value={filterDimension}
                 onChange={(e) => setFilterDimension(e.target.value)}
               >
-                <option value="">All Dimensions</option>
+                <option value="">{dq.allDimensions}</option>
                 {dimensions.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
               </select>
               <select
@@ -778,37 +786,37 @@ export function DqAdminClient({
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
-                <option value="">All Statuses</option>
-                <option value="active">Active only</option>
-                <option value="passing">Passing</option>
-                <option value="failing">Failing</option>
+                <option value="">{dq.allStatuses}</option>
+                <option value="active">{dq.activeOnly}</option>
+                <option value="passing">{dq.passingFilter}</option>
+                <option value="failing">{dq.failingFilter}</option>
               </select>
-              <span className="text-sm text-muted">{filteredRules.length} rules</span>
+              <span className="text-sm text-muted">{filteredRules.length} {dq.rulesCount}</span>
             </div>
             {canEdit && (
               <button onClick={() => { setEditRule(null); setShowForm(true); }} className="btn btn-primary btn-sm">
-                + New Rule
+                {dq.newRule}
               </button>
             )}
           </div>
 
           <div className="card overflow-hidden">
             <div className="grid grid-cols-[2fr_1fr_1fr_80px_80px_80px_90px_110px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div>Rule</div>
-              <div>Dimension</div>
-              <div>Asset</div>
-              <div>Severity</div>
-              <div>Score</div>
-              <div>Status</div>
-              <div>Schedule</div>
-              <div>Actions</div>
+              <div>{dq.colRule}</div>
+              <div>{dq.colDimension}</div>
+              <div>{dq.colAsset}</div>
+              <div>{dq.colSeverity}</div>
+              <div>{dq.colScore}</div>
+              <div>{dq.colStatus}</div>
+              <div>{dq.colSchedule}</div>
+              <div>{dq.colActions}</div>
             </div>
 
             {filteredRules.length === 0 && (
               <div className="py-16 text-center text-muted text-sm">
-                No rules match the current filters.{" "}
+                {dq.noRulesMatch}{" "}
                 {canEdit && (
-                  <button onClick={() => { setEditRule(null); setShowForm(true); }} className="text-brand-purple hover:underline">Create the first rule</button>
+                  <button onClick={() => { setEditRule(null); setShowForm(true); }} className="text-brand-purple hover:underline">{dq.createFirstRule}</button>
                 )}
               </div>
             )}
@@ -852,7 +860,7 @@ export function DqAdminClient({
                   <div>
                     {displayStatus ? (
                       <Badge text={displayStatus} className={STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-600"} />
-                    ) : <span className="text-muted text-xs">Never run</span>}
+                    ) : <span className="text-muted text-xs">{dq.neverRun}</span>}
                   </div>
                   <div className="text-[11px] font-mono text-muted truncate">{rule.scheduleCron || "—"}</div>
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -862,15 +870,15 @@ export function DqAdminClient({
                       className="btn btn-sm text-[11px] px-2 py-1"
                       title="Run now"
                     >
-                      {runningRuleId === rule.ruleId ? "…" : "▶ Run"}
+                      {runningRuleId === rule.ruleId ? "…" : dq.runBtn}
                     </button>
                     {canEdit && (
                       <>
-                        <button onClick={() => { setEditRule(rule); setShowForm(true); }} className="btn btn-sm text-[11px] px-2 py-1" title="Edit">Edit</button>
+                        <button onClick={() => { setEditRule(rule); setShowForm(true); }} className="btn btn-sm text-[11px] px-2 py-1" title="Edit">{dq.editBtn}</button>
                         <button onClick={() => toggleActive(rule)} className="btn btn-sm text-[11px] px-2 py-1 text-ink-soft" title={rule.isActive ? "Deactivate" : "Activate"}>
-                          {rule.isActive ? "Pause" : "Enable"}
+                          {rule.isActive ? dq.pauseBtn : dq.enableBtn}
                         </button>
-                        <button onClick={() => deleteRule(rule.ruleId)} className="btn btn-sm text-[11px] px-2 py-1 text-red-600 hover:bg-red-50" title="Delete">Del</button>
+                        <button onClick={() => deleteRule(rule.ruleId)} className="btn btn-sm text-[11px] px-2 py-1 text-red-600 hover:bg-red-50" title="Delete">{dq.delBtn}</button>
                       </>
                     )}
                   </div>
@@ -886,22 +894,22 @@ export function DqAdminClient({
         <main className="px-8 py-7 pb-14">
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-line">
-              <h3 className="font-bold">Recent Runs</h3>
-              <button onClick={loadRuns} className="btn btn-sm text-xs">Refresh</button>
+              <h3 className="font-bold">{dq.recentRuns}</h3>
+              <button onClick={loadRuns} className="btn btn-sm text-xs">{dq.refreshBtn}</button>
             </div>
             <div className="grid grid-cols-[2fr_1fr_80px_80px_80px_80px_80px_80px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div>Rule</div>
-              <div>Timestamp</div>
-              <div>Status</div>
-              <div>Score</div>
-              <div>Scanned</div>
-              <div>Passed</div>
-              <div>Failed</div>
-              <div>Detail</div>
+              <div>{dq.colRule}</div>
+              <div>{dq.colTimestamp}</div>
+              <div>{dq.colStatus}</div>
+              <div>{dq.colScore}</div>
+              <div>{dq.colScanned}</div>
+              <div>{dq.colPassed}</div>
+              <div>{dq.colFailed}</div>
+              <div>{dq.colDetail}</div>
             </div>
             {runs.length === 0 && (
               <div className="py-16 text-center text-muted text-sm">
-                No runs yet. Go to Rule Library and click "▶ Run" to execute a rule.
+                {dq.noRunsYet}
               </div>
             )}
             {runs.map((r) => (
@@ -917,7 +925,7 @@ export function DqAdminClient({
                 <div className="tabular-nums text-emerald-600">{r.recordsPassed?.toLocaleString() ?? "—"}</div>
                 <div className="tabular-nums text-red-600">{r.recordsFailed?.toLocaleString() ?? "—"}</div>
                 <div>
-                  <button onClick={() => setDetailResult(r)} className="btn btn-sm text-[11px] px-2 py-1">Detail</button>
+                  <button onClick={() => setDetailResult(r)} className="btn btn-sm text-[11px] px-2 py-1">{dq.detailBtn}</button>
                 </div>
               </div>
             ))}
