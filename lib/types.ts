@@ -120,14 +120,16 @@ export type Steward = {
 };
 
 export type GovernanceDomain = {
-  domainCode: string;
-  name: string;
-  description: string;
+  domainCode:    string;
+  name:          string;
+  nameAr?:       string | null;
+  description:   string;
+  descriptionAr?: string | null;
   compliancePct: number;
   maturityLevel: number;
-  level: string;
-  alertCount: number;
-  sortOrder: number;
+  level:         string;
+  alertCount:    number;
+  sortOrder:     number;
   openRequestCount?: number;
 };
 

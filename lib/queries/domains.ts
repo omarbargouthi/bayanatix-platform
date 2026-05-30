@@ -6,7 +6,9 @@ export async function getDomains(): Promise<GovernanceDomain[]> {
     select
       d.domain_code        as "domainCode",
       d.domain_name        as "name",
+      d.name_ar            as "nameAr",
       d.domain_description as "description",
+      d.description_ar     as "descriptionAr",
       d.compliance_pct     as "compliancePct",
       d.maturity_level     as "maturityLevel",
       d.maturity_label     as "level",

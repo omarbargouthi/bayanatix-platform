@@ -22,10 +22,12 @@ export async function POST(
   const fwId = Number(params.frameworkId);
   const body = await req.json();
   const id = await upsertDomainConfig(fwId, {
-    domainCode: body.domainCode,
-    nameEn:     body.nameEn,
-    nameAr:     body.nameAr ?? null,
-    sortOrder:  body.sortOrder ?? 0,
+    domainCode:    body.domainCode,
+    nameEn:        body.nameEn,
+    nameAr:        body.nameAr        ?? null,
+    descriptionEn: body.descriptionEn ?? null,
+    descriptionAr: body.descriptionAr ?? null,
+    sortOrder:     body.sortOrder      ?? 0,
   });
   return NextResponse.json({ id });
 }

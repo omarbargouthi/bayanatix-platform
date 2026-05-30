@@ -3,8 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { GovRegister } from "@/lib/queries/gov-registers";
+import { useLang } from "@/lib/lang-context";
 
 export function RegistersClient({ initialRegisters }: { initialRegisters: GovRegister[] }) {
+  const { t } = useLang();
+  const r = t.registers;
+
   const [registers, setRegisters] = useState<GovRegister[]>(initialRegisters);
   const [showModal, setShowModal] = useState(false);
   const [name, setName]           = useState("");
@@ -24,42 +28,42 @@ export function RegistersClient({ initialRegisters }: { initialRegisters: GovReg
   }
 
   async function del(id: number) {
-    if (!confirm("Delete this register and all its entries?")) return;
+    if (!confirm(r.deleteRegisterConfirm)) return;
     await fetch(`/api/governance/registers/${id}`, { method: "DELETE" });
-    setRegisters((p) => p.filter((r) => r.registerId !== id));
+    setRegisters((p) => p.filter((reg) => reg.registerId !== id));
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-brand-deep">Registers</h1>
-          <p className="text-sm text-ink-soft mt-0.5">{registers.length} register{registers.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-2xl font-bold text-brand-deep">{r.pageTitle}</h1>
+          <p className="text-sm text-ink-soft mt-0.5">{registers.length} {r.pageTitle.toLowerCase()}</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary">+ New Register</button>
+        <button onClick={() => setShowModal(true)} className="btn btn-primary">{r.newRegister}</button>
       </div>
 
       <div className="grid grid-cols-3 gap-5">
-        {registers.map((r) => (
-          <div key={r.registerId} className="card p-5 flex flex-col">
+        {registers.map((reg) => (
+          <div key={reg.registerId} className="card p-5 flex flex-col">
             <div className="flex items-start justify-between mb-2">
-              <h3 className="font-bold text-brand-deep text-sm leading-snug">{r.name}</h3>
-              {r.isSystem && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-brand-purple/10 text-brand-purple rounded shrink-0 ml-2">System</span>
+              <h3 className="font-bold text-brand-deep text-sm leading-snug">{reg.name}</h3>
+              {reg.isSystem && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-brand-purple/10 text-brand-purple rounded shrink-0 ml-2">{r.systemBadge}</span>
               )}
             </div>
-            {r.description && <p className="text-[12px] text-muted mb-3 flex-1">{r.description}</p>}
+            {reg.description && <p className="text-[12px] text-muted mb-3 flex-1">{reg.description}</p>}
             <div className="flex items-center gap-3 text-[11px] text-muted mb-4">
-              <span>{r.columnCount} columns</span>
+              <span>{reg.columnCount} {r.columns}</span>
               <span>·</span>
-              <span>{r.entryCount} entries</span>
+              <span>{reg.entryCount} {r.entries}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Link href={`/governance/registers/${r.registerId}`} className="btn btn-primary btn-sm flex-1 text-center">
-                Open
+              <Link href={`/governance/registers/${reg.registerId}`} className="btn btn-primary btn-sm flex-1 text-center">
+                {r.open}
               </Link>
-              {!r.isSystem && (
-                <button onClick={() => del(r.registerId)} className="btn btn-sm text-red-500 hover:border-red-300">Delete</button>
+              {!reg.isSystem && (
+                <button onClick={() => del(reg.registerId)} className="btn btn-sm text-red-500 hover:border-red-300">{t.common.delete}</button>
               )}
             </div>
           </div>
@@ -69,20 +73,22 @@ export function RegistersClient({ initialRegisters }: { initialRegisters: GovReg
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">New Register</h2>
+            <h2 className="text-lg font-bold mb-4">{r.newRegisterModal}</h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-[12px] font-semibold text-ink-soft mb-1">Register Name *</label>
+                <label className="block text-[12px] font-semibold text-ink-soft mb-1">{r.registerNameLabel}</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} className="field" placeholder="e.g. Risk Register" />
               </div>
               <div>
-                <label className="block text-[12px] font-semibold text-ink-soft mb-1">Description</label>
+                <label className="block text-[12px] font-semibold text-ink-soft mb-1">{t.common.description}</label>
                 <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="field" />
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="btn btn-sm">Cancel</button>
-              <button onClick={create} disabled={saving || !name.trim()} className="btn btn-primary btn-sm">{saving ? "Creating…" : "Create"}</button>
+              <button onClick={() => setShowModal(false)} className="btn btn-sm">{t.common.cancel}</button>
+              <button onClick={create} disabled={saving || !name.trim()} className="btn btn-primary btn-sm">
+                {saving ? r.creating : t.common.add}
+              </button>
             </div>
           </div>
         </div>

@@ -6,42 +6,43 @@ import { FrameworkSectionClient } from "@/components/governance/FrameworkSection
 
 export const dynamic = "force-dynamic";
 
-const SECTION_META: Record<string, { label: string; description: string }> = {
-  policy:     { label: "Policies",               description: "Company policies enforced across the enterprise. Upload approved policies for employee reference." },
-  process:    { label: "Processes",              description: "Documentation explaining how policies are implemented and enforced." },
-  strategy:   { label: "Strategy",               description: "Endorsed data management strategies aligned to organisational objectives." },
-  roadmap:    { label: "Roadmap",                description: "Approved data governance roadmaps showing planned initiatives." },
-  standard:   { label: "Standards & Guidelines", description: "Technical and business standards and best practices." },
-  training:   { label: "Training Material",      description: "Training resources and reference materials for staff." },
-  regulatory: { label: "Regulatory",             description: "Regulatory and legal compliance documentation." },
+const VALID_SECTIONS = new Set(["policy","process","strategy","roadmap","standard","training","regulatory"]);
+
+// English labels for breadcrumbs (server-side only)
+const SECTION_EN_LABEL: Record<string, string> = {
+  policy:     "Policies",
+  process:    "Processes",
+  strategy:   "Strategy",
+  roadmap:    "Roadmap",
+  standard:   "Standards & Guidelines",
+  training:   "Training Material",
+  regulatory: "Regulatory",
 };
 
 export default async function FrameworkSectionPage({ params }: { params: { section: string } }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const meta = SECTION_META[params.section.toLowerCase()];
-  if (!meta) notFound();
+  const key = params.section.toLowerCase();
+  if (!VALID_SECTIONS.has(key)) notFound();
 
-  const sectionCode = params.section.toUpperCase();
+  const sectionCode = key.toUpperCase();
   const docs = await listGovDocs(sectionCode);
 
   return (
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Governance", href: "/governance" },
-          { label: "Governance Framework", href: "/governance/framework" },
-          { label: meta.label },
+          { label: "Bayanat",             href: "/dashboard" },
+          { label: "Data Governance",     href: "/governance" },
+          { label: "Governance Framework",href: "/governance/framework" },
+          { label: SECTION_EN_LABEL[key] },
         ]}
         user={user}
       />
       <main className="px-8 py-7 pb-14">
         <FrameworkSectionClient
           sectionCode={sectionCode}
-          sectionLabel={meta.label}
-          sectionDescription={meta.description}
           initialDocs={docs}
           userId={user.userId}
         />

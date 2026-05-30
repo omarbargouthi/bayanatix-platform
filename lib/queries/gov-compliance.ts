@@ -671,23 +671,27 @@ export { FIELD_LABELS };
 // ── Domain configuration ──────────────────────────────────────────────────────
 
 export type DomainConfig = {
-  configId:    number;
-  frameworkId: number;
-  domainCode:  string;
-  nameEn:      string;
-  nameAr:      string | null;
-  sortOrder:   number;
+  configId:      number;
+  frameworkId:   number;
+  domainCode:    string;
+  nameEn:        string;
+  nameAr:        string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  sortOrder:     number;
 };
 
 export async function listDomainConfig(frameworkId: number): Promise<DomainConfig[]> {
   return sql<DomainConfig[]>`
     SELECT
-      config_id    AS "configId",
-      framework_id AS "frameworkId",
-      domain_code  AS "domainCode",
-      name_en      AS "nameEn",
-      name_ar      AS "nameAr",
-      sort_order   AS "sortOrder"
+      config_id      AS "configId",
+      framework_id   AS "frameworkId",
+      domain_code    AS "domainCode",
+      name_en        AS "nameEn",
+      name_ar        AS "nameAr",
+      description_en AS "descriptionEn",
+      description_ar AS "descriptionAr",
+      sort_order     AS "sortOrder"
     FROM bayanat.gov_compliance_domain_config
     WHERE framework_id = ${frameworkId}
     ORDER BY sort_order, domain_code
@@ -695,19 +699,22 @@ export async function listDomainConfig(frameworkId: number): Promise<DomainConfi
 }
 
 export async function upsertDomainConfig(frameworkId: number, cfg: {
-  domainCode: string; nameEn: string; nameAr?: string | null; sortOrder?: number;
+  domainCode: string; nameEn: string; nameAr?: string | null;
+  descriptionEn?: string | null; descriptionAr?: string | null; sortOrder?: number;
 }): Promise<number> {
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_compliance_domain_config
-      (framework_id, domain_code, name_en, name_ar, sort_order)
+      (framework_id, domain_code, name_en, name_ar, description_en, description_ar, sort_order)
     VALUES (
       ${frameworkId}, ${cfg.domainCode}, ${cfg.nameEn},
-      ${cfg.nameAr ?? null}, ${cfg.sortOrder ?? 0}
+      ${cfg.nameAr ?? null}, ${cfg.descriptionEn ?? null}, ${cfg.descriptionAr ?? null}, ${cfg.sortOrder ?? 0}
     )
     ON CONFLICT (framework_id, domain_code) DO UPDATE SET
-      name_en    = EXCLUDED.name_en,
-      name_ar    = EXCLUDED.name_ar,
-      sort_order = EXCLUDED.sort_order
+      name_en        = EXCLUDED.name_en,
+      name_ar        = EXCLUDED.name_ar,
+      description_en = EXCLUDED.description_en,
+      description_ar = EXCLUDED.description_ar,
+      sort_order     = EXCLUDED.sort_order
     RETURNING config_id AS id
   `;
   return rows[0].id;

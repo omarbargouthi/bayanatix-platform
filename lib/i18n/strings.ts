@@ -181,13 +181,194 @@ export type I18nStrings = {
     noEntries:          string;
     noColumns:          string;
     history:            string;
+    // list page
+    newRegister:        string;
+    newRegisterModal:   string;
+    registerNameLabel:  string;
+    creating:           string;
+    systemBadge:        string;
+    deleteRegisterConfirm: string;
+    columns:            string;
+    entries:            string;
+    open:               string;
+    // detail page
+    editEntry:          string;
+    addEntryModal:      string;
+    editColumnModal:    string;
+    addColumnModal:     string;
+    refresh:            string;
+    loadingHistory:     string;
+    noEntriesYet:       string;
+    noHistoryYet:       string;
+    tabEntries:         string;
+    tabColumns:         string;
+    moreColumns:        string;
+    histDate:           string;
+    histAction:         string;
+    histEntry:          string;
+    histChangedBy:      string;
+    histSummary:        string;
+    actionCreated:      string;
+    actionUpdated:      string;
+    actionDeleted:      string;
+    colKey:             string;
+    formDataType:       string;
+    formOptions:        string;
+    formRequired:       string;
+    selectPlaceholder:  string;
+    deleteEntryConfirm: string;
+    deleteColumnConfirm:string;
   };
 
   // ── Data Governance overview ────────────────────────────────────────────────
   governance: {
-    pageTitle:          string;
-    registers:          string;
-    compliance:         string;
+    // main page
+    pageTitle:    string;
+    pageDesc:     string;
+    // stat cards
+    stats: {
+      fwDocs:               string;
+      acrossAllSections:    string;
+      activeRegisters:      string;
+      entriesTotal:         string;
+      ndiCompliance:        string;
+      noFramework:          string;
+      frameworksTracked:    string;
+      complianceFrameworks: string;
+      requirements:         string;
+    };
+    // category cards
+    framework:      string;
+    frameworkDesc:  string;
+    frameworkOpen:  string;
+    registers:      string;
+    registersDesc:  string;
+    registersOpen:  string;
+    compliance:     string;
+    complianceDesc: string;
+    complianceOpen: string;
+    // framework section labels
+    sectionLabels: {
+      policy: string; process: string; strategy: string;
+      roadmap: string; standard: string; training: string; regulatory: string;
+    };
+    // framework section descriptions
+    sectionDescs: {
+      policy: string; process: string; strategy: string;
+      roadmap: string; standard: string; training: string; regulatory: string;
+    };
+    // framework document management
+    fw: {
+      addDocument:    string;
+      editDocument:   string;
+      noDocuments:    string;
+      uploading:      string;
+      titleRequired:  string;
+      openArrow:      string;
+      docs:           string;
+      colTitle:       string;
+      colStatus:      string;
+      colVersion:     string;
+      colEffective:   string;
+      colOwner:       string;
+      colFiles:       string;
+      colOptions:     string;
+      formTitle:      string;
+      formDesc:       string;
+      formStatus:     string;
+      formVersion:    string;
+      formEffective:  string;
+      formExpiry:     string;
+      formOwner:      string;
+      statusDraft:    string;
+      statusReview:   string;
+      statusApproved: string;
+      statusArchived: string;
+    };
+    // compliance assessment page
+    ca: {
+      pageTitle:        string;
+      overallProgress:  string;
+      tabAssessment:    string;
+      // breadcrumb & step headers
+      allDomains:       string;
+      selectDomain:     string;
+      selectStandard:   string;
+      selectMaturity:   string;
+      // stat cards
+      complete:         string;
+      totalReqs:        string;
+      notCompleted:     string;
+      // level picker cards
+      levelOnly0:       string;
+      levelRangePrefix: string;  // "Levels 1–"
+      levelRangeSuffix: string;  // "included"
+      levelItemsTotal:  string;
+      levelDone:        string;
+      // level selection state messages
+      levelCurrently:   string;
+      levelLowerWarn:   string;
+      // level change warning modal
+      changeMatTitle:   string;
+      changeMatBody1:   string;
+      changeMatBody2:   string;
+      clearAbove:       string;
+      // evidence table headers
+      colLvl:           string;
+      colCode:          string;
+      colEvidence:      string;
+      colType:          string;
+      colAdmin:         string;
+      colOwner:         string;
+      colStatus:        string;
+      colWorkflow:      string;
+      colFile:          string;
+      // step 4 stats row
+      changeLevel:      string;
+      statComplete:     string;
+      statNotCompleted: string;
+      statItems:        string;
+      // evidence expanded labels
+      admCriteria:      string;
+      evidCode:         string;
+      evidType:         string;
+      opExcellence:     string;
+      mgmtSector:       string;
+      comments:         string;
+      saveChanges:      string;
+      approveWorkflow:  string;
+      saveAsDraft:      string;
+      submitReview:     string;
+      confirmAction:    string;
+      endorseAction:    string;
+      fullyEndorsed:    string;
+      // workflow statuses
+      wfDraft:          string;
+      wfSubmitted:      string;
+      wfConfirmed:      string;
+      wfEndorsed:       string;
+      // collab panel
+      discussions:      string;
+      startDiscussion:  string;
+      postBtn:          string;
+      noDiscussions:    string;
+      // history panel
+      changeHistory:    string;
+      noHistory:        string;
+      histDate:         string;
+      histField:        string;
+      histPrevious:     string;
+      histNewValue:     string;
+      histChangedBy:    string;
+      // configuration tab
+      cfgLevelTitle:    string;
+      cfgLevelDesc:     string;
+      cfgDomainTitle:   string;
+      cfgDomainDesc:    string;
+      cfgAutoTranslate: string;
+      cfgTranslating:   string;
+      cfgAddDomain:     string;
+    };
   };
 
   // ── Dashboard ───────────────────────────────────────────────────────────────

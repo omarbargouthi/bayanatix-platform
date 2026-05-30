@@ -1,6 +1,9 @@
+"use client";
+
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import type { GovernanceDomain } from "@/lib/types";
 import Link from "next/link";
+import { useLang } from "@/lib/lang-context";
 
 type WarnLevel = "red" | "amber" | null;
 
@@ -30,6 +33,7 @@ const accentClass: Record<NonNullable<WarnLevel>, string> = {
 };
 
 export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { compliance: string; maturity: string } }) {
+  const { isRtl } = useLang();
   const DOMAIN_HREFS: Record<string, string> = {
     DG:   "/governance",
     DCAT: "/catalog",
@@ -38,6 +42,8 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
   const href = DOMAIN_HREFS[d.domainCode] ?? "#";
   const requestCount = d.openRequestCount ?? 0;
   const level        = warnLevel(requestCount);
+  const displayName        = isRtl && d.nameAr        ? d.nameAr        : d.name;
+  const displayDescription = isRtl && d.descriptionAr ? d.descriptionAr : d.description;
 
   return (
     <div
@@ -70,9 +76,9 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
         href={href}
         className={["block p-5 hover:-translate-y-0.5 transition-transform", level ? "pr-12" : ""].join(" ")}
       >
-        <h3 className="text-[14px] font-bold text-brand-deep leading-snug mb-1">{d.name}</h3>
+        <h3 className="text-[14px] font-bold text-brand-deep leading-snug mb-1">{displayName}</h3>
 
-        <p className="text-[12px] text-muted leading-snug mb-4">{d.description}</p>
+        <p className="text-[12px] text-muted leading-snug mb-4">{displayDescription}</p>
 
         <div className="grid grid-cols-2 gap-x-5 pt-3 border-t border-line-soft">
           <div>

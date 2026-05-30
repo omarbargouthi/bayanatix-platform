@@ -7,6 +7,7 @@ import type {
   LevelConfig, UserOption, ConfigItem, MaturitySelection, DomainConfig,
 } from "@/lib/queries/gov-compliance";
 import type { SessionUser } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
@@ -32,20 +33,20 @@ const DEFAULT_LEVEL_NAMES  = ["No Capability","Build","Definition","Activation",
 
 // Fallback English names keyed by NDI domain code (used when domainEn is null in DB)
 const DOMAIN_EN_BY_CODE: Record<string, string> = {
-  DG:  "Data Governance Domain",
-  DSI: "Data Sharing and Integration Domain (DSI)",
-  RMD: "Reference and Master Data Domain (RMD)",
-  DQ:  "Data Quality Domain",
-  BIA: "Business Intelligence and Analytics Domain (BIA)",
-  DAM: "Data Architecture and Modelling Domain",
-  MCM: "Metadata and Data Catalog Management Domain (MCM)",
-  DVR: "Data Value Realisation Domain",
-  OD:  "Open Data Domain",
-  DC:  "Data Classification Domain",
-  FOI: "Freedom of Information Domain",
-  DO:  "Data Operations Domain",
-  DCM: "Documents and Content Management Domain (DCM)",
-  PDP: "Personal Data Protection Domain",
+  DG:  "Data Governance",
+  DSI: "Data Sharing",
+  RMD: "Master Data",
+  DQ:  "Data Quality",
+  BIA: "BI & Analytics",
+  DAM: "Data Modeling",
+  MCM: "Data Catalog",
+  DVR: "Data Value",
+  OD:  "Open Data",
+  DC:  "Classification",
+  FOI: "FOI Requests",
+  DO:  "Data Operations",
+  DCM: "Content Mgmt.",
+  PDP: "Data Privacy",
 };
 const WORKFLOW_META: Record<string, { label: string; color: string; bg: string }> = {
   DRAFT:     { label: "Draft",     color: "#6B7280", bg: "#F3F4F6" },
@@ -101,6 +102,8 @@ export function ComplianceClient({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isRtl, t } = useLang();
+  const ca = t.governance.ca;
   const [reqs, setReqs]                 = useState<ComplianceRequirement[]>(initialRequirements);
   const [levelCfg, setLevelCfg]         = useState<LevelConfig[]>(initialLevelConfig);
   const [configItems, setConfigItems]   = useState<ConfigItem[]>(initialConfigItems);
@@ -127,7 +130,6 @@ export function ComplianceClient({
   const [importMsg, setImportMsg]       = useState("");
   const [cfgSaving, setCfgSaving]       = useState(false);
   const [levelWarning, setLevelWarning] = useState<{ std: string; newLevel: number } | null>(null);
-  const [lang, setLang]                 = useState<"en"|"ar">("en");
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [collabCounts, setCollabCounts] = useState<Record<string, number>>({});
   const [toastMsg, setToastMsg]         = useState("");
@@ -136,8 +138,16 @@ export function ComplianceClient({
   const fwId = activeFramework?.frameworkId;
 
   const lvlColor = (n: number) => levelCfg.find((c) => c.levelNum === n)?.colorHex ?? DEFAULT_LEVEL_COLORS[n] ?? "#888";
-  const lvlName  = (n: number) => levelCfg.find((c) => c.levelNum === n)?.name    ?? DEFAULT_LEVEL_NAMES[n]  ?? `Level ${n}`;
-  const lvlDesc  = (n: number) => levelCfg.find((c) => c.levelNum === n)?.description ?? "";
+  const lvlName  = (n: number) => {
+    const cfg = levelCfg.find((c) => c.levelNum === n);
+    if (isRtl && cfg?.nameAr) return cfg.nameAr;
+    return cfg?.name ?? DEFAULT_LEVEL_NAMES[n] ?? `Level ${n}`;
+  };
+  const lvlDesc  = (n: number) => {
+    const cfg = levelCfg.find((c) => c.levelNum === n);
+    if (isRtl && cfg?.descriptionAr) return cfg.descriptionAr;
+    return cfg?.description ?? "";
+  };
 
   // Helper: show a toast then hide after 4s
   function toast(msg: string) {
@@ -147,11 +157,11 @@ export function ComplianceClient({
 
   // ── Language helper ──────────────────────────────────────────────────────────
   function disp(en: string | null | undefined, ar: string | null | undefined): string {
-    return lang === "en" ? (en ?? ar ?? "") : (ar ?? en ?? "");
+    return isRtl ? (ar ?? en ?? "") : (en ?? ar ?? "");
   }
 
   // ── Data derived ────────────────────────────────────────────────────────────
-  // Map Arabic domain key → English display name (domainConfig → domainEn → hardcoded fallback → Arabic)
+  // Map Arabic domain key → English/Arabic display names (from domainConfig → fallbacks)
   const domainEnMap = useMemo(() => {
     const map = new Map<string, string>();
     const cfgByCode = new Map(domainConfig.map((d) => [d.domainCode, d]));
@@ -160,6 +170,19 @@ export function ComplianceClient({
       if (!map.has(key)) {
         const cfg = cfgByCode.get(r.domainCode ?? "");
         map.set(key, cfg?.nameEn ?? r.domainEn ?? DOMAIN_EN_BY_CODE[r.domainCode ?? ""] ?? key);
+      }
+    });
+    return map;
+  }, [reqs, domainConfig]);
+
+  const domainArMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const cfgByCode = new Map(domainConfig.map((d) => [d.domainCode, d]));
+    reqs.forEach((r) => {
+      const key = r.domain ?? "Other";
+      if (!map.has(key)) {
+        const cfg = cfgByCode.get(r.domainCode ?? "");
+        map.set(key, cfg?.nameAr ?? key);
       }
     });
     return map;
@@ -181,9 +204,9 @@ export function ComplianceClient({
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([std, rep]) => ({
         std,
-        question: lang === "en" ? (rep.questionEn ?? rep.question) : (rep.question ?? rep.questionEn ?? ""),
+        question: isRtl ? (rep.question ?? rep.questionEn ?? "") : (rep.questionEn ?? rep.question ?? ""),
       }));
-  }, [reqs, selDomain, lang]);
+  }, [reqs, selDomain, isRtl]);
 
   // Cumulative: level 0 → only lvl 0; level N≥1 → levels 1..N
   const questionsForView = useMemo(() => {
@@ -210,6 +233,21 @@ export function ComplianceClient({
     const pct      = Math.round(((complete + na) / Math.max(total, 1)) * 100);
     return { total, complete, na, notDone, pct };
   }, [reqs]);
+
+  const statusConfigItems = useMemo(
+    () => configItems.filter((i) => i.configGroup === "STATUS"),
+    [configItems]
+  );
+
+  const complianceTypeMap = useMemo(() => {
+    const map = new Map<string, ConfigItem>();
+    configItems.filter((i) => i.configGroup === "COMPLIANCE_TYPE").forEach((item) => {
+      map.set(item.label, item);
+      if (item.labelAr) map.set(item.labelAr, item);
+      map.set(item.code, item);
+    });
+    return map;
+  }, [configItems]);
 
   function domainStats(domain: string) {
     const d = reqs.filter((r) => (r.domain ?? "Other") === domain);
@@ -419,19 +457,17 @@ export function ComplianceClient({
       {levelWarning && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-            <h3 className="font-bold text-brand-deep text-lg mb-2">Change Maturity Level?</h3>
+            <h3 className="font-bold text-brand-deep text-lg mb-2">{ca.changeMatTitle}</h3>
             <p className="text-sm text-ink-soft mb-4">
-              Changing <span className="font-semibold">{levelWarning.std}</span> from{" "}
-              <strong>Level {maturitySels[levelWarning.std]}</strong> to{" "}
-              <strong>Level {levelWarning.newLevel}</strong> will{" "}
-              <span className="text-red-600 font-semibold">clear all assessments above Level {levelWarning.newLevel}</span>.
-              Assessments at or below Level {levelWarning.newLevel} are kept.
+              <span className="font-semibold">{levelWarning.std}</span>{" "}
+              <span className="text-red-600 font-semibold">{ca.changeMatBody1} {levelWarning.newLevel}</span>.{" "}
+              {ca.changeMatBody2}
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setLevelWarning(null)} className="btn btn-sm">Cancel</button>
+              <button onClick={() => setLevelWarning(null)} className="btn btn-sm">{t.common.cancel}</button>
               <button onClick={() => doSelectLevel(levelWarning.std, levelWarning.newLevel, true)}
                 className="btn btn-sm bg-red-500 hover:bg-red-600 text-white border-red-500">
-                Clear above &amp; change
+                {ca.clearAbove}
               </button>
             </div>
           </div>
@@ -441,7 +477,7 @@ export function ComplianceClient({
       {/* Header */}
       <div className="flex items-start justify-between mb-5 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-brand-deep">Compliance Assessment</h1>
+          <h1 className="text-2xl font-bold text-brand-deep">{ca.pageTitle}</h1>
           <p className="text-sm text-ink-soft mt-0.5">
             {activeFramework?.name}{activeFramework?.version ? ` · ${activeFramework.version}` : ""}
           </p>
@@ -453,15 +489,6 @@ export function ComplianceClient({
               {frameworks.map((f) => <option key={f.frameworkId} value={f.frameworkId}>{f.name}</option>)}
             </select>
           )}
-          <button
-            onClick={() => setLang((l) => l === "en" ? "ar" : "en")}
-            title="Toggle display language"
-            className={`btn btn-sm flex items-center gap-1.5 font-semibold ${
-              lang === "ar" ? "bg-brand-purple text-white border-brand-purple" : ""
-            }`}>
-            <GlobeIcon />
-            {lang === "en" ? "EN" : "عر"}
-          </button>
           <label className={`btn btn-sm cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
             {importing ? "Importing…" : "Import Excel"}
             <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
@@ -480,16 +507,16 @@ export function ComplianceClient({
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-4">
-        <StatCard label="Total Requirements" value={total}    accent="#6366F1" />
-        <StatCard label="Complete"           value={complete} accent="#10B981" />
-        <StatCard label="N/A"                value={na}       accent="#6B7280" />
-        <StatCard label="Not Completed"      value={notDone}  accent="#F59E0B" />
+        <StatCard label={ca.totalReqs}   value={total}    accent="#6366F1" />
+        <StatCard label={ca.complete}    value={complete} accent="#10B981" />
+        <StatCard label="N/A"            value={na}       accent="#6B7280" />
+        <StatCard label={ca.notCompleted} value={notDone} accent="#F59E0B" />
       </div>
 
       {/* Progress */}
       <div className="card p-4 mb-5">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-ink">Overall Progress</span>
+          <span className="text-sm font-semibold text-ink">{ca.overallProgress}</span>
           <span className="text-sm font-bold text-emerald-600">{pct}%</span>
         </div>
         <div className="h-3 bg-canvas rounded-full overflow-hidden flex">
@@ -497,7 +524,7 @@ export function ComplianceClient({
           <div className="h-full bg-gray-400 transition-all"   style={{ width: `${Math.round(na/Math.max(total,1)*100)}%` }} />
         </div>
         <div className="flex items-center gap-5 mt-2 text-[11px] text-muted">
-          <Dot hex="#10B981" label="Complete" /><Dot hex="#6B7280" label="N/A" /><Dot hex="#E5E7EB" label="Not Completed" />
+          <Dot hex="#10B981" label={ca.complete} /><Dot hex="#6B7280" label="N/A" /><Dot hex="#E5E7EB" label={ca.notCompleted} />
         </div>
       </div>
 
@@ -507,7 +534,7 @@ export function ComplianceClient({
           className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 -mb-px ${
             activeTab === "assessment" ? "border-brand-purple text-brand-purple" : "border-transparent text-ink-soft hover:text-ink"
           }`}>
-          Assessment
+          {ca.tabAssessment}
         </button>
         {(activeTab === "config" || activeTab === "admin") && (
           <button
@@ -536,11 +563,11 @@ export function ComplianceClient({
               {/* Breadcrumb */}
               {selDomain && (
                 <nav className="flex items-center gap-1.5 text-sm mb-5 flex-wrap">
-                  <button onClick={resetAll} className="text-brand-purple hover:underline font-medium">All Domains</button>
+                  <button onClick={resetAll} className="text-brand-purple hover:underline font-medium">{ca.allDomains}</button>
                   <span className="text-muted/50">›</span>
                   <button onClick={backToStandards}
                     className={`font-medium ${selStandard ? "text-brand-purple hover:underline" : "text-ink"}`}>
-                    {lang === "en" ? (domainEnMap.get(selDomain) ?? selDomain) : selDomain}
+                    {isRtl ? (domainArMap.get(selDomain) ?? selDomain) : (domainEnMap.get(selDomain) ?? selDomain)}
                   </button>
                   {selStandard && (<>
                     <span className="text-muted/50">›</span>
@@ -562,15 +589,16 @@ export function ComplianceClient({
               {/* Step 1 — Domains */}
               {!selDomain && (
                 <section>
-                  <StepHeader n={1} label="Select a Domain" />
+                  <StepHeader n={1} label={ca.selectDomain} />
                   <div className="grid grid-cols-3 gap-4">
                     {domains.map((domain) => {
                       const s = domainStats(domain);
                       const rep = reqs.find((r) => (r.domain ?? "Other") === domain);
                       const dc = rep?.domainCode ?? "";
                       const enName = domainEnMap.get(domain) ?? domain;
-                      const displayName = lang === "en" ? enName : domain;
-                      const subtitle    = lang === "en" ? (dc || null) : (enName !== domain ? enName : null);
+                      const arName = domainArMap.get(domain) ?? domain;
+                      const displayName = isRtl ? arName : enName;
+                      const subtitle    = isRtl ? (dc || null) : (dc || null);
                       return (
                         <button key={domain} onClick={() => selectDomain(domain)}
                           className="card p-5 text-left hover:shadow-md hover:border-brand-purple/60 transition-all group border border-line">
@@ -585,7 +613,7 @@ export function ComplianceClient({
                             <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${s.pct}%` }} />
                           </div>
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-emerald-600 font-semibold">{s.pct}% complete</span>
+                            <span className="text-emerald-600 font-semibold">{s.pct}% {ca.complete.toLowerCase()}</span>
                             <span className="text-muted">{s.complete} / {s.total}</span>
                           </div>
                         </button>
@@ -598,7 +626,7 @@ export function ComplianceClient({
               {/* Step 2 — Standards */}
               {selDomain && !selStandard && (
                 <section>
-                  <StepHeader n={2} label="Select a Standard" />
+                  <StepHeader n={2} label={ca.selectStandard} />
                   <div className="grid grid-cols-3 gap-4">
                     {standards.map(({ std, question }) => {
                       const s = standardStats(selDomain, std);
@@ -624,7 +652,7 @@ export function ComplianceClient({
                           </div>
                           {question && (
                             <p className="text-[11px] text-ink-soft mb-3 leading-snug line-clamp-2"
-                              dir={lang === "ar" ? "rtl" : undefined}>
+                              dir={isRtl ? "rtl" : undefined}>
                               {question}
                             </p>
                           )}
@@ -635,7 +663,7 @@ export function ComplianceClient({
                             ))}
                           </div>
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-emerald-600 font-semibold">{s.pct}% complete</span>
+                            <span className="text-emerald-600 font-semibold">{s.pct}% {ca.statComplete}</span>
                             <span className="text-muted">{s.complete} / {s.total}</span>
                           </div>
                         </button>
@@ -648,24 +676,21 @@ export function ComplianceClient({
               {/* Step 3 — Level picker */}
               {selDomain && selStandard && selLevel === null && (
                 <section>
-                  <StepHeader n={3} label="Select the Maturity Level" />
+                  <StepHeader n={3} label={ca.selectMaturity} />
                   {selectedQuestion && (
                     <div className="mb-5 p-4 bg-canvas-soft rounded-xl border border-line">
                       <div className="text-[11px] uppercase tracking-wide text-muted font-semibold mb-1">{selStandard}</div>
-                      <p className="text-sm text-ink leading-relaxed" dir={lang === "ar" ? "rtl" : undefined}>
+                      <p className="text-sm text-ink leading-relaxed" dir={isRtl ? "rtl" : undefined}>
                         {selectedQuestion}
                       </p>
                     </div>
                   )}
                   {maturitySels[selStandard] !== undefined ? (
                     <p className="text-sm bg-amber-50 text-amber-700 border border-amber-200 rounded-lg px-3 py-2 mb-5">
-                      Level <strong>{maturitySels[selStandard]}</strong> ({lvlName(maturitySels[selStandard])}) is currently selected.
-                      Selecting a lower level will clear assessments above it.
+                      Level <strong>{maturitySels[selStandard]}</strong> ({lvlName(maturitySels[selStandard])}) {ca.levelCurrently}
                     </p>
                   ) : (
-                    <p className="text-sm text-ink-soft mb-5">
-                      Choose the level the organisation is at. The evidence table will include all levels up to the selected one.
-                    </p>
+                    <p className="text-sm text-ink-soft mb-5">{ca.levelLowerWarn}</p>
                   )}
                   <div className="grid grid-cols-3 gap-4">
                     {[0,1,2,3,4,5].map((ln) => {
@@ -700,11 +725,11 @@ export function ComplianceClient({
                           </div>
                           {desc && <p className="text-[12px] text-ink-soft mb-3 leading-snug line-clamp-2">{desc}</p>}
                           <div className="text-[11px] text-muted mb-1">
-                            {ln === 0 ? "Level 0 only" : `Levels 1–${ln} included`}
+                            {ln === 0 ? ca.levelOnly0 : `${ca.levelRangePrefix}${ln} ${ca.levelRangeSuffix}`}
                           </div>
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-muted">{s.total} items total</span>
-                            {hasSqs && <span className="font-semibold" style={{ color: s.pct > 0 ? "#10B981" : "#9CA3AF" }}>{s.pct}% done</span>}
+                            <span className="text-muted">{s.total} {ca.levelItemsTotal}</span>
+                            {hasSqs && <span className="font-semibold" style={{ color: s.pct > 0 ? "#10B981" : "#9CA3AF" }}>{s.pct}% {ca.levelDone}</span>}
                           </div>
                           {hasSqs && (
                             <div className="h-1 bg-canvas rounded-full overflow-hidden mt-2">
@@ -736,7 +761,7 @@ export function ComplianceClient({
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-ink leading-relaxed" dir={lang === "ar" ? "rtl" : undefined}>
+                      <p className="text-sm text-ink leading-relaxed" dir={isRtl ? "rtl" : undefined}>
                         {selectedQuestion}
                       </p>
                     </div>
@@ -746,18 +771,18 @@ export function ComplianceClient({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3 text-[12px] flex-wrap">
                       <span className="text-emerald-600 font-semibold">
-                        {questionsForView.filter((r) => r.submissionStatus === "COMPLETE").length} complete
+                        {questionsForView.filter((r) => r.submissionStatus === "COMPLETE").length} {ca.statComplete}
                       </span>
                       <span className="text-amber-600 font-semibold">
-                        {questionsForView.filter((r) => r.submissionStatus === "NOT_COMPLETE").length} not completed
+                        {questionsForView.filter((r) => r.submissionStatus === "NOT_COMPLETE").length} {ca.statNotCompleted}
                       </span>
                       <span className="text-gray-500">
                         {questionsForView.filter((r) => r.submissionStatus === "NA").length} N/A
                       </span>
-                      <span className="text-muted">· {questionsForView.length} items</span>
+                      <span className="text-muted">· {questionsForView.length} {ca.statItems}</span>
                     </div>
                     <button onClick={backToLevels} className="text-[11px] text-brand-purple hover:underline font-medium">
-                      ← Change Level
+                      {ca.changeLevel}
                     </button>
                   </div>
 
@@ -769,16 +794,16 @@ export function ComplianceClient({
                         <table className="w-full text-sm min-w-[1200px]">
                           <thead>
                             <tr className="border-b border-line bg-canvas-soft text-left">
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-8">Lvl</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Code</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Supporting Evidence</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Type</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">Evident Admin</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">Domain Owner</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Status</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Workflow</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-8">{ca.colLvl}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">{ca.colCode}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">{ca.colEvidence}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">{ca.colType}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">{ca.colAdmin}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">{ca.colOwner}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">{ca.colStatus}</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">{ca.colWorkflow}</th>
                               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-8">💬</th>
-                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">File</th>
+                              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">{ca.colFile}</th>
                               <th className="px-3 py-2.5 w-7" />
                             </tr>
                           </thead>
@@ -814,7 +839,7 @@ export function ComplianceClient({
                                     {/* Supporting Evidence */}
                                     <td className="px-3 py-3">
                                       <div className="text-[12px] text-ink leading-snug"
-                                        dir={lang === "ar" ? "rtl" : undefined}>
+                                        dir={isRtl ? "rtl" : undefined}>
                                         {disp(req.supportingEvidenceEn, req.supportingEvidence)
                                           || <span className="text-muted italic">—</span>}
                                       </div>
@@ -823,12 +848,19 @@ export function ComplianceClient({
                                     {/* Compliance/Maturity type */}
                                     <td className="px-3 py-3">
                                       {(() => {
-                                        const t = complianceTypeLabel(req.complianceOrMaturity);
-                                        if (!t) return null;
+                                        const raw = req.complianceOrMaturity;
+                                        if (!raw) return null;
+                                        const cfgItem = complianceTypeMap.get(raw);
+                                        const type = complianceTypeLabel(raw);
+                                        if (!cfgItem && !type) return null;
+                                        const label = cfgItem
+                                          ? (isRtl && cfgItem.labelAr ? cfgItem.labelAr : cfgItem.label)
+                                          : (type?.label ?? "");
+                                        const isCompliance = type?.isCompliance ?? label.toLowerCase().includes("compliance");
                                         return (
                                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                            t.isCompliance ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                                          }`}>{t.label}</span>
+                                            isCompliance ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                                          }`}>{label}</span>
                                         );
                                       })()}
                                     </td>
@@ -853,7 +885,8 @@ export function ComplianceClient({
                                     <td className="px-3 py-3">
                                       <StatusSelect
                                         value={req.submissionStatus}
-                                        onChange={(v) => patch(req, { submissionStatus: v })} />
+                                        onChange={(v) => patch(req, { submissionStatus: v })}
+                                        statusItems={statusConfigItems} />
                                     </td>
 
                                     {/* Workflow badge */}
@@ -911,7 +944,6 @@ export function ComplianceClient({
                                           req={req}
                                           fwId={fwId ?? 0}
                                           role={currentUser.role}
-                                          lang={lang}
                                           onPatch={(updates) => patch(req, updates)}
                                           onWorkflow={(action) => advanceWorkflow(req, action)}
                                           translations={translations}
@@ -952,26 +984,33 @@ export function ComplianceClient({
 
 // ── Workflow badge (standalone) ───────────────────────────────────────────────
 function WorkflowBadge({ status }: { status: string }) {
+  const { t } = useLang();
+  const ca = t.governance.ca;
+  const WF_LABELS: Record<string, string> = {
+    DRAFT: ca.wfDraft, SUBMITTED: ca.wfSubmitted, CONFIRMED: ca.wfConfirmed, ENDORSED: ca.wfEndorsed,
+  };
   const meta = WORKFLOW_META[status] ?? WORKFLOW_META.DRAFT;
   return (
     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
       style={{ color: meta.color, backgroundColor: meta.bg }}>
-      {meta.label}
+      {WF_LABELS[status] ?? meta.label}
     </span>
   );
 }
 
 // ── Evidence expanded row ─────────────────────────────────────────────────────
 function EvidenceExpanded({
-  req, fwId, role, lang, onPatch, onWorkflow, translations,
+  req, fwId, role, onPatch, onWorkflow, translations,
 }: {
-  req: ComplianceRequirement; fwId: number; role: string; lang: "en"|"ar";
+  req: ComplianceRequirement; fwId: number; role: string;
   onPatch: (u: Partial<ComplianceRequirement>) => void;
   onWorkflow: (action: "submit"|"confirm"|"endorse") => void;
   translations: Record<string, string>;
 }) {
+  const { isRtl, t } = useLang();
+  const ca = t.governance.ca;
   function d(en: string | null | undefined, ar: string | null | undefined) {
-    return lang === "en" ? (en ?? ar ?? "") : (ar ?? en ?? "");
+    return isRtl ? (ar ?? en ?? "") : (en ?? ar ?? "");
   }
 
   const mgmtImported = d(req.managementSectorEn, req.managementSector);
@@ -980,7 +1019,7 @@ function EvidenceExpanded({
   const [saving,   setSaving]   = useState(false);
 
   useEffect(() => { setMgmt(req.managementNotes ?? d(req.managementSectorEn, req.managementSector)); },
-    [req.managementNotes, req.managementSectorEn, req.managementSector, lang]); // eslint-disable-line
+    [req.managementNotes, req.managementSectorEn, req.managementSector, isRtl]); // eslint-disable-line
   useEffect(() => { setComments(req.comments ?? ""); }, [req.comments]);
 
   const isDirty = mgmt   !== (req.managementNotes ?? d(req.managementSectorEn, req.managementSector)) ||
@@ -999,7 +1038,6 @@ function EvidenceExpanded({
 
   const admissionCriteria = d(req.admissionCriteriaEn, req.admissionCriteria);
   const directoryType     = d(req.directoryTypeEn,     req.directoryType);
-  const isRtl             = lang === "ar";
 
   return (
     <div className="space-y-4">
@@ -1007,7 +1045,7 @@ function EvidenceExpanded({
       <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[12px]">
         {admissionCriteria && (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Admission Criteria</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">{ca.admCriteria}</div>
             <div className="text-ink leading-snug" dir={isRtl ? "rtl" : undefined}>
               {admissionCriteria}
             </div>
@@ -1015,19 +1053,19 @@ function EvidenceExpanded({
         )}
         {req.directoryCode && (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Evidence Code</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">{ca.evidCode}</div>
             <div className="text-ink font-mono text-[11px]">{req.directoryCode}</div>
           </div>
         )}
         {directoryType && (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Evidence Type</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">{ca.evidType}</div>
             <div className="text-ink">{directoryType}</div>
           </div>
         )}
         {req.operationalExcellence && req.operationalExcellence !== "N/A" && req.operationalExcellence !== "لا" && (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">Operational Excellence</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">{ca.opExcellence}</div>
             <div className="text-ink">{req.operationalExcellence}</div>
           </div>
         )}
@@ -1036,7 +1074,7 @@ function EvidenceExpanded({
       {/* Management & Supporting Sector */}
       <div>
         <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">
-          Management &amp; Supporting Sector
+          {ca.mgmtSector}
         </label>
         {mgmtImported && !req.managementNotes && (
           <div className={`text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5 ${isRtl ? "text-right" : ""}`}
@@ -1051,7 +1089,7 @@ function EvidenceExpanded({
 
       {/* Comments */}
       <div>
-        <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">Comments</label>
+        <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">{ca.comments}</label>
         <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={2}
           className="field text-[12px] w-full" placeholder="Add comments…" />
       </div>
@@ -1059,52 +1097,48 @@ function EvidenceExpanded({
       {/* Save Changes */}
       {isDirty && (
         <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">
-          {saving ? "Saving…" : "Save Changes"}
+          {saving ? t.common.saving : ca.saveChanges}
         </button>
       )}
 
       {/* Workflow section */}
       <div className="border border-line rounded-xl p-4 bg-white">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-[11px] font-semibold text-ink-soft uppercase tracking-wide">Approve Workflow</div>
+          <div className="text-[11px] font-semibold text-ink-soft uppercase tracking-wide">{ca.approveWorkflow}</div>
           <WorkflowBadge status={status} />
         </div>
         {req.endorsedBy && req.endorsedAt && (
           <p className="text-[11px] text-emerald-700 bg-emerald-50 rounded px-2 py-1 mb-3">
-            ✓ Endorsed by <strong>{req.endorsedBy}</strong> on {fmtDate(req.endorsedAt)}
+            ✓ {isRtl ? "اعتمده" : "Endorsed by"} <strong>{req.endorsedBy}</strong> {isRtl ? "بتاريخ" : "on"} {fmtDate(req.endorsedAt)}
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          {/* Save as Draft — always available unless endorsed */}
           {status !== "ENDORSED" && (
-            <button
-              onClick={saveAll}
-              disabled={saving}
-              className="btn btn-sm">
-              💾 Save as Draft
+            <button onClick={saveAll} disabled={saving} className="btn btn-sm">
+              💾 {ca.saveAsDraft}
             </button>
           )}
           {canSubmit && (
             <button onClick={() => onWorkflow("submit")}
               className="btn btn-sm bg-amber-500 hover:bg-amber-600 text-white border-amber-500">
-              Submit for Review →
+              {ca.submitReview} →
             </button>
           )}
           {canConfirm && (
             <button onClick={() => onWorkflow("confirm")}
               className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white border-blue-600">
-              Confirm ✓
+              {ca.confirmAction} ✓
             </button>
           )}
           {canEndorse && (
             <button onClick={() => onWorkflow("endorse")}
               className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600">
-              Endorse ✓✓
+              {ca.endorseAction} ✓✓
             </button>
           )}
           {status === "ENDORSED" && (
             <span className="text-[12px] text-emerald-700 font-semibold flex items-center gap-1">
-              <span>✓</span> Fully endorsed — no further action required
+              <span>✓</span> {ca.fullyEndorsed}
             </span>
           )}
         </div>
@@ -1121,6 +1155,8 @@ function EvidenceExpanded({
 
 // ── Collab panel ──────────────────────────────────────────────────────────────
 function CollabPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
+  const { t } = useLang();
+  const ca = t.governance.ca;
   const [threads,    setThreads]    = useState<CollabThread[] | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [showForm,   setShowForm]   = useState(false);
@@ -1166,7 +1202,7 @@ function CollabPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
         <div className="flex items-center gap-2">
           <ChatIcon className="text-brand-purple" />
           <span className="text-[12px] font-semibold text-ink">
-            Discussions {threads !== null ? `(${threads.length})` : ""}
+            {ca.discussions} {threads !== null ? `(${threads.length})` : ""}
           </span>
         </div>
         <span className="text-muted text-[11px]">{open ? "▲" : "▼"}</span>
@@ -1177,7 +1213,7 @@ function CollabPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
           <div className="px-4 py-2 border-b border-line-soft flex justify-end">
             <button onClick={() => setShowForm((v) => !v)}
               className="text-[11px] font-semibold text-brand-purple hover:text-brand-deep">
-              + Start Discussion
+              + {ca.startDiscussion}
             </button>
           </div>
           {showForm && (
@@ -1189,15 +1225,15 @@ function CollabPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
               <div className="flex gap-2">
                 <button onClick={submit} disabled={submitting || !title.trim() || !body.trim()}
                   className="btn btn-sm btn-primary text-[11px]">
-                  {submitting ? "Posting…" : "Post"}
+                  {submitting ? "…" : ca.postBtn}
                 </button>
-                <button onClick={() => setShowForm(false)} className="btn btn-sm text-[11px]">Cancel</button>
+                <button onClick={() => setShowForm(false)} className="btn btn-sm text-[11px]">{t.common.cancel}</button>
               </div>
             </div>
           )}
           {loading && <div className="px-4 py-3 text-[12px] text-muted italic">Loading…</div>}
           {!loading && threads !== null && threads.length === 0 && (
-            <div className="px-4 py-3 text-[12px] text-muted italic">No discussions yet. Start one!</div>
+            <div className="px-4 py-3 text-[12px] text-muted italic">{ca.noDiscussions}</div>
           )}
           {!loading && threads !== null && threads.map((t) => (
             <div key={t.threadId} className="px-4 py-2.5 border-b border-line-soft last:border-0 flex items-start gap-2">
@@ -1221,6 +1257,8 @@ function CollabPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
 
 // ── History panel (auto-open) ─────────────────────────────────────────────────
 function HistoryPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
+  const { t } = useLang();
+  const ca = t.governance.ca;
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [open,    setOpen]    = useState(true); // default open
@@ -1237,7 +1275,7 @@ function HistoryPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
       <button onClick={() => setOpen((v) => !v)}
         className="w-full px-4 py-2.5 bg-canvas-soft flex items-center justify-between hover:bg-canvas transition-colors">
         <span className="text-[12px] font-semibold text-ink">
-          Change History {history !== null ? `(${history.length})` : loading ? "…" : ""}
+          {ca.changeHistory} {history !== null ? `(${history.length})` : loading ? "…" : ""}
         </span>
         <span className="text-muted text-[11px]">{open ? "▲" : "▼"}</span>
       </button>
@@ -1245,17 +1283,17 @@ function HistoryPanel({ reqId, fwId }: { reqId: number; fwId: number }) {
         <div className="border-t border-line">
           {loading && <div className="px-4 py-3 text-[12px] text-muted italic">Loading history…</div>}
           {!loading && history !== null && history.length === 0 && (
-            <div className="px-4 py-3 text-[12px] text-muted italic">No changes recorded yet.</div>
+            <div className="px-4 py-3 text-[12px] text-muted italic">{ca.noHistory}</div>
           )}
           {!loading && history !== null && history.length > 0 && (
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="bg-canvas-soft border-b border-line text-left">
-                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Date</th>
-                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Field</th>
-                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Previous</th>
-                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">New Value</th>
-                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">Changed By</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">{ca.histDate}</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">{ca.histField}</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">{ca.histPrevious}</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">{ca.histNewValue}</th>
+                  <th className="px-3 py-2 text-muted font-semibold uppercase tracking-wide">{ca.histChangedBy}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1292,6 +1330,8 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
   onConfigItemsChange: (items: ConfigItem[]) => void;
   domainConfig: DomainConfig[]; onDomainConfigChange: (c: DomainConfig[]) => void;
 }) {
+  const { t } = useLang();
+  const ca = t.governance.ca;
   const [rows, setRows] = useState<LevelConfig[]>(levelCfg);
   const [translating, setTranslating] = useState(false);
   const dirty = JSON.stringify(rows) !== JSON.stringify(levelCfg);
@@ -1327,18 +1367,18 @@ function ConfigTab({ levelCfg, configItems, frameworkId, onSaveLevels, saving, o
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="font-bold text-brand-deep">Level Configuration</h2>
-            <p className="text-sm text-ink-soft">Customise names, colours, and descriptions for each maturity level.</p>
+            <h2 className="font-bold text-brand-deep">{ca.cfgLevelTitle}</h2>
+            <p className="text-sm text-ink-soft">{ca.cfgLevelDesc}</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={autoTranslateToArabic} disabled={translating || saving}
               className="btn btn-sm"
-              title="Auto-fill empty Arabic fields by translating from English">
-              {translating ? "Translating…" : "Auto-translate to Arabic"}
+              title={ca.cfgAutoTranslate}>
+              {translating ? ca.cfgTranslating : ca.cfgAutoTranslate}
             </button>
             {dirty && (
               <button onClick={() => onSaveLevels(rows)} disabled={saving} className="btn btn-primary btn-sm">
-                {saving ? "Saving…" : "Save Changes"}
+                {saving ? t.common.saving : t.common.save}
               </button>
             )}
           </div>
@@ -1524,16 +1564,20 @@ function ConfigItemsSection({ group, frameworkId, items, onUpdate }: {
 function DomainConfigSection({ frameworkId, configs, onUpdate }: {
   frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void;
 }) {
-  const [rows,        setRows]        = useState<DomainConfig[]>(configs);
-  const [dirty,       setDirty]       = useState(false);
-  const [saving,      setSaving]      = useState(false);
-  const [translating, setTranslating] = useState(false);
-  const [showAdd,     setShowAdd]     = useState(false);
-  const [addCode,     setAddCode]     = useState("");
-  const [addNameEn,   setAddNameEn]   = useState("");
-  const [addNameAr,   setAddNameAr]   = useState("");
+  const { t } = useLang();
+  const ca = t.governance.ca;
+  const [rows,              setRows]              = useState<DomainConfig[]>(configs);
+  const [dirty,             setDirty]             = useState(false);
+  const [saving,            setSaving]            = useState(false);
+  const [translating,       setTranslating]       = useState(false);
+  const [showAdd,           setShowAdd]           = useState(false);
+  const [addCode,           setAddCode]           = useState("");
+  const [addNameEn,         setAddNameEn]         = useState("");
+  const [addNameAr,         setAddNameAr]         = useState("");
+  const [addDescriptionEn,  setAddDescriptionEn]  = useState("");
+  const [addDescriptionAr,  setAddDescriptionAr]  = useState("");
 
-  function updateRow(idx: number, field: "nameEn" | "nameAr", val: string) {
+  function updateRow(idx: number, field: "nameEn" | "nameAr" | "descriptionEn" | "descriptionAr", val: string) {
     setRows((p) => p.map((r, i) => i === idx ? { ...r, [field]: val } : r));
     setDirty(true);
   }
@@ -1543,7 +1587,11 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
     for (const row of rows) {
       await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domainCode: row.domainCode, nameEn: row.nameEn, nameAr: row.nameAr ?? null, sortOrder: row.sortOrder }),
+        body: JSON.stringify({
+          domainCode: row.domainCode, nameEn: row.nameEn, nameAr: row.nameAr ?? null,
+          descriptionEn: row.descriptionEn ?? null, descriptionAr: row.descriptionAr ?? null,
+          sortOrder: row.sortOrder,
+        }),
       });
     }
     onUpdate(rows);
@@ -1565,33 +1613,47 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
     if (!addCode.trim() || !addNameEn.trim()) return;
     const res = await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domainCode: addCode.trim(), nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null, sortOrder: rows.length }),
+      body: JSON.stringify({
+        domainCode: addCode.trim(), nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null,
+        descriptionEn: addDescriptionEn.trim() || null, descriptionAr: addDescriptionAr.trim() || null,
+        sortOrder: rows.length,
+      }),
     });
     const data = await res.json();
     const newRow: DomainConfig = {
       configId: data.id, frameworkId, domainCode: addCode.trim(),
-      nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null, sortOrder: rows.length,
+      nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null,
+      descriptionEn: addDescriptionEn.trim() || null, descriptionAr: addDescriptionAr.trim() || null,
+      sortOrder: rows.length,
     };
     const updated = [...rows, newRow];
     setRows(updated);
     onUpdate(updated);
-    setAddCode(""); setAddNameEn(""); setAddNameAr(""); setShowAdd(false);
+    setAddCode(""); setAddNameEn(""); setAddNameAr(""); setAddDescriptionEn(""); setAddDescriptionAr(""); setShowAdd(false);
   }
 
   async function autoTranslateToAr() {
     setTranslating(true);
     const updated = [...rows];
     for (const row of updated) {
-      if (row.nameEn && !row.nameAr) {
-        try {
-          const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.nameEn, targetLang: "ar" }),
-          });
-          const d = await res.json();
-          if (d.translation) row.nameAr = d.translation;
-        } catch {}
-      }
+      const translate = async (text: string) => {
+        const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, targetLang: "ar" }),
+        });
+        const d = await res.json();
+        return d.translation as string | undefined;
+      };
+      try {
+        if (row.nameEn && !row.nameAr) {
+          const t = await translate(row.nameEn);
+          if (t) row.nameAr = t;
+        }
+        if (row.descriptionEn && !row.descriptionAr) {
+          const t = await translate(row.descriptionEn);
+          if (t) row.descriptionAr = t;
+        }
+      } catch {}
     }
     setRows([...updated]);
     setDirty(true);
@@ -1602,20 +1664,20 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
     <div>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="font-bold text-brand-deep">Domain Configuration</h2>
-          <p className="text-sm text-ink-soft">Manage domain display names in English and Arabic.</p>
+          <h2 className="font-bold text-brand-deep">{ca.cfgDomainTitle}</h2>
+          <p className="text-sm text-ink-soft">{ca.cfgDomainDesc}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={autoTranslateToAr} disabled={translating || saving} className="btn btn-sm"
-            title="Auto-fill empty Arabic names by translating from English">
-            {translating ? "Translating…" : "Auto-translate to AR"}
+            title={ca.cfgAutoTranslate}>
+            {translating ? ca.cfgTranslating : ca.cfgAutoTranslate}
           </button>
           <button onClick={() => setShowAdd((v) => !v)} className="btn btn-sm">
-            {showAdd ? "Cancel" : "+ Add Domain"}
+            {showAdd ? t.common.cancel : ca.cfgAddDomain}
           </button>
           {dirty && (
             <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">
-              {saving ? "Saving…" : "Save Changes"}
+              {saving ? t.common.saving : t.common.save}
             </button>
           )}
         </div>
@@ -1639,6 +1701,16 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
               <input value={addNameAr} onChange={(e) => setAddNameAr(e.target.value)}
                 className="field text-sm w-full text-right" dir="rtl" placeholder="نطاق حوكمة البيانات" />
             </div>
+            <div>
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Description (EN)</label>
+              <input value={addDescriptionEn} onChange={(e) => setAddDescriptionEn(e.target.value)}
+                className="field text-sm w-full" placeholder="Short English description…" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">الوصف (AR)</label>
+              <input value={addDescriptionAr} onChange={(e) => setAddDescriptionAr(e.target.value)}
+                className="field text-sm w-full text-right" dir="rtl" placeholder="وصف قصير بالعربية…" />
+            </div>
           </div>
           <button onClick={addRow} disabled={!addCode.trim() || !addNameEn.trim()} className="btn btn-sm btn-primary">
             Add
@@ -1650,9 +1722,11 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line bg-canvas-soft text-left">
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Code</th>
+              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Code</th>
               <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Name (EN)</th>
               <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الاسم (AR)</th>
+              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Description (EN)</th>
+              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الوصف (AR)</th>
               <th className="px-4 py-2.5 w-16" />
             </tr>
           </thead>
@@ -1669,13 +1743,21 @@ function DomainConfigSection({ frameworkId, configs, onUpdate }: {
                     className="field text-sm w-full text-right" dir="rtl" placeholder="الاسم بالعربية…" />
                 </td>
                 <td className="px-4 py-2">
+                  <input value={row.descriptionEn ?? ""} onChange={(e) => updateRow(idx, "descriptionEn", e.target.value)}
+                    className="field text-sm w-full" placeholder="Short description…" />
+                </td>
+                <td className="px-4 py-2">
+                  <input value={row.descriptionAr ?? ""} onChange={(e) => updateRow(idx, "descriptionAr", e.target.value)}
+                    className="field text-sm w-full text-right" dir="rtl" placeholder="وصف قصير…" />
+                </td>
+                <td className="px-4 py-2">
                   <button onClick={() => deleteRow(row.configId)}
                     className="text-[10px] text-red-500 hover:text-red-700 font-semibold">Delete</button>
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-muted italic">No domains configured.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted italic">No domains configured.</td></tr>
             )}
           </tbody>
         </table>
@@ -2023,13 +2105,24 @@ function Dot({ hex, label }: { hex: string; label: string }) {
   );
 }
 
-const STATUSES = [
+const STATUSES_FALLBACK = [
   { code: "NOT_COMPLETE", label: "Not Completed", hex: "#F59E0B" },
   { code: "COMPLETE",     label: "Complete",      hex: "#10B981" },
   { code: "NA",           label: "N/A",           hex: "#6B7280" },
 ];
-function StatusSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const s = STATUSES.find((x) => x.code === value) ?? STATUSES[0];
+function StatusSelect({ value, onChange, statusItems }: {
+  value: string; onChange: (v: string) => void; statusItems: ConfigItem[];
+}) {
+  const { isRtl } = useLang();
+  const statuses = statusItems.length > 0
+    ? statusItems.map((i) => ({
+        code: i.code,
+        label: isRtl && i.labelAr ? i.labelAr : i.label,
+        hex: i.colorHex ?? "#6B7280",
+      }))
+    : STATUSES_FALLBACK;
+  const s = statuses.find((x) => x.code === value) ?? statuses[0];
+  if (!s) return null;
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
       className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border-0 cursor-pointer appearance-none pr-6"
@@ -2038,7 +2131,7 @@ function StatusSelect({ value, onChange }: { value: string; onChange: (v: string
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23${s.hex.slice(1)}'/%3E%3C/svg%3E")`,
         backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center",
       }}>
-      {STATUSES.map((st) => <option key={st.code} value={st.code}>{st.label}</option>)}
+      {statuses.map((st) => <option key={st.code} value={st.code}>{st.label}</option>)}
     </select>
   );
 }
@@ -2095,13 +2188,6 @@ function ChatIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" className={`w-3.5 h-3.5 ${className ?? "text-muted"}`}>
       <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414l-2 2A.5.5 0 0 1 1.5 13V2a1 1 0 0 1 1-1h11zm-3 4H5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm0 2H5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1z"/>
-    </svg>
-  );
-}
-function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-      <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM2.04 4.326c.325 1.329 2.532 2.54 3.717 3.19.48.263.793.434.743.484-.08.08-.162.158-.242.234-.416.396-.787.749-.758 1.266.035.634.618.824 1.214 1.017.577.188 1.168.38 1.286.983.082.417-.075.988-.22 1.52-.215.782-.406 1.48.22 1.48 1.5-.5 3.798-3.186 4-5 .138-1.243-2-2-3.5-2.5-.478-.16-.755.081-.99.284-.172.15-.322.279-.51.216-.445-.148-2.615-2.133-1.626-3.554l.127-.179c.333-.46.728-1.006-.296-1.006-.72.001-1.595.515-2.283 1.57l-.083.131z"/>
     </svg>
   );
 }
