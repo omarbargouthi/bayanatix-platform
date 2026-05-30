@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useLang } from "@/lib/lang-context";
 
 const TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Relationships", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof TABS[number];
@@ -9,6 +10,18 @@ export function TableTabs({ active }: { active: Tab }) {
   const router   = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { t } = useLang();
+  const c = t.catalog;
+
+  const TAB_LABELS: Record<Tab, string> = {
+    "Schema":            c.tabSchema,
+    "Data Quality":      c.tabDataQuality,
+    "Activity":          c.tabActivity,
+    "Lineage":           c.tabLineage,
+    "Relationships":     c.tabRelationships,
+    "Sample Data":       c.tabSampleData,
+    "Custom Properties": c.tabCustomProps,
+  };
 
   function navigate(tab: Tab) {
     const p = new URLSearchParams(searchParams.toString());
@@ -29,7 +42,7 @@ export function TableTabs({ active }: { active: Tab }) {
               : "text-ink-soft border-transparent hover:text-brand-purple")
           }
         >
-          {t}
+          {TAB_LABELS[t]}
         </button>
       ))}
     </div>

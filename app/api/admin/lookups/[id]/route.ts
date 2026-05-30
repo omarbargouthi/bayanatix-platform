@@ -12,6 +12,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const body: {
     lookupLabel: string;
+    labelAr?:    string | null;
     description: string | null;
     sortOrder:   number;
     isActive:    boolean;

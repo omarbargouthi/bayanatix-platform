@@ -1,6 +1,6 @@
 "use client";
 import { SidebarProvider, useSidebar } from "@/lib/sidebar-context";
-import { LangProvider, useLang } from "@/lib/lang-context";
+import { LangProvider, useLang, type Lang } from "@/lib/lang-context";
 import { Sidebar } from "./Sidebar";
 import { ChatbotBubble } from "@/components/ui/ChatbotBubble";
 import type { SessionUser } from "@/lib/types";
@@ -21,9 +21,9 @@ function ShellGrid({ user, children }: { user: SessionUser; children: React.Reac
   );
 }
 
-export function AppShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
+export function AppShell({ user, children, initialLang }: { user: SessionUser; children: React.ReactNode; initialLang?: Lang }) {
   return (
-    <LangProvider>
+    <LangProvider initialLang={initialLang}>
       <SidebarProvider>
         <ShellGrid user={user}>{children}</ShellGrid>
       </SidebarProvider>

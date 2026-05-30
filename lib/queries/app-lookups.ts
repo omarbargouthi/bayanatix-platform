@@ -7,6 +7,7 @@ export type AppLookup = {
   lookupGroup: string;
   lookupCode:  string;
   lookupLabel: string;
+  labelAr:     string | null;
   description: string | null;
   sortOrder:   number;
   isActive:    boolean;
@@ -21,6 +22,7 @@ const LOOKUP_COLS = sql.unsafe(`
   lookup_group                  AS "lookupGroup",
   lookup_code                   AS "lookupCode",
   lookup_label                  AS "lookupLabel",
+  label_ar                      AS "labelAr",
   description                   AS "description",
   coalesce(sort_order, 0)       AS "sortOrder",
   coalesce(is_active,  true)    AS "isActive",
@@ -100,6 +102,7 @@ export async function updateLookup(
   lookupId: number,
   data: {
     lookupLabel: string;
+    labelAr?:    string | null;
     description: string | null;
     sortOrder:   number;
     isActive:    boolean;
@@ -109,6 +112,7 @@ export async function updateLookup(
     UPDATE bayanat.app_lookups
     SET
       lookup_label = ${data.lookupLabel},
+      label_ar     = ${data.labelAr ?? null},
       description  = ${data.description ?? null},
       sort_order   = ${data.sortOrder},
       is_active    = ${data.isActive}

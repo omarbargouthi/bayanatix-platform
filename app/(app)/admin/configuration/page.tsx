@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { UiTranslationsSection } from "./UiTranslationsSection";
+import { DqDimensionsSection } from "./DqDimensionsSection";
+import { ClassificationSection } from "./ClassificationSection";
 
 type AppLookup = {
   lookupId: number; lookupGroup: string; lookupCode: string; lookupLabel: string;
@@ -27,8 +29,10 @@ const BLANK = { lookupCode: "", lookupLabel: "", description: "", sortOrder: 0, 
 export default function ConfigurationPage() {
   const [groups, setGroups]       = useState<GroupEntry[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [showGovRoles, setShowGovRoles]         = useState(false);
+  const [showGovRoles, setShowGovRoles]             = useState(false);
   const [showUiTranslations, setShowUiTranslations] = useState(false);
+  const [showDqDims, setShowDqDims]                 = useState(false);
+  const [showClassification, setShowClassification] = useState(false);
   const [newGroupName, setNewGroupName]   = useState("");
   const [lookups, setLookups]     = useState<AppLookup[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -155,7 +159,7 @@ export default function ConfigurationPage() {
 
           {/* ── Governance Roles (pinned) */}
           <button
-            onClick={() => { setShowGovRoles(true); setSelectedGroup(null); setAdding(false); setShowUiTranslations(false); }}
+            onClick={() => { setShowGovRoles(true); setSelectedGroup(null); setAdding(false); setShowUiTranslations(false); setShowDqDims(false); setShowClassification(false); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showGovRoles ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">Governance Roles</div>
@@ -164,22 +168,40 @@ export default function ConfigurationPage() {
 
           {/* ── UI Translations (pinned) */}
           <button
-            onClick={() => { setShowUiTranslations(true); setShowGovRoles(false); setSelectedGroup(null); setAdding(false); }}
+            onClick={() => { setShowUiTranslations(true); setShowGovRoles(false); setShowDqDims(false); setShowClassification(false); setSelectedGroup(null); setAdding(false); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showUiTranslations ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">UI Translations</div>
             <div className="text-[10px] text-muted mt-0.5">English overrides · Arabic labels</div>
           </button>
 
+          {/* ── DQ Dimensions (pinned) */}
+          <button
+            onClick={() => { setShowDqDims(true); setShowGovRoles(false); setShowUiTranslations(false); setShowClassification(false); setSelectedGroup(null); setAdding(false); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showDqDims ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">DQ Dimensions</div>
+            <div className="text-[10px] text-muted mt-0.5">English &amp; Arabic names</div>
+          </button>
+
+          {/* ── Data Classification (pinned) */}
+          <button
+            onClick={() => { setShowClassification(true); setShowGovRoles(false); setShowUiTranslations(false); setShowDqDims(false); setSelectedGroup(null); setAdding(false); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showClassification ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Data Classification</div>
+            <div className="text-[10px] text-muted mt-0.5">English &amp; Arabic labels</div>
+          </button>
+
           {/* Divider */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-line bg-canvas-soft flex items-center justify-between">
             <span>Lookup Groups</span>
-            <button onClick={() => { setSelectedGroup(null); setShowGovRoles(false); setShowUiTranslations(false); setAdding(true); setAddForm({ ...BLANK }); }}
+            <button onClick={() => { setSelectedGroup(null); setShowGovRoles(false); setShowUiTranslations(false); setShowDqDims(false); setShowClassification(false); setAdding(true); setAddForm({ ...BLANK }); }}
               className="text-brand-purple hover:underline font-semibold text-[11px]">+ Add</button>
           </div>
 
           {groups.map(g => (
-            <button key={g.group} onClick={() => { setSelectedGroup(g.group); setShowGovRoles(false); setShowUiTranslations(false); setAdding(false); }}
+            <button key={g.group} onClick={() => { setSelectedGroup(g.group); setShowGovRoles(false); setShowUiTranslations(false); setShowDqDims(false); setShowClassification(false); setAdding(false); }}
               className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${selectedGroup === g.group ? "bg-white border-l-2 border-l-brand-purple" : ""}`}>
               <div className="font-medium text-ink truncate">{GROUP_LABELS[g.group] ?? g.group}</div>
               <div className="text-[10px] text-muted mt-0.5 font-mono">{g.group} · {g.count} values</div>
@@ -265,7 +287,13 @@ export default function ConfigurationPage() {
           </div>
         )}
 
-        {!selectedGroup && !adding && !showGovRoles && !showUiTranslations && (
+        {/* ── DQ Dimensions panel ── */}
+        {showDqDims && <DqDimensionsSection />}
+
+        {/* ── Data Classification panel ── */}
+        {showClassification && <ClassificationSection />}
+
+        {!selectedGroup && !adding && !showGovRoles && !showUiTranslations && !showDqDims && !showClassification && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="text-6xl">⚙️</div>
             <h2 className="text-xl font-semibold text-ink">Application Configuration</h2>

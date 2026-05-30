@@ -496,6 +496,47 @@ export type I18nStrings = {
     encryptedField:    string;
     saveChanges:       string;
     viewHistory:       string;
+    // Table detail page tabs
+    tabSchema:         string;
+    tabDataQuality:    string;
+    tabActivity:       string;
+    tabLineage:        string;
+    tabRelationships:  string;
+    tabSampleData:     string;
+    tabCustomProps:    string;
+    // TableEditPanel
+    descLabel:         string;
+    fromSourceSystem:  string;
+    noDescYet:         string;
+    noCommentSrc:      string;
+    // TableDqTab
+    dqScore:           string;
+    dqRunAll:          string;
+    dqAddRule:         string;
+    dqRunAllRunning:   string;
+    dqPassing:         string;
+    dqWarnings:        string;
+    dqFailing:         string;
+    dqNotYetRun:       string;
+    dqAboveThresh:     string;
+    dqNearThresh:      string;
+    dqBelowThresh:     string;
+    dqFailRecords:     string;
+    dqNoRules:         string;
+    dqAddFirst:        string;
+    dqLoading:         string;
+    dqRunBtn:          string;
+    dqRetryBtn:        string;
+    dqApplyAt:         string;
+    dqTableLvl:        string;
+    dqColumnLvl:       string;
+    dqPreSelected:     string;
+    dqSelectCols:      string;
+    dqExecErrors:      string;
+    dqNotifyFail:      string;
+    dqAutoOpenFail:    string;
+    dqFirstBaseline:   string;
+    dqVsPrevRun:       string;
   };
 
   // ── Data Quality ─────────────────────────────────────────────────────────────

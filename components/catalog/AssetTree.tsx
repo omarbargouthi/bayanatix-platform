@@ -51,7 +51,7 @@ function SourceRow({
             <path d="M3 7l9-4 9 4v10l-9 4-9-4z" />
             <path d="M3 7l9 4 9-4M12 11v10" />
           </svg>
-          <span className="flex-1 font-semibold text-ink text-left truncate">{src.sourceName}</span>
+          <span className="flex-1 font-semibold text-ink truncate">{src.sourceName}</span>
           <span className="text-xs text-muted">
             {src.schemas.length} schemas · {tableTotal.toLocaleString()} tables
           </span>

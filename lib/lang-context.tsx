@@ -26,6 +26,7 @@ const LangCtx = createContext<Ctx>({
 export const useLang = () => useContext(LangCtx);
 
 const STORAGE_KEY = "bayanatix_lang";
+const COOKIE_KEY  = "bayanatix_lang";
 
 function applyToDocument(l: Lang) {
   document.documentElement.dir  = l === "ar" ? "rtl" : "ltr";
@@ -52,9 +53,14 @@ function applyOverrides(base: I18nStrings, forLang: Lang, rows: TranslationRow[]
   return result as I18nStrings;
 }
 
-export function LangProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState]         = useState<Lang>("en");
+export function LangProvider({ children, initialLang }: { children: ReactNode; initialLang?: Lang }) {
+  const [lang, setLangState]         = useState<Lang>(initialLang ?? "en");
   const [dbTranslations, setDbRows]  = useState<TranslationRow[]>([]);
+
+  // Apply document direction for SSR-provided initial lang immediately
+  useEffect(() => {
+    if (initialLang) applyToDocument(initialLang);
+  }, []); // eslint-disable-line
 
   // Load saved language + fetch DB overrides on mount
   useEffect(() => {
@@ -73,6 +79,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   function setLang(l: Lang) {
     setLangState(l);
     localStorage.setItem(STORAGE_KEY, l);
+    document.cookie = `${COOKIE_KEY}=${l}; path=/; max-age=31536000; SameSite=Lax`;
     applyToDocument(l);
   }
 

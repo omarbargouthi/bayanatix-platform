@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { DqRule, DqResult, DqSample } from "@/lib/queries/dq";
 import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
+import { useLang } from "@/lib/lang-context";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
 
@@ -284,6 +285,8 @@ function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
 
 /** Overall DQ score card with trend indicator */
 function OverallScoreCard({ rules }: { rules: DqRule[] }) {
+  const { t } = useLang();
+  const c = t.catalog;
   const scoredRules = rules.filter((r) => r.lastScore != null && r.lastStatusCode !== "ERROR");
   const prevScoredRules = rules.filter((r) => r.previousScore != null && r.lastStatusCode !== "ERROR");
 
@@ -291,8 +294,8 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
     return (
       <div className="card p-5 flex flex-col items-center justify-center text-center min-h-[160px]">
         <div className="text-3xl font-extrabold text-muted mb-1">—</div>
-        <div className="text-[11px] text-muted uppercase tracking-wider">No runs yet</div>
-        <div className="text-xs text-muted mt-2">Run rules to calculate DQ score</div>
+        <div className="text-[11px] text-muted uppercase tracking-wider">{c.dqScore}</div>
+        <div className="text-xs text-muted mt-2">{c.dqLoading}</div>
       </div>
     );
   }
@@ -314,7 +317,7 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
 
   return (
     <div className="card p-5 flex flex-col items-center text-center">
-      <div className="text-[11px] text-muted uppercase tracking-wider font-semibold mb-3">Overall DQ Score</div>
+      <div className="text-[11px] text-muted uppercase tracking-wider font-semibold mb-3">{c.dqScore}</div>
       <div className="relative">
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
           <circle cx={size/2} cy={size/2} r={rOuter} fill="none" stroke="#E2E8F0" strokeWidth="10" />
@@ -334,10 +337,10 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
       {delta != null ? (
         <div className={`mt-2 flex items-center gap-1 text-[12px] font-semibold ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
           <span className="text-base">{delta >= 0 ? "▲" : "▼"}</span>
-          <span>{Math.abs(delta).toFixed(1)}% vs prev run</span>
+          <span>{Math.abs(delta).toFixed(1)}% {c.dqVsPrevRun}</span>
         </div>
       ) : (
-        <div className="mt-2 text-[11px] text-muted">First run baseline</div>
+        <div className="mt-2 text-[11px] text-muted">{c.dqFirstBaseline}</div>
       )}
 
       <div className="mt-3 grid grid-cols-3 gap-2 w-full text-center">
@@ -379,6 +382,8 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
 // ── Samples panel ─────────────────────────────────────────────────────────────
 
 function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => void }) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [samples, setSamples] = useState<DqSample[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -396,7 +401,7 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-xl shadow-2xl w-[580px] border border-line max-h-[70vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
-          <h3 className="font-bold text-ink">Failing Records</h3>
+          <h3 className="font-bold text-ink">{c.dqFailRecords}</h3>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
@@ -456,6 +461,8 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
 type ColumnItem = { id: number; name: string; dataType: string | null; isPk: boolean };
 
 function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: number; entityName: string; onClose: () => void; onSaved: () => void }) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [ruleLevel, setRuleLevel] = useState<"table" | "column">("table");
   const [availableCols, setAvailableCols] = useState<ColumnItem[]>([]);
   const [selectedColIds, setSelectedColIds] = useState<number[]>([]);
@@ -551,7 +558,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
       <div className="bg-white rounded-xl shadow-2xl w-[560px] border border-line">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
           <div>
-            <h3 className="font-bold text-ink">Add DQ Rule</h3>
+            <h3 className="font-bold text-ink">{c.dqAddRule}</h3>
             <p className="text-[11px] text-muted mt-0.5">{entityName}</p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
@@ -562,21 +569,21 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
 
           {/* ── Level selector ── */}
           <div>
-            <label className="block text-[11px] font-semibold text-muted mb-2">Apply Rule At</label>
+            <label className="block text-[11px] font-semibold text-muted mb-2">{c.dqApplyAt}</label>
             <div className="flex rounded-lg border border-line overflow-hidden text-[12px] font-semibold w-fit">
               <button
                 type="button"
                 onClick={() => switchLevel("table")}
                 className={`px-4 py-1.5 transition-colors ${ruleLevel === "table" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas"}`}
               >
-                Table level
+                {c.dqTableLvl}
               </button>
               <button
                 type="button"
                 onClick={() => switchLevel("column")}
                 className={`px-4 py-1.5 transition-colors border-l border-line ${ruleLevel === "column" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas"}`}
               >
-                Column level
+                {c.dqColumnLvl}
               </button>
             </div>
             <p className="text-[11px] text-muted mt-1.5">
@@ -591,7 +598,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
             <div className="flex items-center gap-2.5 px-3 py-2.5 bg-canvas-soft rounded-lg border border-line">
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">TABLE</span>
               <span className="font-semibold text-sm text-ink">{entityName}</span>
-              <span className="text-[11px] text-muted ml-auto italic">pre-selected</span>
+              <span className="text-[11px] text-muted ml-auto italic">{c.dqPreSelected}</span>
             </div>
           )}
 
@@ -600,7 +607,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-[11px] font-semibold text-muted">
-                  Select Columns *
+                  {c.dqSelectCols}
                   {selectedColIds.length > 0 && (
                     <span className="ml-2 font-normal text-brand-purple">
                       {selectedColIds.length} selected — {selectedColIds.length} rule{selectedColIds.length !== 1 ? "s" : ""} will be created
@@ -615,9 +622,9 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
                 )}
               </div>
               <div className="border border-line rounded-lg max-h-52 overflow-y-auto nice-scroll">
-                {loadingCols && <div className="px-3 py-4 text-xs text-muted">Loading columns…</div>}
+                {loadingCols && <div className="px-3 py-4 text-xs text-muted">{t.common.loading}</div>}
                 {!loadingCols && availableCols.length === 0 && (
-                  <div className="px-3 py-4 text-xs text-muted">No columns found</div>
+                  <div className="px-3 py-4 text-xs text-muted">{t.common.noData}</div>
                 )}
                 {!loadingCols && availableCols.map((col) => {
                   const checked = selectedColIds.includes(col.id);
@@ -666,15 +673,15 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           {/* ── Rule name + severity ── */}
           <div className="grid grid-cols-[1fr_140px] gap-3">
             <div>
-              <label className="block text-[11px] font-semibold text-muted mb-1">Rule Name *</label>
+              <label className="block text-[11px] font-semibold text-muted mb-1">{t.dq.ruleNameLabel}</label>
               <input className="input w-full text-sm" value={ruleName} onChange={(e) => setRuleName(e.target.value)} placeholder="e.g. Row Count Check" />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-muted mb-1">Severity</label>
+              <label className="block text-[11px] font-semibold text-muted mb-1">{t.dq.severityLabel}</label>
               <select className="input w-full text-sm" value={severityLevelCode} onChange={(e) => setSeverity(e.target.value)}>
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="CRITICAL">Critical</option>
+                <option value="INFO">{t.dq.severityInfo}</option>
+                <option value="WARNING">{t.dq.severityWarning}</option>
+                <option value="CRITICAL">{t.dq.severityCritical}</option>
               </select>
             </div>
           </div>
@@ -747,23 +754,23 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           <div className="rounded-lg bg-canvas-soft border border-line p-3.5 space-y-2.5">
             <label className="flex items-center gap-3 cursor-pointer text-sm">
               <input type="checkbox" checked={notifyOwners} onChange={(e) => setNotify(e.target.checked)} className="w-4 h-4 accent-brand-purple" />
-              Notify asset owners on failure
+              {c.dqNotifyFail}
             </label>
             <label className="flex items-center gap-3 cursor-pointer text-sm">
               <input type="checkbox" checked={openIssueOnFail} onChange={(e) => setOpenIssue(e.target.checked)} className="w-4 h-4 accent-brand-purple" />
-              Auto-open data fix request on failure
+              {c.dqAutoOpenFail}
             </label>
           </div>
         </div>
 
         <div className="flex justify-end gap-3 px-5 py-4 border-t border-line">
-          <button onClick={onClose} className="btn btn-sm">Cancel</button>
+          <button onClick={onClose} className="btn btn-sm">{t.common.cancel}</button>
           <button
             onClick={save}
             disabled={saving || (ruleLevel === "column" && selectedColIds.length === 0)}
             className="btn btn-primary btn-sm"
           >
-            {saving ? "Saving…" : assetsToSave.length > 1 ? `Add ${assetsToSave.length} Rules` : "Add Rule"}
+            {saving ? t.common.saving : assetsToSave.length > 1 ? `${c.dqAddRule} (${assetsToSave.length})` : c.dqAddRule}
           </button>
         </div>
       </div>
@@ -792,6 +799,8 @@ function MiniGauge({ value, size = 36 }: { value: number; size?: number }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number; entityName: string; canEdit: boolean }) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [rules, setRules] = useState<DqRule[]>([]);
   const [latestResults, setLatestResults] = useState<Record<number, DqResult>>({});
   const [loading, setLoading] = useState(true);
@@ -885,16 +894,16 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
             <div className="flex items-center gap-2">
               {rules.length > 0 && (
                 <button onClick={runAll} disabled={runningAll} className="btn btn-sm text-xs">
-                  {runningAll ? "Running…" : "▶ Run All"}
+                  {runningAll ? c.dqRunAllRunning : c.dqRunAll}
                 </button>
               )}
               {canEdit && (
-                <button onClick={() => setShowAdd(true)} className="btn btn-primary btn-sm text-xs">+ Add Rule</button>
+                <button onClick={() => setShowAdd(true)} className="btn btn-primary btn-sm text-xs">{c.dqAddRule}</button>
               )}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {([["Passing", passingCount, "text-emerald-600", "bg-emerald-50"], ["Warnings", warnCount, "text-amber-600", "bg-amber-50"], ["Failing", failingCount, "text-red-600", "bg-red-50"]] as const).map(([label, val, clr, bg]) => (
+            {([[c.dqPassing, passingCount, "text-emerald-600", "bg-emerald-50"], [c.dqWarnings, warnCount, "text-amber-600", "bg-amber-50"], [c.dqFailing, failingCount, "text-red-600", "bg-red-50"]] as const).map(([label, val, clr, bg]) => (
               <div key={label} className={`rounded-lg ${bg} px-3 py-3 text-center`}>
                 <div className={`text-2xl font-extrabold ${clr}`}>{val}</div>
                 <div className="text-[10px] text-muted mt-0.5">{label}</div>
@@ -944,19 +953,19 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
 
       {/* ── Loading state ─────────────────────────────────────────────────── */}
       {loading && (
-        <div className="card py-12 text-center text-muted text-sm">Loading DQ data…</div>
+        <div className="card py-12 text-center text-muted text-sm">{c.dqLoading}</div>
       )}
 
       {/* ── No rules empty state ─────────────────────────────────────────── */}
       {!loading && rules.length === 0 && (
         <div className="card p-10 text-center">
           <div className="text-4xl mb-3">🔍</div>
-          <h3 className="font-semibold text-ink mb-1">No DQ Rules Defined</h3>
+          <h3 className="font-semibold text-ink mb-1">{c.dqNoRules}</h3>
           <p className="text-sm text-muted max-w-sm mx-auto mb-4">
-            Add data quality rules to validate completeness, validity, uniqueness, and more for this table.
+            {c.dqLoading}
           </p>
           {canEdit && (
-            <button onClick={() => setShowAdd(true)} className="btn btn-primary btn-sm">+ Add First Rule</button>
+            <button onClick={() => setShowAdd(true)} className="btn btn-primary btn-sm">{c.dqAddFirst}</button>
           )}
         </div>
       )}
@@ -988,9 +997,9 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
               const runErr = runErrors[rule.ruleId];
               // Threshold label
               const thresholdLabel =
-                status === "PASSED"  ? { text: "Above threshold", cls: "bg-emerald-100 text-emerald-700" } :
-                status === "FAILED"  ? { text: "Below threshold", cls: "bg-red-100 text-red-700" } :
-                status === "WARNING" ? { text: "Near threshold",  cls: "bg-amber-100 text-amber-700" } :
+                status === "PASSED"  ? { text: c.dqAboveThresh, cls: "bg-emerald-100 text-emerald-700" } :
+                status === "FAILED"  ? { text: c.dqBelowThresh, cls: "bg-red-100 text-red-700" } :
+                status === "WARNING" ? { text: c.dqNearThresh,  cls: "bg-amber-100 text-amber-700" } :
                 null;
               return (
                 <div key={rule.ruleId} className="flex flex-col hover:bg-canvas-soft transition-colors">
@@ -1055,7 +1064,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                       {thresholdLabel ? (
                         <Badge text={thresholdLabel.text} className={thresholdLabel.cls} />
                       ) : (
-                        <span className="text-[11px] text-muted italic">Not yet run</span>
+                        <span className="text-[11px] text-muted italic">{c.dqNotYetRun}</span>
                       )}
                       {latest && (status === "FAILED" || status === "WARNING") && (
                         <button
@@ -1063,7 +1072,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                           className="btn btn-sm text-[11px] px-2 py-1 text-red-600 border-red-200 hover:bg-red-50"
                           title="View records that failed this check"
                         >
-                          Failing Records
+                          {c.dqFailRecords}
                         </button>
                       )}
                       <button
@@ -1071,7 +1080,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                         disabled={runningId === rule.ruleId}
                         className="btn btn-sm text-[11px] px-2 py-1"
                       >
-                        {runningId === rule.ruleId ? "…" : "▶ Run"}
+                        {runningId === rule.ruleId ? "…" : c.dqRunBtn}
                       </button>
                     </div>
                   </div>
@@ -1098,7 +1107,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
       {!loading && errorRules.length > 0 && (
         <div className="card overflow-hidden border-amber-200">
           <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
-            <span className="text-sm font-bold text-amber-700">Execution Errors ({errorRules.length})</span>
+            <span className="text-sm font-bold text-amber-700">{c.dqExecErrors} ({errorRules.length})</span>
             <span className="text-[11px] text-amber-600 flex-1">
               These rules failed to execute. Review their configuration in the DQ Dashboard.
             </span>
@@ -1121,7 +1130,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                     disabled={runningId === rule.ruleId}
                     className="btn btn-sm text-[11px] px-2 py-1 shrink-0"
                   >
-                    {runningId === rule.ruleId ? "…" : "▶ Retry"}
+                    {runningId === rule.ruleId ? "…" : c.dqRetryBtn}
                   </button>
                 </div>
               );

@@ -123,8 +123,11 @@ function RuleFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const dq = t.dq;
+  function dimLabel(d: DqDimension) {
+    return lang === "ar" && d.nameAr ? d.nameAr : d.name;
+  }
   const [form, setForm] = useState<RuleFormData>(
     editRule
       ? {
@@ -600,6 +603,13 @@ export function DqAdminClient({
     const dim = dimensions.find((d) => d.code === code);
     return dim ? dimLabel(dim) : code;
   }
+  function severityLabel(code: string | null): string {
+    if (!code) return "—";
+    if (code === "INFO")     return dq.severityInfo;
+    if (code === "WARNING")  return dq.severityWarning;
+    if (code === "CRITICAL") return dq.severityCritical;
+    return code;
+  }
 
   const [tab, setTab] = useState<Tab>("dashboard");
   const [rules, setRules] = useState(initialRules);
@@ -870,7 +880,7 @@ export function DqAdminClient({
                   </div>
                   <div>
                     {rule.severityLevelCode && (
-                      <Badge text={rule.severityLevelCode} className={SEVERITY_COLORS[rule.severityLevelCode] ?? "bg-gray-100 text-gray-600"} />
+                      <Badge text={severityLabel(rule.severityLevelCode)} className={SEVERITY_COLORS[rule.severityLevelCode] ?? "bg-gray-100 text-gray-600"} />
                     )}
                   </div>
                   <div className="font-bold text-ink tabular-nums">
