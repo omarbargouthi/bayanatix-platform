@@ -36,17 +36,21 @@ export function CertTag({ code }: { code?: string | null }) {
   return <Tag>{upper}</Tag>;
 }
 
+const CLASSIFICATION_VARIANT: Record<string, Variant> = {
+  CONFIDENTIAL: "amber",
+  RESTRICTED:   "amber",
+  PII:          "red",
+  SECRET:       "red",
+  TOP_SECRET:   "red",
+};
+
 export function ClassificationTag({ code }: { code?: string | null }) {
-  const { t } = useLang();
-  const c = t.catalog;
+  const { lookupLabel } = useLang();
   if (!code) return <Tag>—</Tag>;
   const upper = code.toUpperCase();
-  if (upper === "PUBLIC")     return <Tag>{c.classPublic}</Tag>;
-  if (upper === "INTERNAL")   return <Tag>{c.classInternal}</Tag>;
-  if (upper === "CONFIDENTIAL") return <Tag variant="amber">{c.classConfidential}</Tag>;
-  if (upper === "RESTRICTED") return <Tag variant="amber">{c.classRestricted}</Tag>;
-  if (upper === "PII")        return <Tag variant="red">{c.classPii}</Tag>;
-  if (upper === "SECRET")     return <Tag variant="red">{c.classSecret}</Tag>;
-  if (upper === "TOP_SECRET") return <Tag variant="red">{c.classTopSecret}</Tag>;
-  return <Tag>{upper}</Tag>;
+  return (
+    <Tag variant={CLASSIFICATION_VARIANT[upper] ?? "default"}>
+      {lookupLabel("CLASSIFICATION", upper)}
+    </Tag>
+  );
 }

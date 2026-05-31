@@ -123,10 +123,10 @@ function RuleFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t, lang } = useLang();
+  const { t, lang, lookupLabel } = useLang();
   const dq = t.dq;
   function dimLabel(d: DqDimension) {
-    return lang === "ar" && d.nameAr ? d.nameAr : d.name;
+    return lookupLabel("DQ_DIMENSION", d.code) || (lang === "ar" && d.nameAr ? d.nameAr : d.name);
   }
   const [form, setForm] = useState<RuleFormData>(
     editRule
@@ -241,9 +241,9 @@ function RuleFormModal({
             <div>
               <label className="block text-xs font-semibold text-muted mb-1">{dq.severityLabel}</label>
               <select className="input w-full" value={form.severityLevelCode} onChange={(e) => setForm((f) => ({ ...f, severityLevelCode: e.target.value }))}>
-                <option value="INFO">{dq.severityInfo}</option>
-                <option value="WARNING">{dq.severityWarning}</option>
-                <option value="CRITICAL">{dq.severityCritical}</option>
+                <option value="INFO">{lookupLabel("DQ_SEVERITY", "INFO")}</option>
+                <option value="WARNING">{lookupLabel("DQ_SEVERITY", "WARNING")}</option>
+                <option value="CRITICAL">{lookupLabel("DQ_SEVERITY", "CRITICAL")}</option>
               </select>
             </div>
           </div>
@@ -583,11 +583,11 @@ export function DqAdminClient({
   recentRuns: DqResult[];
   userRole: string;
 }) {
-  const { t, lang } = useLang();
+  const { t, lang, lookupLabel } = useLang();
   const dq = t.dq;
 
   function dimLabel(d: DqDimension) {
-    return lang === "ar" && d.nameAr ? d.nameAr : d.name;
+    return lookupLabel("DQ_DIMENSION", d.code) || (lang === "ar" && d.nameAr ? d.nameAr : d.name);
   }
   function statusLabel(code: string | null): string {
     if (!code) return "—";
@@ -600,15 +600,15 @@ export function DqAdminClient({
   }
   function dimLabelByCode(code: string | null): string {
     if (!code) return "—";
+    const cached = lookupLabel("DQ_DIMENSION", code);
+    if (cached !== code) return cached;
     const dim = dimensions.find((d) => d.code === code);
     return dim ? dimLabel(dim) : code;
   }
   function severityLabel(code: string | null): string {
     if (!code) return "—";
-    if (code === "INFO")     return dq.severityInfo;
-    if (code === "WARNING")  return dq.severityWarning;
-    if (code === "CRITICAL") return dq.severityCritical;
-    return code;
+    const cached = lookupLabel("DQ_SEVERITY", code);
+    return cached !== code ? cached : code;
   }
 
   const [tab, setTab] = useState<Tab>("dashboard");

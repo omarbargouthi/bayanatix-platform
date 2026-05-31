@@ -75,17 +75,19 @@ export async function createLookup(data: {
   lookupGroup:  string;
   lookupCode:   string;
   lookupLabel:  string;
+  labelAr?:     string | null;
   description?: string | null;
   sortOrder?:   number | null;
   isActive?:    boolean | null;
 }): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.app_lookups
-      (lookup_group, lookup_code, lookup_label, description, sort_order, is_active)
+      (lookup_group, lookup_code, lookup_label, label_ar, description, sort_order, is_active)
     VALUES (
       ${data.lookupGroup},
       ${data.lookupCode},
       ${data.lookupLabel},
+      ${data.labelAr       ?? null},
       ${data.description   ?? null},
       ${data.sortOrder     ?? 0},
       ${data.isActive      ?? true}

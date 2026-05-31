@@ -461,7 +461,7 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
 type ColumnItem = { id: number; name: string; dataType: string | null; isPk: boolean };
 
 function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: number; entityName: string; onClose: () => void; onSaved: () => void }) {
-  const { t } = useLang();
+  const { t, lookupLabel } = useLang();
   const c = t.catalog;
   const [ruleLevel, setRuleLevel] = useState<"table" | "column">("table");
   const [availableCols, setAvailableCols] = useState<ColumnItem[]>([]);
@@ -679,9 +679,9 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
             <div>
               <label className="block text-[11px] font-semibold text-muted mb-1">{t.dq.severityLabel}</label>
               <select className="input w-full text-sm" value={severityLevelCode} onChange={(e) => setSeverity(e.target.value)}>
-                <option value="INFO">{t.dq.severityInfo}</option>
-                <option value="WARNING">{t.dq.severityWarning}</option>
-                <option value="CRITICAL">{t.dq.severityCritical}</option>
+                <option value="INFO">{lookupLabel("DQ_SEVERITY", "INFO")}</option>
+                <option value="WARNING">{lookupLabel("DQ_SEVERITY", "WARNING")}</option>
+                <option value="CRITICAL">{lookupLabel("DQ_SEVERITY", "CRITICAL")}</option>
               </select>
             </div>
           </div>
@@ -799,7 +799,7 @@ function MiniGauge({ value, size = 36 }: { value: number; size?: number }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number; entityName: string; canEdit: boolean }) {
-  const { t } = useLang();
+  const { t, lookupLabel } = useLang();
   const c = t.catalog;
   const [rules, setRules] = useState<DqRule[]>([]);
   const [latestResults, setLatestResults] = useState<Record<number, DqResult>>({});
@@ -1031,7 +1031,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                           <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
                         )}
                         {rule.severityLevelCode && (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_RING[rule.severityLevelCode] ?? ""}`}>{rule.severityLevelCode}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_RING[rule.severityLevelCode] ?? ""}`}>{lookupLabel("DQ_SEVERITY", rule.severityLevelCode)}</span>
                         )}
                       </div>
                       {rule.assetTypeCode === "DATA_ATTRIBUTES" && rule.assetName && (

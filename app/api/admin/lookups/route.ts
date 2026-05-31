@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     lookupGroup:  string;
     lookupCode:   string;
     lookupLabel:  string;
+    labelAr?:     string | null;
     description?: string | null;
     sortOrder?:   number | null;
     isActive?:    boolean | null;

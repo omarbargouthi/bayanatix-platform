@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UserSearchPicker } from "./UserSearchPicker";
+import { useLang } from "@/lib/lang-context";
 
 export type GovernanceRoleLabels = {
   OWNER:       { name: string; description: string | null };
@@ -42,17 +43,18 @@ type Props = {
 };
 
 export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, canEdit, roleLabels }: Props) {
+  const { lookupLabel } = useLang();
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>(initialStakeholders);
   const [editing,      setEditing]      = useState(false);
   const [addingCode,   setAddingCode]   = useState<string | null>(null);
   const [busy,         setBusy]         = useState(false);
   const [error,        setError]        = useState<string | null>(null);
 
-  // Role groups derive their display labels from roleLabels prop
+  // Role labels from lookup cache (with server-fetched fallback until cache loads)
   const GROUPS = [
-    { roleCode: "OWNER",        label: roleLabels.OWNER.name,        singular: true  },
-    { roleCode: "BIZ_STEWARD",  label: roleLabels.BIZ_STEWARD.name,  singular: false },
-    { roleCode: "TECH_STEWARD", label: roleLabels.TECH_STEWARD.name, singular: false },
+    { roleCode: "OWNER",        label: lookupLabel("GOVERNANCE_ROLE", "OWNER")        || roleLabels.OWNER.name,        singular: true  },
+    { roleCode: "BIZ_STEWARD",  label: lookupLabel("GOVERNANCE_ROLE", "BIZ_STEWARD")  || roleLabels.BIZ_STEWARD.name,  singular: false },
+    { roleCode: "TECH_STEWARD", label: lookupLabel("GOVERNANCE_ROLE", "TECH_STEWARD") || roleLabels.TECH_STEWARD.name, singular: false },
   ];
 
   async function handleAdd(roleCode: string, user: UserResult) {
