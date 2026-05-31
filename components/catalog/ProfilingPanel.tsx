@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { EntityProfileData, AttributeProfile } from "@/lib/queries/catalog";
 import type { DataAttribute } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -98,6 +99,9 @@ export function ProfilingPanel({
   profile: EntityProfileData;
   attributes: DataAttribute[];
 }) {
+  const { t } = useLang();
+  const g = t.catalog;
+
   const byAttrId = new Map<number, AttributeProfile>(
     profile.attributes.map(a => [a.attributeId, a])
   );
@@ -117,8 +121,8 @@ export function ProfilingPanel({
             <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
           </svg>
           <div>
-            <h3 className="font-bold text-sm">Data Profile</h3>
-            <div className="text-[11px] text-muted mt-0.5">Last run: {fmtDate(profile.profiledAt)}</div>
+            <h3 className="font-bold text-sm">{g.dataProfile}</h3>
+            <div className="text-[11px] text-muted mt-0.5">{g.lastRun} {fmtDate(profile.profiledAt)}</div>
           </div>
         </div>
 
@@ -129,21 +133,21 @@ export function ProfilingPanel({
               {fmt(profile.rowCount)}
               <RowCountChange current={profile.rowCount} previous={profile.prevRowCount} />
             </div>
-            <div className="text-[10px] text-muted uppercase tracking-wide">Total rows</div>
+            <div className="text-[10px] text-muted uppercase tracking-wide">{g.totalRows}</div>
           </div>
 
           {/* Sampled (if different from total) */}
           {profile.sampleSize != null && profile.sampleSize !== profile.rowCount && (
             <div className="text-center">
               <div className="font-bold text-brand-deep text-sm tabular-nums">{fmt(profile.sampleSize)}</div>
-              <div className="text-[10px] text-muted uppercase tracking-wide">Sampled</div>
+              <div className="text-[10px] text-muted uppercase tracking-wide">{g.sampled}</div>
             </div>
           )}
 
           {/* Columns profiled */}
           <div className="text-center">
             <div className="font-bold text-brand-deep text-sm tabular-nums">{profile.attributes.length}</div>
-            <div className="text-[10px] text-muted uppercase tracking-wide">Columns profiled</div>
+            <div className="text-[10px] text-muted uppercase tracking-wide">{g.colsProfiled}</div>
           </div>
 
           {/* Profiling mode badge */}
@@ -155,13 +159,13 @@ export function ProfilingPanel({
 
       {/* ── Column headers ──────────────────────────────────────────────── */}
       <div className={`grid ${GRID} gap-3 px-5 py-2.5 bg-canvas text-[10px] uppercase tracking-wider text-muted font-bold border-b border-line`}>
-        <div>Column</div>
-        <div className="text-right">Null %</div>
-        <div className="text-right">Unique %</div>
-        <div className="text-right">Distinct</div>
-        <div>Min</div>
-        <div>Max</div>
-        <div>Top Values</div>
+        <div>{g.colColumn}</div>
+        <div className="text-right">{g.colNullPct}</div>
+        <div className="text-right">{g.colUniquePct}</div>
+        <div className="text-right">{g.colDistinct}</div>
+        <div>{g.colMin}</div>
+        <div>{g.colMax}</div>
+        <div>{g.colTopValues}</div>
       </div>
 
       {/* ── Data rows ───────────────────────────────────────────────────── */}
@@ -226,7 +230,7 @@ export function ProfilingPanel({
       })}
 
       {profile.attributes.length === 0 && (
-        <div className="py-8 text-center text-muted text-sm">No column-level profiling data recorded.</div>
+        <div className="py-8 text-center text-muted text-sm">{g.noProfilingData}</div>
       )}
     </div>
   );

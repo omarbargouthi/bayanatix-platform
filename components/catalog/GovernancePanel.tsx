@@ -43,7 +43,8 @@ type Props = {
 };
 
 export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, canEdit, roleLabels }: Props) {
-  const { lookupLabel } = useLang();
+  const { lookupLabel, t } = useLang();
+  const g = t.catalog;
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>(initialStakeholders);
   const [editing,      setEditing]      = useState(false);
   const [addingCode,   setAddingCode]   = useState<string | null>(null);
@@ -104,13 +105,13 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
   return (
     <div className="card p-5 mt-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-sm">Governance Roles</h3>
+        <h3 className="font-bold text-sm">{g.governanceRoles}</h3>
         {canEdit && (
           <button
             onClick={() => { setEditing((v) => !v); setAddingCode(null); setError(null); }}
             className="btn btn-sm"
           >
-            {editing ? "Done" : "Edit Roles"}
+            {editing ? g.doneEditing : g.editRoles}
           </button>
         )}
       </div>
@@ -122,7 +123,7 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
       )}
 
       {!hasAny && !editing && (
-        <p className="text-[13px] text-muted italic">No governance roles assigned yet.</p>
+        <p className="text-[13px] text-muted italic">{g.noRolesAssigned}</p>
       )}
 
       <div className={`grid gap-5 ${editing ? "grid-cols-3" : "grid-cols-3"}`}>
@@ -150,7 +151,7 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
 
               {/* Members */}
               {members.length === 0 && !isAdding && (
-                <div className="text-[12px] text-muted italic">None assigned</div>
+                <div className="text-[12px] text-muted italic">{g.noneAssigned}</div>
               )}
 
               <div className="space-y-2">

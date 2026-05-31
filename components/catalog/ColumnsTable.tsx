@@ -197,6 +197,8 @@ export function ColumnsTable({
   canEdit:    boolean;
 }) {
   const [editing, setEditing] = useState<DataAttribute | null>(null);
+  const { t } = useLang();
+  const g = t.catalog;
 
   const cols = canEdit
     ? "grid-cols-[36px_1.6fr_1fr_0.9fr_1.1fr_1fr_1fr_36px]"
@@ -211,24 +213,24 @@ export function ColumnsTable({
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
           <h3 className="font-bold">
-            Columns
-            <span className="text-muted text-xs font-normal ml-1.5">{attributes.length} attributes</span>
+            {g.columns}
+            <span className="text-muted text-xs font-normal ml-1.5">{attributes.length} {g.attributes}</span>
           </h3>
           <div className="flex items-center gap-2">
-            <button className="btn btn-sm">Filter</button>
-            <button className="btn btn-sm">Sort</button>
-            <button className="btn btn-sm">Profile</button>
+            <button className="btn btn-sm">{g.filterBtn}</button>
+            <button className="btn btn-sm">{g.sortBtn}</button>
+            <button className="btn btn-sm">{t.common.edit}</button>
           </div>
         </div>
 
         <div className={`grid ${cols} gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold`}>
           <div />
-          <div>Column</div>
-          <div>Type</div>
-          <div>Null %</div>
-          <div>Sensitivity</div>
-          <div>Glossary</div>
-          <div>Quality</div>
+          <div>{g.colColumn}</div>
+          <div>{t.common.type}</div>
+          <div>{g.colNullPct}</div>
+          <div>{g.colSensitivity}</div>
+          <div>{g.colGlossary}</div>
+          <div>{g.colQuality}</div>
           {canEdit && <div />}
         </div>
 

@@ -18,6 +18,7 @@ export type I18nStrings = {
     classification:   string;
     privacy:          string;
     sharing:          string;
+    openData:         string;
     foi:              string;
     aiGovernance:     string;
     // Admin section items
@@ -34,9 +35,10 @@ export type I18nStrings = {
     support:          string;
     settings:         string;
     // Section group headers
-    sectionDomains:   string;
-    sectionAdmin:     string;
-    sectionCompliance:string;
+    sectionDomains:    string;
+    sectionAdmin:      string;
+    sectionCompliance: string;
+    sectionStandalone: string;
   };
 
   // ── User role labels ────────────────────────────────────────────────────────
@@ -538,6 +540,37 @@ export type I18nStrings = {
     dqAutoOpenFail:    string;
     dqFirstBaseline:   string;
     dqVsPrevRun:       string;
+    // Table page — governance panel
+    governanceRoles:   string;
+    editRoles:         string;
+    doneEditing:       string;
+    noRolesAssigned:   string;
+    noneAssigned:      string;
+    // Table page — columns table
+    attributes:        string;
+    colColumn:         string;
+    colNullPct:        string;
+    colUniquePct:      string;
+    colDistinct:       string;
+    colMin:            string;
+    colMax:            string;
+    colTopValues:      string;
+    colSensitivity:    string;
+    colGlossary:       string;
+    colQuality:        string;
+    // Table page — profiling panel
+    dataProfile:       string;
+    lastRun:           string;
+    totalRows:         string;
+    sampled:           string;
+    colsProfiled:      string;
+    noProfilingData:   string;
+    // Table page — compliance gauge
+    complianceScore:      string;
+    piiColumns:           string;
+    classificationLabel:  string;
+    retentionLabel:       string;
+    pdplStatus:           string;
   };
 
   // ── Data Quality ─────────────────────────────────────────────────────────────

@@ -5,8 +5,8 @@ import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { getEntityById, getEntityProfile } from "@/lib/queries/catalog";
 import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
-import { Donut } from "@/components/ui/Donut";
 import { IconTable } from "@/components/layout/icons";
+import { ComplianceScorePanel } from "@/components/catalog/ComplianceScorePanel";
 import { TableTabs } from "@/components/catalog/TableTabs";
 import { TableEditPanel } from "@/components/catalog/TableEditPanel";
 import { ColumnsTable } from "@/components/catalog/ColumnsTable";
@@ -182,20 +182,14 @@ export default async function TablePage({
               </div>
 
               {/* Compliance gauge */}
-              <div className="card p-5 text-center">
-                <h3 className="font-bold mb-3">Compliance Score</h3>
-                <div className="flex justify-center">
-                  <Donut value={Math.round(entity.trustScore ?? 0)} size={180} strokeWidth={16} gradientId="g-trust" />
-                </div>
-                <p className="text-muted text-xs mt-2">8 of 9 checks passing · 1 open finding</p>
-
-                <div className="grid grid-cols-2 gap-2.5 mt-4 text-left">
-                  <Mini label="PII columns" value={`${entity.attributes.filter((a) => a.classificationCode === "PII").length} · masked`} />
-                  <Mini label="Classification" value="Restricted" />
-                  <Mini label="Retention" value="7 yrs" />
-                  <Mini label="PDPL Status" value="Compliant" valueClass="text-emerald-600" />
-                </div>
-              </div>
+              <ComplianceScorePanel
+                trustScore={entity.trustScore ?? 0}
+                piiCount={entity.attributes.filter((a) => a.classificationCode === "PII").length}
+                classificationValue="Restricted"
+                retentionValue="7 yrs"
+                pdplValue="Compliant"
+                pdplClass="text-emerald-600"
+              />
             </section>
 
             <GovernancePanel
@@ -274,15 +268,6 @@ function DqItem({ label, value }: { label: string; value: number }) {
       <div className="h-1 mt-1.5 rounded-full bg-line">
         <div className="h-full rounded-full bg-brand-purple" style={{ width: `${value}%` }} />
       </div>
-    </div>
-  );
-}
-
-function Mini({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div className="bg-canvas-soft rounded-md px-3 py-2.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
-      <div className={"font-bold text-ink " + (valueClass ?? "")}>{value}</div>
     </div>
   );
 }

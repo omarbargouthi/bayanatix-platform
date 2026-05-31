@@ -9,7 +9,7 @@ import { useLang } from "@/lib/lang-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory,
+  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag,
 } from "./icons";
 
 type Item = {
@@ -33,7 +33,11 @@ const NAV_DOMAINS_DEF = [
   { href: "/classification", key: "classification"as const, Icon: IconLines },
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
+  { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },
   { href: "/foi",            key: "foi"           as const, Icon: IconChat, badge: 3 },
+];
+
+const NAV_STANDALONE_DEF = [
   { href: "/ai-governance",  key: "aiGovernance"  as const, Icon: IconCog },
 ];
 
@@ -59,6 +63,8 @@ export function Sidebar({ user }: { user: SessionUser }) {
   const NAV_DOMAINS: Item[] = NAV_DOMAINS_DEF.map((d) => ({
     href: d.href, label: t.nav[d.key], Icon: d.Icon, badge: (d as { badge?: number }).badge,
   }));
+
+  const NAV_STANDALONE: Item[] = NAV_STANDALONE_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
 
   const NAV_ADMIN: Item[] = NAV_ADMIN_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
 
@@ -95,6 +101,18 @@ export function Sidebar({ user }: { user: SessionUser }) {
         }
 
         {NAV_DOMAINS.map((it) => (
+          <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={collapsed} isRtl={isRtl} />
+        ))}
+
+        {/* Standalone domain section */}
+        {collapsed
+          ? <div className="my-2 mx-1 border-t border-dashed border-line" />
+          : <div className="px-3 pt-3 pb-1 flex items-center gap-1.5">
+              <span className="text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">{t.nav.sectionStandalone}</span>
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">AI</span>
+            </div>
+        }
+        {NAV_STANDALONE.map((it) => (
           <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={collapsed} isRtl={isRtl} />
         ))}
 

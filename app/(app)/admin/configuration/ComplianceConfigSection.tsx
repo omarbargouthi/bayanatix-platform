@@ -160,7 +160,7 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-bold text-brand-deep">Maturity Levels</h3>
-          <p className="text-sm text-ink-soft">Names, colours, descriptions, and score ranges for each maturity level (0–5).</p>
+          <p className="text-sm text-ink-soft">Names, colours, descriptions, and score ranges for each maturity level (0.00–5.00).</p>
         </div>
         <div className="flex gap-2">
           <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
@@ -217,22 +217,16 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
                     className="input w-full text-sm text-right" dir="rtl" placeholder="وصف مختصر…" />
                 </td>
                 <td className="px-3 py-2">
-                  <div className="flex items-center gap-1">
-                    <input type="number" min={0} max={100} step={0.1}
-                      value={row.rangeFrom ?? ""}
-                      onChange={e => update(row.levelNum, "rangeFrom", e.target.value === "" ? null : Number(e.target.value))}
-                      className="input w-full text-sm text-center" placeholder="0" />
-                    <span className="text-muted text-[11px]">%</span>
-                  </div>
+                  <input type="number" min={0} max={5} step={0.01}
+                    value={row.rangeFrom ?? ""}
+                    onChange={e => update(row.levelNum, "rangeFrom", e.target.value === "" ? null : Number(e.target.value))}
+                    className="input w-full text-sm text-center" placeholder="0.00" />
                 </td>
                 <td className="px-3 py-2">
-                  <div className="flex items-center gap-1">
-                    <input type="number" min={0} max={100} step={0.1}
-                      value={row.rangeTo ?? ""}
-                      onChange={e => update(row.levelNum, "rangeTo", e.target.value === "" ? null : Number(e.target.value))}
-                      className="input w-full text-sm text-center" placeholder="100" />
-                    <span className="text-muted text-[11px]">%</span>
-                  </div>
+                  <input type="number" min={0} max={5} step={0.01}
+                    value={row.rangeTo ?? ""}
+                    onChange={e => update(row.levelNum, "rangeTo", e.target.value === "" ? null : Number(e.target.value))}
+                    className="input w-full text-sm text-center" placeholder="5.00" />
                 </td>
               </tr>
             ))}
