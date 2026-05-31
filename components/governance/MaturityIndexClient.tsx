@@ -3,18 +3,10 @@
 import { useState, useMemo, useEffect } from "react";
 import type {
   ComplianceFramework, ComplianceRequirement,
-  LevelConfig, UserOption, ConfigItem,
+  LevelConfig, UserOption, ConfigItem, DomainConfig,
 } from "@/lib/queries/gov-compliance";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-const DOMAIN_EN_BY_CODE: Record<string, string> = {
-  DG:  "Data Governance",  DSI: "Data Sharing",   RMD: "Master Data",
-  DQ:  "Data Quality",     BIA: "BI & Analytics",  DAM: "Data Modeling",
-  MCM: "Data Catalog",     DVR: "Data Value",       OD:  "Open Data",
-  DC:  "Classification",   FOI: "FOI Requests",     DO:  "Data Operations",
-  DCM: "Content Mgmt.",    PDP: "Data Privacy",
-};
-
 function parseLevelNum(ml: string | null): number | null {
   if (!ml) return null;
   const m = ml.match(/(\d+)/);
@@ -58,6 +50,7 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
   const [fwId,        setFwId]        = useState<number>(frameworks[0]?.frameworkId ?? 0);
   const [levelCfg,    setLevelCfg]    = useState<LevelConfig[]>([]);
   const [cfgItems,    setCfgItems]    = useState<ConfigItem[]>([]);
+  const [domainCfg,   setDomainCfg]  = useState<DomainConfig[]>([]);
   const [reqs,        setReqs]        = useState<ComplianceRequirement[] | null>(null);
   const [loading,     setLoading]     = useState(false);
   const [translating, setTranslating] = useState(0);
@@ -65,7 +58,14 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
   const [editing,     setEditing]     = useState<ComplianceRequirement | null>(null);
   const [saving,      setSaving]      = useState(false);
 
-  // Load levelCfg + configItems + requirements when fwId changes
+  // Build domain display name map from domain config
+  const domainNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    domainCfg.forEach(d => { if (d.domainCode) map.set(d.domainCode, d.nameEn); });
+    return map;
+  }, [domainCfg]);
+
+  // Load levelCfg + configItems + requirements + domainCfg when fwId changes
   useEffect(() => {
     if (!fwId) return;
     setLoading(true);
@@ -75,10 +75,12 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
       fetch(`/api/governance/compliance/${fwId}/config`).then(r => r.json()),
       fetch(`/api/governance/compliance/${fwId}/config-items`).then(r => r.json()),
       fetch(`/api/governance/compliance/${fwId}/admin/requirements`).then(r => r.json()),
-    ]).then(([cfgData, itemsData, reqData]) => {
+      fetch(`/api/governance/compliance/${fwId}/domain-config`).then(r => r.json()),
+    ]).then(([cfgData, itemsData, reqData, dcData]) => {
       setLevelCfg(Array.isArray(cfgData) ? cfgData : []);
       setCfgItems(itemsData.items ?? []);
       setReqs(reqData.requirements ?? []);
+      setDomainCfg(dcData.configs ?? []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [fwId]);
@@ -208,12 +210,16 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
                 {filtered.slice(0, 200).map(req => {
                   const evidenceEn = req.supportingEvidenceEn ?? req.questionEn ?? "";
                   const needsTranslation = !req.supportingEvidenceEn && !!req.supportingEvidence && hasArabic(req.supportingEvidence);
+                  // Use domain config for display name
+                  const domainDisplay = req.domainCode
+                    ? (domainNameMap.get(req.domainCode) ?? req.domainEn ?? req.domain ?? "—")
+                    : (req.domainEn ?? req.domain ?? "—");
                   return (
                     <tr key={req.reqId} className="border-b border-line-soft hover:bg-canvas/30">
                       <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-muted">{req.reqCode}</td>
                       <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{deriveStandard(req)}</td>
                       <td className="px-3 py-2.5 text-[12px] text-ink">
-                        <div>{req.domainEn ?? DOMAIN_EN_BY_CODE[req.domainCode ?? ""] ?? req.domain ?? "—"}</div>
+                        <div>{domainDisplay}</div>
                         {req.domainCode && <div className="text-[10px] text-muted font-mono">{req.domainCode}</div>}
                       </td>
                       <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate" title={evidenceEn || undefined}>
@@ -268,23 +274,24 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
   levelCfg: LevelConfig[];
   complianceTypeItems: ConfigItem[];
 }) {
-  function resolveComplianceLabel(raw: string | null | undefined): string {
+  function resolveComplianceCode(raw: string | null | undefined): string {
     if (!raw) return "";
     const direct = complianceTypeItems.find(i => i.label.toLowerCase() === raw.toLowerCase());
-    if (direct) return direct.label;
+    if (direct) return direct.code;
     const arMatch = complianceTypeItems.find(i => i.labelAr === raw);
-    if (arMatch) return arMatch.label;
+    if (arMatch) return arMatch.code;
     const t = complianceTypeLabel(raw);
     if (t) {
       const fb = complianceTypeItems.find(i =>
         t.isCompliance ? i.label.toLowerCase().includes("compliance") : i.label.toLowerCase().includes("maturity")
       );
-      if (fb) return fb.label;
+      if (fb) return fb.code;
     }
-    return raw;
+    return "";
   }
 
   const parsedInitLevel = parseLevelNum(req.maturityLevel);
+  const initCompCode = resolveComplianceCode(req.complianceOrMaturity);
 
   const [v, setV] = useState({
     question:             req.question            ?? "",
@@ -293,7 +300,7 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
     managementSector:     req.managementSector    ?? "",
     directoryCode:        req.directoryCode       ?? "",
     directoryType:        req.directoryType       ?? "",
-    complianceOrMaturity: resolveComplianceLabel(req.complianceOrMaturity),
+    complianceOrMaturity: req.complianceOrMaturity ?? "",
     evidentAdministrator: req.evidentAdministrator ?? "",
     domainOwner:          req.domainOwner          ?? "",
     maturityLevel:        parsedInitLevel !== null ? String(parsedInitLevel) : "",
@@ -303,14 +310,33 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
     managementSectorEn:   req.managementSectorEn   ?? "",
     directoryTypeEn:      req.directoryTypeEn      ?? "",
   });
+  // Separate state for the compliance type code (maps to label for saving)
+  const [compCode, setCompCode] = useState(initCompCode);
 
   function set(k: keyof typeof v, val: string) { setV(p => ({ ...p, [k]: val })); }
 
+  // When compCode changes, update v.complianceOrMaturity to the English label (what DB stores)
+  function handleCompCodeChange(code: string) {
+    setCompCode(code);
+    const item = complianceTypeItems.find(i => i.code === code);
+    setV(p => ({ ...p, complianceOrMaturity: item?.label ?? code }));
+  }
+
+  // Selected compliance type item for AR display
+  const selectedCompItem = complianceTypeItems.find(i => i.code === compCode);
+  // Selected level config for AR name display
+  const selectedLevel = levelCfg.find(lc => String(lc.levelNum) === v.maturityLevel);
+
   function save() {
+    const original = {
+      ...req,
+      complianceOrMaturity: req.complianceOrMaturity ?? "",
+      maturityLevel: parsedInitLevel !== null ? String(parsedInitLevel) : "",
+    };
     const updates: Record<string, string | null> = {};
     (Object.keys(v) as Array<keyof typeof v>).forEach(k => {
       const nv = v[k].trim();
-      const ov = ((req[k as keyof ComplianceRequirement] ?? "") as string).trim();
+      const ov = ((original[k as keyof typeof original] ?? "") as string).trim();
       if (nv !== ov) updates[k] = nv || null;
     });
     onSave(updates as Partial<ComplianceRequirement>);
@@ -335,10 +361,13 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
           <button onClick={onClose} className="text-muted hover:text-ink text-xl">×</button>
         </div>
         <div className="px-6 py-5 space-y-5">
+          {/* Column headers */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-b border-line pb-2 mb-1">
             <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide">English (EN)</div>
             <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide text-right" dir="rtl">العربية (AR)</div>
           </div>
+
+          {/* Bilingual text fields */}
           {bilingualFields.map(([labelEn, labelAr, keyEn, keyAr]) => (
             <div key={keyEn} className="grid grid-cols-2 gap-x-4">
               <div>
@@ -352,38 +381,64 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
             </div>
           ))}
 
-          <div className="border-t border-line pt-4 space-y-3">
+          {/* Other fields */}
+          <div className="border-t border-line pt-4 space-y-4">
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Evidence Code</label>
               <input value={v.directoryCode} onChange={e => set("directoryCode", e.target.value)} className="field text-sm w-full" />
             </div>
+
+            {/* Compliance or Maturity — bilingual display */}
             <div>
-              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Compliance or Maturity</label>
-              {complianceTypeItems.length > 0 ? (
-                <select value={v.complianceOrMaturity} onChange={e => set("complianceOrMaturity", e.target.value)} className="field text-sm w-full">
-                  <option value="">— Select type —</option>
-                  {complianceTypeItems.map(item => (
-                    <option key={item.code} value={item.label}>
-                      {item.label}{item.labelAr ? ` (${item.labelAr})` : ""}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input value={v.complianceOrMaturity} onChange={e => set("complianceOrMaturity", e.target.value)}
-                  className="field text-sm w-full" placeholder="e.g. Compliance or Maturity" />
-              )}
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">Compliance or Maturity</label>
+              <div className="grid grid-cols-2 gap-x-4">
+                <div>
+                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block">English (EN)</label>
+                  {complianceTypeItems.length > 0 ? (
+                    <select value={compCode} onChange={e => handleCompCodeChange(e.target.value)} className="field text-sm w-full">
+                      <option value="">— Select type —</option>
+                      {complianceTypeItems.map(item => (
+                        <option key={item.code} value={item.code}>{item.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={v.complianceOrMaturity} onChange={e => set("complianceOrMaturity", e.target.value)}
+                      className="field text-sm w-full" placeholder="e.g. Compliance or Maturity" />
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block text-right" dir="rtl">العربية (AR)</label>
+                  <div className="field text-sm w-full text-right bg-canvas-soft text-ink-soft min-h-[38px] flex items-center justify-end px-3" dir="rtl">
+                    {selectedCompItem?.labelAr ?? <span className="italic text-muted/60 text-[11px]">—</span>}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Maturity Level — bilingual display */}
             <div>
-              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Maturity Level</label>
-              <select value={v.maturityLevel} onChange={e => set("maturityLevel", e.target.value)} className="field text-sm w-full">
-                <option value="">— Select level —</option>
-                {levelCfg.map(lc => (
-                  <option key={lc.levelNum} value={String(lc.levelNum)}>
-                    Level {lc.levelNum} — {lc.name}{lc.nameAr ? ` (${lc.nameAr})` : ""}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">Maturity Level</label>
+              <div className="grid grid-cols-2 gap-x-4">
+                <div>
+                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block">English (EN)</label>
+                  <select value={v.maturityLevel} onChange={e => set("maturityLevel", e.target.value)} className="field text-sm w-full">
+                    <option value="">— Select level —</option>
+                    {levelCfg.map(lc => (
+                      <option key={lc.levelNum} value={String(lc.levelNum)}>
+                        Level {lc.levelNum} — {lc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block text-right" dir="rtl">العربية (AR)</label>
+                  <div className="field text-sm w-full text-right bg-canvas-soft text-ink-soft min-h-[38px] flex items-center justify-end px-3" dir="rtl">
+                    {selectedLevel?.nameAr ?? <span className="italic text-muted/60 text-[11px]">—</span>}
+                  </div>
+                </div>
+              </div>
             </div>
+
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Evident Administrator</label>
               <input value={v.evidentAdministrator} onChange={e => set("evidentAdministrator", e.target.value)} className="field text-sm w-full" />

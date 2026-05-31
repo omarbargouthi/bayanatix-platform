@@ -63,6 +63,8 @@ export type LevelConfig = {
   description:   string | null;
   nameAr:        string | null;
   descriptionAr: string | null;
+  rangeFrom:     number | null;
+  rangeTo:       number | null;
 };
 
 export type UserOption = {
@@ -546,18 +548,20 @@ export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]
       color_hex      AS "colorHex",
       description,
       name_ar        AS "nameAr",
-      description_ar AS "descriptionAr"
+      description_ar AS "descriptionAr",
+      range_from     AS "rangeFrom",
+      range_to       AS "rangeTo"
     FROM bayanat.gov_compliance_level_config
     WHERE framework_id = ${frameworkId}
     ORDER BY level_num
   `;
   const defaults = [
-    { name: "No Capability", colorHex: "#D84848", description: "", nameAr: null, descriptionAr: null },
-    { name: "Build",         colorHex: "#E88030", description: "", nameAr: null, descriptionAr: null },
-    { name: "Definition",    colorHex: "#2D4AA0", description: "", nameAr: null, descriptionAr: null },
-    { name: "Activation",    colorHex: "#3D7EC8", description: "", nameAr: null, descriptionAr: null },
-    { name: "Managed",       colorHex: "#1E8C76", description: "", nameAr: null, descriptionAr: null },
-    { name: "Innovation",    colorHex: "#5CA85C", description: "", nameAr: null, descriptionAr: null },
+    { name: "No Capability", colorHex: "#D84848", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
+    { name: "Build",         colorHex: "#E88030", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
+    { name: "Definition",    colorHex: "#2D4AA0", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
+    { name: "Activation",    colorHex: "#3D7EC8", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
+    { name: "Managed",       colorHex: "#1E8C76", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
+    { name: "Innovation",    colorHex: "#5CA85C", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
   ];
   return Array.from({ length: 6 }, (_, i) => {
     const existing = rows.find((r) => r.levelNum === i);
@@ -567,20 +571,26 @@ export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]
 
 export async function saveLevelConfig(
   frameworkId: number,
-  levels: Array<{ levelNum: number; name: string; colorHex: string; description: string | null; nameAr: string | null; descriptionAr: string | null }>
+  levels: Array<{
+    levelNum: number; name: string; colorHex: string;
+    description: string | null; nameAr: string | null; descriptionAr: string | null;
+    rangeFrom?: number | null; rangeTo?: number | null;
+  }>
 ): Promise<void> {
   for (const l of levels) {
     await sql`
       INSERT INTO bayanat.gov_compliance_level_config
-        (framework_id, level_num, name, color_hex, description, name_ar, description_ar)
+        (framework_id, level_num, name, color_hex, description, name_ar, description_ar, range_from, range_to)
       VALUES (${frameworkId}, ${l.levelNum}, ${l.name}, ${l.colorHex}, ${l.description ?? null},
-              ${l.nameAr ?? null}, ${l.descriptionAr ?? null})
+              ${l.nameAr ?? null}, ${l.descriptionAr ?? null}, ${l.rangeFrom ?? null}, ${l.rangeTo ?? null})
       ON CONFLICT (framework_id, level_num) DO UPDATE SET
         name           = EXCLUDED.name,
         color_hex      = EXCLUDED.color_hex,
         description    = EXCLUDED.description,
         name_ar        = EXCLUDED.name_ar,
-        description_ar = EXCLUDED.description_ar
+        description_ar = EXCLUDED.description_ar,
+        range_from     = EXCLUDED.range_from,
+        range_to       = EXCLUDED.range_to
     `;
   }
 }
@@ -679,6 +689,7 @@ export type DomainConfig = {
   descriptionEn: string | null;
   descriptionAr: string | null;
   sortOrder:     number;
+  weight:        number | null;
 };
 
 export async function listDomainConfig(frameworkId: number): Promise<DomainConfig[]> {
@@ -691,7 +702,8 @@ export async function listDomainConfig(frameworkId: number): Promise<DomainConfi
       name_ar        AS "nameAr",
       description_en AS "descriptionEn",
       description_ar AS "descriptionAr",
-      sort_order     AS "sortOrder"
+      sort_order     AS "sortOrder",
+      weight
     FROM bayanat.gov_compliance_domain_config
     WHERE framework_id = ${frameworkId}
     ORDER BY sort_order, domain_code
@@ -700,21 +712,24 @@ export async function listDomainConfig(frameworkId: number): Promise<DomainConfi
 
 export async function upsertDomainConfig(frameworkId: number, cfg: {
   domainCode: string; nameEn: string; nameAr?: string | null;
-  descriptionEn?: string | null; descriptionAr?: string | null; sortOrder?: number;
+  descriptionEn?: string | null; descriptionAr?: string | null;
+  sortOrder?: number; weight?: number | null;
 }): Promise<number> {
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_compliance_domain_config
-      (framework_id, domain_code, name_en, name_ar, description_en, description_ar, sort_order)
+      (framework_id, domain_code, name_en, name_ar, description_en, description_ar, sort_order, weight)
     VALUES (
       ${frameworkId}, ${cfg.domainCode}, ${cfg.nameEn},
-      ${cfg.nameAr ?? null}, ${cfg.descriptionEn ?? null}, ${cfg.descriptionAr ?? null}, ${cfg.sortOrder ?? 0}
+      ${cfg.nameAr ?? null}, ${cfg.descriptionEn ?? null}, ${cfg.descriptionAr ?? null},
+      ${cfg.sortOrder ?? 0}, ${cfg.weight ?? null}
     )
     ON CONFLICT (framework_id, domain_code) DO UPDATE SET
       name_en        = EXCLUDED.name_en,
       name_ar        = EXCLUDED.name_ar,
       description_en = EXCLUDED.description_en,
       description_ar = EXCLUDED.description_ar,
-      sort_order     = EXCLUDED.sort_order
+      sort_order     = EXCLUDED.sort_order,
+      weight         = EXCLUDED.weight
     RETURNING config_id AS id
   `;
   return rows[0].id;

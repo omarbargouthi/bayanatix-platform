@@ -210,17 +210,7 @@ export default function ConfigurationPage() {
         )}
 
         {/* ── Compliance Config panel ── */}
-        {showComplianceConfig && (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-ink">Compliance Configuration</h2>
-              <p className="text-xs text-muted mt-1">
-                Configure maturity levels, submission statuses, evidence types, compliance types, and domain display names for each compliance framework.
-              </p>
-            </div>
-            <ComplianceConfigSection />
-          </div>
-        )}
+        {showComplianceConfig && <ComplianceConfigSection />}
 
         {/* ── Empty state ── */}
         {!selectedGroup && !adding && !showUiTranslations && !showComplianceConfig && (

@@ -28,6 +28,7 @@ export async function POST(
     descriptionEn: body.descriptionEn ?? null,
     descriptionAr: body.descriptionAr ?? null,
     sortOrder:     body.sortOrder      ?? 0,
+    weight:        body.weight != null ? Number(body.weight) : null,
   });
   return NextResponse.json({ id });
 }

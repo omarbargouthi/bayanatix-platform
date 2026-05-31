@@ -19,6 +19,7 @@ function blankLevels(fwId: number): LevelConfig[] {
     configId: 0, frameworkId: fwId, levelNum: i,
     name: DEFAULT_NAMES[i], nameAr: null,
     colorHex: DEFAULT_COLORS[i], description: null, descriptionAr: null,
+    rangeFrom: null, rangeTo: null,
   }));
 }
 
@@ -68,22 +69,17 @@ export function ComplianceConfigSection() {
 
   return (
     <div className="max-w-5xl">
-      {/* Header + framework selector */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h2 className="text-lg font-bold text-ink">Compliance Configuration</h2>
-          <p className="text-xs text-muted mt-1">
-            Configure maturity level names and colours, submission statuses, evidence types, compliance
-            types, and domain labels used across the compliance assessment.
-          </p>
-        </div>
+      {/* Framework selector */}
+      <div className="flex items-center gap-3 mb-8">
         {frameworks.length > 1 ? (
-          <select value={fwId ?? ""} onChange={e => setFwId(Number(e.target.value))}
-            className="input text-sm">
-            {frameworks.map(fw => (
-              <option key={fw.frameworkId} value={fw.frameworkId}>{fw.name}</option>
-            ))}
-          </select>
+          <>
+            <span className="text-sm font-semibold text-ink-soft">Framework</span>
+            <select value={fwId ?? ""} onChange={e => setFwId(Number(e.target.value))} className="input text-sm w-auto">
+              {frameworks.map(fw => (
+                <option key={fw.frameworkId} value={fw.frameworkId}>{fw.name}</option>
+              ))}
+            </select>
+          </>
         ) : frameworks.length === 1 ? (
           <span className="text-[11px] font-semibold text-brand-deep bg-brand-purple/10 px-3 py-1.5 rounded font-mono">
             {frameworks[0].name}
@@ -122,14 +118,14 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
   levelCfg: LevelConfig[]; frameworkId: number; saving: boolean;
   onSave: (rows: LevelConfig[]) => void;
 }) {
-  const [rows,       setRows]       = useState<LevelConfig[]>(levelCfg);
-  const [translating,setTranslating]= useState(false);
+  const [rows,        setRows]        = useState<LevelConfig[]>(levelCfg);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => { setRows(levelCfg); }, [levelCfg]);
 
   const dirty = JSON.stringify(rows) !== JSON.stringify(levelCfg);
 
-  function update(ln: number, field: keyof LevelConfig, val: string) {
+  function update(ln: number, field: keyof LevelConfig, val: string | number | null) {
     setRows(p => p.map(r => r.levelNum === ln ? { ...r, [field]: val } : r));
   }
 
@@ -160,7 +156,7 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-bold text-brand-deep">Maturity Levels</h3>
-          <p className="text-sm text-ink-soft">Names, colours, and descriptions for each maturity level (0–5).</p>
+          <p className="text-sm text-ink-soft">Names, colours, descriptions, and score ranges for each maturity level (0–5).</p>
         </div>
         <div className="flex gap-2">
           <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
@@ -175,44 +171,64 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
+        <table className="w-full text-sm min-w-[1100px]">
           <thead>
             <tr className="border-b border-line bg-canvas-soft text-left">
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-16">Level</th>
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-12">Colour</th>
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Name (EN)</th>
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">الاسم (AR)</th>
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Description (EN)</th>
-              <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الوصف (AR)</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-14">Level</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-10">Colour</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">Name (EN)</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">الاسم (AR)</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Description (EN)</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الوصف (AR)</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24 text-center">Range From</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24 text-center">Range To</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(row => (
               <tr key={row.levelNum} className="border-b border-line-soft">
-                <td className="px-4 py-2.5">
+                <td className="px-3 py-2">
                   <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-extrabold text-base"
                     style={{ backgroundColor: row.colorHex }}>{row.levelNum}</span>
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-3 py-2">
                   <input type="color" value={row.colorHex}
                     onChange={e => update(row.levelNum, "colorHex", e.target.value)}
                     className="w-9 h-9 rounded-lg cursor-pointer border border-line p-0.5" />
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-3 py-2">
                   <input value={row.name} onChange={e => update(row.levelNum, "name", e.target.value)}
                     className="input w-full text-sm" placeholder="Level name…" />
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-3 py-2">
                   <input value={row.nameAr ?? ""} onChange={e => update(row.levelNum, "nameAr", e.target.value)}
                     className="input w-full text-sm text-right" dir="rtl" placeholder="اسم المستوى…" />
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-3 py-2">
                   <input value={row.description ?? ""} onChange={e => update(row.levelNum, "description", e.target.value)}
                     className="input w-full text-sm" placeholder="Brief description…" />
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-3 py-2">
                   <input value={row.descriptionAr ?? ""} onChange={e => update(row.levelNum, "descriptionAr", e.target.value)}
                     className="input w-full text-sm text-right" dir="rtl" placeholder="وصف مختصر…" />
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1">
+                    <input type="number" min={0} max={100} step={0.1}
+                      value={row.rangeFrom ?? ""}
+                      onChange={e => update(row.levelNum, "rangeFrom", e.target.value === "" ? null : Number(e.target.value))}
+                      className="input w-full text-sm text-center" placeholder="0" />
+                    <span className="text-muted text-[11px]">%</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1">
+                    <input type="number" min={0} max={100} step={0.1}
+                      value={row.rangeTo ?? ""}
+                      onChange={e => update(row.levelNum, "rangeTo", e.target.value === "" ? null : Number(e.target.value))}
+                      className="input w-full text-sm text-center" placeholder="100" />
+                    <span className="text-muted text-[11px]">%</span>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -229,12 +245,39 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
   group: string; frameworkId: number; items: ConfigItem[];
   onUpdate: (items: ConfigItem[]) => void;
 }) {
-  const [showAdd,   setShowAdd]   = useState(false);
-  const [addCode,   setAddCode]   = useState("");
-  const [addLabel,  setAddLabel]  = useState("");
-  const [addLabelAr,setAddLabelAr]= useState("");
-  const [addColor,  setAddColor]  = useState("#6B7280");
-  const [adding,    setAdding]    = useState(false);
+  const [showAdd,    setShowAdd]    = useState(false);
+  const [addCode,    setAddCode]    = useState("");
+  const [addLabel,   setAddLabel]   = useState("");
+  const [addLabelAr, setAddLabelAr] = useState("");
+  const [addColor,   setAddColor]   = useState("#6B7280");
+  const [adding,     setAdding]     = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editForm,    setEditForm]  = useState({ label: "", labelAr: "", colorHex: "#6B7280" });
+  const [editSaving,  setEditSaving]= useState(false);
+
+  function startEdit(item: ConfigItem) {
+    setEditingCode(item.code);
+    setEditForm({ label: item.label, labelAr: item.labelAr ?? "", colorHex: item.colorHex ?? "#6B7280" });
+  }
+
+  async function saveEdit(code: string) {
+    setEditSaving(true);
+    const item = items.find(i => i.code === code)!;
+    await fetch(`/api/governance/compliance/${frameworkId}/config-items`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        configGroup: group, code,
+        label: editForm.label.trim(), labelAr: editForm.labelAr.trim() || null,
+        colorHex: editForm.colorHex, sortOrder: item.sortOrder,
+      }),
+    });
+    onUpdate(items.map(i => i.code === code
+      ? { ...i, label: editForm.label.trim(), labelAr: editForm.labelAr.trim() || null, colorHex: editForm.colorHex }
+      : i
+    ));
+    setEditingCode(null);
+    setEditSaving(false);
+  }
 
   async function add() {
     if (!addCode.trim() || !addLabel.trim()) return;
@@ -270,7 +313,7 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
           <h3 className="font-bold text-brand-deep">{CGROUP_LABELS[group] ?? group}</h3>
           <p className="text-sm text-ink-soft">Configure list values used in this framework.</p>
         </div>
-        <button onClick={() => setShowAdd(v => !v)} className="btn btn-sm">
+        <button onClick={() => { setShowAdd(v => !v); setEditingCode(null); }} className="btn btn-sm">
           {showAdd ? "Cancel" : "+ Add"}
         </button>
       </div>
@@ -304,22 +347,59 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
       )}
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[40px_120px_1fr_1fr_60px] gap-3 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-          <div>Color</div><div>Code</div><div>English Label</div><div>Arabic Label (عربي)</div><div></div>
+        <div className="grid grid-cols-[36px_110px_1fr_1fr_100px] gap-3 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
+          <div></div><div>Code</div><div>English Label</div><div>Arabic Label (عربي)</div><div></div>
         </div>
         {[...items].sort((a, b) => a.sortOrder - b.sortOrder).map(item => (
-          <div key={item.code} className="grid grid-cols-[40px_120px_1fr_1fr_60px] gap-3 px-4 py-3 items-center border-b border-line-soft last:border-b-0 hover:bg-canvas-soft">
-            <div>
-              <span className="w-5 h-5 rounded-full inline-block border border-line"
-                style={{ backgroundColor: item.colorHex ?? "#6B7280" }} />
-            </div>
-            <div className="font-mono text-[11px] text-muted font-semibold">{item.code}</div>
-            <div className="font-medium text-sm text-ink">{item.label}</div>
-            <div className="text-sm text-ink text-right" dir="rtl">{item.labelAr ?? <span className="text-muted italic text-[11px]">Not set</span>}</div>
-            <div>
-              <button onClick={() => del(item.code)}
-                className="text-[11px] text-red-500 hover:text-red-700 font-semibold">Delete</button>
-            </div>
+          <div key={item.code} className="border-b border-line-soft last:border-b-0">
+            {editingCode === item.code ? (
+              <div className="px-4 py-3 bg-blue-50/40 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-mono text-[11px] text-brand-deep font-semibold bg-brand-purple/10 px-2 py-0.5 rounded">{item.code}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label (EN)</label>
+                    <input value={editForm.label} onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))}
+                      className="input w-full text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">التسمية (AR)</label>
+                    <input value={editForm.labelAr} onChange={e => setEditForm(f => ({ ...f, labelAr: e.target.value }))}
+                      className="input w-full text-sm text-right" dir="rtl" />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Colour</label>
+                      <input type="color" value={editForm.colorHex}
+                        onChange={e => setEditForm(f => ({ ...f, colorHex: e.target.value }))}
+                        className="w-9 h-9 rounded-lg cursor-pointer border border-line p-0.5" />
+                    </div>
+                    <button onClick={() => saveEdit(item.code)} disabled={editSaving || !editForm.label.trim()}
+                      className="btn btn-sm btn-primary mb-0.5">{editSaving ? "Saving…" : "Save"}</button>
+                    <button onClick={() => setEditingCode(null)} className="btn btn-sm mb-0.5">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[36px_110px_1fr_1fr_100px] gap-3 px-4 py-3 items-center hover:bg-canvas-soft">
+                <div>
+                  <span className="w-5 h-5 rounded-full inline-block border border-line"
+                    style={{ backgroundColor: item.colorHex ?? "#6B7280" }} />
+                </div>
+                <div className="font-mono text-[11px] text-muted font-semibold">{item.code}</div>
+                <div className="font-medium text-sm text-ink">{item.label}</div>
+                <div className="text-sm text-ink text-right" dir="rtl">
+                  {item.labelAr ?? <span className="text-muted italic text-[11px]">Not set</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => startEdit(item)}
+                    className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold">Edit</button>
+                  <button onClick={() => del(item.code)}
+                    className="text-[11px] text-red-500 hover:text-red-700 font-semibold">Delete</button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
         {items.length === 0 && (
@@ -335,20 +415,21 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
 function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
   frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void;
 }) {
-  const [rows,       setRows]       = useState<DomainConfig[]>(configs);
-  const [dirty,      setDirty]      = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [translating,setTranslating]= useState(false);
-  const [showAdd,    setShowAdd]    = useState(false);
-  const [addCode,    setAddCode]    = useState("");
-  const [addNameEn,  setAddNameEn]  = useState("");
-  const [addNameAr,  setAddNameAr]  = useState("");
-  const [addDescEn,  setAddDescEn]  = useState("");
-  const [addDescAr,  setAddDescAr]  = useState("");
+  const [rows,        setRows]        = useState<DomainConfig[]>(configs);
+  const [dirty,       setDirty]       = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [showAdd,     setShowAdd]     = useState(false);
+  const [addCode,     setAddCode]     = useState("");
+  const [addNameEn,   setAddNameEn]   = useState("");
+  const [addNameAr,   setAddNameAr]   = useState("");
+  const [addDescEn,   setAddDescEn]   = useState("");
+  const [addDescAr,   setAddDescAr]   = useState("");
+  const [addWeight,   setAddWeight]   = useState("");
 
   useEffect(() => { setRows(configs); setDirty(false); }, [configs]);
 
-  function updateRow(idx: number, field: "nameEn"|"nameAr"|"descriptionEn"|"descriptionAr", val: string) {
+  function updateRow(idx: number, field: keyof DomainConfig, val: string | number | null) {
     setRows(p => p.map((r, i) => i === idx ? { ...r, [field]: val } : r));
     setDirty(true);
   }
@@ -361,7 +442,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
         body: JSON.stringify({
           domainCode: row.domainCode, nameEn: row.nameEn, nameAr: row.nameAr ?? null,
           descriptionEn: row.descriptionEn ?? null, descriptionAr: row.descriptionAr ?? null,
-          sortOrder: row.sortOrder,
+          sortOrder: row.sortOrder, weight: row.weight ?? null,
         }),
       });
     }
@@ -388,7 +469,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
       body: JSON.stringify({
         domainCode: addCode.trim(), nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null,
         descriptionEn: addDescEn.trim() || null, descriptionAr: addDescAr.trim() || null,
-        sortOrder: rows.length,
+        sortOrder: rows.length, weight: addWeight ? Number(addWeight) : null,
       }),
     });
     const data = await res.json();
@@ -396,12 +477,12 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
       configId: data.id, frameworkId, domainCode: addCode.trim(),
       nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null,
       descriptionEn: addDescEn.trim() || null, descriptionAr: addDescAr.trim() || null,
-      sortOrder: rows.length,
+      sortOrder: rows.length, weight: addWeight ? Number(addWeight) : null,
     };
     const updated = [...rows, newRow];
     setRows(updated);
     onUpdate(updated);
-    setAddCode(""); setAddNameEn(""); setAddNameAr(""); setAddDescEn(""); setAddDescAr(""); setShowAdd(false);
+    setAddCode(""); setAddNameEn(""); setAddNameAr(""); setAddDescEn(""); setAddDescAr(""); setAddWeight(""); setShowAdd(false);
   }
 
   async function autoTranslate() {
@@ -432,12 +513,23 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
     setTranslating(false);
   }
 
+  // Total weight display
+  const totalWeight = rows.reduce((s, r) => s + (r.weight ?? 0), 0);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="font-bold text-brand-deep">Domain Configuration</h3>
-          <p className="text-sm text-ink-soft">English and Arabic display names for each compliance domain.</p>
+          <p className="text-sm text-ink-soft">
+            Display names and weights for each compliance domain.
+            {rows.some(r => r.weight != null) && (
+              <span className={`ml-2 font-semibold text-[12px] ${Math.abs(totalWeight - 100) < 0.01 ? "text-emerald-600" : "text-amber-600"}`}>
+                Total weight: {totalWeight.toFixed(1)}%
+                {Math.abs(totalWeight - 100) > 0.01 && " (should sum to 100%)"}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
@@ -456,7 +548,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
 
       {showAdd && (
         <div className="card p-4 mb-4 bg-canvas-soft/50 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Domain Code</label>
               <input value={addCode} onChange={e => setAddCode(e.target.value)}
@@ -473,11 +565,17 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
                 className="input w-full text-sm text-right" dir="rtl" placeholder="حوكمة البيانات" />
             </div>
             <div>
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Weight (%)</label>
+              <input type="number" min={0} max={100} step={0.1} value={addWeight}
+                onChange={e => setAddWeight(e.target.value)}
+                className="input w-full text-sm" placeholder="e.g. 10" />
+            </div>
+            <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Description (EN)</label>
               <input value={addDescEn} onChange={e => setAddDescEn(e.target.value)}
                 className="input w-full text-sm" />
             </div>
-            <div className="col-span-2">
+            <div className="col-span-3">
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">الوصف (AR)</label>
               <input value={addDescAr} onChange={e => setAddDescAr(e.target.value)}
                 className="input w-full text-sm text-right" dir="rtl" />
@@ -489,11 +587,12 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
       )}
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_60px] gap-2 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-          <div>Code</div><div>Name EN</div><div>الاسم AR</div><div>Description EN</div><div>الوصف AR</div><div></div>
+        <div className="grid grid-cols-[70px_1fr_1fr_1fr_1fr_80px_60px] gap-2 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
+          <div>Code</div><div>Name EN</div><div>الاسم AR</div><div>Description EN</div><div>الوصف AR</div>
+          <div className="text-center">Weight %</div><div></div>
         </div>
         {rows.map((row, idx) => (
-          <div key={row.configId} className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_60px] gap-2 px-4 py-2 items-center border-b border-line-soft last:border-b-0">
+          <div key={row.configId} className="grid grid-cols-[70px_1fr_1fr_1fr_1fr_80px_60px] gap-2 px-4 py-2 items-center border-b border-line-soft last:border-b-0">
             <div className="font-mono text-[11px] font-bold text-muted">{row.domainCode}</div>
             <input value={row.nameEn} onChange={e => updateRow(idx, "nameEn", e.target.value)}
               className="input w-full text-sm" />
@@ -503,6 +602,13 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
               className="input w-full text-sm" />
             <input value={row.descriptionAr ?? ""} onChange={e => updateRow(idx, "descriptionAr", e.target.value)}
               className="input w-full text-sm text-right" dir="rtl" />
+            <div className="flex items-center gap-0.5">
+              <input type="number" min={0} max={100} step={0.1}
+                value={row.weight ?? ""}
+                onChange={e => updateRow(idx, "weight", e.target.value === "" ? null : Number(e.target.value))}
+                className="input w-full text-sm text-center" placeholder="—" />
+              <span className="text-muted text-[11px] shrink-0">%</span>
+            </div>
             <div>
               <button onClick={() => deleteRow(row.configId)}
                 className="text-[11px] text-red-500 hover:text-red-700 font-semibold">Delete</button>
