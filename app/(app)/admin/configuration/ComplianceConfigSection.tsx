@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLang } from "@/lib/lang-context";
 import type {
   ComplianceFramework, LevelConfig, ConfigItem, DomainConfig,
 } from "@/lib/queries/gov-compliance";
@@ -24,6 +25,9 @@ function blankLevels(fwId: number): LevelConfig[] {
 }
 
 export function ComplianceConfigSection() {
+  const { secondaryLangDef } = useLang();
+  const secondaryLangCode = secondaryLangDef.code;
+
   const [frameworks,   setFrameworks]   = useState<ComplianceFramework[]>([]);
   const [fwId,         setFwId]         = useState<number | null>(null);
   const [levelCfg,     setLevelCfg]     = useState<LevelConfig[]>([]);
@@ -91,7 +95,7 @@ export function ComplianceConfigSection() {
 
       {!loading && fwId && (
         <div className="space-y-10">
-          <LevelConfigSection levelCfg={levelCfg} frameworkId={fwId} saving={cfgSaving} onSave={saveLevels} />
+          <LevelConfigSection levelCfg={levelCfg} frameworkId={fwId} saving={cfgSaving} onSave={saveLevels} secondaryLangCode={secondaryLangCode} />
 
           {(["STATUS","EVIDENCE_TYPE","COMPLIANCE_TYPE"] as const).map(group => (
             <ConfigItemsGroup
@@ -105,7 +109,7 @@ export function ComplianceConfigSection() {
             />
           ))}
 
-          <DomainConfigGroup frameworkId={fwId} configs={domainConfig} onUpdate={setDomainConfig} />
+          <DomainConfigGroup frameworkId={fwId} configs={domainConfig} onUpdate={setDomainConfig} secondaryLangCode={secondaryLangCode} />
         </div>
       )}
     </div>
@@ -114,9 +118,9 @@ export function ComplianceConfigSection() {
 
 // ── Level Config ──────────────────────────────────────────────────────────────
 
-function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
+function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLangCode }: {
   levelCfg: LevelConfig[]; frameworkId: number; saving: boolean;
-  onSave: (rows: LevelConfig[]) => void;
+  onSave: (rows: LevelConfig[]) => void; secondaryLangCode: string;
 }) {
   const [rows,        setRows]        = useState<LevelConfig[]>(levelCfg);
   const [translating, setTranslating] = useState(false);
@@ -139,11 +143,11 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
       await Promise.all([
         needsName ? fetch(`/api/governance/compliance/${frameworkId}/translate`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: row.name, targetLang: "ar" }),
+          body: JSON.stringify({ text: row.name, targetLang: secondaryLangCode }),
         }).then(r => r.json()).then(d => { if (d.translation) row.nameAr = d.translation; }).catch(() => {}) : null,
         needsDesc ? fetch(`/api/governance/compliance/${frameworkId}/translate`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: row.description, targetLang: "ar" }),
+          body: JSON.stringify({ text: row.description, targetLang: secondaryLangCode }),
         }).then(r => r.json()).then(d => { if (d.translation) row.descriptionAr = d.translation; }).catch(() => {}) : null,
       ]);
     }
@@ -160,7 +164,7 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
         </div>
         <div className="flex gap-2">
           <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
-            {translating ? "Translating…" : "Auto-translate AR"}
+            {translating ? "Translating…" : `Auto-translate ${secondaryLangCode.toUpperCase()}`}
           </button>
           {dirty && (
             <button onClick={() => onSave(rows)} disabled={saving} className="btn btn-primary btn-sm">
@@ -412,8 +416,8 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
 
 // ── Domain Config ─────────────────────────────────────────────────────────────
 
-function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
-  frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void;
+function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }: {
+  frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void; secondaryLangCode: string;
 }) {
   const [rows,        setRows]        = useState<DomainConfig[]>(configs);
   const [dirty,       setDirty]       = useState(false);
@@ -493,7 +497,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
         if (row.nameEn && !row.nameAr) {
           const r = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.nameEn, targetLang: "ar" }),
+            body: JSON.stringify({ text: row.nameEn, targetLang: secondaryLangCode }),
           });
           const d = await r.json();
           if (d.translation) row.nameAr = d.translation;
@@ -501,7 +505,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
         if (row.descriptionEn && !row.descriptionAr) {
           const r = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.descriptionEn, targetLang: "ar" }),
+            body: JSON.stringify({ text: row.descriptionEn, targetLang: secondaryLangCode }),
           });
           const d = await r.json();
           if (d.translation) row.descriptionAr = d.translation;
@@ -533,7 +537,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
         </div>
         <div className="flex gap-2">
           <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
-            {translating ? "Translating…" : "Auto-translate AR"}
+            {translating ? "Translating…" : `Auto-translate ${secondaryLangCode.toUpperCase()}`}
           </button>
           <button onClick={() => setShowAdd(v => !v)} className="btn btn-sm">
             {showAdd ? "Cancel" : "+ Add"}

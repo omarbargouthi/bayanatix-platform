@@ -48,7 +48,7 @@ const NAV_ADMIN_DEF = [
 
 export function Sidebar({ user }: { user: SessionUser }) {
   const { collapsed } = useSidebar();
-  const { t, lang, setLang, isRtl } = useLang();
+  const { t, lang, setLang, isRtl, secondaryLangDef } = useLang();
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
@@ -131,16 +131,16 @@ export function Sidebar({ user }: { user: SessionUser }) {
 
         {/* Language toggle */}
         <button
-          onClick={() => setLang(lang === "en" ? "ar" : "en")}
-          title={lang === "en" ? "Switch to Arabic / التبديل للعربية" : "Switch to English"}
+          onClick={() => setLang(lang === "en" ? secondaryLangDef.code : "en")}
+          title={lang === "en" ? `Switch to ${secondaryLangDef.displayName}` : "Switch to English"}
           className={`w-full mt-1 flex items-center gap-2 py-1.5 rounded-md text-sm font-semibold transition-colors
             ${collapsed ? "justify-center px-2" : "px-3"}
-            ${lang === "ar" ? "bg-brand-purple/10 text-brand-purple" : "text-ink-soft hover:bg-canvas hover:text-brand-deep"}`}
+            ${lang !== "en" ? "bg-brand-purple/10 text-brand-purple" : "text-ink-soft hover:bg-canvas hover:text-brand-deep"}`}
         >
           <GlobeIcon />
           {!collapsed && (
             <span className="text-[13px]">
-              {lang === "en" ? "عربي" : "English"}
+              {lang === "en" ? secondaryLangDef.nativeName : "English"}
             </span>
           )}
         </button>

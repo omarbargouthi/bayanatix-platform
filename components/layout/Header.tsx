@@ -42,7 +42,7 @@ function HeaderIconBtn({
 export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[] }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
-  const { lang, setLang, isRtl } = useLang();
+  const { lang, setLang, isRtl, secondaryLangDef } = useLang();
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -222,15 +222,15 @@ export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: 
       <div className={`${isRtl ? "mr-auto" : "ml-auto"} flex items-center gap-1`}>
         {/* Language */}
         <button
-          onClick={() => setLang(lang === "en" ? "ar" : "en")}
+          onClick={() => setLang(lang === "en" ? secondaryLangDef.code : "en")}
           aria-label="Toggle language"
           className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 border rounded-md text-xs font-semibold transition-colors select-none
-            ${lang === "ar"
+            ${lang !== "en"
               ? "border-brand-purple text-brand-purple bg-brand-purple/5"
               : "border-line text-ink-soft hover:border-brand-purple hover:text-brand-purple"}`}
         >
           <IconGlobe className="w-3.5 h-3.5" />
-          {lang === "en" ? "عربي" : "English"}
+          {lang === "en" ? secondaryLangDef.nativeName : "English"}
         </button>
 
         {/* Notification */}

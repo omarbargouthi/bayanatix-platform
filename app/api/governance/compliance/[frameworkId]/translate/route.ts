@@ -2,16 +2,23 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import crypto from "crypto";
+import { getLangDef } from "@/lib/lang-config";
 
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { text, targetLang } = await req.json();
+  const body = await req.json();
+  const text: string = body.text;
+  // Default "en" = translate source text → English (used by assessment view for Arabic requirements).
+  // Pass any BCP-47 code to translate English → that language.
+  const targetLang: string = body.targetLang ?? "en";
+
   if (!text?.trim()) return NextResponse.json({ error: "text required" }, { status: 400 });
 
-  const direction = targetLang === "ar" ? "ar" : "en";
-  const hashKey = `${direction}:${text.trim()}`;
+  // Cache key uses targetLang code so different languages are cached separately.
+  // "ar:..." and "en:..." are backward-compatible with the previous implementation.
+  const hashKey = `${targetLang}:${text.trim()}`;
   const hash = crypto.createHash("sha256").update(hashKey).digest("hex");
 
   // Check cache first
@@ -30,13 +37,15 @@ export async function POST(req: Request) {
     );
   }
 
-  // Dynamically import to avoid issues if SDK not present
+  const langDef = getLangDef(targetLang);
+  const langName = langDef?.displayName ?? targetLang.toUpperCase();
+
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const client = new Anthropic({ apiKey });
 
-  const prompt = direction === "ar"
-    ? `Translate the following English text to Arabic accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`
-    : `Translate the following Arabic text to English accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`;
+  const prompt = targetLang === "en"
+    ? `Translate the following text to English accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`
+    : `Translate the following English text to ${langName} accurately. Return only the translation with no extra commentary:\n\n${text.trim()}`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",

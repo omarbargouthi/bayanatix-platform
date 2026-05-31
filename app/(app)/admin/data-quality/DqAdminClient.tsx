@@ -126,7 +126,7 @@ function RuleFormModal({
   const { t, lang, lookupLabel } = useLang();
   const dq = t.dq;
   function dimLabel(d: DqDimension) {
-    return lookupLabel("DQ_DIMENSION", d.code) || (lang === "ar" && d.nameAr ? d.nameAr : d.name);
+    return lookupLabel("DQ_DIMENSION", d.code) || (lang !== "en" && d.nameAr ? d.nameAr : d.name);
   }
   const [form, setForm] = useState<RuleFormData>(
     editRule
@@ -479,6 +479,16 @@ function RuleFormModal({
 function RunDetailModal({ result, onClose }: { result: DqResult; onClose: () => void }) {
   const { t } = useLang();
   const dq = t.dq;
+
+  function statusLabel(code: string | null): string {
+    if (!code) return "—";
+    if (code === "PASSED")  return dq.statusPassed;
+    if (code === "FAILED")  return dq.statusFailed;
+    if (code === "ERROR")   return dq.statusError;
+    if (code === "WARNING") return dq.statusWarning;
+    if (code === "PAUSED")  return dq.statusPaused;
+    return code;
+  }
   const [samples, setSamples] = useState<{ sampleId: number; sampleValue: string; isValid: boolean; sampleCount: number }[]>([]);
   const [loadingSamples, setLoadingSamples] = useState(true);
 
@@ -587,7 +597,7 @@ export function DqAdminClient({
   const dq = t.dq;
 
   function dimLabel(d: DqDimension) {
-    return lookupLabel("DQ_DIMENSION", d.code) || (lang === "ar" && d.nameAr ? d.nameAr : d.name);
+    return lookupLabel("DQ_DIMENSION", d.code) || (lang !== "en" && d.nameAr ? d.nameAr : d.name);
   }
   function statusLabel(code: string | null): string {
     if (!code) return "—";

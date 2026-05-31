@@ -138,7 +138,7 @@ export function NewTermModal({ domains, onClose }: Props) {
             <select value={classCode} onChange={(e) => setClassCode(e.target.value)} className="input-field">
               <option value="">— None —</option>
               {CLASSIFICATION_OPTIONS.slice(1).map((o) => (
-                <option key={o.value} value={o.value}>{c[o.labelKey]}</option>
+                <option key={o.value} value={o.value}>{(c as Record<string, string>)[o.labelKey]}</option>
               ))}
             </select>
           </div>

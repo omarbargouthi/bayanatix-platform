@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 // Returns all active lookups as a two-level map for O(1) client-side access.
-// { GROUP: { CODE: { en, ar } } }
+// { GROUP: { CODE: { en, ar, [langCode]... } } }
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,7 +19,7 @@ export async function GET() {
     ORDER BY lookup_group, sort_order, lookup_label
   `;
 
-  const cache: Record<string, Record<string, { en: string; ar: string | null }>> = {};
+  const cache: Record<string, Record<string, Record<string, string | null>>> = {};
   for (const { group, code, en, ar } of rows) {
     if (!cache[group]) cache[group] = {};
     cache[group][code] = { en, ar };

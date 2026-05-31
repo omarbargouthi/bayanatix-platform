@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { UiTranslationsSection } from "./UiTranslationsSection";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
+import { LanguageSettingsSection } from "./LanguageSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -33,6 +34,7 @@ export default function ConfigurationPage() {
   const [showUiTranslations, setShowUiTranslations] = useState(false);
 
   const [showComplianceConfig, setShowComplianceConfig] = useState(false);
+  const [showLanguageSettings, setShowLanguageSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -67,6 +69,7 @@ export default function ConfigurationPage() {
     setSelectedGroup(g);
     setShowUiTranslations(false);
     setShowComplianceConfig(false);
+    setShowLanguageSettings(false);
     setAdding(false);
   }
 
@@ -149,20 +152,29 @@ export default function ConfigurationPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
 
+          {/* ── Language Settings (pinned) */}
+          <button
+            onClick={() => { setShowLanguageSettings(true); setShowUiTranslations(false); setSelectedGroup(null); setShowComplianceConfig(false); setAdding(false); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showLanguageSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Language Settings</div>
+            <div className="text-[10px] text-muted mt-0.5">Second language · Direction · Auto-translate</div>
+          </button>
+
           {/* ── UI Translations (pinned) */}
           <button
-            onClick={() => { setShowUiTranslations(true); setSelectedGroup(null); setAdding(false); }}
+            onClick={() => { setShowUiTranslations(true); setShowLanguageSettings(false); setSelectedGroup(null); setShowComplianceConfig(false); setAdding(false); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showUiTranslations ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">UI Translations</div>
-            <div className="text-[10px] text-muted mt-0.5">English overrides · Arabic labels</div>
+            <div className="text-[10px] text-muted mt-0.5">English overrides · Second language labels</div>
           </button>
 
           {/* ── Lookup Groups header + add */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-line bg-canvas-soft flex items-center justify-between">
             <span>Lookup Groups</span>
             <button
-              onClick={() => { setSelectedGroup(null); setShowUiTranslations(false); setAdding(true); setAddForm({ ...BLANK }); }}
+              onClick={() => { setSelectedGroup(null); setShowUiTranslations(false); setShowLanguageSettings(false); setShowComplianceConfig(false); setAdding(true); setAddForm({ ...BLANK }); }}
               className="text-brand-purple hover:underline font-semibold text-[11px]"
             >+ Add</button>
           </div>
@@ -183,7 +195,7 @@ export default function ConfigurationPage() {
             Compliance
           </div>
           <button
-            onClick={() => { setShowComplianceConfig(true); setSelectedGroup(null); setShowUiTranslations(false); setAdding(false); }}
+            onClick={() => { setShowComplianceConfig(true); setSelectedGroup(null); setShowUiTranslations(false); setShowLanguageSettings(false); setAdding(false); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showComplianceConfig ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">Compliance Config</div>
@@ -194,6 +206,9 @@ export default function ConfigurationPage() {
 
       {/* ── Main panel ───────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto p-8">
+
+        {/* ── Language Settings panel ── */}
+        {showLanguageSettings && <LanguageSettingsSection />}
 
         {/* ── UI Translations panel ── */}
         {showUiTranslations && (
@@ -213,7 +228,7 @@ export default function ConfigurationPage() {
         {showComplianceConfig && <ComplianceConfigSection />}
 
         {/* ── Empty state ── */}
-        {!selectedGroup && !adding && !showUiTranslations && !showComplianceConfig && (
+        {!selectedGroup && !adding && !showUiTranslations && !showComplianceConfig && !showLanguageSettings && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="text-6xl">⚙️</div>
             <h2 className="text-xl font-semibold text-ink">Application Configuration</h2>
