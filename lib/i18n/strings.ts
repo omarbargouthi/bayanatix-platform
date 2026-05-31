@@ -25,8 +25,9 @@ export type I18nStrings = {
     workflows:        string;
     dataSources:      string;
     auditLogs:        string;
-    configuration:    string;
-    // Compliance sub-items
+    configuration:       string;
+    maturityIndexSetup:  string;
+    // Compliance sub-items (kept for backward compat)
     complianceConfig: string;
     indexSetup:       string;
     // Bottom

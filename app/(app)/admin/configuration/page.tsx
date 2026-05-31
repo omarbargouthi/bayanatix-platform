@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { UiTranslationsSection } from "./UiTranslationsSection";
+import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -30,6 +31,8 @@ export default function ConfigurationPage() {
   const [groups, setGroups]             = useState<GroupEntry[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [showUiTranslations, setShowUiTranslations] = useState(false);
+
+  const [showComplianceConfig, setShowComplianceConfig] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -63,6 +66,7 @@ export default function ConfigurationPage() {
   function selectGroup(g: string) {
     setSelectedGroup(g);
     setShowUiTranslations(false);
+    setShowComplianceConfig(false);
     setAdding(false);
   }
 
@@ -173,6 +177,18 @@ export default function ConfigurationPage() {
             </button>
           ))}
           {groups.length === 0 && <div className="p-4 text-xs text-muted">No lookup groups yet</div>}
+
+          {/* ── Compliance section */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
+            Compliance
+          </div>
+          <button
+            onClick={() => { setShowComplianceConfig(true); setSelectedGroup(null); setShowUiTranslations(false); setAdding(false); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showComplianceConfig ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Compliance Config</div>
+            <div className="text-[10px] text-muted mt-0.5">Levels · Statuses · Domains</div>
+          </button>
         </div>
       </aside>
 
@@ -193,8 +209,21 @@ export default function ConfigurationPage() {
           </div>
         )}
 
+        {/* ── Compliance Config panel ── */}
+        {showComplianceConfig && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-ink">Compliance Configuration</h2>
+              <p className="text-xs text-muted mt-1">
+                Configure maturity levels, submission statuses, evidence types, compliance types, and domain display names for each compliance framework.
+              </p>
+            </div>
+            <ComplianceConfigSection />
+          </div>
+        )}
+
         {/* ── Empty state ── */}
-        {!selectedGroup && !adding && !showUiTranslations && (
+        {!selectedGroup && !adding && !showUiTranslations && !showComplianceConfig && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="text-6xl">⚙️</div>
             <h2 className="text-xl font-semibold text-ink">Application Configuration</h2>

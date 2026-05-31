@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
-import { useLang, type Lang } from "@/lib/lang-context";
+import { useLang } from "@/lib/lang-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
@@ -38,30 +38,20 @@ const NAV_DOMAINS_DEF = [
 ];
 
 const NAV_ADMIN_DEF = [
-  { href: "/admin/user-management", key: "userManagement" as const, Icon: IconShield },
-  { href: "/admin/workflows",       key: "workflows"      as const, Icon: IconLines },
-  { href: "/admin/sources",         key: "dataSources"    as const, Icon: IconShare },
-  { href: "/admin/audit-logs",      key: "auditLogs"      as const, Icon: IconHistory },
-  { href: "/admin/configuration",   key: "configuration"  as const, Icon: IconCog },
-];
-
-const NAV_COMPLIANCE_ADMIN_DEF = [
-  { href: "/governance/compliance?tab=config", key: "complianceConfig" as const, Icon: IconCog },
-  { href: "/governance/compliance?tab=admin",  key: "indexSetup"       as const, Icon: IconShield },
+  { href: "/admin/user-management",      key: "userManagement"      as const, Icon: IconShield },
+  { href: "/admin/workflows",            key: "workflows"           as const, Icon: IconLines },
+  { href: "/admin/sources",             key: "dataSources"          as const, Icon: IconShare },
+  { href: "/admin/audit-logs",          key: "auditLogs"            as const, Icon: IconHistory },
+  { href: "/admin/configuration",       key: "configuration"        as const, Icon: IconCog },
+  { href: "/admin/maturity-index-setup", key: "maturityIndexSetup"  as const, Icon: IconBook },
 ];
 
 export function Sidebar({ user }: { user: SessionUser }) {
   const { collapsed } = useSidebar();
   const { t, lang, setLang, isRtl } = useLang();
-  const pathname     = usePathname();
-  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
-
-  function isComplianceAdminActive(href: string) {
-    const tab = href.includes("tab=config") ? "config" : "admin";
-    return pathname.includes("/governance/compliance") && searchParams.get("tab") === tab;
-  }
 
   // Build i18n-resolved item arrays
   const NAV_TOP: Item[] = NAV_TOP_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
@@ -71,10 +61,6 @@ export function Sidebar({ user }: { user: SessionUser }) {
   }));
 
   const NAV_ADMIN: Item[] = NAV_ADMIN_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
-
-  const NAV_COMPLIANCE_ADMIN: Item[] = NAV_COMPLIANCE_ADMIN_DEF.map((d) => ({
-    href: d.href, label: t.nav[d.key], Icon: d.Icon,
-  }));
 
   const borderSide = isRtl ? "border-l border-line" : "border-r border-line";
 
@@ -131,12 +117,6 @@ export function Sidebar({ user }: { user: SessionUser }) {
               <>
                 {NAV_ADMIN.map((it) => (
                   <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={false} indent isRtl={isRtl} />
-                ))}
-                <div className={`px-3 pt-3 pb-0.5 text-[9px] tracking-[0.14em] uppercase text-muted font-semibold ${isRtl ? "pr-7" : "pl-7"}`}>
-                  {t.nav.sectionCompliance}
-                </div>
-                {NAV_COMPLIANCE_ADMIN.map((it) => (
-                  <NavLink key={it.href} item={it} active={isComplianceAdminActive(it.href)} collapsed={false} indent isRtl={isRtl} />
                 ))}
               </>
             )}
