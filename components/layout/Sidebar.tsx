@@ -9,7 +9,7 @@ import { useLang } from "@/lib/lang-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag,
+  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI,
 } from "./icons";
 
 type Item = {
@@ -38,7 +38,7 @@ const NAV_DOMAINS_DEF = [
 ];
 
 const NAV_STANDALONE_DEF = [
-  { href: "/ai-governance",  key: "aiGovernance"  as const, Icon: IconCog },
+  { href: "/ai-governance",  key: "aiGovernance"  as const, Icon: IconAI },
 ];
 
 const NAV_ADMIN_DEF = [
@@ -106,9 +106,9 @@ export function Sidebar({ user }: { user: SessionUser }) {
 
         {/* Standalone domain section */}
         {collapsed
-          ? <div className="my-2 mx-1 border-t border-dashed border-line" />
-          : <div className="px-3 pt-3 pb-1">
-              <span className="text-[9px] tracking-[0.08em] uppercase text-amber-700 font-bold leading-tight block">{t.nav.sectionStandalone}</span>
+          ? <div className="my-2 mx-1 border-t border-line" />
+          : <div className="px-3 pt-3 pb-1 text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">
+              {t.nav.sectionStandalone}
             </div>
         }
         {NAV_STANDALONE.map((it) => (
