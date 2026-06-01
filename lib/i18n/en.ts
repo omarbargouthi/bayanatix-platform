@@ -28,7 +28,7 @@ export const en: I18nStrings = {
     sectionDomains:    "Domains",
     sectionAdmin:      "Administration",
     sectionCompliance: "Compliance",
-    sectionStandalone: "Standalone",
+    sectionStandalone: "NAII - National Artificial Intelligence Index",
   },
 
   roles: {

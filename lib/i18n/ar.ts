@@ -28,7 +28,7 @@ export const ar: I18nStrings = {
     sectionDomains:    "النطاقات",
     sectionAdmin:      "الإدارة",
     sectionCompliance: "الامتثال",
-    sectionStandalone: "مستقل",
+    sectionStandalone: "NAII - مؤشر الذكاء الاصطناعي الوطني",
   },
 
   roles: {

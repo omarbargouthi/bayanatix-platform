@@ -11,6 +11,7 @@ import {
   useEdgesState,
   Handle,
   Position,
+  MarkerType,
   type Node,
   type Edge,
   type NodeTypes,
@@ -40,7 +41,7 @@ type EdgeData = {
   id: string;
   sourceId: number;
   targetId: number;
-  label?: string;
+  label?: string | null;
 };
 
 type DataModelResponse = {
@@ -167,8 +168,12 @@ function buildEdges(rawEdges: EdgeData[]): Edge[] {
     source: `entity-${e.sourceId}`,
     target: `entity-${e.targetId}`,
     type: "smoothstep",
-    animated: true,
-    label: e.label,
+    animated: false,
+    label: e.label ?? undefined,
+    labelStyle: { fontSize: 10, fill: "#6b7280", fontFamily: "monospace" },
+    labelBgStyle: { fill: "#f9fafb" },
+    style: { stroke: "#9ca3af", strokeWidth: 1.5 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "#9ca3af", width: 14, height: 14 },
   }));
 }
 

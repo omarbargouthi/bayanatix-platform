@@ -124,6 +124,7 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
 }) {
   const [rows,        setRows]        = useState<LevelConfig[]>(levelCfg);
   const [translating, setTranslating] = useState(false);
+  const [translateMsg, setTranslateMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => { setRows(levelCfg); }, [levelCfg]);
 
@@ -135,24 +136,47 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
 
   async function autoTranslate() {
     setTranslating(true);
+    setTranslateMsg(null);
     const updated = rows.map(r => ({ ...r }));
+    let count = 0;
+    let lastError = "";
     for (const row of updated) {
-      const needsName = row.name && !row.nameAr;
-      const needsDesc = row.description && !row.descriptionAr;
-      if (!needsName && !needsDesc) continue;
-      await Promise.all([
-        needsName ? fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: row.name, targetLang: secondaryLangCode }),
-        }).then(r => r.json()).then(d => { if (d.translation) row.nameAr = d.translation; }).catch(() => {}) : null,
-        needsDesc ? fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: row.description, targetLang: secondaryLangCode }),
-        }).then(r => r.json()).then(d => { if (d.translation) row.descriptionAr = d.translation; }).catch(() => {}) : null,
-      ]);
+      // Translate name if present
+      if (row.name) {
+        try {
+          const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: row.name, targetLang: secondaryLangCode }),
+          });
+          const d = await res.json();
+          if (d.translation) { row.nameAr = d.translation; count++; }
+          else if (d.error)   { lastError = d.error; }
+        } catch (e) { lastError = String(e); }
+      }
+      // Translate description if present
+      if (row.description) {
+        try {
+          const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: row.description, targetLang: secondaryLangCode }),
+          });
+          const d = await res.json();
+          if (d.translation) { row.descriptionAr = d.translation; count++; }
+          else if (d.error)   { lastError = d.error; }
+        } catch (e) { lastError = String(e); }
+      }
     }
     setRows(updated);
     setTranslating(false);
+    if (lastError) {
+      setTranslateMsg({ type: "err", text: lastError });
+    } else if (count > 0) {
+      setTranslateMsg({ type: "ok", text: `Translated ${count} field${count !== 1 ? "s" : ""}` });
+      setTimeout(() => setTranslateMsg(null), 4000);
+    } else {
+      setTranslateMsg({ type: "err", text: "Nothing to translate — add names or descriptions first." });
+      setTimeout(() => setTranslateMsg(null), 4000);
+    }
   }
 
   return (
@@ -162,10 +186,15 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
           <h3 className="font-bold text-brand-deep">Maturity Levels</h3>
           <p className="text-sm text-ink-soft">Names, colours, descriptions, and score ranges for each maturity level (0.00–5.00).</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
             {translating ? "Translating…" : `Auto-translate ${secondaryLangCode.toUpperCase()}`}
           </button>
+          {translateMsg && (
+            <span className={`text-[11px] font-semibold ${translateMsg.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
+              {translateMsg.text}
+            </span>
+          )}
           {dirty && (
             <button onClick={() => onSave(rows)} disabled={saving} className="btn btn-primary btn-sm">
               {saving ? "Saving…" : "Save"}
@@ -564,7 +593,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
             </div>
             <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Weight (%)</label>
-              <input type="number" min={0} max={100} step={0.1} value={addWeight}
+              <input type="number" min={0} max={100} step={0.01} value={addWeight}
                 onChange={e => setAddWeight(e.target.value)}
                 className="input w-full text-sm" placeholder="e.g. 10" />
             </div>
@@ -601,7 +630,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
             <input value={row.descriptionAr ?? ""} onChange={e => updateRow(idx, "descriptionAr", e.target.value)}
               className="input w-full text-sm text-right" dir="rtl" />
             <div className="flex items-center gap-0.5">
-              <input type="number" min={0} max={100} step={0.1}
+              <input type="number" min={0} max={100} step={0.01}
                 value={row.weight ?? ""}
                 onChange={e => updateRow(idx, "weight", e.target.value === "" ? null : Number(e.target.value))}
                 className="input w-full text-sm text-center" placeholder="—" />

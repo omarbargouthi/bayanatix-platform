@@ -45,6 +45,43 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
   const displayName        = isRtl && d.nameAr        ? d.nameAr        : d.name;
   const displayDescription = isRtl && d.descriptionAr ? d.descriptionAr : d.description;
 
+  // AIG is a standalone domain — render it distinctly
+  if (d.domainCode === "AIG") {
+    return (
+      <div className="relative rounded-lg border-2 border-amber-300 border-dashed bg-gradient-to-br from-amber-50 to-orange-50 transition-all hover:shadow-md overflow-hidden">
+        {/* Standalone badge */}
+        <div className="absolute top-3 right-3">
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 uppercase tracking-wider">
+            Standalone
+          </span>
+        </div>
+
+        <Link href="/ai-governance" className="block p-5 hover:-translate-y-0.5 transition-transform pr-24">
+          {/* AI brain icon */}
+          <div className="mb-2">
+            <svg viewBox="0 0 24 24" className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/>
+              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/>
+            </svg>
+          </div>
+
+          <h3 className="text-[14px] font-bold text-amber-900 leading-snug mb-1">{displayName}</h3>
+          <p className="text-[12px] text-amber-700/70 leading-snug mb-4">{displayDescription}</p>
+
+          <div className="pt-3 border-t border-amber-200">
+            <p className="text-[11px] text-amber-600 italic">
+              Not included in overall maturity &amp; compliance score
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <Stars value={d.maturityLevel} />
+              <span className="text-[11px] font-bold text-amber-700">{d.level}</span>
+            </div>
+          </div>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div
       className={[

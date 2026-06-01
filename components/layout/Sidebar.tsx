@@ -107,9 +107,8 @@ export function Sidebar({ user }: { user: SessionUser }) {
         {/* Standalone domain section */}
         {collapsed
           ? <div className="my-2 mx-1 border-t border-dashed border-line" />
-          : <div className="px-3 pt-3 pb-1 flex items-center gap-1.5">
-              <span className="text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">{t.nav.sectionStandalone}</span>
-              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">AI</span>
+          : <div className="px-3 pt-3 pb-1">
+              <span className="text-[9px] tracking-[0.08em] uppercase text-amber-700 font-bold leading-tight block">{t.nav.sectionStandalone}</span>
             </div>
         }
         {NAV_STANDALONE.map((it) => (

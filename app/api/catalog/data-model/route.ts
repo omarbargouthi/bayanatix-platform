@@ -109,11 +109,45 @@ export async function GET(req: Request) {
     })),
   }));
 
-  const edges = edgeRows.map((r) => ({
+  // Edges from explicit lineage
+  const lineageEdges = edgeRows.map((r) => ({
     id: `e-${r.lineageId}`,
     sourceId: r.sourceId,
     targetId: r.targetId,
   }));
+
+  // Infer FK relationships from "_id" column naming patterns
+  // e.g. "customer_id" in "orders" → FK to "customers" table
+  const nameToId = new Map<string, number>();
+  for (const e of entities) {
+    const n = e.entityName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    nameToId.set(n, e.entityId);
+    // map singular ↔ plural variants
+    if (n.endsWith("s"))  nameToId.set(n.slice(0, -1), e.entityId);
+    else                  nameToId.set(n + "s",         e.entityId);
+  }
+
+  const inferredEdgeSet = new Set<string>();
+  const inferredEdges: { id: string; sourceId: number; targetId: number; label: string }[] = [];
+
+  for (const entity of entities) {
+    for (const attr of (attrsByEntity.get(entity.entityId) ?? [])) {
+      if (attr.isPk) continue;
+      const col = attr.name.toLowerCase();
+      if (!col.endsWith("_id")) continue;
+      const prefix = col.slice(0, -3).replace(/[^a-z0-9]/g, "");
+      const targetId = nameToId.get(prefix) ?? nameToId.get(prefix + "s");
+      if (targetId && targetId !== entity.entityId) {
+        const key = `${entity.entityId}-${targetId}`;
+        if (!inferredEdgeSet.has(key)) {
+          inferredEdgeSet.add(key);
+          inferredEdges.push({ id: `fk-${key}`, sourceId: entity.entityId, targetId, label: attr.name });
+        }
+      }
+    }
+  }
+
+  const edges = [...lineageEdges, ...inferredEdges];
 
   return NextResponse.json({ schemaName: schemaRows[0].schemaName, entities, edges });
 }
