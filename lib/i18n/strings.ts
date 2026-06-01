@@ -728,6 +728,85 @@ export type I18nStrings = {
     propertiesSection:  string;
   };
 
+  // ── Data Retention ───────────────────────────────────────────────────────────
+  retention: {
+    pageTitle:          string;
+    pageDesc:           string;
+    tabCategories:      string;
+    tabLegalHolds:      string;
+    tabOverview:        string;
+    // Categories
+    categoriesTitle:    string;
+    addCategory:        string;
+    addSubcategory:     string;
+    editCategory:       string;
+    categoryName:       string;
+    categoryNameAr:     string;
+    sensitivity:        string;
+    schedules:          string;
+    entities:           string;
+    noCategories:       string;
+    // Schedule panel
+    schedulesTitle:     string;
+    addSchedule:        string;
+    jurisdiction:       string;
+    triggerEvent:       string;
+    period:             string;
+    action:             string;
+    reference:          string;
+    defaultSchedule:    string;
+    noSchedules:        string;
+    deleteSchedule:     string;
+    // Retention units
+    unitDays:           string;
+    unitMonths:         string;
+    unitYears:          string;
+    // Post-retention actions
+    actionDelete:       string;
+    actionAnonymize:    string;
+    actionArchive:      string;
+    actionReview:       string;
+    // Legal Holds
+    legalHoldsTitle:    string;
+    newHold:            string;
+    caseReference:      string;
+    caseName:           string;
+    scopeType:          string;
+    holdDate:           string;
+    releaseDate:        string;
+    holdStatus:         string;
+    placedBy:           string;
+    releaseHold:        string;
+    releaseJustification: string;
+    affectedCategories: string;
+    noLegalHolds:       string;
+    statusActive:       string;
+    statusReleased:     string;
+    statusExpired:      string;
+    scopeCategory:      string;
+    scopeEntity:        string;
+    scopeGlobal:        string;
+    // Overview
+    overviewTitle:      string;
+    totalCategories:    string;
+    totalSchedules:     string;
+    activeHolds:        string;
+    classified:         string;
+    unclassified:       string;
+    expiringSoon:       string;
+    overdue:            string;
+    coverageTitle:      string;
+    sensitivityDist:    string;
+    retentionStatusDist: string;
+    // Sensitivity labels
+    sensitivityPublic:      string;
+    sensitivityInternal:    string;
+    sensitivityConfidential:string;
+    sensitivityRestricted:  string;
+    sensitivitySecret:      string;
+    sensitivityTopSecret:   string;
+  };
+
   // ── Dashboard ───────────────────────────────────────────────────────────────
   dashboard: {
     welcome:           string;   // supports {name} placeholder

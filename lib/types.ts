@@ -401,3 +401,74 @@ export type AssetRequest = {
   updatedAt:          string;
   targets:            AssetRequestTarget[];
 };
+
+// ── Data Retention ────────────────────────────────────────────────────────────
+
+export type DataCategory = {
+  categoryId:     number;
+  name:           string;
+  nameAr:         string | null;
+  parentId:       number | null;
+  sensitivity:    "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+  description:    string | null;
+  descriptionAr:  string | null;
+  examples:       string | null;
+  sortOrder:      number;
+  isActive:       boolean;
+  createdAt:      string;
+  children?:      DataCategory[];
+  scheduleCount?: number;
+  entityCount?:   number;
+};
+
+export type RetentionSchedule = {
+  scheduleId:          number;
+  categoryId:          number;
+  jurisdiction:        string;
+  triggerEvent:        string;
+  triggerCustomExpr:   string | null;
+  retentionPeriod:     number;
+  retentionUnit:       "DAYS" | "MONTHS" | "YEARS";
+  postRetentionAction: "DELETE" | "ANONYMIZE" | "ARCHIVE" | "REVIEW";
+  archiveLocation:     string | null;
+  regulatoryReference: string | null;
+  notes:               string | null;
+  isDefault:           boolean;
+  createdAt:           string;
+};
+
+export type LegalHold = {
+  holdId:             number;
+  caseReference:      string;
+  caseName:           string;
+  holdScopeType:      "CATEGORY" | "ENTITY" | "GLOBAL";
+  holdDate:           string;
+  releaseDate:        string | null;
+  holdStatus:         "ACTIVE" | "RELEASED" | "EXPIRED";
+  placedBy:           string;
+  placedByName:       string | null;
+  releaseAuthority:   string | null;
+  releaseJustification: string | null;
+  notes:              string | null;
+  createdAt:          string;
+  categoryIds?:       number[];
+  categoryNames?:     string[];
+};
+
+export type RetentionOverview = {
+  totalCategories:    number;
+  totalSchedules:     number;
+  activeHolds:        number;
+  entitiesClassified: number;
+  entitiesTotal:      number;
+  expiringSoon:       number;
+  overdue:            number;
+  byStatus: {
+    status: string;
+    count:  number;
+  }[];
+  bySensitivity: {
+    sensitivity: string;
+    count:       number;
+  }[];
+};
