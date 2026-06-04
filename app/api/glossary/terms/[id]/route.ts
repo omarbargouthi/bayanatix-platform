@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
-import { updateGlossaryTerm } from "@/lib/queries/glossary";
+import { updateGlossaryTerm, setTermRetentionCategory } from "@/lib/queries/glossary";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -12,7 +12,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const glossaryId = Number(params.id);
     if (isNaN(glossaryId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-    const { definition, format, businessRules, classCode, isPii, piCategory, example, termType } = await req.json();
+    const body = await req.json();
+    const { definition, format, businessRules, classCode, isPii, piCategory, example, termType, retentionCategoryId } = body;
 
     if (!definition?.trim()) {
       return NextResponse.json({ error: "definition is required" }, { status: 400 });
@@ -28,6 +29,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       example:       typeof example       === "string" ? example       : "",
       termType:      termType   ?? "TERM",
     });
+
+    // Save retention category separately (nullable)
+    if ("retentionCategoryId" in body) {
+      await setTermRetentionCategory(
+        glossaryId,
+        session.userId,
+        retentionCategoryId != null ? Number(retentionCategoryId) : null,
+      );
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[PATCH /api/glossary/terms/[id]]", err);

@@ -110,6 +110,8 @@ export type DataAttribute = {
   nullPercentage?: number | null;
   isEncrypted: boolean;
   columnType: string | null;
+  retentionCategoryId?:   number | null;
+  retentionCategoryName?: string | null;
 };
 
 export type Steward = {
@@ -262,21 +264,23 @@ export type GlossaryAlias = {
 };
 
 export type GlossaryTermDetail = {
-  glossaryId:     number;
-  termName:       string;
-  definition:     string;
-  businessRules:  string | null;
-  format:         string | null;
-  example:        string | null;
-  classCode:      string | null;
-  isPii:          boolean;
-  piCategory:     string | null;
-  npiCategory:    string | null;
-  termType:       string | null;
-  domainName:     string | null;
-  domainId:       number | null;
-  createdAt:      string;
-  aliases:        GlossaryAlias[];
+  glossaryId:            number;
+  termName:              string;
+  definition:            string;
+  businessRules:         string | null;
+  format:                string | null;
+  example:               string | null;
+  classCode:             string | null;
+  isPii:                 boolean;
+  piCategory:            string | null;
+  npiCategory:           string | null;
+  termType:              string | null;
+  domainName:            string | null;
+  domainId:              number | null;
+  createdAt:             string;
+  retentionCategoryId:   number | null;
+  retentionCategoryName: string | null;
+  aliases:               GlossaryAlias[];
   linkedAttributes: {
     attributeId:  number;
     physicalName: string;

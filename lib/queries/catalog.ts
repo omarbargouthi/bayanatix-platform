@@ -255,8 +255,15 @@ export async function getEntityById(entityId: number): Promise<
       a.quality_score as "qualityScore",
       a.null_percentage as "nullPercentage",
       coalesce(a.is_encrypted, false) as "isEncrypted",
-      a.attribute_class_code as "columnType"
+      a.attribute_class_code as "columnType",
+      bg.retention_category_id  as "retentionCategoryId",
+      dc.name                   as "retentionCategoryName"
     from bayanat.data_attributes a
+    left join bayanat.business_glossaries bg
+      on bg.term_name_text = a.glossary_term_text
+      and bg.parent_glossary_id is not null
+    left join bayanat.data_categories dc
+      on dc.category_id = bg.retention_category_id
     where a.entity_id = ${entityId}
     order by a.attribute_id
   `;

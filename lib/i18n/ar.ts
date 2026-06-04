@@ -647,6 +647,8 @@ export const ar: I18nStrings = {
     propNpiCategory:    "فئة المعلومات غير الشخصية",
     propCreated:        "تاريخ الإنشاء",
     propLinkedCols:     "الأعمدة المرتبطة",
+    propRetentionCategory: "سياسة الاحتفاظ",
+    retentionInherited: "موروث",
     yesPersonalData:    "نعم — بيانات شخصية",
     noPersonalData:     "لا",
     termTypeTerm:       "مصطلح",

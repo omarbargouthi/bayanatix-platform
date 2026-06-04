@@ -67,20 +67,22 @@ export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[
 
 export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetail | null> {
   const rows = await sql<{
-    glossaryId:    number;
-    termName:      string;
-    definition:    string;
-    businessRules: string | null;
-    format:        string | null;
-    example:       string | null;
-    classCode:     string | null;
-    isPii:         boolean;
-    piCategory:    string | null;
-    npiCategory:   string | null;
-    termType:      string | null;
-    domainName:    string | null;
-    domainId:      number | null;
-    createdAt:     string;
+    glossaryId:            number;
+    termName:              string;
+    definition:            string;
+    businessRules:         string | null;
+    format:                string | null;
+    example:               string | null;
+    classCode:             string | null;
+    isPii:                 boolean;
+    piCategory:            string | null;
+    npiCategory:           string | null;
+    termType:              string | null;
+    domainName:            string | null;
+    domainId:              number | null;
+    createdAt:             string;
+    retentionCategoryId:   number | null;
+    retentionCategoryName: string | null;
   }[]>`
     SELECT
       g.glossary_id            AS "glossaryId",
@@ -96,9 +98,12 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
       g.term_type              AS "termType",
       p.term_name_text         AS "domainName",
       p.glossary_id            AS "domainId",
-      g.created_at_timestamp   AS "createdAt"
+      g.created_at_timestamp   AS "createdAt",
+      g.retention_category_id  AS "retentionCategoryId",
+      dc.name                  AS "retentionCategoryName"
     FROM bayanat.business_glossaries g
-    LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
+    LEFT JOIN bayanat.business_glossaries p  ON p.glossary_id  = g.parent_glossary_id
+    LEFT JOIN bayanat.data_categories    dc  ON dc.category_id = g.retention_category_id
     WHERE g.glossary_id = ${id}
     LIMIT 1
   `;
@@ -142,6 +147,26 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     aliases:          aliasRows.map((r): GlossaryAlias => ({ aliasId: r.aliasId, name: r.alias })),
     linkedAttributes: attrRows,
   };
+}
+
+export async function setTermRetentionCategory(
+  glossaryId: number,
+  userId: string,
+  retentionCategoryId: number | null,
+): Promise<void> {
+  const [old] = await sql<{ retention_category_id: number | null }[]>`
+    SELECT retention_category_id FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
+  `;
+  await sql`
+    UPDATE bayanat.business_glossaries
+    SET retention_category_id = ${retentionCategoryId}
+    WHERE glossary_id = ${glossaryId}
+  `;
+  if (old) {
+    await logUpdate("BUSINESS_GLOSSARIES", glossaryId, userId, [
+      { field: "retention_category_id", oldVal: String(old.retention_category_id ?? ""), newVal: String(retentionCategoryId ?? "") },
+    ]);
+  }
 }
 
 // ----- Glossary mutations -----

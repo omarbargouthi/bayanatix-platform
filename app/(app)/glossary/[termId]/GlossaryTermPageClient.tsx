@@ -256,8 +256,37 @@ export function GlossaryTermPageClient({ term, canEdit }: Props) {
               <PropRow label={g.propLinkedCols}>
                 <span className="font-semibold text-brand-deep">{term.linkedAttributes.length}</span>
               </PropRow>
+              <PropRow label={g.propRetentionCategory}>
+                {term.retentionCategoryName ? (
+                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-purple">
+                    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 shrink-0 opacity-70">
+                      <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 2.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm1 7H7v-4h2v4z"/>
+                    </svg>
+                    {term.retentionCategoryName}
+                  </span>
+                ) : (
+                  <span className="text-muted text-[12px]">—</span>
+                )}
+              </PropRow>
             </dl>
           </Section>
+
+          {term.retentionCategoryName && (
+            <div className="rounded-xl border border-brand-purple/20 bg-brand-purple/5 p-4">
+              <div className="flex items-start gap-2.5">
+                <span className="text-lg shrink-0">🗂️</span>
+                <div>
+                  <div className="text-[11px] font-bold text-brand-purple uppercase tracking-wider mb-1">
+                    {g.propRetentionCategory}
+                  </div>
+                  <div className="text-[12px] text-ink font-medium">{term.retentionCategoryName}</div>
+                  <div className="text-[11px] text-muted mt-1">
+                    {g.retentionInherited} · {term.linkedAttributes.length} column{term.linkedAttributes.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {term.aliases.length > 0 && (
             <Section title={`${g.synonymsTitle} (${term.aliases.length})`}>

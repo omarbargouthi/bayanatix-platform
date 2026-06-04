@@ -265,10 +265,18 @@ export function ColumnsTable({
             <div className="font-mono text-[12px] text-ink-soft">{a.dataType}</div>
             <div>{a.nullPercentage != null ? `${Number(a.nullPercentage).toFixed(1)}%` : "—"}</div>
             <div><ClassificationTag code={a.classificationCode} /></div>
-            <div>
+            <div className="space-y-1">
               {a.glossaryTerm
                 ? <Tag variant="blue">{a.glossaryTerm}</Tag>
                 : <span className="text-muted">—</span>}
+              {a.retentionCategoryName && (
+                <div className="flex items-center gap-1 text-[9px] text-brand-purple font-medium">
+                  <svg viewBox="0 0 12 12" fill="currentColor" className="w-2.5 h-2.5 shrink-0 opacity-60">
+                    <path d="M6 0a6 6 0 1 0 0 12A6 6 0 0 0 6 0zm0 2a.75.75 0 1 1 0 1.5A.75.75 0 0 1 6 2zm.75 7.5h-1.5V5.25h1.5V9.5z"/>
+                  </svg>
+                  <span className="truncate" title={a.retentionCategoryName}>{a.retentionCategoryName}</span>
+                </div>
+              )}
             </div>
             <div>
               {a.qualityScore != null ? (

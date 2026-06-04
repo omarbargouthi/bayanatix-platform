@@ -647,6 +647,8 @@ export const en: I18nStrings = {
     propNpiCategory:    "NPI Category",
     propCreated:        "Created",
     propLinkedCols:     "Linked Cols",
+    propRetentionCategory: "Retention Policy",
+    retentionInherited: "Inherited",
     yesPersonalData:    "Yes — Personal Data",
     noPersonalData:     "No",
     termTypeTerm:       "Term",

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { GlossaryTermDetail, GlossaryAlias } from "@/lib/types";
+import type { GlossaryTermDetail, GlossaryAlias, DataCategory } from "@/lib/types";
 
 const CLASSIFICATION_OPTIONS = [
   { value: "",            label: "— None —" },
@@ -34,14 +34,32 @@ export function TermEditModal({ term, onClose }: Props) {
   const router = useRouter();
 
   // Form fields
-  const [definition,    setDefinition]    = useState(term.definition    ?? "");
-  const [format,        setFormat]        = useState(term.format        ?? "");
-  const [businessRules, setBusinessRules] = useState(term.businessRules ?? "");
-  const [classCode,     setClassCode]     = useState(term.classCode     ?? "");
-  const [isPii,         setIsPii]         = useState(term.isPii         ?? false);
-  const [piCategory,    setPiCategory]    = useState(term.piCategory    ?? "");
-  const [example,       setExample]       = useState(term.example       ?? "");
-  const [termType,      setTermType]      = useState(term.termType      ?? "TERM");
+  const [definition,           setDefinition]           = useState(term.definition           ?? "");
+  const [format,               setFormat]               = useState(term.format               ?? "");
+  const [businessRules,        setBusinessRules]        = useState(term.businessRules        ?? "");
+  const [classCode,            setClassCode]            = useState(term.classCode            ?? "");
+  const [isPii,                setIsPii]                = useState(term.isPii                ?? false);
+  const [piCategory,           setPiCategory]           = useState(term.piCategory           ?? "");
+  const [example,              setExample]              = useState(term.example              ?? "");
+  const [termType,             setTermType]             = useState(term.termType             ?? "TERM");
+  const [retentionCategoryId,  setRetentionCategoryId]  = useState<number | null>(term.retentionCategoryId ?? null);
+
+  // Flat list of all retention categories for the picker
+  const [retentionCategories, setRetentionCategories] = useState<DataCategory[]>([]);
+  useEffect(() => {
+    fetch("/api/retention/categories")
+      .then((r) => r.json())
+      .then((tree: DataCategory[]) => {
+        // Flatten tree to [root, ...children] for a single <select>
+        const flat: DataCategory[] = [];
+        for (const root of tree) {
+          flat.push(root);
+          for (const child of root.children ?? []) flat.push(child);
+        }
+        setRetentionCategories(flat);
+      })
+      .catch(() => {});
+  }, []);
 
   // Alias management (local state, committed on Save)
   const [aliases,    setAliases]    = useState<GlossaryAlias[]>(term.aliases);
@@ -81,6 +99,7 @@ export function TermEditModal({ term, onClose }: Props) {
           piCategory: piCategory || null,
           example,
           termType,
+          retentionCategoryId: retentionCategoryId ?? null,
         }),
       });
       if (!r.ok) {
@@ -226,6 +245,28 @@ export function TermEditModal({ term, onClose }: Props) {
                 PII Flag — Contains personal data
               </label>
             </div>
+          </div>
+
+          {/* Retention Category */}
+          <div>
+            <label className="field-label">Retention Policy</label>
+            <select
+              value={retentionCategoryId ?? ""}
+              onChange={(e) => setRetentionCategoryId(e.target.value ? Number(e.target.value) : null)}
+              className="input-field"
+            >
+              <option value="">— No retention policy —</option>
+              {retentionCategories.map((cat) => (
+                <option key={cat.categoryId} value={cat.categoryId}>
+                  {cat.parentId ? `   ↳ ${cat.name}` : cat.name}
+                </option>
+              ))}
+            </select>
+            {retentionCategoryId && (
+              <p className="mt-1.5 text-[11px] text-brand-purple">
+                All columns tagged with this term inherit the retention schedule of the selected category.
+              </p>
+            )}
           </div>
 
           {/* Synonyms / Aliases */}

@@ -711,6 +711,8 @@ export type I18nStrings = {
     propNpiCategory:    string;
     propCreated:        string;
     propLinkedCols:     string;
+    propRetentionCategory: string;
+    retentionInherited: string;
     yesPersonalData:    string;
     noPersonalData:     string;
     termTypeTerm:       string;
