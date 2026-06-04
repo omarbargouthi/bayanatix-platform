@@ -132,11 +132,13 @@ export type GovernanceDomain = {
   level:         string;
   alertCount:    number;
   sortOrder:     number;
+  weight?:       number;
   openRequestCount?: number;
 };
 
 export type ComplianceSummary = {
   overallPct: number;
+  overallMaturityPct: number;
   specsTracked: number;
   domainsActive: number;
   controlsPassing: number;
