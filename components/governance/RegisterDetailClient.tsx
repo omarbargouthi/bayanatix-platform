@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { GovRegister, RegisterColumn, RegisterEntry, RegisterEntryHistory } from "@/lib/queries/gov-registers";
+import type { GovRegister, RegisterColumn, RegisterEntry, RegisterEntryHistory, RegisterColumnLog } from "@/lib/queries/gov-registers";
 import { useLang } from "@/lib/lang-context";
 
 type Props = {
@@ -40,9 +40,11 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
 
   const [columns, setColumns]         = useState<RegisterColumn[]>(initialColumns);
   const [entries, setEntries]         = useState<RegisterEntry[]>(initialEntries);
-  const [activeTab, setActiveTab]     = useState<"entries" | "columns" | "history">("entries");
+  const [activeTab, setActiveTab]     = useState<"entries" | "columns" | "history" | "collog">("entries");
   const [history, setHistory]         = useState<RegisterEntryHistory[] | null>(null);
   const [histLoading, setHistLoading] = useState(false);
+  const [colLog, setColLog]           = useState<RegisterColumnLog[] | null>(null);
+  const [colLogLoading, setColLogLoading] = useState(false);
 
   const [entryModal, setEntryModal]   = useState(false);
   const [editEntry, setEditEntry]     = useState<RegisterEntry | null>(null);
@@ -53,6 +55,11 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
   const [editCol, setEditCol]         = useState<RegisterColumn | null>(null);
   const [colForm, setColForm]         = useState({ columnName: "", dataType: "TEXT", isRequired: false, optionsRaw: "" });
   const [savingCol, setSavingCol]     = useState(false);
+
+  // Column delete confirmation modal
+  const [deleteColTarget, setDeleteColTarget] = useState<RegisterColumn | null>(null);
+  const [archiveColData,  setArchiveColData]  = useState(false);
+  const [deletingCol,     setDeletingCol]     = useState(false);
 
   const refreshColumns = useCallback(async () => {
     const res = await fetch(`/api/governance/registers/${register.registerId}/columns`);
@@ -71,9 +78,20 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
     setHistLoading(false);
   }, [register.registerId]);
 
+  const refreshColLog = useCallback(async () => {
+    setColLogLoading(true);
+    const res = await fetch(`/api/governance/registers/${register.registerId}/column-log`);
+    setColLog(await res.json());
+    setColLogLoading(false);
+  }, [register.registerId]);
+
   useEffect(() => {
     if (activeTab === "history" && history === null) refreshHistory();
   }, [activeTab, history, refreshHistory]);
+
+  useEffect(() => {
+    if (activeTab === "collog" && colLog === null) refreshColLog();
+  }, [activeTab, colLog, refreshColLog]);
 
   function openNewEntry() { setEditEntry(null); setEntryData({}); setEntryModal(true); }
   function openEditEntry(e: RegisterEntry) {
@@ -137,25 +155,60 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
     setColModal(false);
     setSavingCol(false);
   }
-  async function deleteCol(id: number) {
-    if (!confirm(r.deleteColumnConfirm)) return;
-    await fetch(`/api/governance/registers/${register.registerId}/columns/${id}`, { method: "DELETE" });
-    setColumns((p) => p.filter((col) => col.columnId !== id));
+
+  async function confirmDeleteCol() {
+    if (!deleteColTarget) return;
+    setDeletingCol(true);
+    await fetch(`/api/governance/registers/${register.registerId}/columns/${deleteColTarget.columnId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archiveData: archiveColData }),
+    });
+    setColumns((p) => p.filter((col) => col.columnId !== deleteColTarget.columnId));
+    if (archiveColData) setColLog(null);
+    setDeleteColTarget(null);
+    setArchiveColData(false);
+    setDeletingCol(false);
+  }
+
+  // Count entries that have a value for a given column key
+  function countAffectedEntries(col: RegisterColumn) {
+    return entries.filter((e) => e.data[col.columnKey] != null && e.data[col.columnKey] !== "").length;
   }
 
   const visibleCols = columns.slice(0, 6);
 
+  const tabs = [
+    { key: "entries",  label: `${r.tabEntries} (${entries.length})` },
+    { key: "columns",  label: `${r.tabColumns} (${columns.length})` },
+    { key: "history",  label: r.history },
+    ...(isAdmin ? [{ key: "collog", label: "Column Log" }] : []),
+  ] as const;
+
+  // Archived register banner
+  const isArchived = !!register.deletedAt;
+
   return (
     <div>
+      {isArchived && (
+        <div className="mb-5 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <span className="text-amber-500 text-lg">⚠</span>
+          <span>
+            This register is <strong>archived</strong> and not visible to regular users.
+            {register.deletedBy && <> Archived by <strong>{register.deletedBy}</strong>{register.deletedAt && <> on {fmtDate(register.deletedAt)}</>}.</>}
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-brand-deep">{register.name}</h1>
           {register.description && <p className="text-sm text-ink-soft mt-0.5">{register.description}</p>}
         </div>
-        {activeTab === "entries" && (
+        {activeTab === "entries" && !isArchived && (
           <button onClick={openNewEntry} className="btn btn-primary">+ {r.addEntry}</button>
         )}
-        {activeTab === "columns" && isAdmin && (
+        {activeTab === "columns" && isAdmin && !isArchived && (
           <button onClick={openNewCol} className="btn btn-primary">+ {r.addColumn}</button>
         )}
         {activeTab === "history" && history !== null && history.length > 0 && (
@@ -165,16 +218,12 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-line mb-5">
-        {(["entries", "columns", "history"] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+        {tabs.map((tab) => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as typeof activeTab)}
             className={`px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 ${
-              activeTab === tab ? "text-brand-purple border-brand-purple" : "text-ink-soft border-transparent hover:text-brand-purple"
+              activeTab === tab.key ? "text-brand-purple border-brand-purple" : "text-ink-soft border-transparent hover:text-brand-purple"
             }`}>
-            {tab === "entries"
-              ? `${r.tabEntries} (${entries.length})`
-              : tab === "columns"
-              ? `${r.tabColumns} (${columns.length})`
-              : r.history}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -256,10 +305,17 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
                   <td className="px-4 py-2.5 text-center">{col.isRequired ? "✓" : "—"}</td>
                   <td className="px-4 py-2.5 text-muted text-[11px] max-w-[200px] truncate">{col.options?.join(", ") ?? "—"}</td>
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => openEditCol(col)} className="text-[11px] text-ink-soft hover:text-brand-purple">{c.edit}</button>
-                      <button onClick={() => deleteCol(col.columnId)} className="text-[11px] text-ink-soft hover:text-red-500">{c.delete}</button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2 justify-end">
+                        <button onClick={() => openEditCol(col)} className="text-[11px] text-ink-soft hover:text-brand-purple">{c.edit}</button>
+                        <button
+                          onClick={() => { setDeleteColTarget(col); setArchiveColData(false); }}
+                          className="text-[11px] text-ink-soft hover:text-red-500"
+                        >
+                          {c.delete}
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -308,6 +364,59 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Column Log tab (admin only) */}
+      {activeTab === "collog" && isAdmin && (
+        <div className="card overflow-hidden">
+          {colLogLoading && <div className="py-10 text-center text-sm text-muted">Loading column log…</div>}
+          {!colLogLoading && colLog !== null && colLog.length === 0 && (
+            <div className="py-14 text-center">
+              <div className="text-3xl mb-2">🗂</div>
+              <p className="text-sm text-ink-soft">No column changes archived yet.</p>
+            </div>
+          )}
+          {!colLogLoading && colLog !== null && colLog.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-canvas-soft border-b border-line text-left">
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-36">Date</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-20">Action</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Column</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Affected</th>
+                  <th className="px-4 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Archived By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {colLog.map((log) => (
+                  <tr key={log.logId} className="border-b border-line-soft hover:bg-canvas/30">
+                    <td className="px-4 py-2.5 text-muted whitespace-nowrap text-[12px]">{fmtDate(log.changedAt)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        log.action === "DELETED" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
+                      }`}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium text-ink text-[12px]">{log.columnName}</div>
+                      <div className="text-[10px] font-mono text-muted">{log.columnKey}</div>
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px] text-muted">
+                      {log.action === "DELETED" ? (
+                        <span title={log.archivedData ? "Data archived" : "Data not archived"}>
+                          {log.affectedCount} entries
+                          {log.archivedData ? " ✓" : ""}
+                        </span>
+                      ) : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px] text-ink">{log.changedBy ?? "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -370,6 +479,64 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setColModal(false)} className="btn btn-sm">{c.cancel}</button>
               <button onClick={saveCol} disabled={savingCol || !colForm.columnName.trim()} className="btn btn-primary btn-sm">{savingCol ? c.saving : c.save}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Column Delete Confirmation Modal */}
+      {deleteColTarget && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !deletingCol && setDeleteColTarget(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0 text-red-500 text-xl">⚠</div>
+              <div>
+                <h2 className="text-base font-bold text-ink mb-1">Delete Column</h2>
+                <p className="text-sm text-ink-soft">
+                  You are about to delete <strong>&ldquo;{deleteColTarget.columnName}&rdquo;</strong>
+                  {" "}(<code className="text-[11px] bg-canvas-soft px-1 rounded">{deleteColTarget.columnKey}</code>).
+                </p>
+              </div>
+            </div>
+
+            {(() => {
+              const affected = countAffectedEntries(deleteColTarget);
+              return (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 mb-4">
+                  <p className="font-semibold mb-1">Data impact:</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-[12px]">
+                    <li>
+                      {affected > 0
+                        ? <><strong>{affected}</strong> of {entries.length} entries have data in this column — it will be permanently removed.</>
+                        : "No entries have data in this column."}
+                    </li>
+                    <li>This column definition will be permanently deleted.</li>
+                    <li>This action cannot be undone.</li>
+                  </ul>
+                </div>
+              );
+            })()}
+
+            <label className="flex items-start gap-3 cursor-pointer mb-5 p-3 rounded-lg border border-line hover:bg-canvas-soft">
+              <input
+                type="checkbox"
+                checked={archiveColData}
+                onChange={(e) => setArchiveColData(e.target.checked)}
+                className="mt-0.5"
+              />
+              <div>
+                <div className="text-sm font-semibold text-ink">Archive column data to audit log</div>
+                <div className="text-[11px] text-muted mt-0.5">
+                  Saves a snapshot of all entry values for this column to the Column Log tab before deletion. Recommended for legal or compliance reference.
+                </div>
+              </div>
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteColTarget(null)} disabled={deletingCol} className="btn btn-sm">{c.cancel}</button>
+              <button onClick={confirmDeleteCol} disabled={deletingCol} className="btn btn-sm bg-red-500 text-white border-red-500 hover:bg-red-600">
+                {deletingCol ? "Deleting…" : "Delete Column"}
+              </button>
             </div>
           </div>
         </div>

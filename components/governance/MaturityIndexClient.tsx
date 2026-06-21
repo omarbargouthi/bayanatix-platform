@@ -58,6 +58,12 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
   const [editing,     setEditing]     = useState<ComplianceRequirement | null>(null);
   const [saving,      setSaving]      = useState(false);
 
+  // Filter state
+  const [filterDomain,   setFilterDomain]   = useState("");
+  const [filterStandard, setFilterStandard] = useState("");
+  const [filterCode,     setFilterCode]     = useState("");
+  const [filterLevel,    setFilterLevel]    = useState("");
+
   // Build domain display name map from domain config
   const domainNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -126,17 +132,85 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
     [cfgItems]
   );
 
+  // Derive unique filter options from loaded requirements
+  const uniqueDomains = useMemo(() => {
+    if (!reqs) return [];
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    for (const r of reqs) {
+      const code = r.domainCode ?? "";
+      const label = r.domainCode
+        ? (domainNameMap.get(r.domainCode) ?? r.domainEn ?? r.domain ?? r.domainCode)
+        : (r.domainEn ?? r.domain ?? "");
+      if (label && !seen.has(code || label)) {
+        seen.add(code || label);
+        out.push({ value: code || label, label });
+      }
+    }
+    return out.sort((a, b) => a.label.localeCompare(b.label));
+  }, [reqs, domainNameMap]);
+
+  const uniqueStandards = useMemo(() => {
+    if (!reqs) return [];
+    const seen = new Set<string>();
+    for (const r of reqs) seen.add(deriveStandard(r));
+    return Array.from(seen).sort();
+  }, [reqs]);
+
+  const uniqueCodes = useMemo(() => {
+    if (!reqs) return [];
+    const seen = new Set<string>();
+    for (const r of reqs) {
+      const prefix = r.reqCode.split(".")[0];
+      if (prefix) seen.add(prefix);
+    }
+    return Array.from(seen).sort();
+  }, [reqs]);
+
+  const uniqueLevels = useMemo(() => {
+    if (!reqs) return [];
+    const seen = new Set<string>();
+    for (const r of reqs) {
+      const lv = r.maturityLevel;
+      if (lv != null && lv !== "") seen.add(String(lv));
+    }
+    return Array.from(seen).sort((a, b) => {
+      const na = parseInt(a, 10), nb = parseInt(b, 10);
+      return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb;
+    });
+  }, [reqs]);
+
   const filtered = useMemo(() => {
     if (!reqs) return [];
     const lq = q.toLowerCase();
-    if (!lq) return reqs;
-    return reqs.filter(r =>
-      r.reqCode.toLowerCase().includes(lq) ||
-      (r.supportingEvidenceEn ?? r.supportingEvidence ?? "").toLowerCase().includes(lq) ||
-      (r.domainEn ?? r.domain ?? "").toLowerCase().includes(lq) ||
-      deriveStandard(r).toLowerCase().includes(lq)
-    );
-  }, [reqs, q]);
+    return reqs.filter(r => {
+      if (lq && !(
+        r.reqCode.toLowerCase().includes(lq) ||
+        (r.supportingEvidenceEn ?? r.supportingEvidence ?? "").toLowerCase().includes(lq) ||
+        (r.domainEn ?? r.domain ?? "").toLowerCase().includes(lq) ||
+        deriveStandard(r).toLowerCase().includes(lq)
+      )) return false;
+
+      if (filterDomain) {
+        const domVal = r.domainCode
+          ? (domainNameMap.get(r.domainCode) ?? r.domainEn ?? r.domain ?? r.domainCode)
+          : (r.domainEn ?? r.domain ?? "");
+        const domKey = r.domainCode || domVal;
+        if (domKey !== filterDomain) return false;
+      }
+
+      if (filterStandard && deriveStandard(r) !== filterStandard) return false;
+
+      if (filterCode) {
+        const prefix = r.reqCode.split(".")[0];
+        if (prefix !== filterCode) return false;
+      }
+
+      if (filterLevel && String(r.maturityLevel) !== filterLevel) return false;
+
+      return true;
+    });
+  }, [reqs, q, filterDomain, filterStandard, filterCode, filterLevel, domainNameMap]);
 
   async function saveEdit(req: ComplianceRequirement, updates: Partial<ComplianceRequirement>) {
     setSaving(true);
@@ -171,23 +245,86 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-sm text-ink-soft">
-            Edit requirement details, evidence codes, domains and assignments.
-            {translating > 0 && (
-              <span className="ml-2 text-brand-purple animate-pulse text-[11px]">
-                Translating {translating} missing EN fields…
-              </span>
-            )}
-          </p>
+      {/* Search + filters bar */}
+      <div className="mb-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <input
+            value={q} onChange={e => setQ(e.target.value)}
+            className="field text-sm flex-1"
+            placeholder="Search by code, domain, standard, evidence…"
+          />
+          {translating > 0 && (
+            <span className="text-brand-purple animate-pulse text-[11px] shrink-0">
+              Translating {translating} missing EN fields…
+            </span>
+          )}
         </div>
-        <input
-          value={q} onChange={e => setQ(e.target.value)}
-          className="field text-sm w-72"
-          placeholder="Search by code, domain, standard, evidence…"
-        />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-semibold text-muted uppercase tracking-wide shrink-0">Filter:</span>
+
+          <select
+            value={filterDomain}
+            onChange={e => setFilterDomain(e.target.value)}
+            className="field text-sm py-1.5 w-auto min-w-[160px]"
+          >
+            <option value="">All Domains</option>
+            {uniqueDomains.map(d => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterStandard}
+            onChange={e => setFilterStandard(e.target.value)}
+            className="field text-sm py-1.5 w-auto min-w-[140px]"
+          >
+            <option value="">All Standards</option>
+            {uniqueStandards.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterCode}
+            onChange={e => setFilterCode(e.target.value)}
+            className="field text-sm py-1.5 w-auto min-w-[130px]"
+          >
+            <option value="">All Codes</option>
+            {uniqueCodes.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterLevel}
+            onChange={e => setFilterLevel(e.target.value)}
+            className="field text-sm py-1.5 w-auto min-w-[130px]"
+          >
+            <option value="">All Levels</option>
+            {uniqueLevels.map(lv => {
+              const cfg = levelCfg.find(l => String(l.levelNum) === lv);
+              return (
+                <option key={lv} value={lv}>
+                  Level {lv}{cfg ? ` — ${cfg.name}` : ""}
+                </option>
+              );
+            })}
+          </select>
+
+          {(filterDomain || filterStandard || filterCode || filterLevel || q) && (
+            <button
+              onClick={() => { setFilterDomain(""); setFilterStandard(""); setFilterCode(""); setFilterLevel(""); setQ(""); }}
+              className="text-[11px] text-muted hover:text-brand-purple font-semibold"
+            >
+              Clear all
+            </button>
+          )}
+
+          <span className="ml-auto text-[11px] text-muted">
+            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
 
       {loading && <div className="card p-8 text-center text-muted text-sm">Loading requirements…</div>}

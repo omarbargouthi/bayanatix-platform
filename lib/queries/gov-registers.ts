@@ -6,6 +6,8 @@ export type GovRegister = {
   description:  string | null;
   isSystem:     boolean;
   createdAt:    string;
+  deletedAt:    string | null;
+  deletedBy:    string | null;
   columnCount:  number;
   entryCount:   number;
 };
@@ -41,6 +43,19 @@ export type RegisterEntryHistory = {
   newData:    Record<string, unknown> | null;
 };
 
+export type RegisterColumnLog = {
+  logId:         number;
+  registerId:    number;
+  columnId:      number | null;
+  columnName:    string;
+  columnKey:     string;
+  action:        string;
+  affectedCount: number;
+  archivedData:  Record<string, unknown> | null;
+  changedBy:     string | null;
+  changedAt:     string;
+};
+
 export async function listRegisters(): Promise<GovRegister[]> {
   return sql<GovRegister[]>`
     SELECT
@@ -49,26 +64,52 @@ export async function listRegisters(): Promise<GovRegister[]> {
       r.description,
       r.is_system     AS "isSystem",
       r.created_at::text AS "createdAt",
+      NULL::text      AS "deletedAt",
+      NULL::text      AS "deletedBy",
       COUNT(DISTINCT c.column_id)::int AS "columnCount",
       COUNT(DISTINCT e.entry_id)::int  AS "entryCount"
     FROM bayanat.gov_registers r
     LEFT JOIN bayanat.gov_register_columns c ON c.register_id = r.register_id
     LEFT JOIN bayanat.gov_register_entries e ON e.register_id = r.register_id
+    WHERE r.deleted_at IS NULL
     GROUP BY r.register_id
     ORDER BY r.is_system DESC, r.name
   `;
 }
 
-export async function getRegister(registerId: number): Promise<GovRegister | null> {
+export async function listDeletedRegisters(): Promise<GovRegister[]> {
+  return sql<GovRegister[]>`
+    SELECT
+      r.register_id   AS "registerId",
+      r.name,
+      r.description,
+      r.is_system     AS "isSystem",
+      r.created_at::text AS "createdAt",
+      r.deleted_at::text AS "deletedAt",
+      r.deleted_by       AS "deletedBy",
+      COUNT(DISTINCT c.column_id)::int AS "columnCount",
+      COUNT(DISTINCT e.entry_id)::int  AS "entryCount"
+    FROM bayanat.gov_registers r
+    LEFT JOIN bayanat.gov_register_columns c ON c.register_id = r.register_id
+    LEFT JOIN bayanat.gov_register_entries e ON e.register_id = r.register_id
+    WHERE r.deleted_at IS NOT NULL
+    GROUP BY r.register_id
+    ORDER BY r.deleted_at DESC
+  `;
+}
+
+export async function getRegister(registerId: number, includeDeleted = false): Promise<GovRegister | null> {
   const rows = await sql<GovRegister[]>`
     SELECT r.register_id AS "registerId", r.name, r.description,
            r.is_system AS "isSystem", r.created_at::text AS "createdAt",
+           r.deleted_at::text AS "deletedAt", r.deleted_by AS "deletedBy",
            COUNT(DISTINCT c.column_id)::int AS "columnCount",
            COUNT(DISTINCT e.entry_id)::int  AS "entryCount"
     FROM bayanat.gov_registers r
     LEFT JOIN bayanat.gov_register_columns c ON c.register_id = r.register_id
     LEFT JOIN bayanat.gov_register_entries e ON e.register_id = r.register_id
     WHERE r.register_id = ${registerId}
+      AND (${includeDeleted} OR r.deleted_at IS NULL)
     GROUP BY r.register_id
   `;
   return rows[0] ?? null;
@@ -86,8 +127,20 @@ export async function updateRegister(registerId: number, name: string, descripti
   await sql`UPDATE bayanat.gov_registers SET name=${name}, description=${description} WHERE register_id=${registerId}`;
 }
 
-export async function deleteRegister(registerId: number): Promise<void> {
-  await sql`DELETE FROM bayanat.gov_registers WHERE register_id=${registerId} AND is_system=FALSE`;
+export async function softDeleteRegister(registerId: number, deletedBy: string): Promise<void> {
+  await sql`
+    UPDATE bayanat.gov_registers
+    SET deleted_at = NOW(), deleted_by = ${deletedBy}
+    WHERE register_id = ${registerId} AND is_system = FALSE
+  `;
+}
+
+export async function restoreRegister(registerId: number): Promise<void> {
+  await sql`
+    UPDATE bayanat.gov_registers
+    SET deleted_at = NULL, deleted_by = NULL
+    WHERE register_id = ${registerId}
+  `;
 }
 
 export async function listColumns(registerId: number): Promise<RegisterColumn[]> {
@@ -132,8 +185,62 @@ export async function updateColumn(columnId: number, col: {
   `;
 }
 
-export async function deleteColumn(columnId: number): Promise<void> {
+export async function deleteColumnWithCleanup(
+  columnId: number,
+  registerId: number,
+  columnKey: string,
+  columnName: string,
+  archiveData: boolean,
+  changedBy: string,
+): Promise<void> {
+  if (archiveData) {
+    // Snapshot all entry values for this column into the column log
+    const entries = await sql<{ entryId: number; val: unknown }[]>`
+      SELECT entry_id AS "entryId", data->>${columnKey} AS val
+      FROM bayanat.gov_register_entries
+      WHERE register_id = ${registerId} AND data ? ${columnKey}
+    `;
+    const snapshot: Record<string, unknown> = {};
+    for (const e of entries) {
+      if (e.val !== null) snapshot[String(e.entryId)] = e.val;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const snapshotJson = snapshot as any;
+    await sql`
+      INSERT INTO bayanat.gov_register_column_log
+        (register_id, column_id, column_name, column_key, action, affected_count, archived_data, changed_by)
+      VALUES (${registerId}, ${columnId}, ${columnName}, ${columnKey}, 'DELETED',
+              ${Object.keys(snapshot).length}, ${snapshotJson}, ${changedBy})
+    `;
+  }
+
+  // Remove this key from all entry JSONB data
+  await sql`
+    UPDATE bayanat.gov_register_entries
+    SET data = data - ${columnKey}
+    WHERE register_id = ${registerId}
+  `;
+
   await sql`DELETE FROM bayanat.gov_register_columns WHERE column_id = ${columnId}`;
+}
+
+export async function getColumnLog(registerId: number): Promise<RegisterColumnLog[]> {
+  return sql<RegisterColumnLog[]>`
+    SELECT
+      log_id         AS "logId",
+      register_id    AS "registerId",
+      column_id      AS "columnId",
+      column_name    AS "columnName",
+      column_key     AS "columnKey",
+      action,
+      affected_count AS "affectedCount",
+      archived_data  AS "archivedData",
+      changed_by     AS "changedBy",
+      changed_at::text AS "changedAt"
+    FROM bayanat.gov_register_column_log
+    WHERE register_id = ${registerId}
+    ORDER BY changed_at DESC
+  `;
 }
 
 export async function listEntries(registerId: number): Promise<RegisterEntry[]> {

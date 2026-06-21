@@ -10,13 +10,19 @@ export default async function RegisterDetailPage({ params }: { params: { registe
   const user = await getSession();
   if (!user) redirect("/login");
 
+  const isAdmin = user.role === "ADMIN";
   const id = Number(params.registerId);
+
+  // Admins can view archived registers; regular users cannot
   const [register, columns, entries] = await Promise.all([
-    getRegister(id),
+    getRegister(id, isAdmin),
     listColumns(id),
     listEntries(id),
   ]);
   if (!register) notFound();
+
+  // Block non-admins from accessing archived registers
+  if (register.deletedAt && !isAdmin) notFound();
 
   return (
     <>
@@ -34,7 +40,7 @@ export default async function RegisterDetailPage({ params }: { params: { registe
           register={register}
           initialColumns={columns}
           initialEntries={entries}
-          isAdmin={user.role === "ADMIN"}
+          isAdmin={isAdmin}
         />
       </main>
     </>
