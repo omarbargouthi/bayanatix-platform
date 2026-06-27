@@ -153,7 +153,7 @@ function AttributeEditModal({
 
             <div>
               <label className="field-label">{c.businessTerms}</label>
-              <TermMultiPicker assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} />
+              <TermMultiPicker assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} dual />
             </div>
 
             {error && (

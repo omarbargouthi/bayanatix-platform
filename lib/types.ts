@@ -344,6 +344,7 @@ export type LinkedTerm = {
   termName:    string;
   domainName:  string | null;
   isPii:       boolean;
+  termRole:    "CLASSIFICATION" | "ENRICHMENT";
 };
 
 export type AssetRating = {
