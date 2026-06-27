@@ -257,13 +257,29 @@ export async function getEntityById(entityId: number): Promise<
       coalesce(a.is_encrypted, false) as "isEncrypted",
       a.attribute_class_code as "columnType",
       bg.retention_category_id  as "retentionCategoryId",
-      dc.name                   as "retentionCategoryName"
+      dc.name                   as "retentionCategoryName",
+      bg_cls.term_name_text        as "classTermName",
+      bg_cls.classification_code   as "classTermClassCode",
+      ct_cls.class_name_text       as "classTermClassName",
+      bg_cls.is_pii_indicator      as "classTermIsPii",
+      bg_cls.pi_category_code      as "classTermPiCategoryCode",
+      pct_cls.category_name_text   as "classTermPiCategoryName"
     from bayanat.data_attributes a
     left join bayanat.business_glossaries bg
       on bg.term_name_text = a.glossary_term_text
       and bg.parent_glossary_id is not null
     left join bayanat.data_categories dc
       on dc.category_id = bg.retention_category_id
+    left join bayanat.asset_business_terms abt_cls
+      on abt_cls.asset_type_code = 'DATA_ATTRIBUTES'
+      and abt_cls.asset_id = a.attribute_id
+      and abt_cls.term_role = 'CLASSIFICATION'
+    left join bayanat.business_glossaries bg_cls
+      on bg_cls.glossary_id = abt_cls.glossary_id
+    left join bayanat.classification_types ct_cls
+      on ct_cls.class_code = bg_cls.classification_code
+    left join bayanat.pi_category_types pct_cls
+      on pct_cls.category_code = bg_cls.pi_category_code
     where a.entity_id = ${entityId}
     order by a.attribute_id
   `;

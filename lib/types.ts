@@ -110,8 +110,15 @@ export type DataAttribute = {
   nullPercentage?: number | null;
   isEncrypted: boolean;
   columnType: string | null;
-  retentionCategoryId?:   number | null;
-  retentionCategoryName?: string | null;
+  retentionCategoryId?:    number | null;
+  retentionCategoryName?:  string | null;
+  // From the linked CLASSIFICATION business term
+  classTermName?:           string | null;
+  classTermClassCode?:      string | null;
+  classTermClassName?:      string | null;
+  classTermIsPii?:          boolean | null;
+  classTermPiCategoryCode?: string | null;
+  classTermPiCategoryName?: string | null;
 };
 
 export type Steward = {
