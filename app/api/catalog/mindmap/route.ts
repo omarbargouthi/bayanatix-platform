@@ -19,6 +19,137 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Invalid assetId" }, { status: 400 });
   }
 
+  // ── Column-level mindmap ───────────────────────────────────────────────────
+  if (assetType === "DATA_ATTRIBUTES") {
+    const [attrRows, termRows, tagRows, dqRows, requestRows] = await Promise.all([
+      sql<{
+        id: number; name: string; dataType: string;
+        parentEntityId: number; parentEntityName: string;
+        parentSchemaId: number | null; parentSchemaName: string | null;
+      }[]>`
+        SELECT
+          a.attribute_id          AS id,
+          a.physical_name_text    AS name,
+          a.data_type_text        AS "dataType",
+          e.entity_id             AS "parentEntityId",
+          e.entity_name_text      AS "parentEntityName",
+          s.schema_id             AS "parentSchemaId",
+          s.schema_name_text      AS "parentSchemaName"
+        FROM bayanat.data_attributes a
+        JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+        LEFT JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+        WHERE a.attribute_id = ${assetId}
+        LIMIT 1
+      `,
+
+      sql<{ id: number; label: string; meta: string | null }[]>`
+        SELECT
+          abt.abt_id          AS id,
+          bg.term_name_text   AS label,
+          CASE abt.term_role
+            WHEN 'CLASSIFICATION' THEN 'Classification · ' || COALESCE(bg.classification_code, '')
+            ELSE 'Enrichment'
+          END                 AS meta
+        FROM bayanat.asset_business_terms abt
+        JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+        WHERE abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = ${assetId}
+      `,
+
+      sql<{ id: number; label: string; meta: string | null }[]>`
+        SELECT
+          at2.asset_tag_id    AS id,
+          t.tag_name          AS label,
+          t.color_hex         AS meta
+        FROM bayanat.asset_tags at2
+        JOIN bayanat.tags t ON t.tag_id = at2.tag_id
+        WHERE at2.asset_type_code = 'DATA_ATTRIBUTES' AND at2.asset_id = ${assetId}
+      `,
+
+      sql<{ id: number; label: string; meta: string | null }[]>`
+        SELECT
+          rule_id             AS id,
+          rule_name_text      AS label,
+          last_status_code    AS meta
+        FROM bayanat.dq_rules
+        WHERE asset_type_code = 'DATA_ATTRIBUTES' AND asset_id = ${assetId}
+      `,
+
+      sql<{ id: number; label: string; meta: string | null; requestId: number }[]>`
+        SELECT
+          art.target_id                                           AS id,
+          ar.title                                                AS label,
+          CONCAT(ar.request_type_code, ' · ', ar.status_code)    AS meta,
+          ar.request_id                                           AS "requestId"
+        FROM bayanat.asset_request_targets art
+        JOIN bayanat.asset_requests ar ON ar.request_id = art.request_id
+        WHERE art.asset_type_code = 'DATA_ATTRIBUTES' AND art.asset_id = ${assetId}
+      `,
+    ]);
+
+    if (attrRows.length === 0) {
+      return NextResponse.json({ error: "Column not found" }, { status: 404 });
+    }
+
+    const raw = attrRows[0];
+
+    const asset = {
+      id:          raw.id,
+      name:        raw.name,
+      rowCount:    null,
+      isView:      false,
+      description: raw.dataType,
+      assetType:   "DATA_ATTRIBUTES",
+    };
+
+    const parentHref = raw.parentSchemaId
+      ? `/catalog/${raw.parentSchemaId}/tables/${raw.parentEntityId}`
+      : null;
+
+    const groups = [
+      {
+        id: "parentTable",
+        label: "Parent Table",
+        color: "#201C55",
+        items: [{
+          id: String(raw.parentEntityId),
+          label: raw.parentEntityName,
+          meta: raw.parentSchemaName ?? undefined,
+          href: parentHref ?? undefined,
+        }],
+      },
+      {
+        id: "terms",
+        label: "Business Terms",
+        color: "#7c3aed",
+        items: termRows.map((r) => ({ id: String(r.id), label: r.label, meta: r.meta ?? undefined })),
+      },
+      {
+        id: "tags",
+        label: "Tags",
+        color: "#3b82f6",
+        items: tagRows.map((r) => ({ id: String(r.id), label: r.label, meta: r.meta ?? undefined })),
+      },
+      {
+        id: "dq",
+        label: "DQ Rules",
+        color: "#f59e0b",
+        items: dqRows.map((r) => ({ id: String(r.id), label: r.label, meta: r.meta ?? undefined })),
+      },
+      {
+        id: "requests",
+        label: "Requests",
+        color: "#ef4444",
+        items: requestRows.map((r) => ({
+          id: String(r.id), label: r.label, meta: r.meta ?? undefined,
+          href: `/requests/${r.requestId}`,
+        })),
+      },
+    ];
+
+    return NextResponse.json({ asset, groups });
+  }
+
+  // ── Table-level mindmap (DATA_ENTITIES) ────────────────────────────────────
   const [entityRows, termRows, tagRows, dqRows, requestRows, stewardRows, lineageRows] =
     await Promise.all([
       sql<{ id: number; name: string; rowCount: number | null; isView: boolean; description: string | null }[]>`
@@ -143,9 +274,7 @@ export async function GET(req: Request) {
       label: "Requests",
       color: "#ef4444",
       items: requestRows.map((r) => ({
-        id: String(r.id),
-        label: r.label,
-        meta: r.meta ?? undefined,
+        id: String(r.id), label: r.label, meta: r.meta ?? undefined,
         href: `/requests/${r.requestId}`,
       })),
     },
@@ -160,9 +289,7 @@ export async function GET(req: Request) {
       label: "Lineage",
       color: "#6366f1",
       items: lineageRows.map((r) => ({
-        id: String(r.id),
-        label: r.label ?? "Unknown",
-        meta: r.direction,
+        id: String(r.id), label: r.label ?? "Unknown", meta: r.direction,
       })),
     },
   ];

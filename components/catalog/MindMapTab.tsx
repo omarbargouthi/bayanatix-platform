@@ -42,6 +42,7 @@ type MindMapData = {
     rowCount: number | null;
     isView: boolean;
     description: string | null;
+    assetType?: string;
   };
   groups: MindMapGroup[];
 };
@@ -52,6 +53,8 @@ type CenterNodeData = {
   name: string;
   rowCount: number | null;
   isView: boolean;
+  assetType?: string;
+  description?: string | null;
 };
 
 type GroupNodeData = {
@@ -74,18 +77,25 @@ type ItemNodeData = {
 // ── Group icons ────────────────────────────────────────────────────────────────
 
 const GROUP_ICONS: Record<string, string> = {
-  terms:    "📖",
-  tags:     "🏷️",
-  dq:       "✓",
-  requests: "🎫",
-  stewards: "👤",
-  lineage:  "⛓️",
+  terms:       "📖",
+  tags:        "🏷️",
+  dq:          "✓",
+  requests:    "🎫",
+  stewards:    "👤",
+  lineage:     "⛓️",
+  parentTable: "🗄️",
 };
 
 // ── Custom node: Center asset ──────────────────────────────────────────────────
 
 function CenterNode({ data }: NodeProps) {
   const d = data as unknown as CenterNodeData;
+  const isColumn = d.assetType === "DATA_ATTRIBUTES";
+  const icon = isColumn ? "📊" : "🗄️";
+  const badge = isColumn ? "Column" : d.isView ? "View" : "Table";
+  const badgeBg    = isColumn ? "#ede9fe" : d.isView ? "#e0e7ff" : "#f0fdf4";
+  const badgeColor = isColumn ? "#6d28d9" : d.isView ? "#4338ca" : "#166534";
+
   return (
     <div
       style={{ borderColor: "#201C55", width: 160 }}
@@ -93,7 +103,7 @@ function CenterNode({ data }: NodeProps) {
     >
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <div className="text-lg mb-1">🗄️</div>
+      <div className="text-lg mb-1">{icon}</div>
       <div className="font-bold text-[13px] text-[#201C55] truncate" title={d.name}>
         {d.name}
       </div>
@@ -102,11 +112,14 @@ function CenterNode({ data }: NodeProps) {
           {d.rowCount.toLocaleString()} rows
         </div>
       )}
+      {isColumn && d.description && (
+        <div className="text-[10px] text-gray-500 mt-0.5 font-mono">{d.description}</div>
+      )}
       <div
         className="mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block"
-        style={{ background: d.isView ? "#e0e7ff" : "#f0fdf4", color: d.isView ? "#4338ca" : "#166534" }}
+        style={{ background: badgeBg, color: badgeColor }}
       >
-        {d.isView ? "View" : "Table"}
+        {badge}
       </div>
     </div>
   );
@@ -205,6 +218,8 @@ function buildNodesAndEdges(
       name: data.asset.name,
       rowCount: data.asset.rowCount,
       isView: data.asset.isView,
+      assetType: data.asset.assetType,
+      description: data.asset.description,
     } as unknown as Record<string, unknown>,
   });
 
@@ -294,9 +309,11 @@ function buildNodesAndEdges(
 function MindMapInner({
   assetId,
   assetType,
+  height = 600,
 }: {
   assetId: number;
   assetType: string;
+  height?: number;
 }) {
   const [data, setData] = useState<MindMapData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -378,7 +395,7 @@ function MindMapInner({
   }
 
   return (
-    <div className="w-full rounded-xl overflow-hidden border border-line" style={{ height: 600 }}>
+    <div className="w-full rounded-xl overflow-hidden border border-line" style={{ height }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -406,10 +423,12 @@ export function MindMapTab({
   assetId,
   assetType,
   entityName,
+  height,
 }: {
   assetId: number;
   assetType: string;
   entityName: string;
+  height?: number;
 }) {
   return (
     <div className="space-y-3">
@@ -420,7 +439,7 @@ export function MindMapTab({
         <p className="text-[11px] text-muted">Click a group to expand its items</p>
       </div>
       <ReactFlowProvider>
-        <MindMapInner assetId={assetId} assetType={assetType} />
+        <MindMapInner assetId={assetId} assetType={assetType} height={height} />
       </ReactFlowProvider>
     </div>
   );

@@ -8,6 +8,7 @@ import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { GlossaryTermPicker } from "./GlossaryTermPicker";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
+import { MindMapTab } from "./MindMapTab";
 import { useLang } from "@/lib/lang-context";
 
 // ── Column chooser definitions ──────────────────────────────────────────────
@@ -160,8 +161,9 @@ type TagRow   = { tagId: number; tagName: string; colorHex: string };
 type TermRow  = { glossaryId: number; termName: string; domainName: string | null; isPii: boolean; termRole: string };
 
 function ColumnDetail({ attr, onEdit }: { attr: DataAttribute; onEdit: () => void }) {
-  const [tags,       setTags]       = useState<TagRow[]  | null>(null);
-  const [enrichment, setEnrichment] = useState<TermRow[] | null>(null);
+  const [tags,            setTags]            = useState<TagRow[]  | null>(null);
+  const [enrichment,      setEnrichment]      = useState<TermRow[] | null>(null);
+  const [showRelationships, setShowRelationships] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -282,9 +284,32 @@ function ColumnDetail({ attr, onEdit }: { attr: DataAttribute; onEdit: () => voi
           )}
       </div>
 
-      <div className="flex justify-end pt-1">
+      {/* Action row */}
+      <div className="flex items-center justify-between pt-1">
+        <button
+          onClick={() => setShowRelationships((v) => !v)}
+          className={`btn btn-sm flex items-center gap-1.5 ${showRelationships ? "bg-brand-purple/10 border-brand-purple/40 text-brand-purple" : ""}`}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
+            <line x1="12" y1="8" x2="5.5" y2="16"/><line x1="12" y1="8" x2="18.5" y2="16"/>
+          </svg>
+          {showRelationships ? "Hide Relationships" : "View Relationships"}
+        </button>
         <button onClick={onEdit} className="btn btn-sm btn-primary">Edit Column</button>
       </div>
+
+      {/* Inline relationship diagram */}
+      {showRelationships && (
+        <div className="mt-2 -mx-6 -mb-4 border-t border-line pt-4 px-6 pb-4">
+          <MindMapTab
+            assetId={attr.attributeId}
+            assetType="DATA_ATTRIBUTES"
+            entityName={attr.physicalName}
+            height={450}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -469,21 +494,21 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
             {/* Main row */}
             <div
               style={{ gridTemplateColumns: gridTemplate }}
-              className="grid gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors cursor-pointer"
+              className="grid gap-3 px-5 py-3.5 items-start text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors cursor-pointer"
               onClick={() => toggleExpand(a.attributeId)}
             >
-              {/* Expand chevron */}
-              <div className="flex items-center justify-center">
+              {/* Expand chevron — top-aligned with a nudge */}
+              <div className="flex items-center justify-center pt-0.5">
                 <svg
                   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                  className={`text-muted transition-transform ${expandedId === a.attributeId ? "rotate-90" : ""}`}
+                  className={`text-muted transition-transform shrink-0 ${expandedId === a.attributeId ? "rotate-90" : ""}`}
                 >
                   <path d="M9 18l6-6-6-6"/>
                 </svg>
               </div>
 
               {/* PK / FK indicator */}
-              <div>
+              <div className="pt-0.5">
                 {a.isPrimaryKey ? (
                   <span className="w-[22px] h-[22px] grid place-items-center bg-brand-purple/10 text-brand-purple rounded text-[10px] font-bold">PK</span>
                 ) : a.physicalName.endsWith("_id") ? (
@@ -491,30 +516,32 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                 ) : null}
               </div>
 
-              {/* Dynamic columns */}
+              {/* Dynamic columns — every cell needs min-w-0 to honour fr widths */}
               {activeColDefs.map((col) => {
                 switch (col.id) {
                   case "name":
                     return (
-                      <div key="name">
+                      <div key="name" className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-brand-deep">{a.physicalName}</span>
-                          {a.isEncrypted && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">🔒 Enc</span>}
-                          {a.columnType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>}
-                          {a.classTermIsPii && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">PII</span>}
+                          <span className="font-semibold text-brand-deep truncate">{a.physicalName}</span>
+                          {a.isEncrypted && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">🔒 Enc</span>}
+                          {a.columnType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>}
+                          {a.classTermIsPii && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 shrink-0">PII</span>}
                         </div>
-                        <div className="text-[11px] text-muted truncate">{a.description ?? a.sourceDescription ?? a.friendlyName ?? "—"}</div>
+                        <div className="text-[11px] text-muted mt-0.5 line-clamp-2 break-words">
+                          {a.description ?? a.sourceDescription ?? a.friendlyName ?? "—"}
+                        </div>
                       </div>
                     );
                   case "type":
-                    return <div key="type" className="font-mono text-[12px] text-ink-soft">{a.dataType}</div>;
+                    return <div key="type" className="min-w-0 font-mono text-[12px] text-ink-soft truncate">{a.dataType}</div>;
                   case "nullpct":
-                    return <div key="nullpct">{a.nullPercentage != null ? `${Number(a.nullPercentage).toFixed(1)}%` : "—"}</div>;
+                    return <div key="nullpct" className="min-w-0">{a.nullPercentage != null ? `${Number(a.nullPercentage).toFixed(1)}%` : "—"}</div>;
                   case "sensitivity":
-                    return <div key="sensitivity"><ClassificationTag code={a.classificationCode} /></div>;
+                    return <div key="sensitivity" className="min-w-0"><ClassificationTag code={a.classificationCode} /></div>;
                   case "glossary":
                     return (
-                      <div key="glossary" className="space-y-1">
+                      <div key="glossary" className="min-w-0 space-y-1">
                         {a.glossaryTerm ? <Tag variant="blue">{a.glossaryTerm}</Tag> : <span className="text-muted">—</span>}
                         {a.retentionCategoryName && (
                           <div className="flex items-center gap-1 text-[9px] text-brand-purple font-medium">
@@ -526,7 +553,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                     );
                   case "quality":
                     return (
-                      <div key="quality">
+                      <div key="quality" className="min-w-0">
                         {a.qualityScore != null ? (
                           <div>
                             <div className={`text-sm font-bold ${Number(a.qualityScore) >= 90 ? "text-emerald-600" : Number(a.qualityScore) >= 70 ? "text-amber-600" : "text-red-600"}`}>
@@ -543,10 +570,10 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                       </div>
                     );
                   case "friendly":
-                    return <div key="friendly" className="text-[12px] text-ink-soft truncate">{a.friendlyName ?? <span className="text-muted">—</span>}</div>;
+                    return <div key="friendly" className="min-w-0 text-[12px] text-ink-soft truncate">{a.friendlyName ?? <span className="text-muted">—</span>}</div>;
                   case "coltype":
                     return (
-                      <div key="coltype">
+                      <div key="coltype" className="min-w-0">
                         {a.columnType
                           ? <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>
                           : <span className="text-muted">—</span>}
@@ -554,7 +581,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                     );
                   case "encrypted":
                     return (
-                      <div key="encrypted">
+                      <div key="encrypted" className="min-w-0">
                         {a.isEncrypted
                           ? <span className="text-[11px] font-bold text-amber-700">🔒 Yes</span>
                           : <span className="text-muted text-[12px]">—</span>}
@@ -562,7 +589,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                     );
                   case "pii":
                     return (
-                      <div key="pii">
+                      <div key="pii" className="min-w-0">
                         {a.classTermIsPii
                           ? <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">Yes</span>
                           : a.classTermName
@@ -572,7 +599,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                     );
                   case "picategory":
                     return (
-                      <div key="picategory" className="text-[12px] text-ink-soft truncate">
+                      <div key="picategory" className="min-w-0 text-[12px] text-ink-soft truncate">
                         {a.classTermPiCategoryName ?? <span className="text-muted">—</span>}
                       </div>
                     );
@@ -583,7 +610,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
 
               {/* Edit button */}
               {canEdit && (
-                <div onClick={(e) => e.stopPropagation()}>
+                <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
                   <button
                     onClick={() => setEditing(a)}
                     className="w-7 h-7 grid place-items-center rounded hover:bg-brand-purple/10 text-muted hover:text-brand-purple transition-colors"
