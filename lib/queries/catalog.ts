@@ -83,8 +83,15 @@ export async function getSchemaById(schemaId: number): Promise<
       (select count(*)::int
          from bayanat.data_attributes a
          join bayanat.data_entities e2 on e2.entity_id = a.entity_id
+         join bayanat.asset_business_terms abt
+           on abt.asset_type_code = 'DATA_ATTRIBUTES'
+          and abt.asset_id = a.attribute_id
+          and abt.term_role = 'CLASSIFICATION'
+         join bayanat.business_glossaries bg
+           on bg.glossary_id = abt.glossary_id
         where e2.schema_id = s.schema_id
-          and a.glossary_term_text is not null) as "cdeCount"
+          and bg.classification_code in ('CONFIDENTIAL','SECRET','TOP_SECRET')
+       ) as "cdeCount"
     from bayanat.data_schemas s
     left join bayanat.data_sources ds on ds.data_source_id = s.data_source_id
     where s.schema_id = ${schemaId}
@@ -621,6 +628,66 @@ export async function setAssetTags(assetType: string, assetId: number, tagIds: n
       ON CONFLICT DO NOTHING
     `;
   }
+}
+
+// ----- Classification stats (for /classification page) -----
+
+export type ClassificationStats = {
+  total:       number;
+  classified:  number;
+  unclassified:number;
+  cde:         number;
+  pii:         number;
+  business:    number;
+  technical:   number;
+  byPiCategory: { name: string; count: number }[];
+};
+
+export async function getClassificationStats(): Promise<ClassificationStats> {
+  const [row] = await sql<{
+    total: number; classified: number; cde: number; pii: number;
+    business: number; technical: number;
+  }[]>`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(abt.glossary_id)::int AS classified,
+      COUNT(CASE WHEN bg.classification_code IN ('CONFIDENTIAL','SECRET','TOP_SECRET') THEN 1 END)::int AS cde,
+      COUNT(CASE WHEN bg.is_pii_indicator = true THEN 1 END)::int AS pii,
+      COUNT(CASE WHEN a.attribute_class_code = 'BUSINESS'  THEN 1 END)::int AS business,
+      COUNT(CASE WHEN a.attribute_class_code = 'TECHNICAL' THEN 1 END)::int AS technical
+    FROM bayanat.data_attributes a
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES'
+     AND abt.asset_id = a.attribute_id
+     AND abt.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+  `;
+
+  const piRows = await sql<{ name: string; count: number }[]>`
+    SELECT pct.category_name_text AS name, COUNT(*)::int AS count
+    FROM bayanat.data_attributes a
+    JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES'
+     AND abt.asset_id = a.attribute_id
+     AND abt.term_role = 'CLASSIFICATION'
+    JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    JOIN bayanat.pi_category_types pct ON pct.category_code = bg.pi_category_code
+    WHERE bg.pi_category_code IS NOT NULL
+    GROUP BY pct.category_name_text
+    ORDER BY COUNT(*) DESC
+    LIMIT 6
+  `;
+
+  return {
+    total:        Number(row?.total        ?? 0),
+    classified:   Number(row?.classified   ?? 0),
+    unclassified: Number(row?.total ?? 0) - Number(row?.classified ?? 0),
+    cde:          Number(row?.cde          ?? 0),
+    pii:          Number(row?.pii          ?? 0),
+    business:     Number(row?.business     ?? 0),
+    technical:    Number(row?.technical    ?? 0),
+    byPiCategory: piRows.map((r) => ({ name: r.name, count: Number(r.count) })),
+  };
 }
 
 // ----- Glossaries (top-level domains) -----

@@ -385,7 +385,8 @@ export type RequestTypeCode =
   | "CERTIFY_ASSET"
   | "GRANT_ACCESS"
   | "REMOVE_ACCESS"
-  | "OTHER";
+  | "OTHER"
+  | "CLASSIFY_ASSET";
 
 export type RequestPriority = "HIGH" | "MEDIUM" | "LOW";
 export type RequestStatus   = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";

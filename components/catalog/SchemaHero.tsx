@@ -161,14 +161,17 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
             </div>
           </div>
 
-          {/* CDEs tile */}
-          <div className="bg-white/70 border border-white rounded-xl px-5 py-4 text-center shadow-sm">
-            <div className="text-3xl font-extrabold text-brand-purple leading-none mb-1">
+          {/* CDEs tile — links to classification page with CDE filter */}
+          <Link
+            href="/classification?filter=cde"
+            className="bg-white/70 border border-white rounded-xl px-5 py-4 text-center shadow-sm hover:bg-brand-purple/10 hover:border-brand-purple/30 transition-colors group"
+          >
+            <div className="text-3xl font-extrabold text-brand-purple leading-none mb-1 group-hover:text-brand-deep transition-colors">
               {(schema.cdeCount ?? 0).toLocaleString()}
             </div>
             <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{c.cdes}</div>
-            <div className="text-[11px] text-muted mt-1">{c.businessLinked}</div>
-          </div>
+            <div className="text-[11px] text-brand-purple/70 mt-1 font-medium">View all CDEs →</div>
+          </Link>
 
           {/* Tables tile */}
           <div className="bg-white/70 border border-white rounded-xl px-5 py-4 text-center shadow-sm">
