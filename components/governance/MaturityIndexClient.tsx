@@ -19,15 +19,8 @@ function hasArabic(text: string): boolean {
 }
 
 function deriveStandard(req: ComplianceRequirement): string {
-  const code = req.reqCode ?? "";
-  const m = code.match(/^([A-Z]+-\d+)/);
-  if (m) return m[1];
-  const firstDot = code.indexOf(".");
-  const dotIdx = code.indexOf(".", firstDot + 1);
-  if (firstDot > 0) {
-    return dotIdx > 0 ? code.slice(0, dotIdx) : code.slice(0, firstDot + 2);
-  }
-  if (req.standard?.trim() && !hasArabic(req.standard)) return req.standard.trim();
+  if (req.standard?.trim()) return req.standard.trim();
+  if (req.standardCode?.trim()) return req.standardCode.trim();
   return req.domainCode ?? "General";
 }
 
@@ -39,11 +32,33 @@ function complianceTypeLabel(raw: string | null | undefined) {
   return { label: isCompliance ? "Compliance" : "Maturity", isCompliance };
 }
 
+const LEVEL_DOT: Record<number, string> = {
+  0: "bg-slate-400",
+  1: "bg-red-400",
+  2: "bg-orange-400",
+  3: "bg-amber-500",
+  4: "bg-blue-500",
+  5: "bg-green-600",
+};
+
+const LEVEL_BAND: Record<number, string> = {
+  0: "bg-slate-50 text-slate-600",
+  1: "bg-red-50 text-red-700",
+  2: "bg-orange-50 text-orange-700",
+  3: "bg-amber-50 text-amber-800",
+  4: "bg-blue-50 text-blue-700",
+  5: "bg-green-50 text-green-800",
+};
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
   frameworks: ComplianceFramework[];
   users:      UserOption[];
 };
+
+type LevelGroup    = { levelNum: number; questions: ComplianceRequirement[] };
+type StandardGroup = { standard: string; levels: LevelGroup[] };
+type DomainGroup   = { domainCode: string; domainName: string; standards: StandardGroup[] };
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function MaturityIndexClient({ frameworks, users }: Props) {
@@ -55,28 +70,28 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
   const [loading,     setLoading]     = useState(false);
   const [translating, setTranslating] = useState(0);
   const [q,           setQ]           = useState("");
+  const [filterDomain, setFilterDomain] = useState("");
   const [editing,     setEditing]     = useState<ComplianceRequirement | null>(null);
   const [saving,      setSaving]      = useState(false);
 
-  // Filter state
-  const [filterDomain,   setFilterDomain]   = useState("");
-  const [filterStandard, setFilterStandard] = useState("");
-  const [filterCode,     setFilterCode]     = useState("");
-  const [filterLevel,    setFilterLevel]    = useState("");
+  // collapse state — keyed by domainCode / "domainCode::standard"
+  const [collapsedDomains,    setCollapsedDomains]    = useState<Set<string>>(new Set());
+  const [collapsedStandards,  setCollapsedStandards]  = useState<Set<string>>(new Set());
 
-  // Build domain display name map from domain config
   const domainNameMap = useMemo(() => {
     const map = new Map<string, string>();
     domainCfg.forEach(d => { if (d.domainCode) map.set(d.domainCode, d.nameEn); });
     return map;
   }, [domainCfg]);
 
-  // Load levelCfg + configItems + requirements + domainCfg when fwId changes
   useEffect(() => {
     if (!fwId) return;
     setLoading(true);
     setReqs(null);
     setQ("");
+    setFilterDomain("");
+    setCollapsedDomains(new Set());
+    setCollapsedStandards(new Set());
     Promise.all([
       fetch(`/api/governance/compliance/${fwId}/config`).then(r => r.json()),
       fetch(`/api/governance/compliance/${fwId}/config-items`).then(r => r.json()),
@@ -91,7 +106,7 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
     }).catch(() => setLoading(false));
   }, [fwId]);
 
-  // Auto-translate missing EN fields
+  // Auto-translate missing EN supporting evidence
   useEffect(() => {
     if (!reqs || reqs.length === 0) return;
     const missing = reqs.filter(
@@ -132,15 +147,14 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
     [cfgItems]
   );
 
-  // Derive unique filter options from loaded requirements
   const uniqueDomains = useMemo(() => {
     if (!reqs) return [];
     const seen = new Set<string>();
     const out: { value: string; label: string }[] = [];
     for (const r of reqs) {
-      const code = r.domainCode ?? "";
-      const label = r.domainCode
-        ? (domainNameMap.get(r.domainCode) ?? r.domainEn ?? r.domain ?? r.domainCode)
+      const code  = r.domainCode ?? "";
+      const label = code
+        ? (domainNameMap.get(code) ?? r.domainEn ?? r.domain ?? code)
         : (r.domainEn ?? r.domain ?? "");
       if (label && !seen.has(code || label)) {
         seen.add(code || label);
@@ -150,67 +164,81 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
     return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [reqs, domainNameMap]);
 
-  const uniqueStandards = useMemo(() => {
-    if (!reqs) return [];
-    const seen = new Set<string>();
-    for (const r of reqs) seen.add(deriveStandard(r));
-    return Array.from(seen).sort();
-  }, [reqs]);
-
-  const uniqueCodes = useMemo(() => {
-    if (!reqs) return [];
-    const seen = new Set<string>();
-    for (const r of reqs) {
-      const prefix = r.reqCode.split(".")[0];
-      if (prefix) seen.add(prefix);
-    }
-    return Array.from(seen).sort();
-  }, [reqs]);
-
-  const uniqueLevels = useMemo(() => {
-    if (!reqs) return [];
-    const seen = new Set<string>();
-    for (const r of reqs) {
-      const lv = r.maturityLevel;
-      if (lv != null && lv !== "") seen.add(String(lv));
-    }
-    return Array.from(seen).sort((a, b) => {
-      const na = parseInt(a, 10), nb = parseInt(b, 10);
-      return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb;
-    });
-  }, [reqs]);
-
-  const filtered = useMemo(() => {
+  // Build domain → standard → level → questions hierarchy
+  const grouped = useMemo<DomainGroup[]>(() => {
     if (!reqs) return [];
     const lq = q.toLowerCase();
-    return reqs.filter(r => {
+
+    const visible = reqs.filter(r => {
       if (lq && !(
-        r.reqCode.toLowerCase().includes(lq) ||
+        (r.questionEn ?? r.question ?? "").toLowerCase().includes(lq) ||
+        (r.reqCode ?? "").toLowerCase().includes(lq) ||
         (r.supportingEvidenceEn ?? r.supportingEvidence ?? "").toLowerCase().includes(lq) ||
-        (r.domainEn ?? r.domain ?? "").toLowerCase().includes(lq) ||
         deriveStandard(r).toLowerCase().includes(lq)
       )) return false;
-
       if (filterDomain) {
-        const domVal = r.domainCode
-          ? (domainNameMap.get(r.domainCode) ?? r.domainEn ?? r.domain ?? r.domainCode)
-          : (r.domainEn ?? r.domain ?? "");
-        const domKey = r.domainCode || domVal;
+        const domKey = r.domainCode || (r.domainEn ?? r.domain ?? "");
         if (domKey !== filterDomain) return false;
       }
-
-      if (filterStandard && deriveStandard(r) !== filterStandard) return false;
-
-      if (filterCode) {
-        const prefix = r.reqCode.split(".")[0];
-        if (prefix !== filterCode) return false;
-      }
-
-      if (filterLevel && String(r.maturityLevel) !== filterLevel) return false;
-
       return true;
     });
-  }, [reqs, q, filterDomain, filterStandard, filterCode, filterLevel, domainNameMap]);
+
+    // nested maps: domainCode → standard → levelNum → rows
+    const tree = new Map<string, {
+      domainName: string;
+      standards:  Map<string, Map<number, ComplianceRequirement[]>>;
+    }>();
+
+    for (const r of visible) {
+      const domCode  = r.domainCode ?? "";
+      const domName  = domCode
+        ? (domainNameMap.get(domCode) ?? r.domainEn ?? r.domain ?? domCode)
+        : (r.domainEn ?? r.domain ?? "Unknown Domain");
+      const std = deriveStandard(r);
+      const lvl = parseLevelNum(r.maturityLevel) ?? 0;
+
+      if (!tree.has(domCode)) tree.set(domCode, { domainName: domName, standards: new Map() });
+      const domNode = tree.get(domCode)!;
+      if (!domNode.standards.has(std)) domNode.standards.set(std, new Map());
+      const stdNode = domNode.standards.get(std)!;
+      if (!stdNode.has(lvl)) stdNode.set(lvl, []);
+      stdNode.get(lvl)!.push(r);
+    }
+
+    return Array.from(tree.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([domCode, { domainName, standards }]) => ({
+        domainCode: domCode,
+        domainName,
+        standards: Array.from(standards.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([standard, levMap]) => ({
+            standard,
+            levels: Array.from(levMap.entries())
+              .sort(([a], [b]) => a - b)
+              .map(([levelNum, questions]) => ({
+                levelNum,
+                questions: questions.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+              })),
+          })),
+      }));
+  }, [reqs, q, filterDomain, domainNameMap]);
+
+  function toggleDomain(code: string) {
+    setCollapsedDomains(prev => {
+      const next = new Set(prev);
+      next.has(code) ? next.delete(code) : next.add(code);
+      return next;
+    });
+  }
+
+  function toggleStandard(key: string) {
+    setCollapsedStandards(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
 
   async function saveEdit(req: ComplianceRequirement, updates: Partial<ComplianceRequirement>) {
     setSaving(true);
@@ -222,6 +250,10 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
     setSaving(false);
     setEditing(null);
   }
+
+  const totalVisible = grouped.reduce((s, dom) =>
+    s + dom.standards.reduce((s2, std) =>
+      s2 + std.levels.reduce((s3, lv) => s3 + lv.questions.length, 0), 0), 0);
 
   return (
     <div>
@@ -240,151 +272,186 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
         <div className="mb-6">
           <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-purple/10 text-brand-purple text-sm font-semibold">
             {frameworks[0].name}
-            {frameworks[0].version && <span className="text-brand-purple/60 font-normal">· {frameworks[0].version}</span>}
+            {frameworks[0].version && (
+              <span className="text-brand-purple/60 font-normal">· {frameworks[0].version}</span>
+            )}
           </span>
         </div>
       )}
 
-      {/* Search + filters bar */}
-      <div className="mb-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <input
-            value={q} onChange={e => setQ(e.target.value)}
-            className="field text-sm flex-1"
-            placeholder="Search by code, domain, standard, evidence…"
-          />
-          {translating > 0 && (
-            <span className="text-brand-purple animate-pulse text-[11px] shrink-0">
-              Translating {translating} missing EN fields…
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wide shrink-0">Filter:</span>
-
-          <select
-            value={filterDomain}
-            onChange={e => setFilterDomain(e.target.value)}
-            className="field text-sm py-1.5 w-auto min-w-[160px]"
+      {/* Search + filter */}
+      <div className="mb-5 flex items-center gap-3 flex-wrap">
+        <input
+          value={q} onChange={e => setQ(e.target.value)}
+          className="field text-sm flex-1 min-w-[220px]"
+          placeholder="Search questions, evidence codes, standards…"
+        />
+        <select
+          value={filterDomain}
+          onChange={e => setFilterDomain(e.target.value)}
+          className="field text-sm py-1.5 w-auto min-w-[180px]"
+        >
+          <option value="">All Domains</option>
+          {uniqueDomains.map(d => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
+        </select>
+        {(q || filterDomain) && (
+          <button
+            onClick={() => { setQ(""); setFilterDomain(""); }}
+            className="text-[11px] text-muted hover:text-brand-purple font-semibold"
           >
-            <option value="">All Domains</option>
-            {uniqueDomains.map(d => (
-              <option key={d.value} value={d.value}>{d.label}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterStandard}
-            onChange={e => setFilterStandard(e.target.value)}
-            className="field text-sm py-1.5 w-auto min-w-[140px]"
-          >
-            <option value="">All Standards</option>
-            {uniqueStandards.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterCode}
-            onChange={e => setFilterCode(e.target.value)}
-            className="field text-sm py-1.5 w-auto min-w-[130px]"
-          >
-            <option value="">All Codes</option>
-            {uniqueCodes.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterLevel}
-            onChange={e => setFilterLevel(e.target.value)}
-            className="field text-sm py-1.5 w-auto min-w-[130px]"
-          >
-            <option value="">All Levels</option>
-            {uniqueLevels.map(lv => {
-              const cfg = levelCfg.find(l => String(l.levelNum) === lv);
-              return (
-                <option key={lv} value={lv}>
-                  Level {lv}{cfg ? ` — ${cfg.name}` : ""}
-                </option>
-              );
-            })}
-          </select>
-
-          {(filterDomain || filterStandard || filterCode || filterLevel || q) && (
-            <button
-              onClick={() => { setFilterDomain(""); setFilterStandard(""); setFilterCode(""); setFilterLevel(""); setQ(""); }}
-              className="text-[11px] text-muted hover:text-brand-purple font-semibold"
-            >
-              Clear all
-            </button>
-          )}
-
-          <span className="ml-auto text-[11px] text-muted">
-            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+            Clear
+          </button>
+        )}
+        {translating > 0 && (
+          <span className="text-brand-purple animate-pulse text-[11px]">
+            Translating {translating} fields…
           </span>
-        </div>
+        )}
+        <span className="ml-auto text-[11px] text-muted">{totalVisible} questions</span>
       </div>
 
-      {loading && <div className="card p-8 text-center text-muted text-sm">Loading requirements…</div>}
+      {loading && (
+        <div className="card p-8 text-center text-muted text-sm">Loading requirements…</div>
+      )}
 
       {!loading && reqs !== null && (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1000px]">
-              <thead>
-                <tr className="border-b border-line bg-canvas-soft text-left">
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-28">Code</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24">Standard</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-44">Domain</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Supporting Evidence</th>
-                  <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-16">Level</th>
-                  <th className="px-3 py-2.5 w-12" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.slice(0, 200).map(req => {
-                  const evidenceEn = req.supportingEvidenceEn ?? req.questionEn ?? "";
-                  const needsTranslation = !req.supportingEvidenceEn && !!req.supportingEvidence && hasArabic(req.supportingEvidence);
-                  // Use domain config for display name
-                  const domainDisplay = req.domainCode
-                    ? (domainNameMap.get(req.domainCode) ?? req.domainEn ?? req.domain ?? "—")
-                    : (req.domainEn ?? req.domain ?? "—");
-                  return (
-                    <tr key={req.reqId} className="border-b border-line-soft hover:bg-canvas/30">
-                      <td className="px-3 py-2.5 font-mono text-[11px] font-bold text-muted">{req.reqCode}</td>
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{deriveStandard(req)}</td>
-                      <td className="px-3 py-2.5 text-[12px] text-ink">
-                        <div>{domainDisplay}</div>
-                        {req.domainCode && <div className="text-[10px] text-muted font-mono">{req.domainCode}</div>}
-                      </td>
-                      <td className="px-3 py-2.5 text-[12px] text-ink-soft max-w-[340px] truncate" title={evidenceEn || undefined}>
-                        {needsTranslation
-                          ? <span className="text-muted/50 italic text-[11px]">Translating…</span>
-                          : evidenceEn
-                            ? (evidenceEn.length > 90 ? evidenceEn.slice(0, 88) + "…" : evidenceEn)
-                            : <span className="text-muted/40 italic">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-[11px] text-muted">{req.maturityLevel ?? "—"}</td>
-                      <td className="px-3 py-2.5">
-                        <button onClick={() => setEditing(req)}
-                          className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold">Edit</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted italic">No requirements match.</td></tr>
+        <div className="space-y-3">
+          {grouped.length === 0 && (
+            <div className="card p-8 text-center text-muted text-sm italic">No requirements match.</div>
+          )}
+
+          {grouped.map(dom => {
+            const isDomOpen = !collapsedDomains.has(dom.domainCode);
+            const totalQs   = dom.standards.reduce((s, std) =>
+              s + std.levels.reduce((s2, lv) => s2 + lv.questions.length, 0), 0);
+
+            return (
+              <div key={dom.domainCode} className="border border-line rounded-xl overflow-hidden">
+
+                {/* ── Domain header ── */}
+                <button
+                  onClick={() => toggleDomain(dom.domainCode)}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-brand-deep/[0.06] hover:bg-brand-deep/10 text-left transition-colors"
+                >
+                  <svg
+                    className={`w-4 h-4 text-brand-deep/50 transition-transform shrink-0 ${isDomOpen ? "rotate-90" : ""}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span className="font-bold text-brand-deep text-sm">{dom.domainName}</span>
+                  {dom.domainCode && (
+                    <span className="text-[10px] font-mono text-brand-deep/60 bg-brand-deep/8 px-1.5 py-0.5 rounded">
+                      {dom.domainCode}
+                    </span>
+                  )}
+                  <span className="ml-auto text-[11px] text-muted shrink-0">
+                    {dom.standards.length} standard{dom.standards.length !== 1 ? "s" : ""} · {totalQs} question{totalQs !== 1 ? "s" : ""}
+                  </span>
+                </button>
+
+                {isDomOpen && (
+                  <div>
+                    {dom.standards.map((std, si) => {
+                      const stdKey    = `${dom.domainCode}::${std.standard}`;
+                      const isStdOpen = !collapsedStandards.has(stdKey);
+                      const stdQs     = std.levels.reduce((s, lv) => s + lv.questions.length, 0);
+
+                      return (
+                        <div key={std.standard} className={si > 0 ? "border-t border-line-soft" : ""}>
+
+                          {/* ── Standard header ── */}
+                          <button
+                            onClick={() => toggleStandard(stdKey)}
+                            className="w-full flex items-center gap-3 px-5 py-2.5 bg-canvas-soft hover:bg-canvas text-left transition-colors"
+                          >
+                            <svg
+                              className={`w-3.5 h-3.5 text-muted transition-transform shrink-0 ${isStdOpen ? "rotate-90" : ""}`}
+                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="font-mono text-[13px] font-bold text-ink">{std.standard}</span>
+                            <span className="ml-auto text-[11px] text-muted shrink-0">
+                              {stdQs} question{stdQs !== 1 ? "s" : ""}
+                            </span>
+                          </button>
+
+                          {isStdOpen && (
+                            <div className="border-t border-line-soft">
+                              {std.levels.map(lev => {
+                                const cfg  = levelCfg.find(l => l.levelNum === lev.levelNum);
+                                const dot  = LEVEL_DOT[lev.levelNum]  ?? "bg-slate-400";
+                                const band = LEVEL_BAND[lev.levelNum] ?? "bg-slate-50 text-slate-600";
+
+                                return (
+                                  <div key={lev.levelNum}>
+                                    {/* ── Level band ── */}
+                                    <div className={`flex items-center gap-2.5 px-6 py-1.5 border-b border-black/5 ${band}`}>
+                                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-black text-white shrink-0 ${dot}`}>
+                                        {lev.levelNum}
+                                      </span>
+                                      <span className="text-[11px] font-bold uppercase tracking-wide">
+                                        {cfg ? cfg.name : `Level ${lev.levelNum}`}
+                                      </span>
+                                      {cfg?.nameAr && (
+                                        <span className="text-[11px] opacity-60 ml-1" dir="rtl">
+                                          {cfg.nameAr}
+                                        </span>
+                                      )}
+                                      <span className="ml-auto text-[10px] opacity-50">
+                                        {lev.questions.length} question{lev.questions.length !== 1 ? "s" : ""}
+                                      </span>
+                                    </div>
+
+                                    {/* ── Questions ── */}
+                                    {lev.questions.map((req, qi) => {
+                                      const questionText = req.questionEn ?? req.question ?? "";
+                                      const evidenceSnip = req.supportingEvidenceEn ?? req.supportingEvidence ?? "";
+                                      return (
+                                        <div
+                                          key={req.reqId}
+                                          className={`flex items-start gap-3 px-6 py-3 bg-white hover:bg-canvas/50 ${qi < lev.questions.length - 1 ? "border-b border-line-soft/40" : ""}`}
+                                        >
+                                          {/* Evidence code badge */}
+                                          <span className="text-[10px] font-mono bg-muted/10 text-muted rounded px-1.5 py-0.5 shrink-0 mt-0.5 whitespace-nowrap">
+                                            {req.reqCode}
+                                          </span>
+
+                                          {/* Question + evidence snippet */}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-ink leading-snug">{questionText || <em className="text-muted/50">No question text</em>}</p>
+                                            {evidenceSnip && (
+                                              <p className="text-[11px] text-muted mt-0.5 line-clamp-1">
+                                                {evidenceSnip}
+                                              </p>
+                                            )}
+                                          </div>
+
+                                          <button
+                                            onClick={() => setEditing(req)}
+                                            className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold shrink-0 mt-0.5"
+                                          >
+                                            Edit
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-              </tbody>
-            </table>
-            {filtered.length > 200 && (
-              <div className="px-4 py-2 text-[11px] text-muted text-center border-t border-line">
-                Showing first 200 of {filtered.length}. Narrow your search to see more.
               </div>
-            )}
-          </div>
+            );
+          })}
         </div>
       )}
 
@@ -428,7 +495,7 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
   }
 
   const parsedInitLevel = parseLevelNum(req.maturityLevel);
-  const initCompCode = resolveComplianceCode(req.complianceOrMaturity);
+  const initCompCode    = resolveComplianceCode(req.complianceOrMaturity);
 
   const [v, setV] = useState({
     question:             req.question            ?? "",
@@ -447,22 +514,18 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
     managementSectorEn:   req.managementSectorEn   ?? "",
     directoryTypeEn:      req.directoryTypeEn      ?? "",
   });
-  // Separate state for the compliance type code (maps to label for saving)
   const [compCode, setCompCode] = useState(initCompCode);
 
   function set(k: keyof typeof v, val: string) { setV(p => ({ ...p, [k]: val })); }
 
-  // When compCode changes, update v.complianceOrMaturity to the English label (what DB stores)
   function handleCompCodeChange(code: string) {
     setCompCode(code);
     const item = complianceTypeItems.find(i => i.code === code);
     setV(p => ({ ...p, complianceOrMaturity: item?.label ?? code }));
   }
 
-  // Selected compliance type item for AR display
   const selectedCompItem = complianceTypeItems.find(i => i.code === compCode);
-  // Selected level config for AR name display
-  const selectedLevel = levelCfg.find(lc => String(lc.levelNum) === v.maturityLevel);
+  const selectedLevel    = levelCfg.find(lc => String(lc.levelNum) === v.maturityLevel);
 
   function save() {
     const original = {
@@ -498,13 +561,11 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
           <button onClick={onClose} className="text-muted hover:text-ink text-xl">×</button>
         </div>
         <div className="px-6 py-5 space-y-5">
-          {/* Column headers */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-b border-line pb-2 mb-1">
             <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide">English (EN)</div>
             <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide text-right" dir="rtl">العربية (AR)</div>
           </div>
 
-          {/* Bilingual text fields */}
           {bilingualFields.map(([labelEn, labelAr, keyEn, keyAr]) => (
             <div key={keyEn} className="grid grid-cols-2 gap-x-4">
               <div>
@@ -518,14 +579,12 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
             </div>
           ))}
 
-          {/* Other fields */}
           <div className="border-t border-line pt-4 space-y-4">
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">Evidence Code</label>
               <input value={v.directoryCode} onChange={e => set("directoryCode", e.target.value)} className="field text-sm w-full" />
             </div>
 
-            {/* Compliance or Maturity — bilingual display */}
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">Compliance or Maturity</label>
               <div className="grid grid-cols-2 gap-x-4">
@@ -552,7 +611,6 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
               </div>
             </div>
 
-            {/* Maturity Level — bilingual display */}
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">Maturity Level</label>
               <div className="grid grid-cols-2 gap-x-4">

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { DataAttribute } from "@/lib/types";
 import { Tag, ClassificationTag } from "@/components/ui/Tag";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
-import { GlossaryTermPicker } from "./GlossaryTermPicker";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
 import { MindMapTab } from "./MindMapTab";
@@ -15,25 +14,36 @@ import { useLang } from "@/lib/lang-context";
 
 type GridColId =
   | "name" | "type" | "nullpct" | "sensitivity" | "glossary" | "quality"
-  | "friendly" | "coltype" | "encrypted" | "pii" | "picategory";
+  | "friendly" | "coltype" | "encrypted" | "pii" | "picategory" | "cde"
+  | "classTerm" | "enrichTerms";
 
 type GridColDef = { id: GridColId; label: string; width: string; defaultOn: boolean };
 
 const ALL_GRID_COLS: GridColDef[] = [
-  { id: "name",        label: "Column",        width: "1.6fr", defaultOn: true  },
-  { id: "type",        label: "Data Type",     width: "1fr",   defaultOn: true  },
-  { id: "nullpct",     label: "Null %",        width: "0.8fr", defaultOn: true  },
-  { id: "sensitivity", label: "Sensitivity",   width: "1.1fr", defaultOn: true  },
-  { id: "glossary",    label: "Glossary Term", width: "1fr",   defaultOn: true  },
-  { id: "quality",     label: "Quality",       width: "0.9fr", defaultOn: true  },
-  { id: "friendly",    label: "Friendly Name", width: "1fr",   defaultOn: false },
-  { id: "coltype",     label: "Column Type",   width: "0.9fr", defaultOn: false },
-  { id: "encrypted",   label: "Encrypted",     width: "0.8fr", defaultOn: false },
-  { id: "pii",         label: "PII",           width: "0.7fr", defaultOn: false },
-  { id: "picategory",  label: "PI Category",   width: "1fr",   defaultOn: false },
+  { id: "name",        label: "Column",               width: "1.6fr", defaultOn: true  },
+  { id: "type",        label: "Data Type",            width: "1fr",   defaultOn: true  },
+  { id: "nullpct",     label: "Null %",               width: "0.8fr", defaultOn: true  },
+  { id: "sensitivity", label: "Classification",        width: "1.1fr", defaultOn: true  },
+  { id: "cde",         label: "CDE",                  width: "0.7fr", defaultOn: true  },
+  { id: "classTerm",   label: "Classification Term",  width: "1.2fr", defaultOn: true  },
+  { id: "enrichTerms", label: "Context Enrichment",   width: "1.3fr", defaultOn: false },
+  { id: "glossary",    label: "Glossary Term",        width: "1fr",   defaultOn: false },
+  { id: "quality",     label: "Quality",              width: "0.9fr", defaultOn: true  },
+  { id: "friendly",    label: "Friendly Name",        width: "1fr",   defaultOn: false },
+  { id: "coltype",     label: "Column Type",          width: "0.9fr", defaultOn: false },
+  { id: "encrypted",   label: "Encrypted",            width: "0.8fr", defaultOn: false },
+  { id: "pii",         label: "PII",                  width: "0.7fr", defaultOn: false },
+  { id: "picategory",  label: "PI Category",          width: "1fr",   defaultOn: false },
 ];
 
-const LS_KEY = "bayanatix_col_prefs_v1";
+// CDE = Critical Data Element: column is CDE when classified as Confidential, Secret, or Top Secret
+const CDE_CODES = new Set(["CONFIDENTIAL", "SECRET", "TOP_SECRET"]);
+function isCde(attr: import("@/lib/types").DataAttribute): boolean {
+  const code = (attr.classTermClassCode ?? attr.classificationCode ?? "").toUpperCase();
+  return CDE_CODES.has(code);
+}
+
+const LS_KEY = "bayanatix_col_prefs_v3";
 const DEFAULT_COLS: GridColId[] = ALL_GRID_COLS.filter((c) => c.defaultOn).map((c) => c.id);
 
 function loadColPrefs(): GridColId[] {
@@ -155,10 +165,37 @@ function ColumnChooser({
   );
 }
 
+// ── Enrichment terms grid cell (lazy-loaded) ────────────────────────────────
+
+type TermRow = { glossaryId: number; termName: string; domainName: string | null; isPii: boolean; termRole: string };
+
+function EnrichmentTermsCell({ attributeId }: { attributeId: number }) {
+  const [terms, setTerms] = useState<TermRow[] | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/assets/DATA_ATTRIBUTES/${attributeId}/terms`)
+      .then((r) => r.json())
+      .then((data: TermRow[]) => setTerms(data.filter((t) => t.termRole === "ENRICHMENT")));
+  }, [attributeId]);
+
+  if (terms === null) return <span className="text-muted text-[11px]">…</span>;
+  if (terms.length === 0) return <span className="text-muted">—</span>;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {terms.map((t) => (
+        <span key={t.glossaryId} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-brand-purple/10 text-brand-deep border border-brand-purple/20">
+          {t.termName}
+          {t.isPii && <span className="text-[9px] font-bold text-red-600 ml-0.5">PII</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Expanded column detail panel ────────────────────────────────────────────
 
-type TagRow   = { tagId: number; tagName: string; colorHex: string };
-type TermRow  = { glossaryId: number; termName: string; domainName: string | null; isPii: boolean; termRole: string };
+type TagRow = { tagId: number; tagName: string; colorHex: string };
 
 function ColumnDetail({ attr, onEdit }: { attr: DataAttribute; onEdit: () => void }) {
   const [tags,            setTags]            = useState<TagRow[]  | null>(null);
@@ -231,6 +268,12 @@ function ColumnDetail({ attr, onEdit }: { attr: DataAttribute; onEdit: () => voi
               <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">PII</span>
               {attr.classTermIsPii
                 ? <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">Yes</span>
+                : <span className="text-sm text-muted">No</span>}
+            </div>
+            <div>
+              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">CDE</span>
+              {isCde(attr)
+                ? <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5">Yes — Critical Data Element</span>
                 : <span className="text-sm text-muted">No</span>}
             </div>
             <div>
@@ -324,7 +367,6 @@ function AttributeEditModal({ attr, onClose }: { attr: DataAttribute; onClose: (
   const [friendlyName, setFriendlyName] = useState(attr.friendlyName ?? "");
   const [isEncrypted,  setIsEncrypted]  = useState(attr.isEncrypted  ?? false);
   const [columnType,   setColumnType]   = useState(attr.columnType   ?? "");
-  const [glossaryTerm, setGlossaryTerm] = useState(attr.glossaryTerm ?? "");
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState<string | null>(null);
   const [showHistory,  setShowHistory]  = useState(false);
@@ -340,7 +382,7 @@ function AttributeEditModal({ attr, onClose }: { attr: DataAttribute; onClose: (
     try {
       const r = await fetch(`/api/catalog/attributes/${attr.attributeId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, friendlyName, isEncrypted, columnType: columnType || null, glossaryTerm }),
+        body: JSON.stringify({ description, friendlyName, isEncrypted, columnType: columnType || null }),
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({ error: "Unknown error" }));
@@ -378,15 +420,9 @@ function AttributeEditModal({ attr, onClose }: { attr: DataAttribute; onClose: (
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="field-label">{c.editFriendlyName}</label>
-                <input type="text" value={friendlyName} onChange={(e) => setFriendlyName(e.target.value)} className="input-field" placeholder="e.g. Customer Identifier" />
-              </div>
-              <div>
-                <label className="field-label">{c.colBusinessTerm}</label>
-                <GlossaryTermPicker value={glossaryTerm} onChange={setGlossaryTerm} />
-              </div>
+            <div>
+              <label className="field-label">{c.editFriendlyName}</label>
+              <input type="text" value={friendlyName} onChange={(e) => setFriendlyName(e.target.value)} className="input-field" placeholder="e.g. Customer Identifier" />
             </div>
 
             <div className="grid grid-cols-2 gap-4 items-end">
@@ -527,6 +563,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                           {a.isEncrypted && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">🔒 Enc</span>}
                           {a.columnType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>}
                           {a.classTermIsPii && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 shrink-0">PII</span>}
+                          {isCde(a) && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 shrink-0">CDE</span>}
                         </div>
                         <div className="text-[11px] text-muted mt-0.5 line-clamp-2 break-words">
                           {a.description ?? a.sourceDescription ?? a.friendlyName ?? "—"}
@@ -538,7 +575,19 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                   case "nullpct":
                     return <div key="nullpct" className="min-w-0">{a.nullPercentage != null ? `${Number(a.nullPercentage).toFixed(1)}%` : "—"}</div>;
                   case "sensitivity":
-                    return <div key="sensitivity" className="min-w-0"><ClassificationTag code={a.classificationCode} /></div>;
+                    return <div key="sensitivity" className="min-w-0"><ClassificationTag code={a.classTermClassCode ?? a.classificationCode} /></div>;
+                  case "classTerm":
+                    return (
+                      <div key="classTerm" className="min-w-0 text-[12px] text-ink-soft truncate">
+                        {a.classTermName ?? <span className="text-muted">—</span>}
+                      </div>
+                    );
+                  case "enrichTerms":
+                    return (
+                      <div key="enrichTerms" className="min-w-0">
+                        <EnrichmentTermsCell attributeId={a.attributeId} />
+                      </div>
+                    );
                   case "glossary":
                     return (
                       <div key="glossary" className="min-w-0 space-y-1">
@@ -601,6 +650,18 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                     return (
                       <div key="picategory" className="min-w-0 text-[12px] text-ink-soft truncate">
                         {a.classTermPiCategoryName ?? <span className="text-muted">—</span>}
+                      </div>
+                    );
+                  case "cde":
+                    return (
+                      <div key="cde" className="min-w-0">
+                        {isCde(a) ? (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">CDE</span>
+                        ) : a.classTermClassCode || a.classificationCode ? (
+                          <span className="text-muted text-[12px]">No</span>
+                        ) : (
+                          <span className="text-muted text-[12px]">—</span>
+                        )}
                       </div>
                     );
                   default:

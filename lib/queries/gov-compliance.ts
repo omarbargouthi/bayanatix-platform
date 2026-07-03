@@ -418,7 +418,7 @@ export async function clearAssessmentsAboveLevel(
       SELECT req_id FROM bayanat.gov_compliance_requirements
       WHERE framework_id = ${frameworkId}
         AND standard    = ${standardCode}
-        AND CAST(COALESCE(NULLIF(SUBSTRING(COALESCE(maturity_level,'') FROM '\d+'), ''), '0') AS INTEGER)
+        AND CAST(COALESCE(NULLIF(SUBSTRING(COALESCE(maturity_level,'') FROM '[0-9]+'), ''), '0') AS INTEGER)
             > ${keepUpToLevel}
     )
   `;
@@ -428,7 +428,7 @@ export async function clearAssessmentsAboveLevel(
       SELECT req_id FROM bayanat.gov_compliance_requirements
       WHERE framework_id = ${frameworkId}
         AND standard    = ${standardCode}
-        AND CAST(COALESCE(NULLIF(SUBSTRING(COALESCE(maturity_level,'') FROM '\d+'), ''), '0') AS INTEGER)
+        AND CAST(COALESCE(NULLIF(SUBSTRING(COALESCE(maturity_level,'') FROM '[0-9]+'), ''), '0') AS INTEGER)
             > ${keepUpToLevel}
     )
   `;

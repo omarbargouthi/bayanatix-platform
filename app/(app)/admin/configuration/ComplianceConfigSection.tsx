@@ -541,7 +541,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
   }
 
   // Total weight display
-  const totalWeight = rows.reduce((s, r) => s + (r.weight ?? 0), 0);
+  const totalWeight = rows.reduce((s, r) => s + Number(r.weight ?? 0), 0);
 
   return (
     <div>

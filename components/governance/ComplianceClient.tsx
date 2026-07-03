@@ -63,18 +63,8 @@ function parseLevelNum(ml: string | null): number | null {
   return n !== null && n >= 0 && n <= 5 ? n : null;
 }
 function deriveStandard(req: ComplianceRequirement): string {
-  // Always derive from req_code first to guarantee an English code (e.g. "DG-1-L1-01" → "DG-1")
-  const code = req.reqCode ?? "";
-  const m = code.match(/^([A-Z]+-\d+)/);
-  if (m) return m[1];
-  // Dot-separated code: "DG.1.L0.01" → "DG.1"
-  const dotIdx = code.indexOf(".", code.indexOf(".") + 1); // second dot
-  const firstDot = code.indexOf(".");
-  if (firstDot > 0) {
-    return dotIdx > 0 ? code.slice(0, dotIdx) : code.slice(0, firstDot + 2);
-  }
-  // Last resort: use req.standard only if it is not Arabic
-  if (req.standard?.trim() && !hasArabic(req.standard)) return req.standard.trim();
+  if (req.standard?.trim()) return req.standard.trim();
+  if (req.standardCode?.trim()) return req.standardCode.trim();
   return req.domainCode ?? "General";
 }
 function fmtDate(iso: string) {
@@ -330,32 +320,48 @@ export function ComplianceClient({
   // ── Level selection with smart warning ──────────────────────────────────────
   async function selectLevel(std: string, ln: number) {
     if (!fwId) return;
-    const existing = maturitySels[std];
-    if (existing !== undefined && ln < existing) {
-      // Going LOWER → warn user, clearing levels above will happen
+    // Warn if any row above ln already has a non-default status or attached file
+    const hasDataAbove = reqs.some((r) => {
+      if (deriveStandard(r) !== std) return false;
+      const lvl = parseLevelNum(r.maturityLevel);
+      if (lvl === null || lvl <= ln) return false;
+      return r.submissionStatus !== "NOT_COMPLETE" || r.evidenceName != null;
+    });
+    if (hasDataAbove) {
       setLevelWarning({ std, newLevel: ln });
       return;
     }
-    await doSelectLevel(std, ln, false);
+    await doSelectLevel(std, ln);
   }
 
-  async function doSelectLevel(std: string, ln: number, clear: boolean) {
+  async function doSelectLevel(std: string, ln: number) {
     if (!fwId) return;
+    // Always clear levels strictly above ln — removes assessments, workflow rows, and
+    // evidence file data (stored as BYTEA in gov_compliance_assessments)
     await fetch(`/api/governance/compliance/${fwId}/maturity-selection`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ standardCode: std, selectedLevel: ln, clear }),
+      body: JSON.stringify({ standardCode: std, selectedLevel: ln, clear: true }),
     });
-    if (clear) {
-      setReqs((p) => p.map((r) => {
-        if (deriveStandard(r) !== std) return r;
-        const lvl = parseLevelNum(r.maturityLevel);
-        if (lvl !== null && lvl > ln) {
-          return { ...r, submissionStatus: "NOT_COMPLETE", evidenceName: null,
-                   workflowStatus: null, endorsedBy: null, endorsedAt: null };
-        }
-        return r;
-      }));
-    }
+    // Reset UI state for every row above ln
+    setReqs((p) => p.map((r) => {
+      if (deriveStandard(r) !== std) return r;
+      const lvl = parseLevelNum(r.maturityLevel);
+      if (lvl !== null && lvl > ln) {
+        return {
+          ...r,
+          submissionStatus:    "NOT_COMPLETE",
+          evidenceName:        null,
+          workflowStatus:      null,
+          endorsedBy:          null,
+          endorsedAt:          null,
+          evidentAdminOverride: null,
+          domainOwnerOverride:  null,
+          managementNotes:     null,
+          comments:            null,
+        };
+      }
+      return r;
+    }));
     setMaturitySels((s) => ({ ...s, [std]: ln }));
     setSelLevel(ln);
     setLevelWarning(null);
@@ -443,7 +449,7 @@ export function ComplianceClient({
             </p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setLevelWarning(null)} className="btn btn-sm">{t.common.cancel}</button>
-              <button onClick={() => doSelectLevel(levelWarning.std, levelWarning.newLevel, true)}
+              <button onClick={() => doSelectLevel(levelWarning.std, levelWarning.newLevel)}
                 className="btn btn-sm bg-red-500 hover:bg-red-600 text-white border-red-500">
                 {ca.clearAbove}
               </button>
