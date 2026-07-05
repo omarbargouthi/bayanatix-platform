@@ -47,6 +47,27 @@ export async function POST(req: Request, { params }: Ctx) {
       return NextResponse.json({ error: "At least one column must be selected before submitting" }, { status: 400 });
     }
 
+    // Block submission if any column still has a restricted classification without a re-classification request
+    const restrictedCodes = ["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"];
+    const blockedCols = await sql<{ physicalName: string; classCode: string }[]>`
+      SELECT a.physical_name_text AS "physicalName", bg.classification_code AS "classCode"
+      FROM bayanat.open_dataset_columns odc
+      JOIN bayanat.data_attributes       a   ON a.attribute_id   = odc.attribute_id
+      LEFT JOIN bayanat.asset_business_terms abt
+        ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+      LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+      WHERE odc.dataset_id = ${datasetId}
+        AND bg.classification_code = ANY(${restrictedCodes})
+        AND odc.reclassification_request_id IS NULL
+    `;
+    if (blockedCols.length > 0) {
+      const names = blockedCols.map((c) => `"${c.physicalName}" (${c.classCode})`).join(", ");
+      return NextResponse.json({
+        error: `The following columns have restricted classification and must be re-classified as Public before submission: ${names}`,
+        blockedColumns: blockedCols,
+      }, { status: 400 });
+    }
+
     const title = `Publish open dataset: "${ds.name}"`;
 
     const [reqRow] = await sql<{ requestId: number }[]>`

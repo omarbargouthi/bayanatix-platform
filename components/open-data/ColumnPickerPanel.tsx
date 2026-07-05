@@ -7,14 +7,28 @@ import type { OpenDataColumn, OpenDataDqIssue } from "@/lib/types";
 import { ClassificationTag } from "@/components/ui/Tag";
 
 type DqDimension = { code: string; name: string };
+type PublicTerm  = { glossaryId: number; termName: string; classificationCode: string | null };
 
 type DqIssueFormState = {
   open:      boolean;
-  issueId:   number | null; // null = new, non-null = editing existing
+  issueId:   number | null;
   dimension: string;
   text:      string;
   severity:  string;
 };
+
+type ReclassifyFormState = {
+  open:    boolean;
+  termId:  string;
+  reason:  string;
+  saving:  boolean;
+};
+
+const RESTRICTED_CODES = new Set(["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"]);
+
+function isRestricted(code: string | null | undefined): boolean {
+  return !!code && RESTRICTED_CODES.has(code.toUpperCase());
+}
 
 type Props = {
   datasetId: number | null;
@@ -22,9 +36,10 @@ type Props = {
   dqIssues: OpenDataDqIssue[];
   dimensions: DqDimension[];
   canEdit: boolean;
-  onColumnAdded: (col: OpenDataColumn) => void;
-  onColumnRemoved: (odColumnId: number) => void;
-  onDqIssueAdded: (issue: OpenDataDqIssue) => void;
+  onColumnAdded:    (col: OpenDataColumn) => void;
+  onColumnRemoved:  (odColumnId: number) => void;
+  onColumnUpdated:  (col: OpenDataColumn) => void;
+  onDqIssueAdded:   (issue: OpenDataDqIssue) => void;
   onDqIssueUpdated: (issue: OpenDataDqIssue) => void;
   onDqIssueRemoved: (issueId: number) => void;
 };
@@ -47,8 +62,8 @@ function RuleStatusBadge({ status, score }: { status: string | null; score: numb
   const cfg = status === "PASSED"
     ? { bg: "bg-emerald-50 text-emerald-700", icon: "✓" }
     : status === "FAILED"
-    ? { bg: "bg-red-50 text-red-600", icon: "✗" }
-    : { bg: "bg-slate-100 text-slate-500", icon: "!" };
+    ? { bg: "bg-red-50 text-red-600",     icon: "✗" }
+    : { bg: "bg-slate-100 text-slate-500",  icon: "!" };
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${cfg.bg}`}>
       <span>{cfg.icon}</span>
@@ -68,6 +83,7 @@ export function ColumnPickerPanel({
   canEdit,
   onColumnAdded,
   onColumnRemoved,
+  onColumnUpdated,
   onDqIssueAdded,
   onDqIssueUpdated,
   onDqIssueRemoved,
@@ -78,16 +94,21 @@ export function ColumnPickerPanel({
   const [adding, setAdding]       = useState<number | null>(null);
 
   // DQ rules per column (attributeId → rules), fetched lazily
-  const [dqRules, setDqRules]     = useState<Record<number, ColumnDqRule[]>>({});
+  const [dqRules, setDqRules]           = useState<Record<number, ColumnDqRule[]>>({});
   const [rulesLoading, setRulesLoading] = useState<Record<number, boolean>>({});
 
   // DQ issue form per column
   const [dqForms, setDqForms] = useState<Record<number, DqIssueFormState>>({});
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const selectedAttrIds = new Set(selectedColumns.map((c) => c.attributeId));
+  // Re-classification form per column (attributeId → form)
+  const [reclassifyForms, setReclassifyForms] = useState<Record<number, ReclassifyFormState>>({});
+  const [publicTerms, setPublicTerms]         = useState<PublicTerm[] | null>(null);
+  const [termsLoading, setTermsLoading]       = useState(false);
 
-  // ── Search ──────────────────────────────────────────────────────────────
+  const searchTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedAttrIds  = new Set(selectedColumns.map((c) => c.attributeId));
+
+  // ── Search ─────────────────────────────────────────────────────────────────
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); return; }
@@ -107,10 +128,10 @@ export function ColumnPickerPanel({
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [search, doSearch]);
 
-  // ── Fetch DQ rules for a column ─────────────────────────────────────────
+  // ── Fetch DQ rules for a column ────────────────────────────────────────────
 
   async function fetchDqRules(attributeId: number) {
-    if (dqRules[attributeId] !== undefined) return; // already fetched
+    if (dqRules[attributeId] !== undefined) return;
     setRulesLoading((p) => ({ ...p, [attributeId]: true }));
     try {
       const res  = await fetch(`/api/open-data/column-dq?attributeId=${attributeId}`);
@@ -121,7 +142,21 @@ export function ColumnPickerPanel({
     }
   }
 
-  // ── Add column ──────────────────────────────────────────────────────────
+  // ── Fetch available public terms (once) ───────────────────────────────────
+
+  async function ensurePublicTerms() {
+    if (publicTerms !== null || termsLoading) return;
+    setTermsLoading(true);
+    try {
+      const res  = await fetch("/api/open-data/public-terms");
+      const data = await res.json();
+      setPublicTerms(Array.isArray(data) ? data : []);
+    } finally {
+      setTermsLoading(false);
+    }
+  }
+
+  // ── Add column ─────────────────────────────────────────────────────────────
 
   async function addColumn(col: ClassificationColumn) {
     if (!datasetId) return;
@@ -137,28 +172,38 @@ export function ColumnPickerPanel({
 
       const newCol: OpenDataColumn = {
         odColumnId,
-        datasetId:      datasetId!,
-        attributeId:    col.attributeId,
-        physicalName:   col.physicalName,
-        friendlyName:   null,
-        dataType:       col.dataType,
-        publishName:    null,
-        publishDesc:    null,
-        sortOrder:      selectedColumns.length,
-        entityName:     col.entityName,
-        entityId:       col.entityId,
-        schemaName:     col.schemaName,
-        schemaId:       col.schemaId,
-        sourceName:     col.sourceName,
-        classTermName:  col.classTermName,
-        classTermCode:  col.classTermClassCode,
-        classTermIsPii: col.classTermIsPii,
-        dqScore:        null,
-        dqRuleCount:    0,
+        datasetId:                 datasetId!,
+        attributeId:               col.attributeId,
+        physicalName:              col.physicalName,
+        friendlyName:              null,
+        dataType:                  col.dataType,
+        publishName:               null,
+        publishDesc:               null,
+        sortOrder:                 selectedColumns.length,
+        entityName:                col.entityName,
+        entityId:                  col.entityId,
+        schemaName:                col.schemaName,
+        schemaId:                  col.schemaId,
+        sourceName:                col.sourceName,
+        classTermName:             col.classTermName,
+        classTermCode:             col.classTermClassCode,
+        classTermIsPii:            col.classTermIsPii,
+        dqScore:                   null,
+        dqRuleCount:               0,
+        reclassificationReason:    null,
+        reclassificationRequestId: null,
       };
       onColumnAdded(newCol);
-      // Pre-fetch DQ rules for newly added column
       fetchDqRules(col.attributeId);
+
+      // If restricted, automatically open the re-classify form
+      if (isRestricted(col.classTermClassCode)) {
+        ensurePublicTerms();
+        setReclassifyForms((p) => ({
+          ...p,
+          [col.attributeId]: { open: true, termId: "", reason: "", saving: false },
+        }));
+      }
     } finally {
       setAdding(null);
     }
@@ -170,7 +215,73 @@ export function ColumnPickerPanel({
     onColumnRemoved(col.odColumnId);
   }
 
-  // ── DQ issue form helpers ───────────────────────────────────────────────
+  // ── Re-classification helpers ──────────────────────────────────────────────
+
+  function openReclassifyForm(attributeId: number) {
+    ensurePublicTerms();
+    setReclassifyForms((p) => ({
+      ...p,
+      [attributeId]: p[attributeId]?.saving
+        ? p[attributeId]
+        : { open: true, termId: p[attributeId]?.termId ?? "", reason: p[attributeId]?.reason ?? "", saving: false },
+    }));
+  }
+
+  function closeReclassifyForm(attributeId: number) {
+    setReclassifyForms((p) => ({ ...p, [attributeId]: { ...p[attributeId], open: false } }));
+  }
+
+  function updateReclassifyField(attributeId: number, field: "termId" | "reason", value: string) {
+    setReclassifyForms((p) => ({ ...p, [attributeId]: { ...p[attributeId], [field]: value } }));
+  }
+
+  async function submitReclassify(col: OpenDataColumn) {
+    if (!datasetId) return;
+    const form = reclassifyForms[col.attributeId];
+    if (!form || !form.termId || !form.reason.trim()) return;
+
+    setReclassifyForms((p) => ({ ...p, [col.attributeId]: { ...p[col.attributeId], saving: true } }));
+    try {
+      const res = await fetch(`/api/open-data/datasets/${datasetId}/reclassify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attributeId: col.attributeId,
+          newTermId:   Number(form.termId),
+          reason:      form.reason.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert((err as { error?: string }).error ?? "Re-classification failed. Please try again.");
+        return;
+      }
+      const result = await res.json() as {
+        ok: boolean; requestId: number;
+        newTermName: string; newTermCode: string | null; isPii: boolean;
+      };
+
+      // Update the column state optimistically
+      const updated: OpenDataColumn = {
+        ...col,
+        classTermName:             result.newTermName,
+        classTermCode:             result.newTermCode,
+        classTermIsPii:            result.isPii,
+        reclassificationReason:    form.reason.trim(),
+        reclassificationRequestId: result.requestId,
+      };
+      onColumnUpdated(updated);
+
+      setReclassifyForms((p) => ({ ...p, [col.attributeId]: { open: false, termId: "", reason: "", saving: false } }));
+    } finally {
+      setReclassifyForms((p) => ({
+        ...p,
+        [col.attributeId]: { ...p[col.attributeId], saving: false },
+      }));
+    }
+  }
+
+  // ── DQ issue form helpers ──────────────────────────────────────────────────
 
   function openNewIssueForm(attributeId: number, prefillDimension = "") {
     setDqForms((p) => ({
@@ -208,7 +319,6 @@ export function ColumnPickerPanel({
     const dim = dimensions.find((d) => d.code === form.dimension);
 
     if (form.issueId != null) {
-      // ── Update existing ──
       const res = await fetch(`/api/open-data/datasets/${datasetId}/dq-issues`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -220,7 +330,6 @@ export function ColumnPickerPanel({
         }),
       });
       if (!res.ok) return;
-
       const existing = dqIssues.find((i) => i.issueId === form.issueId);
       if (existing) {
         onDqIssueUpdated({
@@ -232,7 +341,6 @@ export function ColumnPickerPanel({
         });
       }
     } else {
-      // ── Create new ──
       const res = await fetch(`/api/open-data/datasets/${datasetId}/dq-issues`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -245,7 +353,6 @@ export function ColumnPickerPanel({
       });
       if (!res.ok) return;
       const { issueId } = await res.json();
-
       onDqIssueAdded({
         issueId,
         datasetId:     datasetId!,
@@ -268,7 +375,7 @@ export function ColumnPickerPanel({
     onDqIssueRemoved(issueId);
   }
 
-  // ── Severity colour helper ──────────────────────────────────────────────
+  // ── Severity colour helper ─────────────────────────────────────────────────
 
   const severityColors = {
     BLOCKER: "text-red-600 bg-red-50",
@@ -276,7 +383,7 @@ export function ColumnPickerPanel({
     INFO:    "text-slate-500 bg-slate-100",
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -304,27 +411,33 @@ export function ColumnPickerPanel({
           {results.length > 0 && (
             <div className="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm max-h-72 overflow-y-auto">
               {results.map((col) => {
-                const already = selectedAttrIds.has(col.attributeId);
+                const already     = selectedAttrIds.has(col.attributeId);
+                const restricted  = isRestricted(col.classTermClassCode);
                 return (
                   <div
                     key={col.attributeId}
                     className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm text-slate-800">{col.physicalName}</span>
                         <span className="text-xs text-slate-400">{col.dataType}</span>
                         {col.classTermIsPii && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium">PII</span>
+                        )}
+                        {restricted && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium border border-orange-200">
+                            Needs re-classification
+                          </span>
                         )}
                       </div>
                       <div className="text-xs text-slate-400 mt-0.5">
                         {col.sourceName} › {col.schemaName} › {col.entityName}
                       </div>
                       {col.classTermName && (
-                        <div className="mt-1">
+                        <div className="mt-1 flex items-center gap-1.5">
                           <ClassificationTag code={col.classTermClassCode} />
-                          <span className="ml-1 text-xs text-slate-500">{col.classTermName}</span>
+                          <span className="text-xs text-slate-500">{col.classTermName}</span>
                         </div>
                       )}
                     </div>
@@ -334,10 +447,12 @@ export function ColumnPickerPanel({
                       className={`ml-3 shrink-0 px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
                         already
                           ? "bg-slate-100 text-slate-400 cursor-default"
+                          : restricted
+                          ? "bg-orange-500 text-white hover:bg-orange-600"
                           : "bg-brand-purple text-white hover:bg-brand-purple/90"
                       }`}
                     >
-                      {already ? "Added" : adding === col.attributeId ? "…" : "Add"}
+                      {already ? "Added" : adding === col.attributeId ? "…" : restricted ? "Add + Re-classify" : "Add"}
                     </button>
                   </div>
                 );
@@ -364,14 +479,55 @@ export function ColumnPickerPanel({
           </p>
 
           {selectedColumns.map((col) => {
-            const colIssues  = dqIssues.filter((i) => i.attributeId === col.attributeId);
-            const rules      = dqRules[col.attributeId];
-            const loadingRules = rulesLoading[col.attributeId];
-            const dqForm     = dqForms[col.attributeId];
-            const hasRules   = col.dqRuleCount > 0 || (rules && rules.length > 0);
+            const colIssues       = dqIssues.filter((i) => i.attributeId === col.attributeId);
+            const rules           = dqRules[col.attributeId];
+            const loadingRules    = rulesLoading[col.attributeId];
+            const dqForm          = dqForms[col.attributeId];
+            const reclassForm     = reclassifyForms[col.attributeId];
+            const needsReclass    = isRestricted(col.classTermCode) && !col.reclassificationRequestId;
+            const reclassPending  = !!col.reclassificationRequestId;
 
             return (
-              <div key={col.odColumnId} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+              <div
+                key={col.odColumnId}
+                className={`border rounded-xl bg-white overflow-hidden ${
+                  needsReclass ? "border-orange-300" : "border-slate-200"
+                }`}
+              >
+                {/* ── Re-classification required banner ── */}
+                {needsReclass && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-2 bg-orange-50 border-b border-orange-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-orange-500 text-sm">⚠</span>
+                      <p className="text-xs text-orange-800 font-medium">
+                        This column is classified as <strong>{col.classTermCode}</strong> and must be
+                        re-classified as Public before this dataset can be submitted for approval.
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => openReclassifyForm(col.attributeId)}
+                        className="shrink-0 text-xs px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                      >
+                        Re-classify as Public
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Re-classification pending indicator ── */}
+                {reclassPending && (
+                  <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-100">
+                    <span className="text-amber-500 text-xs">⏳</span>
+                    <p className="text-xs text-amber-800">
+                      Re-classification pending approval (request #{col.reclassificationRequestId}).
+                      {col.reclassificationReason && (
+                        <span className="ml-1 text-amber-600">Reason: {col.reclassificationReason}</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 {/* ── Column header ── */}
                 <div className="flex items-start gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
@@ -395,7 +551,6 @@ export function ColumnPickerPanel({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* Load DQ rules button (if not already fetched) */}
                     {col.dqRuleCount > 0 && rules === undefined && !loadingRules && (
                       <button
                         onClick={() => fetchDqRules(col.attributeId)}
@@ -425,6 +580,73 @@ export function ColumnPickerPanel({
                     )}
                   </div>
                 </div>
+
+                {/* ── Re-classification form ── */}
+                {reclassForm?.open && (
+                  <div className="border-t border-orange-200 bg-orange-50 px-4 py-3 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-orange-800 mb-1">Re-classify for Open Data Publication</p>
+                      <p className="text-[11px] text-orange-700 leading-relaxed">
+                        The selected term is classified as <strong>{col.classTermCode}</strong>.
+                        Choose a public-level classification term and provide a justification.
+                        A re-classification request will be created and must be approved by the data steward and owner.
+                        The reason will be recorded in the term's audit history.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-orange-800 mb-1">
+                          Target classification term <span className="text-red-500">*</span>
+                        </label>
+                        {termsLoading ? (
+                          <p className="text-xs text-slate-400 animate-pulse">Loading available terms…</p>
+                        ) : (
+                          <select
+                            value={reclassForm.termId}
+                            onChange={(e) => updateReclassifyField(col.attributeId, "termId", e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-orange-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-orange-300"
+                          >
+                            <option value="">— Select a public classification term —</option>
+                            {(publicTerms ?? []).map((t) => (
+                              <option key={t.glossaryId} value={String(t.glossaryId)}>
+                                {t.termName}
+                                {t.classificationCode ? ` (${t.classificationCode})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-orange-800 mb-1">
+                          Reason for re-classification <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={reclassForm.reason}
+                          onChange={(e) => updateReclassifyField(col.attributeId, "reason", e.target.value)}
+                          placeholder="Explain why this column can be published as open data and should be re-classified as public…"
+                          rows={3}
+                          className="w-full px-2 py-1.5 text-xs border border-orange-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-1 focus:ring-orange-300"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => submitReclassify(col)}
+                          disabled={!reclassForm.termId || !reclassForm.reason.trim() || reclassForm.saving}
+                          className="px-3 py-1.5 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 font-medium transition-colors"
+                        >
+                          {reclassForm.saving ? "Submitting…" : "Submit Re-classification Request"}
+                        </button>
+                        <button
+                          onClick={() => closeReclassifyForm(col.attributeId)}
+                          disabled={reclassForm.saving}
+                          className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── DQ Rules from catalog ── */}
                 {rules && rules.length > 0 && (

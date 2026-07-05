@@ -428,25 +428,27 @@ export type OpenDataset = {
 };
 
 export type OpenDataColumn = {
-  odColumnId:      number;
-  datasetId:       number;
-  attributeId:     number;
-  physicalName:    string;
-  friendlyName:    string | null;
-  dataType:        string;
-  publishName:     string | null;
-  publishDesc:     string | null;
-  sortOrder:       number;
-  entityName:      string;
-  entityId:        number;
-  schemaName:      string;
-  schemaId:        number;
-  sourceName:      string;
-  classTermName:   string | null;
-  classTermCode:   string | null;
-  classTermIsPii:  boolean;
-  dqScore:         number | null;
-  dqRuleCount:     number;
+  odColumnId:                number;
+  datasetId:                 number;
+  attributeId:               number;
+  physicalName:              string;
+  friendlyName:              string | null;
+  dataType:                  string;
+  publishName:               string | null;
+  publishDesc:               string | null;
+  sortOrder:                 number;
+  entityName:                string;
+  entityId:                  number;
+  schemaName:                string;
+  schemaId:                  number;
+  sourceName:                string;
+  classTermName:             string | null;
+  classTermCode:             string | null;
+  classTermIsPii:            boolean;
+  dqScore:                   number | null;
+  dqRuleCount:               number;
+  reclassificationReason:    string | null;
+  reclassificationRequestId: number | null;
 };
 
 export type OpenDataDqIssue = {

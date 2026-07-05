@@ -267,6 +267,10 @@ export function OpenDataEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prevAutoLogic, extraction]);
 
+  const handleColumnUpdated = useCallback((col: OpenDataColumn) => {
+    setColumns((prev) => prev.map((c) => c.odColumnId === col.odColumnId ? col : c));
+  }, []);
+
   const handleDqIssueAdded   = useCallback((i: OpenDataDqIssue) => setDqIssues((p) => [...p, i]), []);
   const handleDqIssueUpdated = useCallback((i: OpenDataDqIssue) => setDqIssues((p) => p.map((x) => x.issueId === i.issueId ? i : x)), []);
   const handleDqIssueRemoved = useCallback((id: number) => setDqIssues((p) => p.filter((i) => i.issueId !== id)), []);
@@ -667,6 +671,7 @@ export function OpenDataEditor({
             canEdit={isEditable && datasetId != null}
             onColumnAdded={handleColumnAdded}
             onColumnRemoved={handleColumnRemoved}
+            onColumnUpdated={handleColumnUpdated}
             onDqIssueAdded={handleDqIssueAdded}
             onDqIssueUpdated={handleDqIssueUpdated}
             onDqIssueRemoved={handleDqIssueRemoved}
