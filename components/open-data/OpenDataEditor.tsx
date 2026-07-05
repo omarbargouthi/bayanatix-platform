@@ -197,11 +197,15 @@ export function OpenDataEditor({
   const [department,    setDepartment]    = useState(dataset?.departmentText ?? "");
   const [domainCode,    setDomainCode]    = useState(dataset?.domainCode ?? "");
   const [purpose,       setPurpose]       = useState(dataset?.purposeText ?? "");
-  const [segments,      setSegments]      = useState<string[]>(dataset?.beneficiarySegments ?? []);
+  const [segments,      setSegments]      = useState<string[]>(
+    Array.isArray(dataset?.beneficiarySegments) ? dataset.beneficiarySegments : [],
+  );
   const [publishDate,   setPublishDate]   = useState(dataset?.publishDate ?? "");
   const [coverageFrom,  setCoverageFrom]  = useState(String(dataset?.coverageFromYear ?? ""));
   const [coverageTo,    setCoverageTo]    = useState(String(dataset?.coverageToYear ?? ""));
-  const [formats,       setFormats]       = useState<OpenDataFormat[]>(dataset?.dataFormats ?? []);
+  const [formats,       setFormats]       = useState<OpenDataFormat[]>(
+    Array.isArray(dataset?.dataFormats) ? dataset.dataFormats : [],
+  );
   const [dataSize,      setDataSize]      = useState(dataset?.dataSizeText ?? "");
   const [refreshFreq,   setRefreshFreq]   = useState<OpenDataRefresh | "">(dataset?.refreshFrequency ?? "");
   const [dqNotes,       setDqNotes]       = useState(dataset?.dqNotesText ?? "");

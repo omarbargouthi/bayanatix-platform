@@ -1,6 +1,16 @@
 import { sql } from "@/lib/db";
 import type { OpenDataset, OpenDataColumn, OpenDataDqIssue } from "@/lib/types";
 
+// postgres.js returns JSONB as a parsed JS value in most cases, but can
+// occasionally return it as a JSON string when coming through complex queries.
+function jsonArr<T>(val: unknown): T[] {
+  if (Array.isArray(val)) return val as T[];
+  if (typeof val === "string") {
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
+
 // ── List ──────────────────────────────────────────────────────────────────────
 
 export async function listOpenDatasets(opts: {
@@ -66,8 +76,8 @@ export async function listOpenDatasets(opts: {
       ...r,
       datasetId:           Number(r.datasetId),
       columnCount:         Number(r.columnCount ?? 0),
-      beneficiarySegments: (r.beneficiarySegments as unknown as string[]) ?? [],
-      dataFormats:         (r.dataFormats as unknown as string[]) ?? [],
+      beneficiarySegments: jsonArr<string>(r.beneficiarySegments),
+      dataFormats:         jsonArr(r.dataFormats),
     })) as OpenDataset[],
     total,
   };
