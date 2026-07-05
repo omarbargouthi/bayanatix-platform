@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getStakeholders, assignStakeholder } from "@/lib/queries/stakeholders";
+import { getStakeholders, assignStakeholder, resolveEffectiveGovernance, resolveEffectiveEntityGovernance } from "@/lib/queries/stakeholders";
 import { sql } from "@/lib/db";
 
 export async function GET(req: Request) {
@@ -10,7 +10,19 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const assetTypeCode = searchParams.get("assetType") ?? "";
   const assetId       = Number(searchParams.get("assetId"));
+  const effective     = searchParams.get("effective") === "true";
+
   if (!assetTypeCode || !assetId) return NextResponse.json({ error: "Missing assetType or assetId" }, { status: 400 });
+
+  // Effective governance resolves the hierarchy (column → table → schema → source)
+  if (effective) {
+    if (assetTypeCode === "DATA_ATTRIBUTES") {
+      return NextResponse.json(await resolveEffectiveGovernance(assetId));
+    }
+    if (assetTypeCode === "DATA_ENTITIES") {
+      return NextResponse.json(await resolveEffectiveEntityGovernance(assetId));
+    }
+  }
 
   return NextResponse.json(await getStakeholders(assetTypeCode, assetId));
 }

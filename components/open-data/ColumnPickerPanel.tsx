@@ -36,6 +36,7 @@ type Props = {
   dqIssues: OpenDataDqIssue[];
   dimensions: DqDimension[];
   canEdit: boolean;
+  mySources?: boolean;
   onColumnAdded:    (col: OpenDataColumn) => void;
   onColumnRemoved:  (odColumnId: number) => void;
   onColumnUpdated:  (col: OpenDataColumn) => void;
@@ -81,6 +82,7 @@ export function ColumnPickerPanel({
   dqIssues,
   dimensions,
   canEdit,
+  mySources = false,
   onColumnAdded,
   onColumnRemoved,
   onColumnUpdated,
@@ -114,7 +116,8 @@ export function ColumnPickerPanel({
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
-      const res  = await fetch(`/api/classification/columns?search=${encodeURIComponent(q)}&limit=30`);
+      const msParam = mySources ? "&mySources=true" : "";
+      const res  = await fetch(`/api/classification/columns?search=${encodeURIComponent(q)}&limit=30${msParam}`);
       const json = await res.json();
       setResults((json.data as ClassificationColumn[]) ?? []);
     } finally {
@@ -196,8 +199,8 @@ export function ColumnPickerPanel({
       onColumnAdded(newCol);
       fetchDqRules(col.attributeId);
 
-      // If restricted, automatically open the re-classify form
-      if (isRestricted(col.classTermClassCode)) {
+      // If restricted or unclassified, automatically open the classify form
+      if (isRestricted(col.classTermClassCode) || !col.classTermClassCode) {
         ensurePublicTerms();
         setReclassifyForms((p) => ({
           ...p,
@@ -411,8 +414,9 @@ export function ColumnPickerPanel({
           {results.length > 0 && (
             <div className="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm max-h-72 overflow-y-auto">
               {results.map((col) => {
-                const already     = selectedAttrIds.has(col.attributeId);
-                const restricted  = isRestricted(col.classTermClassCode);
+                const already         = selectedAttrIds.has(col.attributeId);
+                const restricted      = isRestricted(col.classTermClassCode);
+                const unclassified    = !col.classTermClassCode;
                 return (
                   <div
                     key={col.attributeId}
@@ -428,6 +432,11 @@ export function ColumnPickerPanel({
                         {restricted && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium border border-orange-200">
                             Needs re-classification
+                          </span>
+                        )}
+                        {!restricted && unclassified && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium border border-yellow-200">
+                            Not classified
                           </span>
                         )}
                       </div>
@@ -449,10 +458,12 @@ export function ColumnPickerPanel({
                           ? "bg-slate-100 text-slate-400 cursor-default"
                           : restricted
                           ? "bg-orange-500 text-white hover:bg-orange-600"
+                          : unclassified
+                          ? "bg-yellow-500 text-white hover:bg-yellow-600"
                           : "bg-brand-purple text-white hover:bg-brand-purple/90"
                       }`}
                     >
-                      {already ? "Added" : adding === col.attributeId ? "…" : restricted ? "Add + Re-classify" : "Add"}
+                      {already ? "Added" : adding === col.attributeId ? "…" : restricted ? "Add + Re-classify" : unclassified ? "Add + Classify" : "Add"}
                     </button>
                   </div>
                 );
@@ -484,16 +495,40 @@ export function ColumnPickerPanel({
             const loadingRules    = rulesLoading[col.attributeId];
             const dqForm          = dqForms[col.attributeId];
             const reclassForm     = reclassifyForms[col.attributeId];
-            const needsReclass    = isRestricted(col.classTermCode) && !col.reclassificationRequestId;
-            const reclassPending  = !!col.reclassificationRequestId;
+            const needsReclass      = isRestricted(col.classTermCode) && !col.reclassificationRequestId;
+            const needsClassification = !col.classTermCode && !col.reclassificationRequestId;
+            const reclassPending    = !!col.reclassificationRequestId;
 
             return (
               <div
                 key={col.odColumnId}
                 className={`border rounded-xl bg-white overflow-hidden ${
-                  needsReclass ? "border-orange-300" : "border-slate-200"
+                  needsReclass ? "border-orange-300"
+                  : needsClassification ? "border-yellow-300"
+                  : "border-slate-200"
                 }`}
               >
+                {/* ── Classification required banner (unclassified column) ── */}
+                {needsClassification && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-2 bg-yellow-50 border-b border-yellow-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-yellow-500 text-sm">⚠</span>
+                      <p className="text-xs text-yellow-800 font-medium">
+                        This column has no classification. It must be assigned a public classification before
+                        this dataset can be submitted for approval.
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => openReclassifyForm(col.attributeId)}
+                        className="shrink-0 text-xs px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+                      >
+                        Assign Classification
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* ── Re-classification required banner ── */}
                 {needsReclass && (
                   <div className="flex items-center justify-between gap-3 px-4 py-2 bg-orange-50 border-b border-orange-200">
@@ -581,16 +616,17 @@ export function ColumnPickerPanel({
                   </div>
                 </div>
 
-                {/* ── Re-classification form ── */}
+                {/* ── Classify / Re-classify form ── */}
                 {reclassForm?.open && (
-                  <div className="border-t border-orange-200 bg-orange-50 px-4 py-3 space-y-3">
+                  <div className={`border-t px-4 py-3 space-y-3 ${col.classTermCode ? "border-orange-200 bg-orange-50" : "border-yellow-200 bg-yellow-50"}`}>
                     <div>
-                      <p className="text-xs font-semibold text-orange-800 mb-1">Re-classify for Open Data Publication</p>
-                      <p className="text-[11px] text-orange-700 leading-relaxed">
-                        The selected term is classified as <strong>{col.classTermCode}</strong>.
-                        Choose a public-level classification term and provide a justification.
-                        A re-classification request will be created and must be approved by the data steward and owner.
-                        The reason will be recorded in the term's audit history.
+                      <p className={`text-xs font-semibold mb-1 ${col.classTermCode ? "text-orange-800" : "text-yellow-800"}`}>
+                        {col.classTermCode ? "Re-classify for Open Data Publication" : "Assign Classification for Open Data Publication"}
+                      </p>
+                      <p className={`text-[11px] leading-relaxed ${col.classTermCode ? "text-orange-700" : "text-yellow-700"}`}>
+                        {col.classTermCode
+                          ? <>The selected term is classified as <strong>{col.classTermCode}</strong>. Choose a public-level classification term and provide a justification. A re-classification request will be created and must be approved. The reason will be recorded in the term's audit history.</>
+                          : "This column has no classification. Select a public-level classification term and provide a reason. A classification request will be submitted for approval."}
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -632,9 +668,9 @@ export function ColumnPickerPanel({
                         <button
                           onClick={() => submitReclassify(col)}
                           disabled={!reclassForm.termId || !reclassForm.reason.trim() || reclassForm.saving}
-                          className="px-3 py-1.5 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 font-medium transition-colors"
+                          className={`px-3 py-1.5 text-xs text-white rounded-lg disabled:opacity-50 font-medium transition-colors ${col.classTermCode ? "bg-orange-500 hover:bg-orange-600" : "bg-yellow-500 hover:bg-yellow-600"}`}
                         >
-                          {reclassForm.saving ? "Submitting…" : "Submit Re-classification Request"}
+                          {reclassForm.saving ? "Submitting…" : col.classTermCode ? "Submit Re-classification Request" : "Submit Classification Request"}
                         </button>
                         <button
                           onClick={() => closeReclassifyForm(col.attributeId)}

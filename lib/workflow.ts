@@ -23,14 +23,34 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
     }
 
     case "STEWARD": {
-      const rows = await sql<{ userId: string }[]>`
+      // 1. Direct assignments on request targets
+      const direct = await sql<{ userId: string }[]>`
         SELECT DISTINCT s.user_id AS "userId"
         FROM bayanat.asset_stakeholders s
         JOIN bayanat.asset_request_targets art
           ON art.asset_type_code = s.asset_type_code AND art.asset_id = s.asset_id
         WHERE art.request_id = ${requestId}
+          AND s.role_code IN ('BIZ_STEWARD', 'TECH_STEWARD')
       `;
-      if (rows.length > 0) return rows.map((r) => r.userId);
+      if (direct.length > 0) return direct.map((r) => r.userId);
+
+      // 2. Hierarchy resolution for DATA_ATTRIBUTES targets
+      const colTargets = await sql<{ assetId: number }[]>`
+        SELECT art.asset_id AS "assetId" FROM bayanat.asset_request_targets art
+        WHERE art.request_id = ${requestId} AND art.asset_type_code = 'DATA_ATTRIBUTES'
+      `;
+      const hierUsers = new Set<string>();
+      for (const t of colTargets) {
+        for (const role of ["BIZ_STEWARD", "TECH_STEWARD"]) {
+          const rows = await sql<{ userId: string }[]>`
+            SELECT user_id AS "userId" FROM bayanat.fn_resolve_effective_stakeholder(${t.assetId}, ${role})
+            WHERE user_id IS NOT NULL
+          `;
+          rows.forEach((r) => hierUsers.add(r.userId));
+        }
+      }
+      if (hierUsers.size > 0) return [...hierUsers];
+
       const fb = await sql<{ userId: string }[]>`
         SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 3
       `;
@@ -38,14 +58,31 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
     }
 
     case "OWNER": {
-      const rows = await sql<{ userId: string }[]>`
+      // 1. Direct owner assignments on request targets
+      const direct = await sql<{ userId: string }[]>`
         SELECT DISTINCT s.user_id AS "userId"
         FROM bayanat.asset_stakeholders s
         JOIN bayanat.asset_request_targets art
           ON art.asset_type_code = s.asset_type_code AND art.asset_id = s.asset_id
         WHERE art.request_id = ${requestId} AND s.role_code = 'OWNER'
       `;
-      if (rows.length > 0) return rows.map((r) => r.userId);
+      if (direct.length > 0) return direct.map((r) => r.userId);
+
+      // 2. Hierarchy resolution for DATA_ATTRIBUTES targets
+      const colTargets = await sql<{ assetId: number }[]>`
+        SELECT art.asset_id AS "assetId" FROM bayanat.asset_request_targets art
+        WHERE art.request_id = ${requestId} AND art.asset_type_code = 'DATA_ATTRIBUTES'
+      `;
+      const hierUsers = new Set<string>();
+      for (const t of colTargets) {
+        const rows = await sql<{ userId: string }[]>`
+          SELECT user_id AS "userId" FROM bayanat.fn_resolve_effective_stakeholder(${t.assetId}, 'OWNER')
+          WHERE user_id IS NOT NULL
+        `;
+        rows.forEach((r) => hierUsers.add(r.userId));
+      }
+      if (hierUsers.size > 0) return [...hierUsers];
+
       const fb = await sql<{ userId: string }[]>`
         SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 3
       `;

@@ -63,16 +63,33 @@ export async function DELETE(_req: Request, { params }: Ctx) {
 
   const [row] = await sql<{ raisedBy: string; status: string }[]>`
     SELECT raised_by_user_id AS "raisedBy", status_code AS "status"
-    FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
+    FROM bayanat.open_datasets
+    WHERE dataset_id = ${datasetId} AND deleted_at IS NULL
   `;
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (row.raisedBy !== session.userId && session.role !== "ADMIN") {
+  if (row.raisedBy !== session.userId && session.role !== "ADMIN" && session.role !== "STEWARD") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (row.status === "PENDING_APPROVAL" || row.status === "APPROVED" || row.status === "PUBLISHED") {
-    return NextResponse.json({ error: "Cannot delete a dataset that is in approval or published" }, { status: 409 });
+
+  if (row.status === "PUBLISHED") {
+    // Retracting a published dataset: change to PENDING for re-review, not a hard delete
+    await sql`
+      UPDATE bayanat.open_datasets
+      SET status_code = 'PENDING', updated_at = NOW()
+      WHERE dataset_id = ${datasetId}
+    `;
+    return NextResponse.json({ ok: true, action: "retracted", newStatus: "PENDING" });
   }
 
-  await sql`DELETE FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}`;
-  return NextResponse.json({ ok: true });
+  if (row.status === "PENDING_APPROVAL" || row.status === "APPROVED") {
+    return NextResponse.json({ error: "Cannot delete a dataset that is pending approval or approved. Reject the workflow first." }, { status: 409 });
+  }
+
+  // DRAFT or PENDING: soft delete
+  await sql`
+    UPDATE bayanat.open_datasets
+    SET deleted_at = NOW(), deleted_by = ${session.userId}
+    WHERE dataset_id = ${datasetId}
+  `;
+  return NextResponse.json({ ok: true, action: "deleted" });
 }

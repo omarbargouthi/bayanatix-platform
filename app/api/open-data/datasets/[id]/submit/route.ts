@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: Ctx) {
       return NextResponse.json({ error: "At least one column must be selected before submitting" }, { status: 400 });
     }
 
-    // Block submission if any column still has a restricted classification without a re-classification request
+    // Block: restricted classifications without re-classification request
     const restrictedCodes = ["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"];
     const blockedCols = await sql<{ physicalName: string; classCode: string }[]>`
       SELECT a.physical_name_text AS "physicalName", bg.classification_code AS "classCode"
@@ -65,6 +65,25 @@ export async function POST(req: Request, { params }: Ctx) {
       return NextResponse.json({
         error: `The following columns have restricted classification and must be re-classified as Public before submission: ${names}`,
         blockedColumns: blockedCols,
+      }, { status: 400 });
+    }
+
+    // Block: columns with no classification term and no pending reclassification request
+    const unclassifiedCols = await sql<{ physicalName: string }[]>`
+      SELECT a.physical_name_text AS "physicalName"
+      FROM bayanat.open_dataset_columns odc
+      JOIN bayanat.data_attributes a ON a.attribute_id = odc.attribute_id
+      LEFT JOIN bayanat.asset_business_terms abt
+        ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+      WHERE odc.dataset_id = ${datasetId}
+        AND abt.glossary_id IS NULL
+        AND odc.reclassification_request_id IS NULL
+    `;
+    if (unclassifiedCols.length > 0) {
+      const names = unclassifiedCols.map((c) => `"${c.physicalName}"`).join(", ");
+      return NextResponse.json({
+        error: `The following columns have no classification and must be classified before submission: ${names}`,
+        unclassifiedColumns: unclassifiedCols,
       }, { status: 400 });
     }
 
@@ -88,6 +107,25 @@ export async function POST(req: Request, { params }: Ctx) {
         (request_id, asset_type_code, asset_id_text, asset_name)
       VALUES (${reqRow.requestId}, 'OPEN_DATASET', ${String(datasetId)}, ${ds.name})
     `;
+
+    // Add data source targets so the workflow can resolve source owners
+    const sourcesUsed = await sql<{ sourceId: number; sourceName: string }[]>`
+      SELECT DISTINCT ds2.data_source_id AS "sourceId", ds2.source_name_text AS "sourceName"
+      FROM bayanat.open_dataset_columns odc
+      JOIN bayanat.data_attributes a   ON a.attribute_id   = odc.attribute_id
+      JOIN bayanat.data_entities   en  ON en.entity_id     = a.entity_id
+      JOIN bayanat.data_schemas    sch ON sch.schema_id    = en.schema_id
+      JOIN bayanat.data_sources    ds2 ON ds2.data_source_id = sch.data_source_id
+      WHERE odc.dataset_id = ${datasetId}
+    `;
+    for (const src of sourcesUsed) {
+      await sql`
+        INSERT INTO bayanat.asset_request_targets
+          (request_id, asset_type_code, asset_id, asset_name)
+        VALUES (${reqRow.requestId}, 'DATA_SOURCES', ${src.sourceId}, ${src.sourceName})
+        ON CONFLICT DO NOTHING
+      `;
+    }
 
     await sql`
       UPDATE bayanat.open_datasets

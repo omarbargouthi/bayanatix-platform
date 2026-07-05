@@ -59,7 +59,8 @@ export async function listOpenDatasets(opts: {
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
     WHERE
-      ${status != null ? sql`d.status_code = ${status}` : sql`true`}
+      d.deleted_at IS NULL
+      AND ${status != null ? sql`d.status_code = ${status}` : sql`true`}
       AND ${userId != null ? sql`d.raised_by_user_id = ${userId}` : sql`true`}
       AND ${search !== "" ? sql`d.dataset_name_text ILIKE ${like} OR d.description_text ILIKE ${like}` : sql`true`}
     GROUP BY d.dataset_id, u.full_name
@@ -115,7 +116,7 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
-    WHERE d.dataset_id = ${datasetId}
+    WHERE d.dataset_id = ${datasetId} AND d.deleted_at IS NULL
     GROUP BY d.dataset_id, u.full_name
   `;
 

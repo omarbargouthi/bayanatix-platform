@@ -38,6 +38,7 @@ type Props = {
   initialSearch: string;
   initialPage: number;
   canCreate: boolean;
+  currentUserId: string;
 };
 
 export function OpenDataList({
@@ -47,9 +48,11 @@ export function OpenDataList({
   initialSearch,
   initialPage,
   canCreate,
+  currentUserId,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [datasets]  = useState(initialDatasets);
   const [total]     = useState(initialTotal);
@@ -59,6 +62,27 @@ export function OpenDataList({
 
   const LIMIT = 20;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+  async function handleDelete(ds: OpenDataset, e: React.MouseEvent) {
+    e.preventDefault();
+    const isPublished = ds.statusCode === "PUBLISHED";
+    const msg = isPublished
+      ? `Retract "${ds.datasetName}" from publication? It will be set back to Pending for revision.`
+      : `Delete "${ds.datasetName}"? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    setDeletingId(ds.datasetId);
+    try {
+      const res = await fetch(`/api/open-data/datasets/${ds.datasetId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        alert(err.error ?? "Failed to delete dataset");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function navigate(newStatus?: string, newSearch?: string, newPage?: number) {
     const s = newStatus  ?? status;
@@ -146,7 +170,7 @@ export function OpenDataList({
             {/* Grid header */}
             <div
               className="grid text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 bg-slate-50 border-b border-slate-200"
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr" }}
+              style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr auto" }}
             >
               <span>Dataset</span>
               <span>Category</span>
@@ -154,15 +178,20 @@ export function OpenDataList({
               <span>Refresh</span>
               <span>Columns</span>
               <span>Status</span>
+              <span></span>
             </div>
 
-            {datasets.map((ds) => (
-              <Link
+            {datasets.map((ds) => {
+              const canDelete = ds.raisedByUserId === currentUserId;
+              const isPublished = ds.statusCode === "PUBLISHED";
+              const isDraft = ds.statusCode === "DRAFT" || ds.statusCode === "PENDING";
+              return (
+              <div
                 key={ds.datasetId}
-                href={`/open-data/${ds.datasetId}`}
                 className="grid items-center px-4 py-3.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
-                style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr" }}
+                style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr auto" }}
               >
+                <Link href={`/open-data/${ds.datasetId}`} className="contents">
                 {/* Name + description */}
                 <div className="min-w-0">
                   <p className="font-medium text-sm text-slate-900 truncate">{ds.datasetName}</p>
@@ -200,8 +229,28 @@ export function OpenDataList({
                 <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[ds.statusCode as OpenDataStatus]}`}>
                   {STATUS_LABELS[ds.statusCode as OpenDataStatus] ?? ds.statusCode}
                 </span>
-              </Link>
-            ))}
+                </Link>
+
+                {/* Delete / Retract action */}
+                <div className="pl-2">
+                  {canDelete && (isDraft || isPublished) && (
+                    <button
+                      onClick={(e) => handleDelete(ds, e)}
+                      disabled={deletingId === ds.datasetId}
+                      title={isPublished ? "Retract from publication" : "Delete dataset"}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                        isPublished
+                          ? "border-amber-200 text-amber-600 hover:bg-amber-50"
+                          : "border-red-100 text-red-400 hover:bg-red-50"
+                      } disabled:opacity-40`}
+                    >
+                      {deletingId === ds.datasetId ? "…" : isPublished ? "Retract" : "Delete"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              );
+            })}
           </div>
 
           {/* Pagination */}

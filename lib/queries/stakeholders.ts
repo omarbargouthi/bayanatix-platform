@@ -101,6 +101,78 @@ export async function notifyAssetStewards(
   }
 }
 
+export type EffectiveStakeholder = {
+  userId:       string;
+  fullName:     string | null;
+  email:        string | null;
+  roleCode:     string;
+  roleName:     string | null;
+  resolvedFrom: "COLUMN" | "TABLE" | "SCHEMA" | "SOURCE";
+};
+
+// Resolve effective governance for a column walking column → table → schema → source
+export async function resolveEffectiveGovernance(attributeId: number): Promise<EffectiveStakeholder[]> {
+  return sql<EffectiveStakeholder[]>`
+    WITH roles(role_code) AS (VALUES ('OWNER'), ('BIZ_STEWARD'), ('TECH_STEWARD')),
+    resolved AS (
+      SELECT r.role_code, eff.user_id, eff.resolved_from
+      FROM roles r
+      CROSS JOIN LATERAL bayanat.fn_resolve_effective_stakeholder(${attributeId}, r.role_code) eff
+      WHERE eff.user_id IS NOT NULL
+    )
+    SELECT
+      res.user_id       AS "userId",
+      u.full_name       AS "fullName",
+      u.email,
+      res.role_code     AS "roleCode",
+      sr.role_name_text AS "roleName",
+      res.resolved_from AS "resolvedFrom"
+    FROM resolved res
+    JOIN bayanat.users          u  ON u.user_id  = res.user_id
+    JOIN bayanat.stakeholder_roles sr ON sr.role_code = res.role_code
+    ORDER BY res.role_code, u.full_name
+  `;
+}
+
+// Resolve effective governance for an entity (table) walking table → schema → source
+export async function resolveEffectiveEntityGovernance(entityId: number): Promise<EffectiveStakeholder[]> {
+  return sql<EffectiveStakeholder[]>`
+    WITH roles(role_code) AS (VALUES ('OWNER'), ('BIZ_STEWARD'), ('TECH_STEWARD')),
+    resolved AS (
+      SELECT r.role_code, eff.user_id, eff.resolved_from
+      FROM roles r
+      CROSS JOIN LATERAL bayanat.fn_resolve_entity_stakeholder(${entityId}, r.role_code) eff
+      WHERE eff.user_id IS NOT NULL
+    )
+    SELECT
+      res.user_id       AS "userId",
+      u.full_name       AS "fullName",
+      u.email,
+      res.role_code     AS "roleCode",
+      sr.role_name_text AS "roleName",
+      res.resolved_from AS "resolvedFrom"
+    FROM resolved res
+    JOIN bayanat.users          u  ON u.user_id  = res.user_id
+    JOIN bayanat.stakeholder_roles sr ON sr.role_code = res.role_code
+    ORDER BY res.role_code, u.full_name
+  `;
+}
+
+// Get stakeholders for a user (sources they are responsible for)
+export async function getSourcesForUser(userId: string): Promise<{ sourceId: number; sourceName: string; roleCode: string }[]> {
+  return sql<{ sourceId: number; sourceName: string; roleCode: string }[]>`
+    SELECT DISTINCT
+      ds.data_source_id AS "sourceId",
+      ds.source_name_text AS "sourceName",
+      s.role_code AS "roleCode"
+    FROM bayanat.asset_stakeholders s
+    JOIN bayanat.data_sources ds ON ds.data_source_id = s.asset_id
+    WHERE s.asset_type_code = 'DATA_SOURCES'
+      AND s.user_id = ${userId}
+    ORDER BY ds.source_name_text
+  `;
+}
+
 // Bulk-assign governance defaults to a newly discovered entity (called during crawl)
 export async function applyGovernanceDefaults(
   entityId:             number,

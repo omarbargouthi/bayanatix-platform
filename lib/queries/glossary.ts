@@ -83,6 +83,8 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     createdAt:             string;
     retentionCategoryId:   number | null;
     retentionCategoryName: string | null;
+    ownerUserId:           string | null;
+    ownerName:             string | null;
   }[]>`
     SELECT
       g.glossary_id            AS "glossaryId",
@@ -100,10 +102,13 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
       p.glossary_id            AS "domainId",
       g.created_at_timestamp   AS "createdAt",
       g.retention_category_id  AS "retentionCategoryId",
-      dc.name                  AS "retentionCategoryName"
+      dc.name                  AS "retentionCategoryName",
+      g.owner_user_id          AS "ownerUserId",
+      ou.full_name             AS "ownerName"
     FROM bayanat.business_glossaries g
     LEFT JOIN bayanat.business_glossaries p  ON p.glossary_id  = g.parent_glossary_id
     LEFT JOIN bayanat.data_categories    dc  ON dc.category_id = g.retention_category_id
+    LEFT JOIN bayanat.users             ou  ON ou.user_id     = g.owner_user_id
     WHERE g.glossary_id = ${id}
     LIMIT 1
   `;
@@ -115,6 +120,16 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     FROM bayanat.glossary_aliases
     WHERE glossary_id = ${id}
     ORDER BY alias_name_text
+  `;
+
+  const stewardRows = await sql<{ stewardId: number; glossaryId: number; userId: string; fullName: string | null; email: string | null; assignedAt: string }[]>`
+    SELECT gs.steward_id AS "stewardId", gs.glossary_id AS "glossaryId", gs.user_id AS "userId",
+           u.full_name AS "fullName", u.email,
+           gs.assigned_at::text AS "assignedAt"
+    FROM bayanat.glossary_stewards gs
+    JOIN bayanat.users u ON u.user_id = gs.user_id
+    WHERE gs.glossary_id = ${id}
+    ORDER BY u.full_name
   `;
 
   const attrRows = await sql<{
@@ -144,6 +159,7 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
 
   return {
     ...term,
+    stewards:         stewardRows,
     aliases:          aliasRows.map((r): GlossaryAlias => ({ aliasId: r.aliasId, name: r.alias })),
     linkedAttributes: attrRows,
   };

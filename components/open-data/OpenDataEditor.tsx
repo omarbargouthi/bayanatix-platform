@@ -18,6 +18,7 @@ type Props = {
   dimensions: DimensionOpt[];
   canEdit: boolean;
   userId: string;
+  userRole: string;
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -203,6 +204,7 @@ export function OpenDataEditor({
   dimensions,
   canEdit,
   userId: _userId,
+  userRole,
 }: Props) {
   const router = useRouter();
 
@@ -669,6 +671,7 @@ export function OpenDataEditor({
             dqIssues={dqIssues}
             dimensions={dimensions}
             canEdit={isEditable && datasetId != null}
+            mySources={userRole === "STEWARD"}
             onColumnAdded={handleColumnAdded}
             onColumnRemoved={handleColumnRemoved}
             onColumnUpdated={handleColumnUpdated}

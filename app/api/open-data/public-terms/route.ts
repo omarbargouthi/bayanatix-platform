@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 // Classification codes that are NOT suitable for open data publication
-export const RESTRICTED_CODES = ["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"];
+const RESTRICTED_CODES = ["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"];
 
 export type PublicTerm = {
   glossaryId:         number;

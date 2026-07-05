@@ -37,6 +37,7 @@ export default async function NewOpenDataPage() {
           dimensions={dimensions}
           canEdit={true}
           userId={user.userId}
+          userRole={user.role}
         />
       </main>
     </>

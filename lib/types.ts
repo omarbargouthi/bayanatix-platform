@@ -246,12 +246,24 @@ export type TeamMember = {
 
 // ── Glossary ──────────────────────────────────────────────────────────────────
 
+export type GlossarySteward = {
+  stewardId:  number;
+  glossaryId: number;
+  userId:     string;
+  fullName:   string | null;
+  email:      string | null;
+  assignedAt: string;
+};
+
 export type GlossaryDomain = {
-  glossaryId:  number;
-  termName:    string;
-  description: string;
-  classCode:   string | null;
-  termCount:   number;
+  glossaryId:    number;
+  termName:      string;
+  description:   string;
+  classCode:     string | null;
+  termCount:     number;
+  ownerUserId?:  string | null;
+  ownerName?:    string | null;
+  stewards?:     GlossarySteward[];
 };
 
 export type GlossaryTerm = {
@@ -289,6 +301,9 @@ export type GlossaryTermDetail = {
   createdAt:             string;
   retentionCategoryId:   number | null;
   retentionCategoryName: string | null;
+  ownerUserId:           string | null;
+  ownerName:             string | null;
+  stewards:              GlossarySteward[];
   aliases:               GlossaryAlias[];
   linkedAttributes: {
     attributeId:  number;

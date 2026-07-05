@@ -49,6 +49,7 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
           dimensions={dimensions}
           canEdit={canEdit}
           userId={user.userId}
+          userRole={user.role}
         />
       </main>
     </>
