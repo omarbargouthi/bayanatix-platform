@@ -2,10 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ClassificationColumn } from "@/app/api/classification/columns/route";
+import type { ColumnDqRule } from "@/app/api/open-data/column-dq/route";
 import type { OpenDataColumn, OpenDataDqIssue } from "@/lib/types";
 import { ClassificationTag } from "@/components/ui/Tag";
 
 type DqDimension = { code: string; name: string };
+
+type DqIssueFormState = {
+  open:      boolean;
+  issueId:   number | null; // null = new, non-null = editing existing
+  dimension: string;
+  text:      string;
+  severity:  string;
+};
 
 type Props = {
   datasetId: number | null;
@@ -16,15 +25,40 @@ type Props = {
   onColumnAdded: (col: OpenDataColumn) => void;
   onColumnRemoved: (odColumnId: number) => void;
   onDqIssueAdded: (issue: OpenDataDqIssue) => void;
+  onDqIssueUpdated: (issue: OpenDataDqIssue) => void;
   onDqIssueRemoved: (issueId: number) => void;
 };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function DqScoreBadge({ score }: { score: number | null }) {
   if (score == null) return <span className="text-xs text-slate-400">—</span>;
-  const pct = Math.round(score);
-  const color = pct >= 80 ? "text-emerald-600 bg-emerald-50" : pct >= 50 ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
-  return <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${color}`}>{pct}%</span>;
+  const pct   = Math.round(score);
+  const color = pct >= 80
+    ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+    : pct >= 50
+    ? "text-amber-600 bg-amber-50 border-amber-200"
+    : "text-red-600 bg-red-50 border-red-200";
+  return <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${color}`}>{pct}%</span>;
 }
+
+function RuleStatusBadge({ status, score }: { status: string | null; score: number | null }) {
+  if (!status) return <span className="text-xs text-slate-400">Not run</span>;
+  const cfg = status === "PASSED"
+    ? { bg: "bg-emerald-50 text-emerald-700", icon: "✓" }
+    : status === "FAILED"
+    ? { bg: "bg-red-50 text-red-600", icon: "✗" }
+    : { bg: "bg-slate-100 text-slate-500", icon: "!" };
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${cfg.bg}`}>
+      <span>{cfg.icon}</span>
+      {status}
+      {score != null && <span className="opacity-70">({Math.round(score)}%)</span>}
+    </span>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function ColumnPickerPanel({
   datasetId,
@@ -35,27 +69,31 @@ export function ColumnPickerPanel({
   onColumnAdded,
   onColumnRemoved,
   onDqIssueAdded,
+  onDqIssueUpdated,
   onDqIssueRemoved,
 }: Props) {
-  const [search, setSearch]         = useState("");
-  const [results, setResults]       = useState<ClassificationColumn[]>([]);
-  const [searching, setSearching]   = useState(false);
-  const [adding, setAdding]         = useState<number | null>(null);
+  const [search, setSearch]       = useState("");
+  const [results, setResults]     = useState<ClassificationColumn[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [adding, setAdding]       = useState<number | null>(null);
 
-  // DQ issue form per column (attributeId → form state)
-  const [dqForms, setDqForms] = useState<
-    Record<number, { open: boolean; dimension: string; text: string; severity: string }>
-  >({});
+  // DQ rules per column (attributeId → rules), fetched lazily
+  const [dqRules, setDqRules]     = useState<Record<number, ColumnDqRule[]>>({});
+  const [rulesLoading, setRulesLoading] = useState<Record<number, boolean>>({});
+
+  // DQ issue form per column
+  const [dqForms, setDqForms] = useState<Record<number, DqIssueFormState>>({});
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const selectedAttrIds = new Set(selectedColumns.map((c) => c.attributeId));
+
+  // ── Search ──────────────────────────────────────────────────────────────
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
-      const res = await fetch(`/api/classification/columns?search=${encodeURIComponent(q)}&limit=30`);
+      const res  = await fetch(`/api/classification/columns?search=${encodeURIComponent(q)}&limit=30`);
       const json = await res.json();
       setResults((json.data as ClassificationColumn[]) ?? []);
     } finally {
@@ -68,6 +106,22 @@ export function ColumnPickerPanel({
     searchTimer.current = setTimeout(() => doSearch(search), 350);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [search, doSearch]);
+
+  // ── Fetch DQ rules for a column ─────────────────────────────────────────
+
+  async function fetchDqRules(attributeId: number) {
+    if (dqRules[attributeId] !== undefined) return; // already fetched
+    setRulesLoading((p) => ({ ...p, [attributeId]: true }));
+    try {
+      const res  = await fetch(`/api/open-data/column-dq?attributeId=${attributeId}`);
+      const data = await res.json();
+      setDqRules((p) => ({ ...p, [attributeId]: Array.isArray(data) ? data : [] }));
+    } finally {
+      setRulesLoading((p) => ({ ...p, [attributeId]: false }));
+    }
+  }
+
+  // ── Add column ──────────────────────────────────────────────────────────
 
   async function addColumn(col: ClassificationColumn) {
     if (!datasetId) return;
@@ -83,26 +137,28 @@ export function ColumnPickerPanel({
 
       const newCol: OpenDataColumn = {
         odColumnId,
-        datasetId: datasetId!,
-        attributeId:   col.attributeId,
-        physicalName:  col.physicalName,
-        friendlyName:  null,
-        dataType:      col.dataType,
-        publishName:   null,
-        publishDesc:   null,
-        sortOrder:     selectedColumns.length,
-        entityName:    col.entityName,
-        entityId:      col.entityId,
-        schemaName:    col.schemaName,
-        schemaId:      col.schemaId,
-        sourceName:    col.sourceName,
-        classTermName: col.classTermName,
-        classTermCode: col.classTermClassCode,
+        datasetId:      datasetId!,
+        attributeId:    col.attributeId,
+        physicalName:   col.physicalName,
+        friendlyName:   null,
+        dataType:       col.dataType,
+        publishName:    null,
+        publishDesc:    null,
+        sortOrder:      selectedColumns.length,
+        entityName:     col.entityName,
+        entityId:       col.entityId,
+        schemaName:     col.schemaName,
+        schemaId:       col.schemaId,
+        sourceName:     col.sourceName,
+        classTermName:  col.classTermName,
+        classTermCode:  col.classTermClassCode,
         classTermIsPii: col.classTermIsPii,
-        dqScore:       null,
-        dqRuleCount:   0,
+        dqScore:        null,
+        dqRuleCount:    0,
       };
       onColumnAdded(newCol);
+      // Pre-fetch DQ rules for newly added column
+      fetchDqRules(col.attributeId);
     } finally {
       setAdding(null);
     }
@@ -114,13 +170,34 @@ export function ColumnPickerPanel({
     onColumnRemoved(col.odColumnId);
   }
 
-  function toggleDqForm(attributeId: number) {
-    setDqForms((prev) => ({
-      ...prev,
-      [attributeId]: prev[attributeId]
-        ? { ...prev[attributeId], open: !prev[attributeId].open }
-        : { open: true, dimension: "", text: "", severity: "WARNING" },
+  // ── DQ issue form helpers ───────────────────────────────────────────────
+
+  function openNewIssueForm(attributeId: number, prefillDimension = "") {
+    setDqForms((p) => ({
+      ...p,
+      [attributeId]: { open: true, issueId: null, dimension: prefillDimension, text: "", severity: "WARNING" },
     }));
+  }
+
+  function openEditForm(attributeId: number, issue: OpenDataDqIssue) {
+    setDqForms((p) => ({
+      ...p,
+      [attributeId]: {
+        open:      true,
+        issueId:   issue.issueId,
+        dimension: issue.dimensionCode ?? "",
+        text:      issue.issueText,
+        severity:  issue.severityCode,
+      },
+    }));
+  }
+
+  function closeForm(attributeId: number) {
+    setDqForms((p) => ({ ...p, [attributeId]: { ...p[attributeId], open: false, issueId: null } }));
+  }
+
+  function updateFormField(attributeId: number, field: keyof DqIssueFormState, value: string) {
+    setDqForms((p) => ({ ...p, [attributeId]: { ...p[attributeId], [field]: value } }));
   }
 
   async function submitDqIssue(attributeId: number) {
@@ -128,33 +205,61 @@ export function ColumnPickerPanel({
     const form = dqForms[attributeId];
     if (!form?.text.trim()) return;
 
-    const res = await fetch(`/api/open-data/datasets/${datasetId}/dq-issues`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        attributeId,
-        dimensionCode: form.dimension || null,
-        issueText:     form.text.trim(),
-        severityCode:  form.severity,
-      }),
-    });
-    if (!res.ok) return;
-    const { issueId } = await res.json();
-
     const dim = dimensions.find((d) => d.code === form.dimension);
-    onDqIssueAdded({
-      issueId,
-      datasetId: datasetId!,
-      attributeId,
-      columnName:    selectedColumns.find((c) => c.attributeId === attributeId)?.physicalName ?? null,
-      dimensionCode: form.dimension || null,
-      dimensionName: dim?.name ?? null,
-      issueText:     form.text.trim(),
-      severityCode:  form.severity as "BLOCKER" | "WARNING" | "INFO",
-      createdAt:     new Date().toISOString(),
-    });
 
-    setDqForms((prev) => ({ ...prev, [attributeId]: { open: false, dimension: "", text: "", severity: "WARNING" } }));
+    if (form.issueId != null) {
+      // ── Update existing ──
+      const res = await fetch(`/api/open-data/datasets/${datasetId}/dq-issues`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueId:       form.issueId,
+          dimensionCode: form.dimension || null,
+          issueText:     form.text.trim(),
+          severityCode:  form.severity,
+        }),
+      });
+      if (!res.ok) return;
+
+      const existing = dqIssues.find((i) => i.issueId === form.issueId);
+      if (existing) {
+        onDqIssueUpdated({
+          ...existing,
+          dimensionCode: form.dimension || null,
+          dimensionName: dim?.name ?? null,
+          issueText:     form.text.trim(),
+          severityCode:  form.severity as "BLOCKER" | "WARNING" | "INFO",
+        });
+      }
+    } else {
+      // ── Create new ──
+      const res = await fetch(`/api/open-data/datasets/${datasetId}/dq-issues`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attributeId,
+          dimensionCode: form.dimension || null,
+          issueText:     form.text.trim(),
+          severityCode:  form.severity,
+        }),
+      });
+      if (!res.ok) return;
+      const { issueId } = await res.json();
+
+      onDqIssueAdded({
+        issueId,
+        datasetId:     datasetId!,
+        attributeId,
+        columnName:    selectedColumns.find((c) => c.attributeId === attributeId)?.physicalName ?? null,
+        dimensionCode: form.dimension || null,
+        dimensionName: dim?.name ?? null,
+        issueText:     form.text.trim(),
+        severityCode:  form.severity as "BLOCKER" | "WARNING" | "INFO",
+        createdAt:     new Date().toISOString(),
+      });
+    }
+
+    closeForm(attributeId);
   }
 
   async function removeDqIssue(issueId: number) {
@@ -163,7 +268,15 @@ export function ColumnPickerPanel({
     onDqIssueRemoved(issueId);
   }
 
-  const severityColors = { BLOCKER: "text-red-600", WARNING: "text-amber-600", INFO: "text-slate-500" };
+  // ── Severity colour helper ──────────────────────────────────────────────
+
+  const severityColors = {
+    BLOCKER: "text-red-600 bg-red-50",
+    WARNING: "text-amber-600 bg-amber-50",
+    INFO:    "text-slate-500 bg-slate-100",
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -188,7 +301,6 @@ export function ColumnPickerPanel({
             )}
           </div>
 
-          {/* Search results */}
           {results.length > 0 && (
             <div className="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm max-h-72 overflow-y-auto">
               {results.map((col) => {
@@ -252,20 +364,21 @@ export function ColumnPickerPanel({
           </p>
 
           {selectedColumns.map((col) => {
-            const colIssues = dqIssues.filter((i) => i.attributeId === col.attributeId);
-            const dqForm    = dqForms[col.attributeId];
+            const colIssues  = dqIssues.filter((i) => i.attributeId === col.attributeId);
+            const rules      = dqRules[col.attributeId];
+            const loadingRules = rulesLoading[col.attributeId];
+            const dqForm     = dqForms[col.attributeId];
+            const hasRules   = col.dqRuleCount > 0 || (rules && rules.length > 0);
 
             return (
               <div key={col.odColumnId} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
-                {/* Column header row */}
+                {/* ── Column header ── */}
                 <div className="flex items-start gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-slate-800">{col.physicalName}</span>
                       <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{col.dataType}</span>
-                      {col.classTermCode && (
-                        <ClassificationTag code={col.classTermCode} />
-                      )}
+                      {col.classTermCode && <ClassificationTag code={col.classTermCode} />}
                       {col.classTermIsPii && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium border border-red-100">PII</span>
                       )}
@@ -279,68 +392,148 @@ export function ColumnPickerPanel({
                         Classification: {col.classTermName}
                       </div>
                     )}
-                    {col.dqRuleCount > 0 && (
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {col.dqRuleCount} DQ rule{col.dqRuleCount > 1 ? "s" : ""} linked
-                      </div>
-                    )}
                   </div>
 
-                  {canEdit && (
-                    <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Load DQ rules button (if not already fetched) */}
+                    {col.dqRuleCount > 0 && rules === undefined && !loadingRules && (
                       <button
-                        onClick={() => toggleDqForm(col.attributeId)}
-                        className="text-xs px-2.5 py-1 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                        onClick={() => fetchDqRules(col.attributeId)}
+                        className="text-xs px-2.5 py-1 border border-sky-200 rounded-lg text-sky-600 hover:bg-sky-50 transition-colors"
                       >
-                        + DQ Issue
+                        {col.dqRuleCount} DQ rule{col.dqRuleCount > 1 ? "s" : ""} ↓
                       </button>
-                      <button
-                        onClick={() => removeColumn(col)}
-                        className="text-xs px-2.5 py-1 border border-red-100 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    {loadingRules && (
+                      <span className="text-xs text-slate-400 animate-pulse">Loading…</span>
+                    )}
+                    {canEdit && (
+                      <>
+                        <button
+                          onClick={() => openNewIssueForm(col.attributeId)}
+                          className="text-xs px-2.5 py-1 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          + DQ Issue
+                        </button>
+                        <button
+                          onClick={() => removeColumn(col)}
+                          className="text-xs px-2.5 py-1 border border-red-100 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                {/* Existing DQ issues for this column */}
+                {/* ── DQ Rules from catalog ── */}
+                {rules && rules.length > 0 && (
+                  <div className="border-t border-sky-100 bg-sky-50/50 px-4 py-2.5">
+                    <p className="text-[11px] font-semibold text-sky-700 uppercase tracking-wide mb-2">
+                      DQ Rules ({rules.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {rules.map((rule) => (
+                        <div key={rule.ruleId} className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-medium text-slate-700">{rule.ruleName}</span>
+                              {rule.dimensionName && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                                  {rule.dimensionName}
+                                </span>
+                              )}
+                              {rule.severity && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                  rule.severity === "BLOCKER" ? "bg-red-100 text-red-600"
+                                  : rule.severity === "WARNING" ? "bg-amber-100 text-amber-600"
+                                  : "bg-slate-100 text-slate-500"
+                                }`}>
+                                  {rule.severity}
+                                </span>
+                              )}
+                            </div>
+                            {rule.lastRunAt && (
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                Last run: {rule.lastRunAt}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <RuleStatusBadge status={rule.lastStatus} score={rule.lastScore} />
+                            {canEdit && (
+                              <button
+                                onClick={() => openNewIssueForm(col.attributeId, rule.dimensionCode ?? "")}
+                                className="text-[10px] px-2 py-0.5 border border-amber-200 rounded text-amber-600 hover:bg-amber-50 transition-colors"
+                              >
+                                Add Issue
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {rules && rules.length === 0 && col.dqRuleCount === 0 && (
+                  <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-2">
+                    <p className="text-xs text-slate-400">No active DQ rules linked to this column.</p>
+                  </div>
+                )}
+
+                {/* ── Existing DQ issues (from dataset context) ── */}
                 {colIssues.length > 0 && (
-                  <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 space-y-1.5">
+                  <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 space-y-2">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                      DQ Issue Notes ({colIssues.length})
+                    </p>
                     {colIssues.map((issue) => (
                       <div key={issue.issueId} className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {issue.dimensionName && (
-                              <span className="text-[11px] font-medium text-slate-500">{issue.dimensionName}</span>
+                              <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {issue.dimensionName}
+                              </span>
                             )}
-                            <span className={`text-[11px] font-medium ${severityColors[issue.severityCode]}`}>
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${severityColors[issue.severityCode]}`}>
                               {issue.severityCode}
                             </span>
                           </div>
                           <p className="text-xs text-slate-700 mt-0.5">{issue.issueText}</p>
                         </div>
                         {canEdit && (
-                          <button
-                            onClick={() => removeDqIssue(issue.issueId)}
-                            className="text-xs text-red-400 hover:text-red-600 shrink-0"
-                          >
-                            ×
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => openEditForm(col.attributeId, issue)}
+                              className="text-xs text-sky-500 hover:text-sky-700"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => removeDqIssue(issue.issueId)}
+                              className="text-xs text-red-400 hover:text-red-600"
+                            >
+                              ×
+                            </button>
+                          </div>
                         )}
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* DQ issue add form */}
+                {/* ── DQ issue add / edit form ── */}
                 {dqForm?.open && (
                   <div className="border-t border-amber-100 bg-amber-50 px-4 py-3 space-y-2">
-                    <p className="text-xs font-medium text-amber-700">Add DQ Issue Note</p>
+                    <p className="text-xs font-medium text-amber-700">
+                      {dqForm.issueId != null ? "Edit DQ Issue Note" : "Add DQ Issue Note"}
+                    </p>
                     <div className="grid grid-cols-2 gap-2">
                       <select
                         value={dqForm.dimension}
-                        onChange={(e) => setDqForms((p) => ({ ...p, [col.attributeId]: { ...p[col.attributeId], dimension: e.target.value } }))}
+                        onChange={(e) => updateFormField(col.attributeId, "dimension", e.target.value)}
                         className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                       >
                         <option value="">— DQ Dimension (optional) —</option>
@@ -350,7 +543,7 @@ export function ColumnPickerPanel({
                       </select>
                       <select
                         value={dqForm.severity}
-                        onChange={(e) => setDqForms((p) => ({ ...p, [col.attributeId]: { ...p[col.attributeId], severity: e.target.value } }))}
+                        onChange={(e) => updateFormField(col.attributeId, "severity", e.target.value)}
                         className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                       >
                         <option value="INFO">Info</option>
@@ -360,8 +553,8 @@ export function ColumnPickerPanel({
                     </div>
                     <textarea
                       value={dqForm.text}
-                      onChange={(e) => setDqForms((p) => ({ ...p, [col.attributeId]: { ...p[col.attributeId], text: e.target.value } }))}
-                      placeholder="Describe the data quality issue for this column in the context of this dataset…"
+                      onChange={(e) => updateFormField(col.attributeId, "text", e.target.value)}
+                      placeholder="Describe the data quality issue in the context of this dataset…"
                       rows={2}
                       className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-1 focus:ring-amber-300"
                     />
@@ -371,10 +564,10 @@ export function ColumnPickerPanel({
                         disabled={!dqForm.text.trim()}
                         className="px-3 py-1 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
                       >
-                        Save Issue
+                        {dqForm.issueId != null ? "Save Changes" : "Save Issue"}
                       </button>
                       <button
-                        onClick={() => toggleDqForm(col.attributeId)}
+                        onClick={() => closeForm(col.attributeId)}
                         className="px-3 py-1 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
                       >
                         Cancel

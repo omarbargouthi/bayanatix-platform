@@ -33,8 +33,7 @@ export async function listOpenDatasets(opts: {
       d.dataset_name_text                       AS "datasetName",
       d.description_text                        AS "descriptionText",
       d.department_text                         AS "departmentText",
-      d.domain_code                             AS "domainCode",
-      gd.domain_name                            AS "domainName",
+      d.category_text                           AS "categoryText",
       d.purpose_text                            AS "purposeText",
       d.beneficiary_segments                    AS "beneficiarySegments",
       to_char(d.publish_date, 'YYYY-MM-DD')     AS "publishDate",
@@ -54,10 +53,8 @@ export async function listOpenDatasets(opts: {
       to_char(d.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "updatedAt",
       COUNT(*) OVER()::int                      AS total
     FROM bayanat.open_datasets d
-    LEFT JOIN bayanat.governance_domains gd ON gd.domain_code = d.domain_code
     LEFT JOIN bayanat.users              u  ON u.user_id = d.raised_by_user_id
     LEFT JOIN bayanat.open_dataset_columns odc ON odc.dataset_id = d.dataset_id
-    LEFT JOIN bayanat.data_attributes     da  ON da.attribute_id = odc.attribute_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
@@ -65,7 +62,7 @@ export async function listOpenDatasets(opts: {
       ${status != null ? sql`d.status_code = ${status}` : sql`true`}
       AND ${userId != null ? sql`d.raised_by_user_id = ${userId}` : sql`true`}
       AND ${search !== "" ? sql`d.dataset_name_text ILIKE ${like} OR d.description_text ILIKE ${like}` : sql`true`}
-    GROUP BY d.dataset_id, gd.domain_name, u.full_name
+    GROUP BY d.dataset_id, u.full_name
     ORDER BY d.updated_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -94,8 +91,7 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
       d.dataset_name_text                       AS "datasetName",
       d.description_text                        AS "descriptionText",
       d.department_text                         AS "departmentText",
-      d.domain_code                             AS "domainCode",
-      gd.domain_name                            AS "domainName",
+      d.category_text                           AS "categoryText",
       d.purpose_text                            AS "purposeText",
       d.beneficiary_segments                    AS "beneficiarySegments",
       to_char(d.publish_date, 'YYYY-MM-DD')     AS "publishDate",
@@ -114,14 +110,13 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
       to_char(d.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt",
       to_char(d.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "updatedAt"
     FROM bayanat.open_datasets d
-    LEFT JOIN bayanat.governance_domains   gd  ON gd.domain_code = d.domain_code
     LEFT JOIN bayanat.users                u   ON u.user_id = d.raised_by_user_id
     LEFT JOIN bayanat.open_dataset_columns odc ON odc.dataset_id = d.dataset_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
     WHERE d.dataset_id = ${datasetId}
-    GROUP BY d.dataset_id, gd.domain_name, u.full_name
+    GROUP BY d.dataset_id, u.full_name
   `;
 
   if (!rows[0]) return null;
@@ -130,8 +125,8 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
     ...r,
     datasetId:           Number(r.datasetId),
     columnCount:         Number(r.columnCount ?? 0),
-    beneficiarySegments: (r.beneficiarySegments as unknown as string[]) ?? [],
-    dataFormats:         (r.dataFormats as unknown as string[]) ?? [],
+    beneficiarySegments: jsonArr<string>(r.beneficiarySegments),
+    dataFormats:         jsonArr(r.dataFormats),
   } as OpenDataset;
 }
 
@@ -208,8 +203,8 @@ export async function getDatasetDqIssues(datasetId: number): Promise<OpenDataDqI
 
   return rows.map((r) => ({
     ...r,
-    issueId:    Number(r.issueId),
-    datasetId:  Number(r.datasetId),
+    issueId:     Number(r.issueId),
+    datasetId:   Number(r.datasetId),
     attributeId: r.attributeId != null ? Number(r.attributeId) : null,
   }));
 }

@@ -8,7 +8,6 @@ import type {
 } from "@/lib/types";
 import { ColumnPickerPanel } from "./ColumnPickerPanel";
 
-type DomainOpt    = { domainCode: string; domainName: string };
 type DimensionOpt = { code: string; name: string };
 
 type Props = {
@@ -16,13 +15,31 @@ type Props = {
   dataset: OpenDataset | null;
   initialColumns: OpenDataColumn[];
   initialDqIssues: OpenDataDqIssue[];
-  domains: DomainOpt[];
   dimensions: DimensionOpt[];
   canEdit: boolean;
   userId: string;
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
+
+const DATA_CATEGORIES = [
+  "Economy and Finance",
+  "Education and Training",
+  "Health and Population",
+  "Environment and Climate",
+  "Real Estate and Housing",
+  "Transportation and Logistics",
+  "Government and Public Services",
+  "Demographics and Social",
+  "Agriculture and Food",
+  "Energy and Utilities",
+  "Security and Safety",
+  "Culture and Tourism",
+  "Technology and Communications",
+  "Infrastructure and Construction",
+  "Legal and Judicial",
+  "Science and Research",
+];
 
 const SEGMENT_OPTIONS = [
   "Investors", "Researchers", "Government", "Media", "Citizens",
@@ -183,10 +200,9 @@ export function OpenDataEditor({
   dataset,
   initialColumns,
   initialDqIssues,
-  domains,
   dimensions,
   canEdit,
-  userId,
+  userId: _userId,
 }: Props) {
   const router = useRouter();
 
@@ -195,7 +211,7 @@ export function OpenDataEditor({
   const [datasetName,   setDatasetName]   = useState(dataset?.datasetName ?? "");
   const [description,   setDescription]  = useState(dataset?.descriptionText ?? "");
   const [department,    setDepartment]    = useState(dataset?.departmentText ?? "");
-  const [domainCode,    setDomainCode]    = useState(dataset?.domainCode ?? "");
+  const [categoryText,  setCategoryText]  = useState(dataset?.categoryText ?? "");
   const [purpose,       setPurpose]       = useState(dataset?.purposeText ?? "");
   const [segments,      setSegments]      = useState<string[]>(
     Array.isArray(dataset?.beneficiarySegments) ? dataset.beneficiarySegments : [],
@@ -252,6 +268,7 @@ export function OpenDataEditor({
   }, [prevAutoLogic, extraction]);
 
   const handleDqIssueAdded   = useCallback((i: OpenDataDqIssue) => setDqIssues((p) => [...p, i]), []);
+  const handleDqIssueUpdated = useCallback((i: OpenDataDqIssue) => setDqIssues((p) => p.map((x) => x.issueId === i.issueId ? i : x)), []);
   const handleDqIssueRemoved = useCallback((id: number) => setDqIssues((p) => p.filter((i) => i.issueId !== id)), []);
 
   // ── Save ──────────────────────────────────────────────────────────────
@@ -263,10 +280,10 @@ export function OpenDataEditor({
 
     const body = {
       datasetName:         datasetName.trim(),
-      descriptionText:     description  || null,
-      departmentText:      department   || null,
-      domainCode:          domainCode   || null,
-      purposeText:         purpose      || null,
+      descriptionText:     description   || null,
+      departmentText:      department    || null,
+      categoryText:        categoryText  || null,
+      purposeText:         purpose       || null,
       beneficiarySegments: segments,
       publishDate:         publishDate  || null,
       coverageFromYear:    coverageFrom ? Number(coverageFrom) : null,
@@ -473,16 +490,16 @@ export function OpenDataEditor({
                 />
               </Field>
 
-              <Field label="Open Data Domain">
+              <Field label="Data Category">
                 <select
-                  value={domainCode}
-                  onChange={(e) => setDomainCode(e.target.value)}
+                  value={categoryText}
+                  onChange={(e) => setCategoryText(e.target.value)}
                   disabled={!isEditable}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                 >
-                  <option value="">— Select domain —</option>
-                  {domains.map((d) => (
-                    <option key={d.domainCode} value={d.domainCode}>{d.domainName}</option>
+                  <option value="">— Select category —</option>
+                  {DATA_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               </Field>
@@ -651,6 +668,7 @@ export function OpenDataEditor({
             onColumnAdded={handleColumnAdded}
             onColumnRemoved={handleColumnRemoved}
             onDqIssueAdded={handleDqIssueAdded}
+            onDqIssueUpdated={handleDqIssueUpdated}
             onDqIssueRemoved={handleDqIssueRemoved}
           />
         </div>

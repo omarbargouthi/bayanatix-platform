@@ -407,8 +407,7 @@ export type OpenDataset = {
   datasetName:          string;
   descriptionText:      string | null;
   departmentText:       string | null;
-  domainCode:           string | null;
-  domainName:           string | null;
+  categoryText:         string | null;
   purposeText:          string | null;
   beneficiarySegments:  string[];
   publishDate:          string | null;

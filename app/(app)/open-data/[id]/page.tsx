@@ -12,23 +12,17 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
   if (!user) redirect("/login");
 
   const datasetId = Number(params.id);
-  const [dataset, columns, dqIssues] = await Promise.all([
+  const [dataset, columns, dqIssues, dimensions] = await Promise.all([
     getOpenDataset(datasetId),
     getDatasetColumns(datasetId),
     getDatasetDqIssues(datasetId),
+    sql<{ code: string; name: string }[]>`
+      SELECT dimension_code AS code, dimension_name_text AS name
+      FROM bayanat.dq_dimensions ORDER BY dimension_code
+    `,
   ]);
 
   if (!dataset) notFound();
-
-  const domains = await sql<{ domainCode: string; domainName: string }[]>`
-    SELECT domain_code AS "domainCode", domain_name AS "domainName"
-    FROM bayanat.governance_domains ORDER BY sort_order
-  `;
-
-  const dimensions = await sql<{ code: string; name: string }[]>`
-    SELECT dimension_code AS code, dimension_name_text AS name
-    FROM bayanat.dq_dimensions ORDER BY dimension_code
-  `;
 
   const canEdit =
     user.role === "ADMIN" ||
@@ -52,7 +46,6 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
           dataset={dataset}
           initialColumns={columns}
           initialDqIssues={dqIssues}
-          domains={domains}
           dimensions={dimensions}
           canEdit={canEdit}
           userId={user.userId}

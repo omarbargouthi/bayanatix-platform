@@ -12,12 +12,6 @@ export default async function NewOpenDataPage() {
 
   if (user.role === "VIEWER") redirect("/open-data");
 
-  const domains = await sql<{ domainCode: string; domainName: string }[]>`
-    SELECT domain_code AS "domainCode", domain_name AS "domainName"
-    FROM bayanat.governance_domains
-    ORDER BY sort_order
-  `;
-
   const dimensions = await sql<{ code: string; name: string }[]>`
     SELECT dimension_code AS code, dimension_name_text AS name
     FROM bayanat.dq_dimensions ORDER BY dimension_code
@@ -40,7 +34,6 @@ export default async function NewOpenDataPage() {
           dataset={null}
           initialColumns={[]}
           initialDqIssues={[]}
-          domains={domains}
           dimensions={dimensions}
           canEdit={true}
           userId={user.userId}

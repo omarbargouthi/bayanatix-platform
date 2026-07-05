@@ -72,3 +72,38 @@ export async function DELETE(req: Request, { params }: Ctx) {
 
   return NextResponse.json({ ok: true });
 }
+
+export async function PATCH(req: Request, { params }: Ctx) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const datasetId = Number(params.id);
+
+  const [ds] = await sql<{ raisedBy: string }[]>`
+    SELECT raised_by_user_id AS "raisedBy" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
+  `;
+  if (!ds) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (ds.raisedBy !== session.userId && session.role !== "ADMIN" && session.role !== "STEWARD") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body: {
+    issueId: number;
+    dimensionCode?: string | null;
+    issueText?: string;
+    severityCode?: "BLOCKER" | "WARNING" | "INFO";
+  } = await req.json();
+
+  if (!body.issueId) return NextResponse.json({ error: "issueId required" }, { status: 400 });
+
+  await sql`
+    UPDATE bayanat.open_dataset_dq_issues
+    SET
+      dimension_code = COALESCE(${body.dimensionCode !== undefined ? (body.dimensionCode ?? null) : null}, dimension_code),
+      issue_text     = COALESCE(${body.issueText?.trim() ?? null}, issue_text),
+      severity_code  = COALESCE(${body.severityCode ?? null}, severity_code)
+    WHERE issue_id = ${body.issueId} AND dataset_id = ${datasetId}
+  `;
+
+  return NextResponse.json({ ok: true });
+}

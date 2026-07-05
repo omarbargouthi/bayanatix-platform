@@ -149,7 +149,7 @@ export function OpenDataList({
               style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr" }}
             >
               <span>Dataset</span>
-              <span>Domain</span>
+              <span>Category</span>
               <span>Format</span>
               <span>Refresh</span>
               <span>Columns</span>
@@ -176,9 +176,9 @@ export function OpenDataList({
                   )}
                 </div>
 
-                {/* Domain */}
+                {/* Category */}
                 <span className="text-sm text-slate-600 truncate pr-2">
-                  {ds.domainName ?? ds.domainCode ?? "—"}
+                  {ds.categoryText ?? "—"}
                 </span>
 
                 {/* Format */}
