@@ -54,8 +54,8 @@ export function OpenDataList({
   const [, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const [datasets]  = useState(initialDatasets);
-  const [total]     = useState(initialTotal);
+  const datasets = initialDatasets;
+  const total    = initialTotal;
   const [status, setStatus] = useState(initialStatus);
   const [search, setSearch] = useState(initialSearch);
   const [page]      = useState(initialPage);
