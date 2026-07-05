@@ -386,7 +386,81 @@ export type RequestTypeCode =
   | "GRANT_ACCESS"
   | "REMOVE_ACCESS"
   | "OTHER"
-  | "CLASSIFY_ASSET";
+  | "CLASSIFY_ASSET"
+  | "PUBLISH_OPEN_DATA";
+
+// ── Open Data ─────────────────────────────────────────────────────────────────
+
+export type OpenDataStatus =
+  | "DRAFT"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "REJECTED"
+  | "PENDING";
+
+export type OpenDataFormat  = "xlsx" | "csv" | "json" | "xml" | "parquet";
+export type OpenDataRefresh = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "ON_DEMAND";
+
+export type OpenDataset = {
+  datasetId:            number;
+  datasetName:          string;
+  descriptionText:      string | null;
+  departmentText:       string | null;
+  domainCode:           string | null;
+  domainName:           string | null;
+  purposeText:          string | null;
+  beneficiarySegments:  string[];
+  publishDate:          string | null;
+  coverageFromYear:     number | null;
+  coverageToYear:       number | null;
+  dataFormats:          OpenDataFormat[];
+  dataSizeText:         string | null;
+  refreshFrequency:     OpenDataRefresh | null;
+  dqNotesText:          string | null;
+  extractionLogic:      string | null;
+  statusCode:           OpenDataStatus;
+  raisedByUserId:       string;
+  raisedByName:         string | null;
+  columnCount:          number;
+  hasPii:               boolean;
+  createdAt:            string;
+  updatedAt:            string;
+};
+
+export type OpenDataColumn = {
+  odColumnId:      number;
+  datasetId:       number;
+  attributeId:     number;
+  physicalName:    string;
+  friendlyName:    string | null;
+  dataType:        string;
+  publishName:     string | null;
+  publishDesc:     string | null;
+  sortOrder:       number;
+  entityName:      string;
+  entityId:        number;
+  schemaName:      string;
+  schemaId:        number;
+  sourceName:      string;
+  classTermName:   string | null;
+  classTermCode:   string | null;
+  classTermIsPii:  boolean;
+  dqScore:         number | null;
+  dqRuleCount:     number;
+};
+
+export type OpenDataDqIssue = {
+  issueId:       number;
+  datasetId:     number;
+  attributeId:   number | null;
+  columnName:    string | null;
+  dimensionCode: string | null;
+  dimensionName: string | null;
+  issueText:     string;
+  severityCode:  "BLOCKER" | "WARNING" | "INFO";
+  createdAt:     string;
+};
 
 export type RequestPriority = "HIGH" | "MEDIUM" | "LOW";
 export type RequestStatus   = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";

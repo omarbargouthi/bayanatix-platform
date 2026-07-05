@@ -1,0 +1,205 @@
+import { sql } from "@/lib/db";
+import type { OpenDataset, OpenDataColumn, OpenDataDqIssue } from "@/lib/types";
+
+// ── List ──────────────────────────────────────────────────────────────────────
+
+export async function listOpenDatasets(opts: {
+  userId?: string;
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ data: OpenDataset[]; total: number }> {
+  const { userId, search = "", page = 1, limit = 20 } = opts;
+  const status = opts.status && opts.status !== "all" ? opts.status : null;
+  const like   = "%" + search + "%";
+  const offset = (page - 1) * limit;
+
+  type Row = OpenDataset & { total: number };
+
+  const rows = await sql<Row[]>`
+    SELECT
+      d.dataset_id                              AS "datasetId",
+      d.dataset_name_text                       AS "datasetName",
+      d.description_text                        AS "descriptionText",
+      d.department_text                         AS "departmentText",
+      d.domain_code                             AS "domainCode",
+      gd.domain_name                            AS "domainName",
+      d.purpose_text                            AS "purposeText",
+      d.beneficiary_segments                    AS "beneficiarySegments",
+      to_char(d.publish_date, 'YYYY-MM-DD')     AS "publishDate",
+      d.coverage_from_year                      AS "coverageFromYear",
+      d.coverage_to_year                        AS "coverageToYear",
+      d.data_formats                            AS "dataFormats",
+      d.data_size_text                          AS "dataSizeText",
+      d.refresh_frequency                       AS "refreshFrequency",
+      d.dq_notes_text                           AS "dqNotesText",
+      d.extraction_logic                        AS "extractionLogic",
+      d.status_code                             AS "statusCode",
+      d.raised_by_user_id                       AS "raisedByUserId",
+      u.full_name                               AS "raisedByName",
+      COUNT(DISTINCT odc.od_column_id)::int     AS "columnCount",
+      BOOL_OR(COALESCE(bg.is_pii_indicator, false)) AS "hasPii",
+      to_char(d.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt",
+      to_char(d.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "updatedAt",
+      COUNT(*) OVER()::int                      AS total
+    FROM bayanat.open_datasets d
+    LEFT JOIN bayanat.governance_domains gd ON gd.domain_code = d.domain_code
+    LEFT JOIN bayanat.users              u  ON u.user_id = d.raised_by_user_id
+    LEFT JOIN bayanat.open_dataset_columns odc ON odc.dataset_id = d.dataset_id
+    LEFT JOIN bayanat.data_attributes     da  ON da.attribute_id = odc.attribute_id
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
+    WHERE
+      ${status != null ? sql`d.status_code = ${status}` : sql`true`}
+      AND ${userId != null ? sql`d.raised_by_user_id = ${userId}` : sql`true`}
+      AND ${search !== "" ? sql`d.dataset_name_text ILIKE ${like} OR d.description_text ILIKE ${like}` : sql`true`}
+    GROUP BY d.dataset_id, gd.domain_name, u.full_name
+    ORDER BY d.updated_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const total = Number(rows[0]?.total ?? 0);
+  return {
+    data: rows.map(({ total: _t, ...r }) => ({
+      ...r,
+      datasetId:           Number(r.datasetId),
+      columnCount:         Number(r.columnCount ?? 0),
+      beneficiarySegments: (r.beneficiarySegments as unknown as string[]) ?? [],
+      dataFormats:         (r.dataFormats as unknown as string[]) ?? [],
+    })) as OpenDataset[],
+    total,
+  };
+}
+
+// ── Single ────────────────────────────────────────────────────────────────────
+
+export async function getOpenDataset(datasetId: number): Promise<OpenDataset | null> {
+  const rows = await sql<(Omit<OpenDataset, "columnCount" | "hasPii"> & {
+    columnCount: number; hasPii: boolean;
+  })[]>`
+    SELECT
+      d.dataset_id                              AS "datasetId",
+      d.dataset_name_text                       AS "datasetName",
+      d.description_text                        AS "descriptionText",
+      d.department_text                         AS "departmentText",
+      d.domain_code                             AS "domainCode",
+      gd.domain_name                            AS "domainName",
+      d.purpose_text                            AS "purposeText",
+      d.beneficiary_segments                    AS "beneficiarySegments",
+      to_char(d.publish_date, 'YYYY-MM-DD')     AS "publishDate",
+      d.coverage_from_year                      AS "coverageFromYear",
+      d.coverage_to_year                        AS "coverageToYear",
+      d.data_formats                            AS "dataFormats",
+      d.data_size_text                          AS "dataSizeText",
+      d.refresh_frequency                       AS "refreshFrequency",
+      d.dq_notes_text                           AS "dqNotesText",
+      d.extraction_logic                        AS "extractionLogic",
+      d.status_code                             AS "statusCode",
+      d.raised_by_user_id                       AS "raisedByUserId",
+      u.full_name                               AS "raisedByName",
+      COUNT(DISTINCT odc.od_column_id)::int     AS "columnCount",
+      BOOL_OR(COALESCE(bg.is_pii_indicator, false)) AS "hasPii",
+      to_char(d.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt",
+      to_char(d.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "updatedAt"
+    FROM bayanat.open_datasets d
+    LEFT JOIN bayanat.governance_domains   gd  ON gd.domain_code = d.domain_code
+    LEFT JOIN bayanat.users                u   ON u.user_id = d.raised_by_user_id
+    LEFT JOIN bayanat.open_dataset_columns odc ON odc.dataset_id = d.dataset_id
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
+    WHERE d.dataset_id = ${datasetId}
+    GROUP BY d.dataset_id, gd.domain_name, u.full_name
+  `;
+
+  if (!rows[0]) return null;
+  const r = rows[0];
+  return {
+    ...r,
+    datasetId:           Number(r.datasetId),
+    columnCount:         Number(r.columnCount ?? 0),
+    beneficiarySegments: (r.beneficiarySegments as unknown as string[]) ?? [],
+    dataFormats:         (r.dataFormats as unknown as string[]) ?? [],
+  } as OpenDataset;
+}
+
+// ── Columns for a dataset ─────────────────────────────────────────────────────
+
+export async function getDatasetColumns(datasetId: number): Promise<OpenDataColumn[]> {
+  const rows = await sql<OpenDataColumn[]>`
+    SELECT
+      odc.od_column_id                          AS "odColumnId",
+      odc.dataset_id                            AS "datasetId",
+      odc.attribute_id                          AS "attributeId",
+      a.physical_name_text                      AS "physicalName",
+      a.friendly_name_text                      AS "friendlyName",
+      a.data_type_text                          AS "dataType",
+      odc.publish_name                          AS "publishName",
+      odc.publish_desc                          AS "publishDesc",
+      odc.sort_order                            AS "sortOrder",
+      e.entity_name_text                        AS "entityName",
+      e.entity_id                               AS "entityId",
+      s.schema_name_text                        AS "schemaName",
+      s.schema_id                               AS "schemaId",
+      COALESCE(ds.source_name_text, '')         AS "sourceName",
+      bg.term_name_text                         AS "classTermName",
+      bg.classification_code                    AS "classTermCode",
+      COALESCE(bg.is_pii_indicator, false)      AS "classTermIsPii",
+      das.overall_score                         AS "dqScore",
+      COALESCE(das.rule_count, 0)::int          AS "dqRuleCount"
+    FROM bayanat.open_dataset_columns odc
+    JOIN bayanat.data_attributes       a    ON a.attribute_id   = odc.attribute_id
+    JOIN bayanat.data_entities         e    ON e.entity_id      = a.entity_id
+    JOIN bayanat.data_schemas          s    ON s.schema_id      = e.schema_id
+    LEFT JOIN bayanat.data_sources     ds   ON ds.data_source_id = s.data_source_id
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries  bg   ON bg.glossary_id   = abt.glossary_id
+    LEFT JOIN bayanat.dq_attribute_scores  das  ON das.attribute_id = odc.attribute_id
+    WHERE odc.dataset_id = ${datasetId}
+    ORDER BY odc.sort_order, odc.od_column_id
+  `;
+
+  return rows.map((r) => ({
+    ...r,
+    odColumnId:   Number(r.odColumnId),
+    datasetId:    Number(r.datasetId),
+    attributeId:  Number(r.attributeId),
+    entityId:     Number(r.entityId),
+    schemaId:     Number(r.schemaId),
+    sortOrder:    Number(r.sortOrder),
+    dqRuleCount:  Number(r.dqRuleCount),
+    dqScore:      r.dqScore != null ? Number(r.dqScore) : null,
+  }));
+}
+
+// ── DQ Issues ─────────────────────────────────────────────────────────────────
+
+export async function getDatasetDqIssues(datasetId: number): Promise<OpenDataDqIssue[]> {
+  const rows = await sql<OpenDataDqIssue[]>`
+    SELECT
+      i.issue_id                                AS "issueId",
+      i.dataset_id                              AS "datasetId",
+      i.attribute_id                            AS "attributeId",
+      a.physical_name_text                      AS "columnName",
+      i.dimension_code                          AS "dimensionCode",
+      dim.dimension_name_text                   AS "dimensionName",
+      i.issue_text                              AS "issueText",
+      i.severity_code                           AS "severityCode",
+      to_char(i.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt"
+    FROM bayanat.open_dataset_dq_issues i
+    LEFT JOIN bayanat.data_attributes a   ON a.attribute_id   = i.attribute_id
+    LEFT JOIN bayanat.dq_dimensions   dim ON dim.dimension_code = i.dimension_code
+    WHERE i.dataset_id = ${datasetId}
+    ORDER BY i.issue_id
+  `;
+
+  return rows.map((r) => ({
+    ...r,
+    issueId:    Number(r.issueId),
+    datasetId:  Number(r.datasetId),
+    attributeId: r.attributeId != null ? Number(r.attributeId) : null,
+  }));
+}
