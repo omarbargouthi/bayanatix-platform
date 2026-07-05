@@ -496,18 +496,18 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
             return (
               <div
                 key={row.attributeId}
-                className={`grid gap-3 px-5 py-3 items-center text-sm border-b border-line-soft last:border-b-0 transition-colors ${isSelected ? "bg-brand-purple/5" : "hover:bg-canvas-soft"}`}
+                className={`grid gap-3 px-5 py-3 items-start text-sm border-b border-line-soft last:border-b-0 transition-colors ${isSelected ? "bg-brand-purple/5" : "hover:bg-canvas-soft"}`}
                 style={{ gridTemplateColumns: canEdit ? "32px 1.8fr 0.9fr 0.8fr 1.1fr 1.1fr 0.7fr 0.7fr 1fr" : "1.8fr 0.9fr 0.8fr 1.1fr 1.1fr 0.7fr 0.7fr 1fr" }}
               >
                 {canEdit && (
-                  <div onClick={(e) => e.stopPropagation()}>
+                  <div className="pt-px" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(row.attributeId)}
                       className="w-4 h-4 rounded accent-brand-purple" />
                   </div>
                 )}
 
                 {/* Column + Table */}
-                <div className="min-w-0">
+                <div className="min-w-0 overflow-hidden">
                   <div className="font-semibold text-brand-deep truncate">{row.physicalName}</div>
                   <div className="text-[11px] text-muted mt-0.5 truncate">
                     <Link href={`/catalog/${row.schemaId}/tables/${row.entityId}`} className="hover:text-brand-purple hover:underline">
@@ -523,59 +523,55 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                 </div>
 
                 {/* Data Type */}
-                <div className="font-mono text-[12px] text-ink-soft truncate">{row.dataType}</div>
+                <div className="min-w-0 font-mono text-[12px] text-ink-soft truncate pt-px">{row.dataType}</div>
 
                 {/* Asset Type */}
-                <div>
+                <div className="min-w-0">
                   {row.columnType ? (
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                    <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded ${
                       row.columnType === "BUSINESS"
                         ? "bg-blue-50 text-blue-700 border border-blue-200"
                         : "bg-slate-50 text-slate-600 border border-slate-200"
                     }`}>{row.columnType === "BUSINESS" ? "Business" : "Technical"}</span>
-                  ) : <span className="text-muted">—</span>}
+                  ) : <span className="text-muted text-[12px]">—</span>}
                 </div>
 
                 {/* Classification (code badge) */}
-                <div>
+                <div className="min-w-0">
                   <ClassificationTag code={row.classTermClassCode} />
                 </div>
 
                 {/* Classification Term (inline picker) */}
-                <div onClick={(e) => e.stopPropagation()}>
+                <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
                   {canEdit ? (
                     <InlineClassPicker
                       current={row.classTermId ? { id: row.classTermId, name: row.classTermName!, code: row.classTermClassCode } : null}
-                      onSelect={(termId, termName) => assignClassification([row.attributeId], termId)}
+                      onSelect={(termId, _name) => assignClassification([row.attributeId], termId)}
                       onClear={() => assignClassification([row.attributeId], null)}
                     />
                   ) : (
                     row.classTermName
                       ? <span className="text-[12px] font-medium text-brand-deep">{row.classTermName}</span>
-                      : <span className="text-muted">—</span>
+                      : <span className="text-muted text-[12px]">—</span>
                   )}
                 </div>
 
                 {/* CDE */}
-                <div>
+                <div className="min-w-0">
                   {isCde
-                    ? <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">CDE</span>
-                    : row.classTermClassCode
-                    ? <span className="text-muted text-[12px]">No</span>
-                    : <span className="text-muted text-[12px]">—</span>}
+                    ? <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">CDE</span>
+                    : <span className="text-muted text-[12px]">{row.classTermClassCode ? "No" : "—"}</span>}
                 </div>
 
                 {/* PII */}
-                <div>
+                <div className="min-w-0">
                   {row.classTermIsPii
-                    ? <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">PII</span>
-                    : row.classTermClassCode
-                    ? <span className="text-muted text-[12px]">No</span>
-                    : <span className="text-muted text-[12px]">—</span>}
+                    ? <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">PII</span>
+                    : <span className="text-muted text-[12px]">{row.classTermClassCode ? "No" : "—"}</span>}
                 </div>
 
                 {/* PI Category */}
-                <div className="text-[12px] text-ink-soft truncate">
+                <div className="min-w-0 text-[12px] text-ink-soft truncate pt-px">
                   {row.classTermPiCategoryName ?? <span className="text-muted">—</span>}
                 </div>
               </div>
