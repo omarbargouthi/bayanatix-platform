@@ -402,7 +402,8 @@ export type RequestTypeCode =
   | "REMOVE_ACCESS"
   | "OTHER"
   | "CLASSIFY_ASSET"
-  | "PUBLISH_OPEN_DATA";
+  | "PUBLISH_OPEN_DATA"
+  | "PUBLISH_OPEN_DATA_PI";
 
 // ── Open Data ─────────────────────────────────────────────────────────────────
 
@@ -460,10 +461,13 @@ export type OpenDataColumn = {
   classTermName:             string | null;
   classTermCode:             string | null;
   classTermIsPii:            boolean;
+  classTermPiCategory:       string | null;
   dqScore:                   number | null;
   dqRuleCount:               number;
   reclassificationReason:    string | null;
   reclassificationRequestId: number | null;
+  deidentificationMethod:    string | null;
+  deidentificationNotes:     string | null;
 };
 
 export type OpenDataDqIssue = {

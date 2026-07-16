@@ -87,15 +87,74 @@ export async function POST(req: Request, { params }: Ctx) {
       }, { status: 400 });
     }
 
+    // Block: direct-identifier PII columns (cannot be included in open data under any circumstances)
+    const DIRECT_ID_CATEGORIES = ["DIRECT_ID"];
+    const directIdCols = await sql<{ physicalName: string; piCategory: string }[]>`
+      SELECT a.physical_name_text AS "physicalName", bg.pi_category_code AS "piCategory"
+      FROM bayanat.open_dataset_columns odc
+      JOIN bayanat.data_attributes a ON a.attribute_id = odc.attribute_id
+      LEFT JOIN bayanat.asset_business_terms abt
+        ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+      LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+      WHERE odc.dataset_id = ${datasetId}
+        AND bg.is_pii_indicator = true
+        AND bg.pi_category_code = ANY(${DIRECT_ID_CATEGORIES})
+    `;
+    if (directIdCols.length > 0) {
+      const names = directIdCols.map((c) => `"${c.physicalName}"`).join(", ");
+      return NextResponse.json({
+        error: `The following columns contain direct identifiers (national ID, SIN, phone number, etc.) and cannot be included in open data: ${names}`,
+        directIdentifierColumns: directIdCols,
+      }, { status: 400 });
+    }
+
+    // Block: PII columns that have no de-identification method set
+    const piiWithoutDeident = await sql<{ physicalName: string; piCategoryName: string | null }[]>`
+      SELECT a.physical_name_text AS "physicalName", pct.category_name_text AS "piCategoryName"
+      FROM bayanat.open_dataset_columns odc
+      JOIN bayanat.data_attributes a ON a.attribute_id = odc.attribute_id
+      LEFT JOIN bayanat.asset_business_terms abt
+        ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+      LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+      LEFT JOIN bayanat.pi_category_types pct ON pct.category_code = bg.pi_category_code
+      WHERE odc.dataset_id = ${datasetId}
+        AND bg.is_pii_indicator = true
+        AND (bg.pi_category_code IS NULL OR bg.pi_category_code <> ALL(${DIRECT_ID_CATEGORIES}))
+        AND odc.deidentification_method IS NULL
+    `;
+    if (piiWithoutDeident.length > 0) {
+      const names = piiWithoutDeident.map((c) => `"${c.physicalName}"${c.piCategoryName ? ` (${c.piCategoryName})` : ""}`).join(", ");
+      return NextResponse.json({
+        error: `The following PII columns must have a de-identification method selected before submission: ${names}`,
+        piiColumns: piiWithoutDeident,
+      }, { status: 400 });
+    }
+
+    // Determine if Privacy Review is needed (any PII column with de-identification)
+    const [{ piiDeidentCount }] = await sql<{ piiDeidentCount: number }[]>`
+      SELECT COUNT(*)::int AS "piiDeidentCount"
+      FROM bayanat.open_dataset_columns odc
+      LEFT JOIN bayanat.asset_business_terms abt
+        ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
+      LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+      WHERE odc.dataset_id = ${datasetId}
+        AND bg.is_pii_indicator = true
+        AND odc.deidentification_method IS NOT NULL
+    `;
+    const requiresPrivacyReview = piiDeidentCount > 0;
+    const requestTypeCode = requiresPrivacyReview ? "PUBLISH_OPEN_DATA_PI" : "PUBLISH_OPEN_DATA";
+
     const title = `Publish open dataset: "${ds.name}"`;
 
     const [reqRow] = await sql<{ requestId: number }[]>`
       INSERT INTO bayanat.asset_requests
         (request_type_code, title, description_text, priority_code, raised_by_user_id)
       VALUES (
-        'PUBLISH_OPEN_DATA',
+        ${requestTypeCode},
         ${title},
-        ${ds.hasPii ? "Dataset contains PII columns — Privacy Review stage is mandatory." : "Standard open data publication approval."},
+        ${requiresPrivacyReview
+          ? `Dataset contains PI data with de-identification applied (${piiDeidentCount} column${piiDeidentCount > 1 ? "s" : ""}). Privacy Review by a Data Protection Officer is required before publication.`
+          : "Standard open data publication approval — no PI data included."},
         'MEDIUM',
         ${session.userId}
       )
@@ -133,7 +192,7 @@ export async function POST(req: Request, { params }: Ctx) {
       WHERE dataset_id = ${datasetId}
     `;
 
-    await startWorkflow(reqRow.requestId, "PUBLISH_OPEN_DATA", title);
+    await startWorkflow(reqRow.requestId, requestTypeCode, title);
 
     return NextResponse.json({ ok: true, requestId: reqRow.requestId, status: "PENDING_APPROVAL" });
   }

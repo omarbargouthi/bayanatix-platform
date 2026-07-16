@@ -3,20 +3,21 @@ import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 export type ClassificationColumn = {
-  attributeId:             number;
-  physicalName:            string;
-  dataType:                string;
-  columnType:              string | null;
-  entityName:              string;
-  entityId:                number;
-  schemaName:              string;
-  schemaId:                number;
-  sourceName:              string;
-  classTermId:             number | null;
-  classTermName:           string | null;
-  classTermClassCode:      string | null;
-  classTermIsPii:          boolean;
-  classTermPiCategoryName: string | null;
+  attributeId:              number;
+  physicalName:             string;
+  dataType:                 string;
+  columnType:               string | null;
+  entityName:               string;
+  entityId:                 number;
+  schemaName:               string;
+  schemaId:                 number;
+  sourceName:               string;
+  classTermId:              number | null;
+  classTermName:            string | null;
+  classTermClassCode:       string | null;
+  classTermIsPii:           boolean;
+  classTermPiCategoryCode:  string | null;
+  classTermPiCategoryName:  string | null;
 };
 
 type Row = ClassificationColumn & { total: number };
@@ -51,6 +52,7 @@ export async function GET(req: Request) {
       bg.term_name_text                   AS "classTermName",
       bg.classification_code              AS "classTermClassCode",
       COALESCE(bg.is_pii_indicator, false) AS "classTermIsPii",
+      bg.pi_category_code                 AS "classTermPiCategoryCode",
       pct.category_name_text              AS "classTermPiCategoryName",
       COUNT(*) OVER()::int                AS total
     FROM bayanat.data_attributes a

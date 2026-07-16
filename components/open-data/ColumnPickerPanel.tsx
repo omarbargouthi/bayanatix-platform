@@ -24,7 +24,25 @@ type ReclassifyFormState = {
   saving:  boolean;
 };
 
-const RESTRICTED_CODES = new Set(["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"]);
+type DeidentifyFormState = {
+  open:   boolean;
+  method: string;
+  notes:  string;
+  saving: boolean;
+};
+
+const RESTRICTED_CODES     = new Set(["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"]);
+const DIRECT_ID_CATEGORY   = "DIRECT_ID";
+
+const DEIDENT_METHOD_LABELS: Record<string, string> = {
+  AGE_BRACKET:      "Age Bracket (e.g. 25–34)",
+  SALARY_BRACKET:   "Salary Bracket (e.g. 5,000–10,000)",
+  CITY_ONLY:        "City Only (suppress street / area)",
+  DATE_YEAR:        "Year Only (suppress month / day)",
+  PSEUDONYMIZATION: "Pseudonymization (replace with token)",
+  GENERALIZATION:   "Generalization (reduce precision)",
+  CUSTOM:           "Custom (described in notes)",
+};
 
 function isRestricted(code: string | null | undefined): boolean {
   return !!code && RESTRICTED_CODES.has(code.toUpperCase());
@@ -94,6 +112,7 @@ export function ColumnPickerPanel({
   const [results, setResults]     = useState<ClassificationColumn[]>([]);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding]       = useState<number | null>(null);
+  const [addError, setAddError]   = useState<string | null>(null);
 
   // DQ rules per column (attributeId → rules), fetched lazily
   const [dqRules, setDqRules]           = useState<Record<number, ColumnDqRule[]>>({});
@@ -106,6 +125,9 @@ export function ColumnPickerPanel({
   const [reclassifyForms, setReclassifyForms] = useState<Record<number, ReclassifyFormState>>({});
   const [publicTerms, setPublicTerms]         = useState<PublicTerm[] | null>(null);
   const [termsLoading, setTermsLoading]       = useState(false);
+
+  // De-identification form per column
+  const [deidentifyForms, setDeidentifyForms] = useState<Record<number, DeidentifyFormState>>({});
 
   const searchTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedAttrIds  = new Set(selectedColumns.map((c) => c.attributeId));
@@ -163,6 +185,16 @@ export function ColumnPickerPanel({
 
   async function addColumn(col: ClassificationColumn) {
     if (!datasetId) return;
+
+    // Block direct identifiers entirely
+    if (col.classTermPiCategoryCode === DIRECT_ID_CATEGORY) {
+      setAddError(
+        `"${col.physicalName}" is a direct identifier (national ID, SIN, phone number, full name, etc.) and cannot be included in open data under any circumstances.`
+      );
+      setTimeout(() => setAddError(null), 7000);
+      return;
+    }
+
     setAdding(col.attributeId);
     try {
       const res = await fetch(`/api/open-data/datasets/${datasetId}/columns`, {
@@ -191,20 +223,31 @@ export function ColumnPickerPanel({
         classTermName:             col.classTermName,
         classTermCode:             col.classTermClassCode,
         classTermIsPii:            col.classTermIsPii,
+        classTermPiCategory:       col.classTermPiCategoryCode,
         dqScore:                   null,
         dqRuleCount:               0,
         reclassificationReason:    null,
         reclassificationRequestId: null,
+        deidentificationMethod:    null,
+        deidentificationNotes:     null,
       };
       onColumnAdded(newCol);
       fetchDqRules(col.attributeId);
 
-      // If restricted or unclassified, automatically open the classify form
+      // Auto-open re-classification form for restricted / unclassified columns
       if (isRestricted(col.classTermClassCode) || !col.classTermClassCode) {
         ensurePublicTerms();
         setReclassifyForms((p) => ({
           ...p,
           [col.attributeId]: { open: true, termId: "", reason: "", saving: false },
+        }));
+      }
+
+      // Auto-open de-identification form for non-direct-id PII columns
+      if (col.classTermIsPii && col.classTermPiCategoryCode !== DIRECT_ID_CATEGORY) {
+        setDeidentifyForms((p) => ({
+          ...p,
+          [col.attributeId]: { open: true, method: "", notes: "", saving: false },
         }));
       }
     } finally {
@@ -264,7 +307,6 @@ export function ColumnPickerPanel({
         newTermName: string; newTermCode: string | null; isPii: boolean;
       };
 
-      // Update the column state optimistically
       const updated: OpenDataColumn = {
         ...col,
         classTermName:             result.newTermName,
@@ -282,6 +324,65 @@ export function ColumnPickerPanel({
         [col.attributeId]: { ...p[col.attributeId], saving: false },
       }));
     }
+  }
+
+  // ── De-identification helpers ──────────────────────────────────────────────
+
+  function openDeidentifyForm(attributeId: number, currentMethod?: string | null, currentNotes?: string | null) {
+    setDeidentifyForms((p) => ({
+      ...p,
+      [attributeId]: p[attributeId]?.saving
+        ? p[attributeId]
+        : { open: true, method: currentMethod ?? p[attributeId]?.method ?? "", notes: currentNotes ?? p[attributeId]?.notes ?? "", saving: false },
+    }));
+  }
+
+  function closeDeidentifyForm(attributeId: number) {
+    setDeidentifyForms((p) => ({ ...p, [attributeId]: { ...p[attributeId], open: false } }));
+  }
+
+  function updateDeidentifyField(attributeId: number, field: "method" | "notes", value: string) {
+    setDeidentifyForms((p) => ({ ...p, [attributeId]: { ...p[attributeId], [field]: value } }));
+  }
+
+  async function submitDeidentify(col: OpenDataColumn) {
+    if (!datasetId) return;
+    const form = deidentifyForms[col.attributeId];
+    if (!form || !form.method) return;
+    if (form.method === "CUSTOM" && !form.notes.trim()) return;
+
+    setDeidentifyForms((p) => ({ ...p, [col.attributeId]: { ...p[col.attributeId], saving: true } }));
+    try {
+      const res = await fetch(`/api/open-data/datasets/${datasetId}/deidentify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attributeId: col.attributeId,
+          method:      form.method,
+          notes:       form.notes.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert((err as { error?: string }).error ?? "Failed to save de-identification method.");
+        return;
+      }
+      onColumnUpdated({
+        ...col,
+        deidentificationMethod: form.method,
+        deidentificationNotes:  form.notes.trim() || null,
+      });
+      setDeidentifyForms((p) => ({ ...p, [col.attributeId]: { open: false, method: form.method, notes: form.notes.trim(), saving: false } }));
+    } finally {
+      setDeidentifyForms((p) => ({ ...p, [col.attributeId]: { ...p[col.attributeId], saving: false } }));
+    }
+  }
+
+  async function clearDeidentify(col: OpenDataColumn) {
+    if (!datasetId) return;
+    await fetch(`/api/open-data/datasets/${datasetId}/deidentify?attributeId=${col.attributeId}`, { method: "DELETE" });
+    onColumnUpdated({ ...col, deidentificationMethod: null, deidentificationNotes: null });
+    setDeidentifyForms((p) => ({ ...p, [col.attributeId]: { open: false, method: "", notes: "", saving: false } }));
   }
 
   // ── DQ issue form helpers ──────────────────────────────────────────────────
@@ -411,30 +512,47 @@ export function ColumnPickerPanel({
             )}
           </div>
 
+          {/* Direct-identifier add error */}
+          {addError && (
+            <div className="mt-2 flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+              <span className="text-red-500 text-sm shrink-0">⛔</span>
+              <p className="text-xs text-red-700 font-medium">{addError}</p>
+            </div>
+          )}
+
           {results.length > 0 && (
             <div className="mt-2 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm max-h-72 overflow-y-auto">
               {results.map((col) => {
-                const already         = selectedAttrIds.has(col.attributeId);
-                const restricted      = isRestricted(col.classTermClassCode);
-                const unclassified    = !col.classTermClassCode;
+                const already      = selectedAttrIds.has(col.attributeId);
+                const restricted   = isRestricted(col.classTermClassCode);
+                const unclassified = !col.classTermClassCode;
+                const isDirectId   = col.classTermPiCategoryCode === DIRECT_ID_CATEGORY;
+                const isPiiOther   = col.classTermIsPii && !isDirectId;
                 return (
                   <div
                     key={col.attributeId}
-                    className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    className={`flex items-center justify-between px-3 py-2.5 border-b border-slate-100 last:border-0 ${isDirectId ? "bg-red-50/50" : "hover:bg-slate-50"}`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm text-slate-800">{col.physicalName}</span>
                         <span className="text-xs text-slate-400">{col.dataType}</span>
-                        {col.classTermIsPii && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium">PII</span>
+                        {isDirectId && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold border border-red-300">
+                            ⛔ Direct Identifier — cannot include
+                          </span>
                         )}
-                        {restricted && (
+                        {isPiiOther && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium border border-purple-200">
+                            PII — de-id required
+                          </span>
+                        )}
+                        {!col.classTermIsPii && restricted && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium border border-orange-200">
                             Needs re-classification
                           </span>
                         )}
-                        {!restricted && unclassified && (
+                        {!col.classTermIsPii && !restricted && unclassified && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium border border-yellow-200">
                             Not classified
                           </span>
@@ -450,21 +568,39 @@ export function ColumnPickerPanel({
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => !already && addColumn(col)}
-                      disabled={already || adding === col.attributeId}
-                      className={`ml-3 shrink-0 px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-                        already
-                          ? "bg-slate-100 text-slate-400 cursor-default"
+                    {isDirectId ? (
+                      <span className="ml-3 shrink-0 px-3 py-1 text-xs rounded-lg font-medium bg-red-100 text-red-400 cursor-not-allowed">
+                        Cannot Add
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => !already && addColumn(col)}
+                        disabled={already || adding === col.attributeId}
+                        className={`ml-3 shrink-0 px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
+                          already
+                            ? "bg-slate-100 text-slate-400 cursor-default"
+                            : isPiiOther
+                            ? "bg-purple-600 text-white hover:bg-purple-700"
+                            : restricted
+                            ? "bg-orange-500 text-white hover:bg-orange-600"
+                            : unclassified
+                            ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                            : "bg-brand-purple text-white hover:bg-brand-purple/90"
+                        }`}
+                      >
+                        {already
+                          ? "Added"
+                          : adding === col.attributeId
+                          ? "…"
+                          : isPiiOther
+                          ? "Add + De-identify"
                           : restricted
-                          ? "bg-orange-500 text-white hover:bg-orange-600"
+                          ? "Add + Re-classify"
                           : unclassified
-                          ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                          : "bg-brand-purple text-white hover:bg-brand-purple/90"
-                      }`}
-                    >
-                      {already ? "Added" : adding === col.attributeId ? "…" : restricted ? "Add + Re-classify" : unclassified ? "Add + Classify" : "Add"}
-                    </button>
+                          ? "Add + Classify"
+                          : "Add"}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -490,24 +626,103 @@ export function ColumnPickerPanel({
           </p>
 
           {selectedColumns.map((col) => {
-            const colIssues       = dqIssues.filter((i) => i.attributeId === col.attributeId);
-            const rules           = dqRules[col.attributeId];
-            const loadingRules    = rulesLoading[col.attributeId];
-            const dqForm          = dqForms[col.attributeId];
-            const reclassForm     = reclassifyForms[col.attributeId];
-            const needsReclass      = isRestricted(col.classTermCode) && !col.reclassificationRequestId;
+            const colIssues        = dqIssues.filter((i) => i.attributeId === col.attributeId);
+            const rules            = dqRules[col.attributeId];
+            const loadingRules     = rulesLoading[col.attributeId];
+            const dqForm           = dqForms[col.attributeId];
+            const reclassForm      = reclassifyForms[col.attributeId];
+            const deidentForm      = deidentifyForms[col.attributeId];
+            const needsReclass     = isRestricted(col.classTermCode) && !col.reclassificationRequestId;
             const needsClassification = !col.classTermCode && !col.reclassificationRequestId;
-            const reclassPending    = !!col.reclassificationRequestId;
+            const reclassPending   = !!col.reclassificationRequestId;
+            const isDirectIdCol    = col.classTermPiCategory === DIRECT_ID_CATEGORY;
+            const isPiiCol         = col.classTermIsPii && !isDirectIdCol;
+            const needsDeident     = isPiiCol && !col.deidentificationMethod;
+            const hasDeident       = isPiiCol && !!col.deidentificationMethod;
 
             return (
               <div
                 key={col.odColumnId}
                 className={`border rounded-xl bg-white overflow-hidden ${
-                  needsReclass ? "border-orange-300"
+                  isDirectIdCol     ? "border-red-400"
+                  : needsReclass    ? "border-orange-300"
                   : needsClassification ? "border-yellow-300"
+                  : needsDeident    ? "border-purple-300"
                   : "border-slate-200"
                 }`}
               >
+                {/* ── Direct identifier hard block banner ── */}
+                {isDirectIdCol && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-red-600 text-sm">⛔</span>
+                      <p className="text-xs text-red-800 font-medium">
+                        This column is a <strong>direct identifier</strong> (national ID, SIN, phone number, full name, etc.)
+                        and cannot be included in open data. Remove it before submitting.
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => removeColumn(col)}
+                        className="shrink-0 text-xs px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* ── De-identification required banner ── */}
+                {needsDeident && !isDirectIdCol && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-2 bg-purple-50 border-b border-purple-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-purple-500 text-sm">🔒</span>
+                      <p className="text-xs text-purple-800 font-medium">
+                        This column contains PII and must have a de-identification method selected before submission.
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => openDeidentifyForm(col.attributeId)}
+                        className="shrink-0 text-xs px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                      >
+                        Set De-identification
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* ── De-identification applied indicator ── */}
+                {hasDeident && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-1.5 bg-purple-50 border-b border-purple-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-purple-500 text-xs">✓</span>
+                      <p className="text-xs text-purple-800">
+                        De-identified: <strong>{DEIDENT_METHOD_LABELS[col.deidentificationMethod!] ?? col.deidentificationMethod}</strong>
+                        {col.deidentificationNotes && (
+                          <span className="ml-1 text-purple-600">— {col.deidentificationNotes}</span>
+                        )}
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => openDeidentifyForm(col.attributeId, col.deidentificationMethod, col.deidentificationNotes)}
+                          className="text-[10px] px-2 py-0.5 border border-purple-200 rounded text-purple-600 hover:bg-purple-100 transition-colors"
+                        >
+                          Change
+                        </button>
+                        <button
+                          onClick={() => clearDeidentify(col)}
+                          className="text-[10px] px-2 py-0.5 border border-red-100 rounded text-red-400 hover:bg-red-50 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* ── Classification required banner (unclassified column) ── */}
                 {needsClassification && (
                   <div className="flex items-center justify-between gap-3 px-4 py-2 bg-yellow-50 border-b border-yellow-200">
@@ -570,8 +785,13 @@ export function ColumnPickerPanel({
                       <span className="font-medium text-sm text-slate-800">{col.physicalName}</span>
                       <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{col.dataType}</span>
                       {col.classTermCode && <ClassificationTag code={col.classTermCode} />}
-                      {col.classTermIsPii && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium border border-red-100">PII</span>
+                      {isDirectIdCol && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold border border-red-200">
+                          Direct Identifier
+                        </span>
+                      )}
+                      {isPiiCol && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium border border-purple-200">PII</span>
                       )}
                       {col.dqScore != null && <DqScoreBadge score={col.dqScore} />}
                     </div>
@@ -615,6 +835,66 @@ export function ColumnPickerPanel({
                     )}
                   </div>
                 </div>
+
+                {/* ── De-identification form ── */}
+                {deidentForm?.open && (
+                  <div className="border-t border-purple-200 bg-purple-50 px-4 py-3 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-purple-900 mb-1">De-identification Method</p>
+                      <p className="text-[11px] leading-relaxed text-purple-700">
+                        This column contains PII. Select how it will be de-identified before publication.
+                        The chosen method will be reviewed by a Data Protection Officer as part of the approval process.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-purple-900 mb-1">
+                          Method <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={deidentForm.method}
+                          onChange={(e) => updateDeidentifyField(col.attributeId, "method", e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-purple-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-purple-300"
+                        >
+                          <option value="">— Select a de-identification method —</option>
+                          {Object.entries(DEIDENT_METHOD_LABELS).map(([code, label]) => (
+                            <option key={code} value={code}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {deidentForm.method === "CUSTOM" && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-purple-900 mb-1">
+                            Description <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={deidentForm.notes}
+                            onChange={(e) => updateDeidentifyField(col.attributeId, "notes", e.target.value)}
+                            placeholder="Describe the custom de-identification method that will be applied…"
+                            rows={2}
+                            className="w-full px-2 py-1.5 text-xs border border-purple-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-1 focus:ring-purple-300"
+                          />
+                        </div>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => submitDeidentify(col)}
+                          disabled={!deidentForm.method || (deidentForm.method === "CUSTOM" && !deidentForm.notes.trim()) || deidentForm.saving}
+                          className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium transition-colors"
+                        >
+                          {deidentForm.saving ? "Saving…" : "Save De-identification Method"}
+                        </button>
+                        <button
+                          onClick={() => closeDeidentifyForm(col.attributeId)}
+                          disabled={deidentForm.saving}
+                          className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Classify / Re-classify form ── */}
                 {reclassForm?.open && (

@@ -73,21 +73,33 @@ export async function POST(req: Request, { params }: Ctx) {
     ON CONFLICT DO NOTHING
   `;
 
-  // ── 2. Append audit note to the OLD term's definition ────────────────────
+  // ── 2. Append audit notes to BOTH the old and new term definitions ─────────
+  const today = new Date().toISOString().slice(0, 10);
+
   if (oldTerm) {
-    const today      = new Date().toISOString().slice(0, 10);
-    const auditNote  =
+    const oldNote =
       `\n\n[Re-classification note, ${today}]: ` +
-      `Column "${physicalName}" was re-classified from this term to "${newTerm.termName}" ` +
+      `Column "${physicalName}" was re-classified away from this term to "${newTerm.termName}" ` +
       `for open data publication (dataset: "${ds.datasetName}"). ` +
       `Reason: ${reason.trim()}`;
-
     await sql`
       UPDATE bayanat.business_glossaries
-      SET definition_text = COALESCE(definition_text, '') || ${auditNote}
+      SET definition_text = COALESCE(definition_text, '') || ${oldNote}
       WHERE glossary_id = ${oldTerm.glossaryId}
     `;
   }
+
+  // Also append to the NEW term so it carries the full audit trail
+  const newNote =
+    `\n\n[Open data classification, ${today}]: ` +
+    `Column "${physicalName}" was classified under this term for open data publication (dataset: "${ds.datasetName}").` +
+    (oldTerm ? ` Previously classified as "${oldTerm.termName}".` : " Column had no prior classification.") +
+    ` Reason: ${reason.trim()}`;
+  await sql`
+    UPDATE bayanat.business_glossaries
+    SET definition_text = COALESCE(definition_text, '') || ${newNote}
+    WHERE glossary_id = ${newTermId}
+  `;
 
   // ── 3. Create CLASSIFY_ASSET request and start workflow ──────────────────
   const title = `Re-classify "${physicalName}" as "${newTerm.termName}" for open data`;

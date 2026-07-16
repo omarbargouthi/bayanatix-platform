@@ -153,10 +153,13 @@ export async function getDatasetColumns(datasetId: number): Promise<OpenDataColu
       bg.term_name_text                         AS "classTermName",
       bg.classification_code                    AS "classTermCode",
       COALESCE(bg.is_pii_indicator, false)      AS "classTermIsPii",
+      bg.pi_category_code                       AS "classTermPiCategory",
       das.overall_score                         AS "dqScore",
       COALESCE(das.rule_count, 0)::int          AS "dqRuleCount",
       odc.reclassification_reason               AS "reclassificationReason",
-      odc.reclassification_request_id           AS "reclassificationRequestId"
+      odc.reclassification_request_id           AS "reclassificationRequestId",
+      odc.deidentification_method               AS "deidentificationMethod",
+      odc.deidentification_notes                AS "deidentificationNotes"
     FROM bayanat.open_dataset_columns odc
     JOIN bayanat.data_attributes       a    ON a.attribute_id   = odc.attribute_id
     JOIN bayanat.data_entities         e    ON e.entity_id      = a.entity_id
@@ -182,6 +185,9 @@ export async function getDatasetColumns(datasetId: number): Promise<OpenDataColu
     dqScore:                   r.dqScore != null ? Number(r.dqScore) : null,
     reclassificationReason:    r.reclassificationReason ?? null,
     reclassificationRequestId: r.reclassificationRequestId != null ? Number(r.reclassificationRequestId) : null,
+    classTermPiCategory:       r.classTermPiCategory ?? null,
+    deidentificationMethod:    r.deidentificationMethod ?? null,
+    deidentificationNotes:     r.deidentificationNotes ?? null,
   }));
 }
 

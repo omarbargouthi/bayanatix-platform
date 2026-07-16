@@ -51,14 +51,18 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       }
       if (hierUsers.size > 0) return [...hierUsers];
 
+      // Fallback: OFFICER then ADMIN
       const fb = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 3
+        SELECT user_id AS "userId" FROM bayanat.users
+        WHERE role IN ('OFFICER', 'ADMIN') AND is_active = true
+        ORDER BY CASE role WHEN 'OFFICER' THEN 1 ELSE 2 END
+        LIMIT 5
       `;
       return fb.map((r) => r.userId);
     }
 
     case "OWNER": {
-      // 1. Direct owner assignments on request targets
+      // 1. Direct owner assignments on request targets (covers DATA_SOURCES, DATA_ENTITIES, etc.)
       const direct = await sql<{ userId: string }[]>`
         SELECT DISTINCT s.user_id AS "userId"
         FROM bayanat.asset_stakeholders s
@@ -68,7 +72,7 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       `;
       if (direct.length > 0) return direct.map((r) => r.userId);
 
-      // 2. Hierarchy resolution for DATA_ATTRIBUTES targets
+      // 2. Hierarchy resolution for DATA_ATTRIBUTES targets (column → table → schema → source)
       const colTargets = await sql<{ assetId: number }[]>`
         SELECT art.asset_id AS "assetId" FROM bayanat.asset_request_targets art
         WHERE art.request_id = ${requestId} AND art.asset_type_code = 'DATA_ATTRIBUTES'
@@ -83,8 +87,10 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       }
       if (hierUsers.size > 0) return [...hierUsers];
 
+      // Fallback: ADMIN (ownership responsibility when no owner assigned)
       const fb = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 3
+        SELECT user_id AS "userId" FROM bayanat.users
+        WHERE role = 'ADMIN' AND is_active = true LIMIT 5
       `;
       return fb.map((r) => r.userId);
     }
