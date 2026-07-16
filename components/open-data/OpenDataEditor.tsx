@@ -7,6 +7,7 @@ import type {
   OpenDataFormat, OpenDataRefresh, OpenDataStatus,
 } from "@/lib/types";
 import { ColumnPickerPanel } from "./ColumnPickerPanel";
+import { useLang } from "@/lib/lang-context";
 
 type DimensionOpt = { code: string; name: string };
 
@@ -23,48 +24,7 @@ type Props = {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const DATA_CATEGORIES = [
-  "Economy and Finance",
-  "Education and Training",
-  "Health and Population",
-  "Environment and Climate",
-  "Real Estate and Housing",
-  "Transportation and Logistics",
-  "Government and Public Services",
-  "Demographics and Social",
-  "Agriculture and Food",
-  "Energy and Utilities",
-  "Security and Safety",
-  "Culture and Tourism",
-  "Technology and Communications",
-  "Infrastructure and Construction",
-  "Legal and Judicial",
-  "Science and Research",
-];
-
-const SEGMENT_OPTIONS = [
-  "Investors", "Researchers", "Government", "Media", "Citizens",
-  "NGOs", "Private Sector", "Students", "International Organizations",
-];
-
 const FORMAT_OPTIONS: OpenDataFormat[] = ["xlsx", "csv", "json", "xml", "parquet"];
-
-const REFRESH_OPTIONS: { value: OpenDataRefresh; label: string }[] = [
-  { value: "MONTHLY",     label: "Monthly" },
-  { value: "QUARTERLY",   label: "Quarterly" },
-  { value: "HALF_YEARLY", label: "Half-yearly" },
-  { value: "YEARLY",      label: "Yearly" },
-  { value: "ON_DEMAND",   label: "On Demand" },
-];
-
-const STATUS_LABELS: Record<OpenDataStatus, string> = {
-  DRAFT:            "Draft",
-  PENDING_APPROVAL: "Pending Approval",
-  APPROVED:         "Approved",
-  PUBLISHED:        "Published",
-  REJECTED:         "Rejected",
-  PENDING:          "Pending Changes",
-};
 
 const STATUS_COLORS: Record<OpenDataStatus, string> = {
   DRAFT:            "bg-slate-100 text-slate-600 border-slate-200",
@@ -207,6 +167,55 @@ export function OpenDataEditor({
   userRole,
 }: Props) {
   const router = useRouter();
+  const { t } = useLang();
+
+  const STATUS_LABELS: Record<OpenDataStatus, string> = {
+    DRAFT:            t.openData.statusDraft,
+    PENDING_APPROVAL: t.openData.statusPendingApproval,
+    APPROVED:         t.openData.statusApproved,
+    PUBLISHED:        t.openData.statusPublished,
+    REJECTED:         t.openData.statusRejected,
+    PENDING:          t.openData.statusPending,
+  };
+
+  const DATA_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+    { value: "Economy and Finance",           label: t.openData.categories.economyFinance },
+    { value: "Education and Training",        label: t.openData.categories.educationTraining },
+    { value: "Health and Population",         label: t.openData.categories.healthPopulation },
+    { value: "Environment and Climate",       label: t.openData.categories.environmentClimate },
+    { value: "Real Estate and Housing",       label: t.openData.categories.realEstateHousing },
+    { value: "Transportation and Logistics",  label: t.openData.categories.transportationLogistics },
+    { value: "Government and Public Services",label: t.openData.categories.governmentPublicServices },
+    { value: "Demographics and Social",       label: t.openData.categories.demographicsSocial },
+    { value: "Agriculture and Food",          label: t.openData.categories.agricultureFood },
+    { value: "Energy and Utilities",          label: t.openData.categories.energyUtilities },
+    { value: "Security and Safety",           label: t.openData.categories.securitySafety },
+    { value: "Culture and Tourism",           label: t.openData.categories.cultureTourism },
+    { value: "Technology and Communications", label: t.openData.categories.technologyCommunications },
+    { value: "Infrastructure and Construction",label: t.openData.categories.infrastructureConstruction },
+    { value: "Legal and Judicial",            label: t.openData.categories.legalJudicial },
+    { value: "Science and Research",          label: t.openData.categories.scienceResearch },
+  ];
+
+  const SEGMENT_OPTIONS_L: { value: string; label: string }[] = [
+    { value: "Investors",               label: t.openData.segments.investors },
+    { value: "Researchers",             label: t.openData.segments.researchers },
+    { value: "Government",              label: t.openData.segments.government },
+    { value: "Media",                   label: t.openData.segments.media },
+    { value: "Citizens",                label: t.openData.segments.citizens },
+    { value: "NGOs",                    label: t.openData.segments.ngos },
+    { value: "Private Sector",          label: t.openData.segments.privateSector },
+    { value: "Students",                label: t.openData.segments.students },
+    { value: "International Organizations", label: t.openData.segments.internationalOrgs },
+  ];
+
+  const REFRESH_OPTIONS: { value: OpenDataRefresh; label: string }[] = [
+    { value: "MONTHLY",     label: t.openData.refreshMonthly },
+    { value: "QUARTERLY",   label: t.openData.refreshQuarterly },
+    { value: "HALF_YEARLY", label: t.openData.refreshHalfYearly },
+    { value: "YEARLY",      label: t.openData.refreshYearly },
+    { value: "ON_DEMAND",   label: t.openData.refreshOnDemand },
+  ];
 
   // Form fields
   const [datasetId,     setDatasetId]     = useState<number | null>(dataset?.datasetId ?? null);
@@ -368,10 +377,10 @@ export function OpenDataEditor({
   const hasPii     = columns.some((c) => c.classTermIsPii);
 
   const tabs = [
-    { key: "info",       label: "Dataset Info" },
-    { key: "columns",    label: `Columns (${columns.length})` },
-    { key: "extraction", label: "Extraction Logic" },
-    { key: "workflow",   label: "Approval" },
+    { key: "info",       label: t.openData.tabInfo },
+    { key: "columns",    label: t.openData.tabColumns.replace("{n}", String(columns.length)) },
+    { key: "extraction", label: t.openData.tabExtraction },
+    { key: "workflow",   label: t.openData.tabApproval },
   ] as const;
 
   return (
@@ -380,7 +389,7 @@ export function OpenDataEditor({
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">
-            {mode === "create" ? "New Open Dataset" : datasetName || "Open Dataset"}
+            {mode === "create" ? t.openData.titleCreate : datasetName || t.openData.pageTitle}
           </h1>
           <div className="flex items-center gap-3 mt-1.5">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[status]}`}>
@@ -388,7 +397,7 @@ export function OpenDataEditor({
             </span>
             {hasPii && (
               <span className="text-xs font-medium px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">
-                Contains PII — Privacy Review required
+                {t.openData.containsPii}
               </span>
             )}
           </div>
@@ -402,7 +411,7 @@ export function OpenDataEditor({
               disabled={saving}
               className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition-colors"
             >
-              {saving ? "Saving…" : saved ? "Saved ✓" : "Save Draft"}
+              {saving ? t.openData.savingLabel : saved ? t.openData.savedCheck : t.openData.saveDraft}
             </button>
           )}
 
@@ -410,10 +419,10 @@ export function OpenDataEditor({
             <button
               onClick={submitForApproval}
               disabled={submitting || columns.length === 0}
-              title={columns.length === 0 ? "Add at least one column before submitting" : undefined}
+              title={columns.length === 0 ? t.openData.addColumnFirst : undefined}
               className="px-4 py-2 bg-brand-purple text-white rounded-lg text-sm font-medium hover:bg-brand-purple/90 disabled:opacity-60 transition-colors"
             >
-              {submitting ? "Submitting…" : "Submit for Approval"}
+              {submitting ? t.openData.submittingLabel : t.openData.submitApproval}
             </button>
           )}
 
@@ -423,7 +432,7 @@ export function OpenDataEditor({
               disabled={submitting}
               className="px-4 py-2 border border-amber-200 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 transition-colors"
             >
-              Revert to Pending
+              {t.openData.revertPendingBtn}
             </button>
           )}
         </div>
@@ -457,66 +466,66 @@ export function OpenDataEditor({
         <div className="space-y-8">
           {/* Basic info */}
           <div>
-            <SectionHeading title="Basic Information" subtitle="Core attributes for this open dataset" />
+            <SectionHeading title={t.openData.sectionBasic} subtitle={t.openData.sectionBasicSub} />
             <div className="grid grid-cols-2 gap-5">
               <div className="col-span-2">
-                <Field label="Dataset Name" required>
+                <Field label={t.openData.fieldName} required>
                   <input
                     type="text"
                     value={datasetName}
                     onChange={(e) => setDatasetName(e.target.value)}
                     disabled={!isEditable}
-                    placeholder="e.g. Real Estate Transaction Index 2024"
+                    placeholder={t.openData.fieldNamePlaceholder}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                   />
                 </Field>
               </div>
 
               <div className="col-span-2">
-                <Field label="Description">
+                <Field label={t.openData.fieldDesc}>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     disabled={!isEditable}
-                    placeholder="Describe the dataset, its scope, and key characteristics…"
+                    placeholder={t.openData.fieldDescPlaceholder}
                     rows={3}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                   />
                 </Field>
               </div>
 
-              <Field label="Department Responsible">
+              <Field label={t.openData.fieldDept}>
                 <input
                   type="text"
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   disabled={!isEditable}
-                  placeholder="e.g. Ministry of Housing"
+                  placeholder={t.openData.fieldDeptPlaceholder}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                 />
               </Field>
 
-              <Field label="Data Category">
+              <Field label={t.openData.fieldCategory}>
                 <select
                   value={categoryText}
                   onChange={(e) => setCategoryText(e.target.value)}
                   disabled={!isEditable}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                 >
-                  <option value="">— Select category —</option>
-                  {DATA_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                  <option value="">{t.openData.selectCategory}</option>
+                  {DATA_CATEGORY_OPTIONS.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
               </Field>
 
               <div className="col-span-2">
-                <Field label="Purpose for Publishing">
+                <Field label={t.openData.fieldPurpose}>
                   <textarea
                     value={purpose}
                     onChange={(e) => setPurpose(e.target.value)}
                     disabled={!isEditable}
-                    placeholder="Explain why this dataset is being published and its intended use…"
+                    placeholder={t.openData.fieldPurposePlaceholder}
                     rows={2}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                   />
@@ -527,11 +536,11 @@ export function OpenDataEditor({
 
           {/* Publication details */}
           <div>
-            <SectionHeading title="Publication Details" />
+            <SectionHeading title={t.openData.sectionPublication} />
             <div className="space-y-5">
-              <Field label="Beneficiary Segments" hint="Select all groups expected to benefit from this dataset">
+              <Field label={t.openData.fieldSegments} hint={t.openData.fieldSegmentsHint}>
                 <MultiToggle
-                  options={SEGMENT_OPTIONS}
+                  options={SEGMENT_OPTIONS_L}
                   selected={segments}
                   onChange={setSegments}
                   disabled={!isEditable}
@@ -539,7 +548,7 @@ export function OpenDataEditor({
               </Field>
 
               <div className="grid grid-cols-3 gap-5">
-                <Field label="Publish Date">
+                <Field label={t.openData.fieldPublishDate}>
                   <input
                     type="date"
                     value={publishDate}
@@ -549,26 +558,26 @@ export function OpenDataEditor({
                   />
                 </Field>
 
-                <Field label="Coverage From Year">
+                <Field label={t.openData.fieldCoverageFrom}>
                   <input
                     type="number"
                     value={coverageFrom}
                     onChange={(e) => setCoverageFrom(e.target.value)}
                     disabled={!isEditable}
-                    placeholder="e.g. 2020"
+                    placeholder={t.openData.fieldCoverageFromPh}
                     min={1990}
                     max={2100}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                   />
                 </Field>
 
-                <Field label="Coverage To Year">
+                <Field label={t.openData.fieldCoverageTo}>
                   <input
                     type="number"
                     value={coverageTo}
                     onChange={(e) => setCoverageTo(e.target.value)}
                     disabled={!isEditable}
-                    placeholder="e.g. 2024"
+                    placeholder={t.openData.fieldCoverageToPh}
                     min={1990}
                     max={2100}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
@@ -576,7 +585,7 @@ export function OpenDataEditor({
                 </Field>
               </div>
 
-              <Field label="Output Formats">
+              <Field label={t.openData.fieldFormats}>
                 <MultiToggle
                   options={FORMAT_OPTIONS}
                   selected={formats}
@@ -586,25 +595,25 @@ export function OpenDataEditor({
               </Field>
 
               <div className="grid grid-cols-2 gap-5">
-                <Field label="Data Size" hint="Approximate size, e.g. 250 MB, 1.2 GB">
+                <Field label={t.openData.fieldSize} hint={t.openData.fieldSizeHint}>
                   <input
                     type="text"
                     value={dataSize}
                     onChange={(e) => setDataSize(e.target.value)}
                     disabled={!isEditable}
-                    placeholder="e.g. 450 MB"
+                    placeholder={t.openData.fieldSizePh}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                   />
                 </Field>
 
-                <Field label="Refresh Frequency">
+                <Field label={t.openData.fieldRefreshFreq}>
                   <select
                     value={refreshFreq}
                     onChange={(e) => setRefreshFreq(e.target.value as OpenDataRefresh | "")}
                     disabled={!isEditable}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                   >
-                    <option value="">— Select frequency —</option>
+                    <option value="">{t.openData.selectFrequency}</option>
                     {REFRESH_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
@@ -616,13 +625,13 @@ export function OpenDataEditor({
 
           {/* Dataset-level DQ notes */}
           <div>
-            <SectionHeading title="Data Quality Notes" subtitle="Known data quality considerations at the dataset level" />
-            <Field label="DQ Notes">
+            <SectionHeading title={t.openData.sectionDqNotes} subtitle={t.openData.sectionDqNotesSub} />
+            <Field label={t.openData.fieldDqNotes}>
               <textarea
                 value={dqNotes}
                 onChange={(e) => setDqNotes(e.target.value)}
                 disabled={!isEditable}
-                placeholder="Describe any known data quality limitations, caveats, or completeness gaps…"
+                placeholder={t.openData.fieldDqNotesPh}
                 rows={4}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
               />
@@ -637,7 +646,7 @@ export function OpenDataEditor({
                 disabled={saving}
                 className="px-5 py-2 bg-brand-purple text-white rounded-lg text-sm font-medium hover:bg-brand-purple/90 disabled:opacity-60 transition-colors"
               >
-                {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+                {saving ? t.openData.savingLabel : saved ? t.openData.savedCheck : t.openData.saveBtn}
               </button>
             </div>
           )}
@@ -648,19 +657,19 @@ export function OpenDataEditor({
       {activeTab === "columns" && (
         <div>
           <SectionHeading
-            title="Dataset Columns"
-            subtitle="Select the individual columns to include in this open dataset. Column-level DQ issues can be noted here."
+            title={t.openData.sectionColumns}
+            subtitle={t.openData.sectionColumnsSub}
           />
 
           {datasetId == null && (
             <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-              Save the dataset first before adding columns.
+              {t.openData.saveFirstWarning}
               <button
                 onClick={save}
                 disabled={saving}
                 className="ml-3 underline font-medium"
               >
-                {saving ? "Saving…" : "Save now"}
+                {saving ? t.openData.savingLabel : t.openData.saveNow}
               </button>
             </div>
           )}
@@ -686,13 +695,13 @@ export function OpenDataEditor({
       {activeTab === "extraction" && (
         <div>
           <SectionHeading
-            title="Data Extraction Logic"
-            subtitle="Suggested SQL or extraction steps to pull the selected columns from the source system. Auto-generated based on selected columns — edit as needed."
+            title={t.openData.sectionExtraction}
+            subtitle={t.openData.sectionExtractionSub}
           />
 
           {columns.length === 0 ? (
             <div className="text-center py-10 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-              <p className="text-sm">Select columns first to generate extraction logic.</p>
+              <p className="text-sm">{t.openData.noColumnsExtraction}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -702,7 +711,7 @@ export function OpenDataEditor({
                     onClick={() => setExtraction(generateExtractionLogic(columns))}
                     className="text-xs text-brand-purple hover:underline"
                   >
-                    ↺ Re-generate from selected columns
+                    {t.openData.regenerateBtn}
                   </button>
                 </div>
               )}
@@ -721,7 +730,7 @@ export function OpenDataEditor({
                     disabled={saving}
                     className="px-4 py-2 bg-brand-purple text-white rounded-lg text-sm font-medium hover:bg-brand-purple/90 disabled:opacity-60 transition-colors"
                   >
-                    {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+                    {saving ? t.openData.savingLabel : saved ? t.openData.savedCheck : t.openData.saveBtn}
                   </button>
                 </div>
               )}
@@ -734,17 +743,17 @@ export function OpenDataEditor({
       {activeTab === "workflow" && (
         <div className="space-y-6">
           <SectionHeading
-            title="Approval Workflow"
-            subtitle="Open data publication follows a four-stage review process."
+            title={t.openData.sectionApproval}
+            subtitle={t.openData.sectionApprovalSub}
           />
 
           {/* Workflow stages diagram */}
           <div className="grid grid-cols-4 gap-3">
             {[
-              { stage: 1, name: "Steward Review",  role: "Data Steward",        sla: "3 days",  active: status === "PENDING_APPROVAL" },
-              { stage: 2, name: "Owner Approval",  role: "Data Owner",          sla: "5 days",  active: false },
-              { stage: 3, name: "Privacy Review",  role: "Privacy Officer",     sla: "3 days",  note: hasPii ? undefined : "Skipped if no PII", active: false },
-              { stage: 4, name: "DMO Sign-off",    role: "DMO Admin",           sla: "3 days",  active: false },
+              { stage: 1, name: t.openData.stageStewardReview, role: t.openData.roleSteward,  sla: "3 days", active: status === "PENDING_APPROVAL" },
+              { stage: 2, name: t.openData.stageOwnerApproval, role: t.openData.roleOwner,    sla: "5 days", active: false },
+              { stage: 3, name: t.openData.stagePrivacyReview, role: t.openData.rolePrivacy,  sla: "3 days", note: hasPii ? undefined : t.openData.skippedNoPii, active: false },
+              { stage: 4, name: t.openData.stageDmoSignoff,    role: t.openData.roleDmo,      sla: "3 days", active: false },
             ].map((s) => (
               <div
                 key={s.stage}
@@ -761,37 +770,13 @@ export function OpenDataEditor({
 
           {/* Current status panel */}
           <div className={`rounded-xl border p-5 ${STATUS_COLORS[status]}`}>
-            <div className="font-semibold text-base mb-1">Current Status: {STATUS_LABELS[status]}</div>
-            {status === "DRAFT" && (
-              <p className="text-sm opacity-80">
-                Complete the dataset info and add at least one column, then submit for approval to start the workflow.
-              </p>
-            )}
-            {status === "PENDING" && (
-              <p className="text-sm opacity-80">
-                The dataset is pending changes. Edit as needed and resubmit for approval.
-              </p>
-            )}
-            {status === "PENDING_APPROVAL" && (
-              <p className="text-sm opacity-80">
-                The dataset is in the approval workflow. Reviewers have been notified. You will be updated when each stage completes.
-              </p>
-            )}
-            {status === "APPROVED" && (
-              <p className="text-sm opacity-80">
-                The dataset has been approved. An administrator can publish it. You can revert it to Pending if changes are needed.
-              </p>
-            )}
-            {status === "PUBLISHED" && (
-              <p className="text-sm opacity-80">
-                The dataset is published and publicly available.
-              </p>
-            )}
-            {status === "REJECTED" && (
-              <p className="text-sm opacity-80">
-                The dataset was rejected during review. Update it and resubmit.
-              </p>
-            )}
+            <div className="font-semibold text-base mb-1">{t.openData.currentStatus.replace("{status}", STATUS_LABELS[status])}</div>
+            {status === "DRAFT"            && <p className="text-sm opacity-80">{t.openData.statusDescDraft}</p>}
+            {status === "PENDING"          && <p className="text-sm opacity-80">{t.openData.statusDescPending}</p>}
+            {status === "PENDING_APPROVAL" && <p className="text-sm opacity-80">{t.openData.statusDescPendingApproval}</p>}
+            {status === "APPROVED"         && <p className="text-sm opacity-80">{t.openData.statusDescApproved}</p>}
+            {status === "PUBLISHED"        && <p className="text-sm opacity-80">{t.openData.statusDescPublished}</p>}
+            {status === "REJECTED"         && <p className="text-sm opacity-80">{t.openData.statusDescRejected}</p>}
           </div>
 
           {/* Actions */}
@@ -800,10 +785,10 @@ export function OpenDataEditor({
               <button
                 onClick={submitForApproval}
                 disabled={submitting || columns.length === 0 || datasetId == null}
-                title={columns.length === 0 ? "Add at least one column first" : undefined}
+                title={columns.length === 0 ? t.openData.addColumnFirst : undefined}
                 className="px-5 py-2 bg-brand-purple text-white rounded-lg text-sm font-medium hover:bg-brand-purple/90 disabled:opacity-60 transition-colors"
               >
-                {submitting ? "Submitting…" : "Submit for Approval"}
+                {submitting ? t.openData.submittingLabel : t.openData.submitApproval}
               </button>
             )}
 
@@ -813,15 +798,14 @@ export function OpenDataEditor({
                 disabled={submitting}
                 className="px-5 py-2 border border-amber-200 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60 transition-colors"
               >
-                {submitting ? "…" : "Revert to Pending Changes"}
+                {submitting ? "…" : t.openData.revertPendingBtn}
               </button>
             )}
           </div>
 
           {hasPii && (
             <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              <strong>Privacy Notice:</strong> This dataset contains columns classified as PII.
-              The Privacy Officer review stage (Stage 3) is mandatory before DMO sign-off.
+              <strong>{t.openData.privacyNotice}</strong> {t.openData.privacyNoticeText}
             </div>
           )}
         </div>

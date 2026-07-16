@@ -5,6 +5,7 @@ import type { ClassificationColumn } from "@/app/api/classification/columns/rout
 import type { ColumnDqRule } from "@/app/api/open-data/column-dq/route";
 import type { OpenDataColumn, OpenDataDqIssue } from "@/lib/types";
 import { ClassificationTag } from "@/components/ui/Tag";
+import { useLang } from "@/lib/lang-context";
 
 type DqDimension = { code: string; name: string };
 type PublicTerm  = { glossaryId: number; termName: string; classificationCode: string | null };
@@ -31,18 +32,8 @@ type DeidentifyFormState = {
   saving: boolean;
 };
 
-const RESTRICTED_CODES     = new Set(["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"]);
-const DIRECT_ID_CATEGORY   = "DIRECT_ID";
-
-const DEIDENT_METHOD_LABELS: Record<string, string> = {
-  AGE_BRACKET:      "Age Bracket (e.g. 25–34)",
-  SALARY_BRACKET:   "Salary Bracket (e.g. 5,000–10,000)",
-  CITY_ONLY:        "City Only (suppress street / area)",
-  DATE_YEAR:        "Year Only (suppress month / day)",
-  PSEUDONYMIZATION: "Pseudonymization (replace with token)",
-  GENERALIZATION:   "Generalization (reduce precision)",
-  CUSTOM:           "Custom (described in notes)",
-};
+const RESTRICTED_CODES   = new Set(["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET", "PII"]);
+const DIRECT_ID_CATEGORY = "DIRECT_ID";
 
 function isRestricted(code: string | null | undefined): boolean {
   return !!code && RESTRICTED_CODES.has(code.toUpperCase());
@@ -108,6 +99,18 @@ export function ColumnPickerPanel({
   onDqIssueUpdated,
   onDqIssueRemoved,
 }: Props) {
+  const { t } = useLang();
+
+  const DEIDENT_METHOD_LABELS: Record<string, string> = {
+    AGE_BRACKET:      t.openData.deidentAgeBracket,
+    SALARY_BRACKET:   t.openData.deidentSalaryBracket,
+    CITY_ONLY:        t.openData.deidentCityOnly,
+    DATE_YEAR:        t.openData.deidentDateYear,
+    PSEUDONYMIZATION: t.openData.deidentPseudonymization,
+    GENERALIZATION:   t.openData.deidentGeneralization,
+    CUSTOM:           t.openData.deidentCustom,
+  };
+
   const [search, setSearch]       = useState("");
   const [results, setResults]     = useState<ClassificationColumn[]>([]);
   const [searching, setSearching] = useState(false);
@@ -495,19 +498,19 @@ export function ColumnPickerPanel({
       {canEdit && (
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Search and add columns
+            {t.openData.searchColumnsLabel}
           </label>
           <div className="relative">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Type column name, table, or schema…"
+              placeholder={t.openData.searchColumnsPh}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
             />
             {searching && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 animate-pulse">
-                Searching…
+                {t.openData.searchingLabel}
               </span>
             )}
           </div>
@@ -539,22 +542,22 @@ export function ColumnPickerPanel({
                         <span className="text-xs text-slate-400">{col.dataType}</span>
                         {isDirectId && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold border border-red-300">
-                            ⛔ Direct Identifier — cannot include
+                            {t.openData.directIdBadge}
                           </span>
                         )}
                         {isPiiOther && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium border border-purple-200">
-                            PII — de-id required
+                            {t.openData.piiDeIdBadge}
                           </span>
                         )}
                         {!col.classTermIsPii && restricted && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium border border-orange-200">
-                            Needs re-classification
+                            {t.openData.needsReclassBadge}
                           </span>
                         )}
                         {!col.classTermIsPii && !restricted && unclassified && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium border border-yellow-200">
-                            Not classified
+                            {t.openData.notClassifiedBadge}
                           </span>
                         )}
                       </div>
@@ -570,7 +573,7 @@ export function ColumnPickerPanel({
                     </div>
                     {isDirectId ? (
                       <span className="ml-3 shrink-0 px-3 py-1 text-xs rounded-lg font-medium bg-red-100 text-red-400 cursor-not-allowed">
-                        Cannot Add
+                        {t.openData.cannotAddBtn}
                       </span>
                     ) : (
                       <button
@@ -589,16 +592,16 @@ export function ColumnPickerPanel({
                         }`}
                       >
                         {already
-                          ? "Added"
+                          ? t.openData.addedBtn
                           : adding === col.attributeId
                           ? "…"
                           : isPiiOther
-                          ? "Add + De-identify"
+                          ? t.openData.addDeidentifyBtn
                           : restricted
-                          ? "Add + Re-classify"
+                          ? t.openData.addReclassifyBtn
                           : unclassified
-                          ? "Add + Classify"
-                          : "Add"}
+                          ? t.openData.addClassifyBtn
+                          : t.openData.addBtn}
                       </button>
                     )}
                   </div>
@@ -608,7 +611,7 @@ export function ColumnPickerPanel({
           )}
 
           {!searching && search.trim() && results.length === 0 && (
-            <p className="text-xs text-slate-400 mt-2">No columns found matching "{search}"</p>
+            <p className="text-xs text-slate-400 mt-2">{t.openData.noColumnsFound.replace("{search}", search)}</p>
           )}
         </div>
       )}
@@ -616,13 +619,13 @@ export function ColumnPickerPanel({
       {/* ── Selected columns ── */}
       {selectedColumns.length === 0 ? (
         <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-          <p className="text-sm">No columns selected yet.</p>
-          {canEdit && <p className="text-xs mt-1">Use the search above to add columns.</p>}
+          <p className="text-sm">{t.openData.noColumnsSelected}</p>
+          {canEdit && <p className="text-xs mt-1">{t.openData.noColumnsHint}</p>}
         </div>
       ) : (
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700">
-            Selected columns ({selectedColumns.length})
+            {t.openData.selectedColumnsLabel.replace("{n}", String(selectedColumns.length))}
           </p>
 
           {selectedColumns.map((col) => {
@@ -656,17 +659,14 @@ export function ColumnPickerPanel({
                   <div className="flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-red-600 text-sm">⛔</span>
-                      <p className="text-xs text-red-800 font-medium">
-                        This column is a <strong>direct identifier</strong> (national ID, SIN, phone number, full name, etc.)
-                        and cannot be included in open data. Remove it before submitting.
-                      </p>
+                      <p className="text-xs text-red-800 font-medium">{t.openData.directIdBannerText}</p>
                     </div>
                     {canEdit && (
                       <button
                         onClick={() => removeColumn(col)}
                         className="shrink-0 text-xs px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                       >
-                        Remove
+                        {t.common.delete}
                       </button>
                     )}
                   </div>
@@ -677,16 +677,14 @@ export function ColumnPickerPanel({
                   <div className="flex items-center justify-between gap-3 px-4 py-2 bg-purple-50 border-b border-purple-200">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-purple-500 text-sm">🔒</span>
-                      <p className="text-xs text-purple-800 font-medium">
-                        This column contains PII and must have a de-identification method selected before submission.
-                      </p>
+                      <p className="text-xs text-purple-800 font-medium">{t.openData.piiDeIdRequiredText}</p>
                     </div>
                     {canEdit && (
                       <button
                         onClick={() => openDeidentifyForm(col.attributeId)}
                         className="shrink-0 text-xs px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
                       >
-                        Set De-identification
+                        {t.openData.setDeidentifyBtn}
                       </button>
                     )}
                   </div>
@@ -698,7 +696,7 @@ export function ColumnPickerPanel({
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-purple-500 text-xs">✓</span>
                       <p className="text-xs text-purple-800">
-                        De-identified: <strong>{DEIDENT_METHOD_LABELS[col.deidentificationMethod!] ?? col.deidentificationMethod}</strong>
+                        {t.openData.deidentifiedPrefix} <strong>{DEIDENT_METHOD_LABELS[col.deidentificationMethod!] ?? col.deidentificationMethod}</strong>
                         {col.deidentificationNotes && (
                           <span className="ml-1 text-purple-600">— {col.deidentificationNotes}</span>
                         )}
@@ -710,13 +708,13 @@ export function ColumnPickerPanel({
                           onClick={() => openDeidentifyForm(col.attributeId, col.deidentificationMethod, col.deidentificationNotes)}
                           className="text-[10px] px-2 py-0.5 border border-purple-200 rounded text-purple-600 hover:bg-purple-100 transition-colors"
                         >
-                          Change
+                          {t.openData.changeDeidentBtn}
                         </button>
                         <button
                           onClick={() => clearDeidentify(col)}
                           className="text-[10px] px-2 py-0.5 border border-red-100 rounded text-red-400 hover:bg-red-50 transition-colors"
                         >
-                          Clear
+                          {t.openData.clearDeidentBtn}
                         </button>
                       </div>
                     )}
@@ -728,17 +726,14 @@ export function ColumnPickerPanel({
                   <div className="flex items-center justify-between gap-3 px-4 py-2 bg-yellow-50 border-b border-yellow-200">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-yellow-500 text-sm">⚠</span>
-                      <p className="text-xs text-yellow-800 font-medium">
-                        This column has no classification. It must be assigned a public classification before
-                        this dataset can be submitted for approval.
-                      </p>
+                      <p className="text-xs text-yellow-800 font-medium">{t.openData.noClassBannerText}</p>
                     </div>
                     {canEdit && (
                       <button
                         onClick={() => openReclassifyForm(col.attributeId)}
                         className="shrink-0 text-xs px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium"
                       >
-                        Assign Classification
+                        {t.openData.assignClassBtn}
                       </button>
                     )}
                   </div>
@@ -750,8 +745,7 @@ export function ColumnPickerPanel({
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-orange-500 text-sm">⚠</span>
                       <p className="text-xs text-orange-800 font-medium">
-                        This column is classified as <strong>{col.classTermCode}</strong> and must be
-                        re-classified as Public before this dataset can be submitted for approval.
+                        {t.openData.needsReclassBannerText.replace("{code}", col.classTermCode ?? "")}
                       </p>
                     </div>
                     {canEdit && (
@@ -759,7 +753,7 @@ export function ColumnPickerPanel({
                         onClick={() => openReclassifyForm(col.attributeId)}
                         className="shrink-0 text-xs px-3 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
                       >
-                        Re-classify as Public
+                        {t.openData.reclassPublicBtn}
                       </button>
                     )}
                   </div>
@@ -770,10 +764,9 @@ export function ColumnPickerPanel({
                   <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-100">
                     <span className="text-amber-500 text-xs">⏳</span>
                     <p className="text-xs text-amber-800">
-                      Re-classification pending approval (request #{col.reclassificationRequestId}).
-                      {col.reclassificationReason && (
-                        <span className="ml-1 text-amber-600">Reason: {col.reclassificationReason}</span>
-                      )}
+                      {t.openData.reclassPendingText
+                        .replace("{id}", String(col.reclassificationRequestId))
+                        .replace("{reason}", col.reclassificationReason ?? "")}
                     </p>
                   </div>
                 )}
@@ -787,11 +780,11 @@ export function ColumnPickerPanel({
                       {col.classTermCode && <ClassificationTag code={col.classTermCode} />}
                       {isDirectIdCol && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold border border-red-200">
-                          Direct Identifier
+                          {t.openData.directIdentifierBadge}
                         </span>
                       )}
                       {isPiiCol && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium border border-purple-200">PII</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium border border-purple-200">{t.openData.piiBadge}</span>
                       )}
                       {col.dqScore != null && <DqScoreBadge score={col.dqScore} />}
                     </div>
@@ -840,23 +833,20 @@ export function ColumnPickerPanel({
                 {deidentForm?.open && (
                   <div className="border-t border-purple-200 bg-purple-50 px-4 py-3 space-y-3">
                     <div>
-                      <p className="text-xs font-semibold text-purple-900 mb-1">De-identification Method</p>
-                      <p className="text-[11px] leading-relaxed text-purple-700">
-                        This column contains PII. Select how it will be de-identified before publication.
-                        The chosen method will be reviewed by a Data Protection Officer as part of the approval process.
-                      </p>
+                      <p className="text-xs font-semibold text-purple-900 mb-1">{t.openData.deidentFormTitle}</p>
+                      <p className="text-[11px] leading-relaxed text-purple-700">{t.openData.deidentFormDesc}</p>
                     </div>
                     <div className="space-y-2">
                       <div>
                         <label className="block text-[11px] font-medium text-purple-900 mb-1">
-                          Method <span className="text-red-500">*</span>
+                          {t.openData.deidentMethodLabel} <span className="text-red-500">*</span>
                         </label>
                         <select
                           value={deidentForm.method}
                           onChange={(e) => updateDeidentifyField(col.attributeId, "method", e.target.value)}
                           className="w-full px-2 py-1.5 text-xs border border-purple-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-purple-300"
                         >
-                          <option value="">— Select a de-identification method —</option>
+                          <option value="">{t.openData.selectDeidentMethod}</option>
                           {Object.entries(DEIDENT_METHOD_LABELS).map(([code, label]) => (
                             <option key={code} value={code}>{label}</option>
                           ))}
@@ -865,12 +855,12 @@ export function ColumnPickerPanel({
                       {deidentForm.method === "CUSTOM" && (
                         <div>
                           <label className="block text-[11px] font-medium text-purple-900 mb-1">
-                            Description <span className="text-red-500">*</span>
+                            {t.openData.deidentCustomNotesLabel} <span className="text-red-500">*</span>
                           </label>
                           <textarea
                             value={deidentForm.notes}
                             onChange={(e) => updateDeidentifyField(col.attributeId, "notes", e.target.value)}
-                            placeholder="Describe the custom de-identification method that will be applied…"
+                            placeholder={t.openData.deidentCustomNotesPh}
                             rows={2}
                             className="w-full px-2 py-1.5 text-xs border border-purple-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-1 focus:ring-purple-300"
                           />
@@ -882,14 +872,14 @@ export function ColumnPickerPanel({
                           disabled={!deidentForm.method || (deidentForm.method === "CUSTOM" && !deidentForm.notes.trim()) || deidentForm.saving}
                           className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium transition-colors"
                         >
-                          {deidentForm.saving ? "Saving…" : "Save De-identification Method"}
+                          {deidentForm.saving ? t.openData.savingDeidentBtn : t.openData.saveDeidentBtn}
                         </button>
                         <button
                           onClick={() => closeDeidentifyForm(col.attributeId)}
                           disabled={deidentForm.saving}
                           className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
                         >
-                          Cancel
+                          {t.common.cancel}
                         </button>
                       </div>
                     </div>

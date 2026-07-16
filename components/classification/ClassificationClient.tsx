@@ -6,6 +6,7 @@ import { ClassificationTag } from "@/components/ui/Tag";
 import type { ClassificationStats } from "@/lib/queries/catalog";
 import type { ClassificationColumn } from "@/app/api/classification/columns/route";
 import type { GlossaryPickerDomain } from "@/app/api/glossary/picker/route";
+import { useLang } from "@/lib/lang-context";
 
 // ── Classification code → CDE ────────────────────────────────────────────────
 const CDE_CODES = new Set(["CONFIDENTIAL", "SECRET", "TOP_SECRET"]);
@@ -21,6 +22,7 @@ function InlineClassPicker({
   onSelect: (termId: number, termName: string) => void;
   onClear: () => void;
 }) {
+  const { t } = useLang();
   const [open, setOpen]     = useState(false);
   const [domains, setDomains] = useState<GlossaryPickerDomain[]>([]);
   const [search, setSearch]  = useState("");
@@ -66,7 +68,7 @@ function InlineClassPicker({
             <span className="font-medium truncate max-w-[120px]">{current.name}</span>
           </span>
         ) : (
-          <span className="text-muted italic">Assign…</span>
+          <span className="text-muted italic">{t.classification.assignPlaceholder}</span>
         )}
         <svg className="w-3 h-3 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -77,7 +79,7 @@ function InlineClassPicker({
             <svg className="w-3.5 h-3.5 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input
               autoFocus value={search} onChange={(e) => { setSearch(e.target.value); setActiveDomain(null); }}
-              placeholder="Search terms…"
+              placeholder={t.classification.bulkSearchPh}
               className="bg-transparent outline-none text-sm flex-1 placeholder-muted"
             />
           </div>
@@ -87,7 +89,7 @@ function InlineClassPicker({
                 onClick={() => { onClear(); setOpen(false); }}
                 className="w-full text-left px-4 py-2 text-[12px] text-red-600 hover:bg-red-50 border-b border-line-soft"
               >
-                ✕ Remove classification
+                {t.classification.removeClassification}
               </button>
             )}
             {!q && !activeDomain && domains.map((d) => (
@@ -117,13 +119,13 @@ function InlineClassPicker({
               </>
             )}
             {q && (flat.length === 0
-              ? <div className="py-5 text-center text-sm text-muted">No match for "{search}"</div>
-              : flat.map((t) => (
-                <button key={t.glossaryId} onClick={() => { onSelect(t.glossaryId, t.termName); setOpen(false); setSearch(""); }}
+              ? <div className="py-5 text-center text-sm text-muted">{t.classification.noMatch.replace("{search}", search)}</div>
+              : flat.map((term) => (
+                <button key={term.glossaryId} onClick={() => { onSelect(term.glossaryId, term.termName); setOpen(false); setSearch(""); }}
                   className="w-full flex items-center gap-2 px-4 py-2 hover:bg-canvas-soft text-left text-sm">
-                  {t.classCode && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CLASS_DOT[t.classCode.toUpperCase()] ?? "bg-gray-400"}`} />}
-                  <span className="flex-1">{t.termName}</span>
-                  <span className="text-[11px] text-muted">{t.domainName}</span>
+                  {term.classCode && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CLASS_DOT[term.classCode.toUpperCase()] ?? "bg-gray-400"}`} />}
+                  <span className="flex-1">{term.termName}</span>
+                  <span className="text-[11px] text-muted">{term.domainName}</span>
                 </button>
               ))
             )}
@@ -145,6 +147,7 @@ function BulkAssignModal({
   onAssign: (termId: number, termName: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useLang();
   const [domains, setDomains] = useState<GlossaryPickerDomain[]>([]);
   const [selected, setSelected] = useState<{ id: number; name: string; code: string | null } | null>(null);
   const [search, setSearch]     = useState("");
@@ -169,8 +172,8 @@ function BulkAssignModal({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-line" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
           <div>
-            <h2 className="font-bold text-brand-deep">Assign Classification Term</h2>
-            <p className="text-[12px] text-muted mt-0.5">Applying to <strong>{count}</strong> column{count !== 1 ? "s" : ""}</p>
+            <h2 className="font-bold text-brand-deep">{t.classification.bulkTitle}</h2>
+            <p className="text-[12px] text-muted mt-0.5">{t.classification.bulkSubtitle.replace("{n}", String(count))}</p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
@@ -180,7 +183,7 @@ function BulkAssignModal({
             <svg className="w-3.5 h-3.5 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input
               autoFocus value={search} onChange={(e) => { setSearch(e.target.value); setActiveDomain(null); }}
-              placeholder="Search classification terms…"
+              placeholder={t.classification.bulkSearchPh}
               className="bg-transparent outline-none text-sm flex-1 placeholder-muted"
             />
           </div>
@@ -224,31 +227,29 @@ function BulkAssignModal({
             </>
           )}
           {q && (flat.length === 0
-            ? <div className="py-8 text-center text-sm text-muted">No match for "{search}"</div>
-            : flat.map((t) => (
-              <button key={t.glossaryId}
-                onClick={() => setSelected({ id: t.glossaryId, name: t.termName, code: t.classCode })}
-                className={`w-full flex items-center gap-2 px-6 py-2.5 hover:bg-canvas-soft text-left text-sm ${selected?.id === t.glossaryId ? "bg-brand-purple/10" : ""}`}>
-                {t.classCode && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CLASS_DOT[t.classCode.toUpperCase()] ?? "bg-gray-400"}`} />}
-                <span className="flex-1">{t.termName}</span>
-                <span className="text-[11px] text-muted">{t.domainName}</span>
+            ? <div className="py-8 text-center text-sm text-muted">{t.classification.noMatch.replace("{search}", search)}</div>
+            : flat.map((term) => (
+              <button key={term.glossaryId}
+                onClick={() => setSelected({ id: term.glossaryId, name: term.termName, code: term.classCode })}
+                className={`w-full flex items-center gap-2 px-6 py-2.5 hover:bg-canvas-soft text-left text-sm ${selected?.id === term.glossaryId ? "bg-brand-purple/10" : ""}`}>
+                {term.classCode && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CLASS_DOT[term.classCode.toUpperCase()] ?? "bg-gray-400"}`} />}
+                <span className="flex-1">{term.termName}</span>
+                <span className="text-[11px] text-muted">{term.domainName}</span>
               </button>
             ))
           )}
         </div>
 
         <div className="px-6 py-3 border-t border-line">
-          <p className="text-[11px] text-muted mb-3">
-            Classification triggers a review workflow: Steward → Owner → DMO Admin.
-          </p>
+          <p className="text-[11px] text-muted mb-3">{t.classification.bulkWorkflowNote}</p>
           <div className="flex justify-end gap-2">
-            <button onClick={onClose} className="btn btn-sm">Cancel</button>
+            <button onClick={onClose} className="btn btn-sm">{t.classification.bulkCancel}</button>
             <button
               onClick={() => { if (selected) { onAssign(selected.id, selected.name); onClose(); } }}
               disabled={!selected}
               className="btn btn-sm btn-primary"
             >
-              Apply & Start Workflow
+              {t.classification.bulkApply}
             </button>
           </div>
         </div>
@@ -287,6 +288,7 @@ type Props = {
 };
 
 export function ClassificationClient({ initialStats, initialFilter, initialSearch, canEdit }: Props) {
+  const { t } = useLang();
   const [stats,   setStats]   = useState(initialStats);
   const [filter,  setFilter]  = useState(initialFilter);
   const [search,  setSearch]  = useState(initialSearch);
@@ -359,35 +361,35 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
   const totalPages = Math.ceil(total / 50);
 
   const FILTERS = [
-    { key: "all",          label: "All Columns",    count: stats.total },
-    { key: "classified",   label: "Classified",     count: stats.classified },
-    { key: "unclassified", label: "Not Classified", count: stats.unclassified },
-    { key: "cde",          label: "CDE",            count: stats.cde },
+    { key: "all",          label: t.classification.filterAll,          count: stats.total },
+    { key: "classified",   label: t.classification.filterClassified,   count: stats.classified },
+    { key: "unclassified", label: t.classification.filterUnclassified, count: stats.unclassified },
+    { key: "cde",          label: t.classification.filterCde,          count: stats.cde },
   ];
 
   return (
     <div>
       {/* Page title */}
       <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-brand-deep">Classification</h1>
-        <p className="text-sm text-muted mt-1">Manage and track column classification across all data assets</p>
+        <h1 className="text-2xl font-extrabold text-brand-deep">{t.classification.pageTitle}</h1>
+        <p className="text-sm text-muted mt-1">{t.classification.pageDesc}</p>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <StatTile label="Total Columns"  value={stats.total}        onClick={() => onFilterChange("all")} />
-        <StatTile label="Classified"     value={stats.classified}   highlight onClick={() => onFilterChange("classified")} />
-        <StatTile label="Not Classified" value={stats.unclassified} onClick={() => onFilterChange("unclassified")} />
-        <StatTile label="CDE"            value={stats.cde}          highlight sub="Critical Data Elements" onClick={() => onFilterChange("cde")} />
-        <StatTile label="PII"            value={stats.pii}          sub="Personal Information" />
-        <StatTile label="Asset Types"    value={stats.business + stats.technical}
-          sub={`${stats.business} Biz · ${stats.technical} Tech`} />
+        <StatTile label={t.classification.statTotalCols}  value={stats.total}        onClick={() => onFilterChange("all")} />
+        <StatTile label={t.classification.statClassified} value={stats.classified}   highlight onClick={() => onFilterChange("classified")} />
+        <StatTile label={t.classification.statNotClassified} value={stats.unclassified} onClick={() => onFilterChange("unclassified")} />
+        <StatTile label={t.classification.statCde}        value={stats.cde}          highlight sub={t.classification.statCdeSub} onClick={() => onFilterChange("cde")} />
+        <StatTile label={t.classification.statPii}        value={stats.pii}          sub={t.classification.statPiiSub} />
+        <StatTile label={t.classification.statAssetTypes} value={stats.business + stats.technical}
+          sub={`${stats.business} · ${stats.technical}`} />
       </div>
 
       {/* PI Category breakdown */}
       {stats.byPiCategory.length > 0 && (
         <div className="card px-5 py-4 mb-5 flex flex-wrap items-center gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">PI Category</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">{t.classification.piCategoryLabel}</span>
           {stats.byPiCategory.map((cat) => (
             <span key={cat.name} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
               {cat.name}
@@ -422,7 +424,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
           <svg className="w-3.5 h-3.5 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input
             value={search} onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search columns, tables, schemas…"
+            placeholder={t.classification.searchPlaceholder}
             className="bg-transparent outline-none text-sm flex-1 placeholder-muted"
           />
           {search && (
@@ -432,19 +434,19 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
 
         {selected.size > 0 && canEdit && (
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-[12px] text-muted">{selected.size} selected</span>
+            <span className="text-[12px] text-muted">{t.classification.selectedCount.replace("{n}", String(selected.size))}</span>
             <button
               onClick={() => setBulkModal(true)}
               className="btn btn-sm btn-primary flex items-center gap-1.5"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-              Assign Classification
+              {t.classification.assignClassification}
             </button>
-            <button onClick={() => setSelected(new Set())} className="btn btn-sm">Clear</button>
+            <button onClick={() => setSelected(new Set())} className="btn btn-sm">{t.classification.clearSelection}</button>
           </div>
         )}
 
-        {saving && <span className="text-[12px] text-muted ml-2">Saving…</span>}
+        {saving && <span className="text-[12px] text-muted ml-2">{t.classification.savingLabel}</span>}
       </div>
 
       {/* Workflow info banner */}
@@ -452,7 +454,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
         <svg className="w-4 h-4 text-brand-purple shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
         </svg>
-        Assigning a classification term automatically starts a review workflow: <strong className="ml-1">Steward → Owner → DMO Admin</strong>
+        {t.classification.workflowBanner}
       </div>
 
       {/* Table */}
@@ -467,25 +469,25 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                 className="w-4 h-4 rounded accent-brand-purple" />
             </div>
           )}
-          <div>Column / Table</div>
-          <div>Data Type</div>
-          <div>Asset Type</div>
-          <div>Classification</div>
-          <div>Classification Term</div>
-          <div>CDE</div>
-          <div>PII</div>
-          <div>PI Category</div>
+          <div>{t.classification.colColumnTable}</div>
+          <div>{t.classification.colDataType}</div>
+          <div>{t.classification.colAssetType}</div>
+          <div>{t.classification.colClassification}</div>
+          <div>{t.classification.colClassificationTerm}</div>
+          <div>{t.classification.colCde}</div>
+          <div>{t.classification.colPii}</div>
+          <div>{t.classification.colPiCategory}</div>
         </div>
 
         {/* Rows */}
         {loading ? (
-          <div className="py-16 text-center text-muted text-sm">Loading…</div>
+          <div className="py-16 text-center text-muted text-sm">{t.classification.loadingLabel}</div>
         ) : rows.length === 0 ? (
           <div className="py-16 text-center">
-            <div className="text-muted text-sm">No columns match the current filter</div>
+            <div className="text-muted text-sm">{t.classification.noColumnsMatch}</div>
             {filter !== "all" && (
               <button onClick={() => onFilterChange("all")} className="mt-2 text-brand-purple text-sm hover:underline">
-                Show all columns
+                {t.classification.showAll}
               </button>
             )}
           </div>
@@ -532,7 +534,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                       row.columnType === "BUSINESS"
                         ? "bg-blue-50 text-blue-700 border border-blue-200"
                         : "bg-slate-50 text-slate-600 border border-slate-200"
-                    }`}>{row.columnType === "BUSINESS" ? "Business" : "Technical"}</span>
+                    }`}>{row.columnType === "BUSINESS" ? t.classification.assetBusiness : t.classification.assetTechnical}</span>
                   ) : <span className="text-muted text-[12px]">—</span>}
                 </div>
 
@@ -588,10 +590,10 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
           </span>
           <div className="flex gap-1">
             <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}
-              className="btn btn-sm disabled:opacity-40">← Prev</button>
+              className="btn btn-sm disabled:opacity-40">{t.classification.prevPage}</button>
             <span className="px-3 py-1.5 text-muted">{page} / {totalPages}</span>
             <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-              className="btn btn-sm disabled:opacity-40">Next →</button>
+              className="btn btn-sm disabled:opacity-40">{t.classification.nextPage}</button>
           </div>
         </div>
       )}

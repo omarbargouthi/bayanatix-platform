@@ -4,15 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { OpenDataset, OpenDataStatus } from "@/lib/types";
-
-const STATUS_LABELS: Record<OpenDataStatus, string> = {
-  DRAFT:            "Draft",
-  PENDING_APPROVAL: "Pending Approval",
-  APPROVED:         "Approved",
-  PUBLISHED:        "Published",
-  REJECTED:         "Rejected",
-  PENDING:          "Pending Changes",
-};
+import { useLang } from "@/lib/lang-context";
 
 const STATUS_COLORS: Record<OpenDataStatus, string> = {
   DRAFT:            "bg-slate-100 text-slate-600",
@@ -22,14 +14,6 @@ const STATUS_COLORS: Record<OpenDataStatus, string> = {
   REJECTED:         "bg-red-100 text-red-700",
   PENDING:          "bg-sky-100 text-sky-700",
 };
-
-const TABS: { key: string; label: string }[] = [
-  { key: "all",             label: "All" },
-  { key: "DRAFT",           label: "Draft" },
-  { key: "PENDING_APPROVAL",label: "Pending Approval" },
-  { key: "APPROVED",        label: "Approved" },
-  { key: "PUBLISHED",       label: "Published" },
-];
 
 type Props = {
   initialDatasets: OpenDataset[];
@@ -53,6 +37,7 @@ export function OpenDataList({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const { t } = useLang();
 
   const datasets = initialDatasets;
   const total    = initialTotal;
@@ -63,19 +48,44 @@ export function OpenDataList({
   const LIMIT = 20;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
+  const STATUS_LABELS: Record<OpenDataStatus, string> = {
+    DRAFT:            t.openData.statusDraft,
+    PENDING_APPROVAL: t.openData.statusPendingApproval,
+    APPROVED:         t.openData.statusApproved,
+    PUBLISHED:        t.openData.statusPublished,
+    REJECTED:         t.openData.statusRejected,
+    PENDING:          t.openData.statusPending,
+  };
+
+  const TABS = [
+    { key: "all",              label: t.openData.tabAll },
+    { key: "DRAFT",            label: t.openData.statusDraft },
+    { key: "PENDING_APPROVAL", label: t.openData.statusPendingApproval },
+    { key: "APPROVED",         label: t.openData.statusApproved },
+    { key: "PUBLISHED",        label: t.openData.statusPublished },
+  ];
+
+  const refreshFreqLabel: Record<string, string> = {
+    MONTHLY:     t.openData.refreshMonthly,
+    QUARTERLY:   t.openData.refreshQuarterly,
+    HALF_YEARLY: t.openData.refreshHalfYearly,
+    YEARLY:      t.openData.refreshYearly,
+    ON_DEMAND:   t.openData.refreshOnDemand,
+  };
+
   async function handleDelete(ds: OpenDataset, e: React.MouseEvent) {
     e.preventDefault();
     const isPublished = ds.statusCode === "PUBLISHED";
     const msg = isPublished
-      ? `Retract "${ds.datasetName}" from publication? It will be set back to Pending for revision.`
-      : `Delete "${ds.datasetName}"? This cannot be undone.`;
+      ? t.openData.confirmRetract.replace("{name}", ds.datasetName)
+      : t.openData.confirmDelete.replace("{name}", ds.datasetName);
     if (!confirm(msg)) return;
     setDeletingId(ds.datasetId);
     try {
       const res = await fetch(`/api/open-data/datasets/${ds.datasetId}`, { method: "DELETE" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string };
-        alert(err.error ?? "Failed to delete dataset");
+        alert(err.error ?? t.openData.deleteError);
         return;
       }
       router.refresh();
@@ -95,23 +105,13 @@ export function OpenDataList({
     startTransition(() => router.push("/open-data" + (params.size ? "?" + params : "")));
   }
 
-  const refreshFreqLabel: Record<string, string> = {
-    MONTHLY:     "Monthly",
-    QUARTERLY:   "Quarterly",
-    HALF_YEARLY: "Half-yearly",
-    YEARLY:      "Yearly",
-    ON_DEMAND:   "On Demand",
-  };
-
   return (
     <div>
       {/* Header row */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Open Data</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage published open datasets and their approval status
-          </p>
+          <h1 className="text-2xl font-semibold text-slate-900">{t.openData.pageTitle}</h1>
+          <p className="text-sm text-slate-500 mt-1">{t.openData.pageDesc}</p>
         </div>
         {canCreate && (
           <Link
@@ -119,24 +119,24 @@ export function OpenDataList({
             className="flex items-center gap-2 px-4 py-2 bg-brand-purple text-white rounded-lg text-sm font-medium hover:bg-brand-purple/90 transition-colors"
           >
             <span className="text-base leading-none">+</span>
-            New Dataset
+            {t.openData.newDataset}
           </Link>
         )}
       </div>
 
       {/* Filter tabs */}
       <div className="flex items-center gap-1 mb-4 border-b border-slate-200">
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <button
-            key={t.key}
-            onClick={() => { setStatus(t.key); navigate(t.key, search, 1); }}
+            key={tab.key}
+            onClick={() => { setStatus(tab.key); navigate(tab.key, search, 1); }}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              status === t.key
+              status === tab.key
                 ? "border-brand-purple text-brand-purple"
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
 
@@ -145,7 +145,7 @@ export function OpenDataList({
           <input
             type="text"
             value={search}
-            placeholder="Search datasets…"
+            placeholder={t.openData.searchPlaceholder}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && navigate(status, search, 1)}
             className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
@@ -157,10 +157,10 @@ export function OpenDataList({
       {datasets.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <div className="text-4xl mb-3">📂</div>
-          <p className="text-sm">No open datasets found.</p>
+          <p className="text-sm">{t.openData.noDatasets}</p>
           {canCreate && (
             <Link href="/open-data/new" className="mt-4 inline-block text-sm text-brand-purple hover:underline">
-              Create the first dataset →
+              {t.openData.createFirst}
             </Link>
           )}
         </div>
@@ -172,12 +172,12 @@ export function OpenDataList({
               className="grid text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 bg-slate-50 border-b border-slate-200"
               style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr auto" }}
             >
-              <span>Dataset</span>
-              <span>Category</span>
-              <span>Format</span>
-              <span>Refresh</span>
-              <span>Columns</span>
-              <span>Status</span>
+              <span>{t.openData.colDataset}</span>
+              <span>{t.openData.colCategory}</span>
+              <span>{t.openData.colFormat}</span>
+              <span>{t.openData.colRefresh}</span>
+              <span>{t.openData.colColumns}</span>
+              <span>{t.openData.colStatus}</span>
               <span></span>
             </div>
 
@@ -237,14 +237,18 @@ export function OpenDataList({
                     <button
                       onClick={(e) => handleDelete(ds, e)}
                       disabled={deletingId === ds.datasetId}
-                      title={isPublished ? "Retract from publication" : "Delete dataset"}
+                      title={isPublished ? t.openData.retractBtn : t.openData.deleteBtn}
                       className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
                         isPublished
                           ? "border-amber-200 text-amber-600 hover:bg-amber-50"
                           : "border-red-100 text-red-400 hover:bg-red-50"
                       } disabled:opacity-40`}
                     >
-                      {deletingId === ds.datasetId ? "…" : isPublished ? "Retract" : "Delete"}
+                      {deletingId === ds.datasetId
+                        ? t.openData.deletingEllipsis
+                        : isPublished
+                        ? t.openData.retractBtn
+                        : t.openData.deleteBtn}
                     </button>
                   )}
                 </div>
@@ -256,22 +260,22 @@ export function OpenDataList({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
-              <span>{total} datasets total</span>
+              <span>{t.openData.datasetsTotal.replace("{n}", String(total))}</span>
               <div className="flex items-center gap-2">
                 <button
                   disabled={page <= 1}
                   onClick={() => navigate(status, search, page - 1)}
                   className="px-3 py-1 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
                 >
-                  ← Prev
+                  {t.openData.prevPage}
                 </button>
-                <span>Page {page} / {totalPages}</span>
+                <span>{t.openData.pageOf.replace("{page}", String(page)).replace("{total}", String(totalPages))}</span>
                 <button
                   disabled={page >= totalPages}
                   onClick={() => navigate(status, search, page + 1)}
                   className="px-3 py-1 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
                 >
-                  Next →
+                  {t.openData.nextPage}
                 </button>
               </div>
             </div>

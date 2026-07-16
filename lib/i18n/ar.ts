@@ -741,6 +741,7 @@ export const ar: I18nStrings = {
     pageTitle:              "البيانات المفتوحة",
     pageDesc:               "إدارة مجموعات البيانات المفتوحة المنشورة وحالة موافقتها",
     newDataset:             "مجموعة بيانات جديدة",
+    tabAll:                 "الكل",
     searchPlaceholder:      "البحث في مجموعات البيانات…",
     noDatasets:             "لا توجد مجموعات بيانات مفتوحة.",
     createFirst:            "إنشاء أول مجموعة بيانات ←",

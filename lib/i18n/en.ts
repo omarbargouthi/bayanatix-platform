@@ -741,6 +741,7 @@ export const en: I18nStrings = {
     pageTitle:              "Open Data",
     pageDesc:               "Manage published open datasets and their approval status",
     newDataset:             "New Dataset",
+    tabAll:                 "All",
     searchPlaceholder:      "Search datasets…",
     noDatasets:             "No open datasets found.",
     createFirst:            "Create the first dataset →",

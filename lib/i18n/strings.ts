@@ -815,6 +815,7 @@ export type I18nStrings = {
     pageTitle:              string;
     pageDesc:               string;
     newDataset:             string;
+    tabAll:                 string;
     searchPlaceholder:      string;
     noDatasets:             string;
     createFirst:            string;
