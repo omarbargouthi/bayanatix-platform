@@ -809,6 +809,303 @@ export type I18nStrings = {
     sensitivityTopSecret:   string;
   };
 
+  // ── Open Data ───────────────────────────────────────────────────────────────
+  openData: {
+    // List page
+    pageTitle:              string;
+    pageDesc:               string;
+    newDataset:             string;
+    searchPlaceholder:      string;
+    noDatasets:             string;
+    createFirst:            string;
+    colDataset:             string;
+    colCategory:            string;
+    colFormat:              string;
+    colRefresh:             string;
+    colColumns:             string;
+    colStatus:              string;
+    deleteBtn:              string;
+    retractBtn:             string;
+    deletingEllipsis:       string;
+    confirmDelete:          string;
+    confirmRetract:         string;
+    deleteError:            string;
+    datasetsTotal:          string;
+    prevPage:               string;
+    nextPage:               string;
+    pageOf:                 string;
+    // Status labels
+    statusDraft:            string;
+    statusPendingApproval:  string;
+    statusApproved:         string;
+    statusPublished:        string;
+    statusRejected:         string;
+    statusPending:          string;
+    // Refresh frequency
+    refreshMonthly:         string;
+    refreshQuarterly:       string;
+    refreshHalfYearly:      string;
+    refreshYearly:          string;
+    refreshOnDemand:        string;
+    // Editor — header / actions
+    titleCreate:            string;
+    containsPii:            string;
+    saveDraft:              string;
+    savedCheck:             string;
+    savingLabel:            string;
+    submitApproval:         string;
+    submittingLabel:        string;
+    addColumnFirst:         string;
+    revertPending:          string;
+    revertPendingBtn:       string;
+    // Editor — tabs
+    tabInfo:                string;
+    tabColumns:             string;
+    tabExtraction:          string;
+    tabApproval:            string;
+    // Editor — Dataset Info tab
+    sectionBasic:           string;
+    sectionBasicSub:        string;
+    fieldName:              string;
+    fieldNamePlaceholder:   string;
+    fieldDesc:              string;
+    fieldDescPlaceholder:   string;
+    fieldDept:              string;
+    fieldDeptPlaceholder:   string;
+    fieldCategory:          string;
+    selectCategory:         string;
+    fieldPurpose:           string;
+    fieldPurposePlaceholder:string;
+    sectionPublication:     string;
+    fieldSegments:          string;
+    fieldSegmentsHint:      string;
+    fieldPublishDate:       string;
+    fieldCoverageFrom:      string;
+    fieldCoverageFromPh:    string;
+    fieldCoverageTo:        string;
+    fieldCoverageToPh:      string;
+    fieldFormats:           string;
+    fieldSize:              string;
+    fieldSizeHint:          string;
+    fieldSizePh:            string;
+    fieldRefreshFreq:       string;
+    selectFrequency:        string;
+    sectionDqNotes:         string;
+    sectionDqNotesSub:      string;
+    fieldDqNotes:           string;
+    fieldDqNotesPh:         string;
+    saveBtn:                string;
+    // Editor — Columns tab
+    sectionColumns:         string;
+    sectionColumnsSub:      string;
+    saveFirstWarning:       string;
+    saveNow:                string;
+    // Editor — Extraction tab
+    sectionExtraction:      string;
+    sectionExtractionSub:   string;
+    noColumnsExtraction:    string;
+    regenerateBtn:          string;
+    // Editor — Approval tab
+    sectionApproval:        string;
+    sectionApprovalSub:     string;
+    stageLabel:             string;
+    stageStewardReview:     string;
+    stageOwnerApproval:     string;
+    stagePrivacyReview:     string;
+    stageDmoSignoff:        string;
+    roleSteward:            string;
+    roleOwner:              string;
+    rolePrivacy:            string;
+    roleDmo:                string;
+    skippedNoPii:           string;
+    currentStatus:          string;
+    statusDescDraft:        string;
+    statusDescPending:      string;
+    statusDescPendingApproval: string;
+    statusDescApproved:     string;
+    statusDescPublished:    string;
+    statusDescRejected:     string;
+    privacyNotice:          string;
+    privacyNoticeText:      string;
+    // Editor — errors
+    errNameRequired:        string;
+    errCreateFailed:        string;
+    errSaveFailed:          string;
+    errSubmitFailed:        string;
+    // Data categories (for select dropdown)
+    categories: {
+      economyFinance:              string;
+      educationTraining:           string;
+      healthPopulation:            string;
+      environmentClimate:          string;
+      realEstateHousing:           string;
+      transportationLogistics:     string;
+      governmentPublicServices:    string;
+      demographicsSocial:          string;
+      agricultureFood:             string;
+      energyUtilities:             string;
+      securitySafety:              string;
+      cultureTourism:              string;
+      technologyCommunications:    string;
+      infrastructureConstruction:  string;
+      legalJudicial:               string;
+      scienceResearch:             string;
+    };
+    // Beneficiary segments
+    segments: {
+      investors:              string;
+      researchers:            string;
+      government:             string;
+      media:                  string;
+      citizens:               string;
+      ngos:                   string;
+      privateSector:          string;
+      students:               string;
+      internationalOrgs:      string;
+    };
+    // Column picker — search area
+    searchColumnsLabel:     string;
+    searchColumnsPh:        string;
+    searchingLabel:         string;
+    directIdBadge:          string;
+    piiDeIdBadge:           string;
+    needsReclassBadge:      string;
+    notClassifiedBadge:     string;
+    cannotAddBtn:           string;
+    addDeidentifyBtn:       string;
+    addReclassifyBtn:       string;
+    addClassifyBtn:         string;
+    addBtn:                 string;
+    addedBtn:               string;
+    noColumnsFound:         string;
+    directIdBlockedError:   string;
+    // Column picker — selected columns
+    selectedColumnsLabel:   string;
+    noColumnsSelected:      string;
+    noColumnsHint:          string;
+    // Column picker — direct identifier banner
+    directIdBannerText:     string;
+    // Column picker — PII de-identification banners
+    piiDeIdRequiredText:    string;
+    setDeidentifyBtn:       string;
+    deidentifiedPrefix:     string;
+    changeDeidentBtn:       string;
+    clearDeidentBtn:        string;
+    directIdentifierBadge:  string;
+    piiBadge:               string;
+    // Column picker — classification banners
+    noClassBannerText:      string;
+    assignClassBtn:         string;
+    needsReclassBannerText: string;
+    reclassPublicBtn:       string;
+    reclassPendingText:     string;
+    // Column picker — de-identification form
+    deidentFormTitle:       string;
+    deidentFormDesc:        string;
+    deidentMethodLabel:     string;
+    selectDeidentMethod:    string;
+    deidentAgeBracket:      string;
+    deidentSalaryBracket:   string;
+    deidentCityOnly:        string;
+    deidentDateYear:        string;
+    deidentPseudonymization:string;
+    deidentGeneralization:  string;
+    deidentCustom:          string;
+    deidentCustomNotesLabel:string;
+    deidentCustomNotesPh:   string;
+    saveDeidentBtn:         string;
+    savingDeidentBtn:       string;
+    // Column picker — reclassify form
+    reclassFormTitleReclass:string;
+    reclassFormTitleAssign: string;
+    reclassFormDescReclass: string;
+    reclassFormDescNoClass: string;
+    reclassTermLabel:       string;
+    reclassTermPh:          string;
+    reclassTermLoading:     string;
+    reclassReasonLabel:     string;
+    reclassReasonPh:        string;
+    submitReclassBtn:       string;
+    submitClassBtn:         string;
+    submittingReclassBtn:   string;
+    // Column picker — DQ rules
+    dqRulesLabel:           string;
+    dqNotRun:               string;
+    dqAddIssueBtn:          string;
+    dqNoRules:              string;
+    dqRuleCount:            string;
+    dqLoading:              string;
+    dqIssueBtn:             string;
+    // Column picker — DQ issue form
+    dqIssueNotesLabel:      string;
+    dqEditIssueTitle:       string;
+    dqAddIssueTitle:        string;
+    dqDimensionPh:          string;
+    dqSeverityInfo:         string;
+    dqSeverityWarning:      string;
+    dqSeverityBlocker:      string;
+    dqIssuePh:              string;
+    dqSaveChangesBtn:       string;
+    dqSaveIssueBtn:         string;
+  };
+
+  // ── Classification ───────────────────────────────────────────────────────────
+  classification: {
+    pageTitle:              string;
+    pageDesc:               string;
+    // Stat tiles
+    statTotalCols:          string;
+    statClassified:         string;
+    statNotClassified:      string;
+    statCde:                string;
+    statCdeSub:             string;
+    statPii:                string;
+    statPiiSub:             string;
+    statAssetTypes:         string;
+    piCategoryLabel:        string;
+    // Filters & toolbar
+    filterAll:              string;
+    filterClassified:       string;
+    filterUnclassified:     string;
+    filterCde:              string;
+    searchPlaceholder:      string;
+    selectedCount:          string;
+    assignClassification:   string;
+    clearSelection:         string;
+    savingLabel:            string;
+    workflowBanner:         string;
+    // Table headers
+    colColumnTable:         string;
+    colDataType:            string;
+    colAssetType:           string;
+    colClassification:      string;
+    colClassificationTerm:  string;
+    colCde:                 string;
+    colPii:                 string;
+    colPiCategory:          string;
+    // States
+    loadingLabel:           string;
+    noColumnsMatch:         string;
+    showAll:                string;
+    // Asset type values
+    assetBusiness:          string;
+    assetTechnical:         string;
+    // Pagination
+    prevPage:               string;
+    nextPage:               string;
+    // Bulk assign modal
+    bulkTitle:              string;
+    bulkSubtitle:           string;
+    bulkSearchPh:           string;
+    bulkWorkflowNote:       string;
+    bulkCancel:             string;
+    bulkApply:              string;
+    // Inline picker
+    assignPlaceholder:      string;
+    removeClassification:   string;
+    noMatch:                string;
+  };
+
   // ── Dashboard ───────────────────────────────────────────────────────────────
   dashboard: {
     welcome:           string;   // supports {name} placeholder
