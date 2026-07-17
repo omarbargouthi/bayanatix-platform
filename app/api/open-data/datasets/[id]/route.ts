@@ -37,7 +37,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
       dataset_name_text    = COALESCE(${body.datasetName   ?? null}, dataset_name_text),
       description_text     = ${body.descriptionText  ?? null},
       department_text      = ${body.departmentText   ?? null},
-      category_code        = ${body.categoryCode     ?? null},
+      category_id          = ${body.categoryId != null ? Number(body.categoryId) : null},
       purpose_text         = ${body.purposeText      ?? null},
       beneficiary_segments = COALESCE(${body.beneficiarySegments != null ? JSON.stringify(body.beneficiarySegments) : null}::jsonb, beneficiary_segments),
       publish_date         = ${body.publishDate      ?? null},

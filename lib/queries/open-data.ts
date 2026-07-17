@@ -33,9 +33,9 @@ export async function listOpenDatasets(opts: {
       d.dataset_name_text                       AS "datasetName",
       d.description_text                        AS "descriptionText",
       d.department_text                         AS "departmentText",
-      d.category_code                           AS "categoryCode",
-      COALESCE(al.lookup_label, d.category_text) AS "categoryText",
-      al.label_ar                               AS "categoryLabelAr",
+      d.category_id                             AS "categoryId",
+      COALESCE(dc.name, d.category_text)        AS "categoryText",
+      dc.name_ar                                AS "categoryLabelAr",
       d.purpose_text                            AS "purposeText",
       d.beneficiary_segments                    AS "beneficiarySegments",
       to_char(d.publish_date, 'YYYY-MM-DD')     AS "publishDate",
@@ -56,7 +56,7 @@ export async function listOpenDatasets(opts: {
       COUNT(*) OVER()::int                      AS total
     FROM bayanat.open_datasets d
     LEFT JOIN bayanat.users              u  ON u.user_id = d.raised_by_user_id
-    LEFT JOIN bayanat.app_lookups        al ON al.lookup_group = 'DATASET_CATEGORY' AND al.lookup_code = d.category_code
+    LEFT JOIN bayanat.data_categories    dc ON dc.category_id = d.category_id
     LEFT JOIN bayanat.open_dataset_columns odc ON odc.dataset_id = d.dataset_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
@@ -66,7 +66,7 @@ export async function listOpenDatasets(opts: {
       AND ${status != null ? sql`d.status_code = ${status}` : sql`true`}
       AND ${userId != null ? sql`d.raised_by_user_id = ${userId}` : sql`true`}
       AND ${search !== "" ? sql`d.dataset_name_text ILIKE ${like} OR d.description_text ILIKE ${like}` : sql`true`}
-    GROUP BY d.dataset_id, u.full_name, al.lookup_label, al.label_ar
+    GROUP BY d.dataset_id, u.full_name, dc.name, dc.name_ar
     ORDER BY d.updated_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -76,6 +76,7 @@ export async function listOpenDatasets(opts: {
     data: rows.map(({ total: _t, ...r }) => ({
       ...r,
       datasetId:           Number(r.datasetId),
+      categoryId:          r.categoryId != null ? Number(r.categoryId) : null,
       columnCount:         Number(r.columnCount ?? 0),
       beneficiarySegments: jsonArr<string>(r.beneficiarySegments),
       dataFormats:         jsonArr(r.dataFormats),
@@ -96,9 +97,9 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
       d.dataset_name_text                       AS "datasetName",
       d.description_text                        AS "descriptionText",
       d.department_text                         AS "departmentText",
-      d.category_code                           AS "categoryCode",
-      COALESCE(al.lookup_label, d.category_text) AS "categoryText",
-      al.label_ar                               AS "categoryLabelAr",
+      d.category_id                             AS "categoryId",
+      COALESCE(dc.name, d.category_text)        AS "categoryText",
+      dc.name_ar                                AS "categoryLabelAr",
       d.purpose_text                            AS "purposeText",
       d.beneficiary_segments                    AS "beneficiarySegments",
       to_char(d.publish_date, 'YYYY-MM-DD')     AS "publishDate",
@@ -124,7 +125,7 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries  bg  ON bg.glossary_id = abt.glossary_id
     WHERE d.dataset_id = ${datasetId} AND d.deleted_at IS NULL
-    GROUP BY d.dataset_id, u.full_name, al.lookup_label, al.label_ar
+    GROUP BY d.dataset_id, u.full_name, dc.name, dc.name_ar
   `;
 
   if (!rows[0]) return null;
@@ -132,6 +133,7 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
   return {
     ...r,
     datasetId:           Number(r.datasetId),
+    categoryId:          r.categoryId != null ? Number(r.categoryId) : null,
     columnCount:         Number(r.columnCount ?? 0),
     beneficiarySegments: jsonArr<string>(r.beneficiarySegments),
     dataFormats:         jsonArr(r.dataFormats),

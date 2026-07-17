@@ -423,9 +423,9 @@ export type OpenDataset = {
   datasetName:          string;
   descriptionText:      string | null;
   departmentText:       string | null;
-  categoryCode:         string | null;
-  categoryText:         string | null;   // English label from lookup join (display only)
-  categoryLabelAr:      string | null;   // Arabic label from lookup join (display only)
+  categoryId:           number | null;
+  categoryText:         string | null;   // English name from data_categories join (display only)
+  categoryLabelAr:      string | null;   // Arabic name from data_categories join (display only)
   purposeText:          string | null;
   beneficiarySegments:  string[];
   publishDate:          string | null;

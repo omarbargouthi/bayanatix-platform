@@ -169,20 +169,22 @@ export function OpenDataEditor({
   const router = useRouter();
   const { t, lang } = useLang();
 
-  // ── Fetch dataset categories from the shared lookup table ──────────────
-  type LookupEntry = { en: string; ar: string | null };
-  const [categoryOptions, setCategoryOptions] = useState<{ code: string; label: string }[]>([]);
+  // ── Fetch dataset categories from the shared data_categories table ─────
+  type CatNode = { categoryId: number; name: string; nameAr: string | null; children: CatNode[] };
+  const [categoryOptions, setCategoryOptions] = useState<{ id: number; label: string; depth: number }[]>([]);
   useEffect(() => {
-    fetch("/api/lookups/all")
+    fetch("/api/retention/categories")
       .then((r) => r.json())
-      .then((all: Record<string, Record<string, LookupEntry>>) => {
-        const group = all["DATASET_CATEGORY"] ?? {};
-        setCategoryOptions(
-          Object.entries(group).map(([code, entry]) => ({
-            code,
-            label: lang === "ar" && entry.ar ? entry.ar : entry.en,
-          })),
-        );
+      .then((roots: CatNode[]) => {
+        const flat: { id: number; label: string; depth: number }[] = [];
+        function walk(nodes: CatNode[], depth: number) {
+          for (const n of nodes) {
+            flat.push({ id: n.categoryId, label: lang === "ar" && n.nameAr ? n.nameAr : n.name, depth });
+            if (n.children?.length) walk(n.children, depth + 1);
+          }
+        }
+        walk(roots, 0);
+        setCategoryOptions(flat);
       })
       .catch(() => {});
   }, [lang]);
@@ -221,7 +223,7 @@ export function OpenDataEditor({
   const [datasetName,   setDatasetName]   = useState(dataset?.datasetName ?? "");
   const [description,   setDescription]  = useState(dataset?.descriptionText ?? "");
   const [department,    setDepartment]    = useState(dataset?.departmentText ?? "");
-  const [categoryCode,  setCategoryCode]  = useState(dataset?.categoryCode ?? "");
+  const [categoryId,    setCategoryId]    = useState<number | null>(dataset?.categoryId ?? null);
   const [purpose,       setPurpose]       = useState(dataset?.purposeText ?? "");
   const [segments,      setSegments]      = useState<string[]>(
     Array.isArray(dataset?.beneficiarySegments) ? dataset.beneficiarySegments : [],
@@ -296,7 +298,7 @@ export function OpenDataEditor({
       datasetName:         datasetName.trim(),
       descriptionText:     description   || null,
       departmentText:      department    || null,
-      categoryCode:        categoryCode  || null,
+      categoryId:          categoryId    ?? null,
       purposeText:         purpose       || null,
       beneficiarySegments: segments,
       publishDate:         publishDate  || null,
@@ -506,14 +508,16 @@ export function OpenDataEditor({
 
               <Field label={t.openData.fieldCategory}>
                 <select
-                  value={categoryCode}
-                  onChange={(e) => setCategoryCode(e.target.value)}
+                  value={categoryId ?? ""}
+                  onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
                   disabled={!isEditable}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                 >
                   <option value="">{t.openData.selectCategory}</option>
-                  {categoryOptions.map(({ code, label }) => (
-                    <option key={code} value={code}>{label}</option>
+                  {categoryOptions.map(({ id, label, depth }) => (
+                    <option key={id} value={id}>
+                      {depth > 0 ? "   → " : ""}{label}
+                    </option>
                   ))}
                 </select>
               </Field>
