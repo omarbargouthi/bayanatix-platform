@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { UiTranslationsSection } from "./UiTranslationsSection";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { LanguageSettingsSection } from "./LanguageSettingsSection";
+import { DataCategoriesTab } from "@/components/retention/DataCategoriesTab";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -24,6 +25,9 @@ const GROUP_LABELS: Record<string, string> = {
   GOVERNANCE_ROLE: "Governance Roles",
 };
 
+// Groups managed outside app_lookups — excluded from the flat lookup list
+const EXCLUDED_GROUPS = new Set(["DATASET_CATEGORY"]);
+
 const BLANK = { lookupCode: "", lookupLabel: "", labelAr: "", description: "", sortOrder: 0, isActive: true };
 
 export default function ConfigurationPage() {
@@ -31,10 +35,10 @@ export default function ConfigurationPage() {
 
   const [groups, setGroups]             = useState<GroupEntry[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [showUiTranslations, setShowUiTranslations] = useState(false);
-
+  const [showUiTranslations, setShowUiTranslations]   = useState(false);
   const [showComplianceConfig, setShowComplianceConfig] = useState(false);
   const [showLanguageSettings, setShowLanguageSettings] = useState(false);
+  const [showDataCategories, setShowDataCategories]     = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -46,7 +50,8 @@ export default function ConfigurationPage() {
 
   async function loadGroups() {
     const r = await fetch("/api/admin/lookups?groupsOnly=true");
-    setGroups(await r.json());
+    const all: GroupEntry[] = await r.json();
+    setGroups(all.filter((g) => !EXCLUDED_GROUPS.has(g.group)));
   }
 
   async function loadLookups(group: string) {
@@ -65,12 +70,17 @@ export default function ConfigurationPage() {
     }
   }, [selectedGroup]);
 
-  function selectGroup(g: string) {
-    setSelectedGroup(g);
+  function resetNav() {
     setShowUiTranslations(false);
     setShowComplianceConfig(false);
     setShowLanguageSettings(false);
+    setShowDataCategories(false);
     setAdding(false);
+  }
+
+  function selectGroup(g: string) {
+    setSelectedGroup(g);
+    resetNav();
   }
 
   function startEdit(l: AppLookup) {
@@ -143,6 +153,10 @@ export default function ConfigurationPage() {
     } finally { setSaving(false); }
   }
 
+  const isNothingSelected =
+    !selectedGroup && !adding && !showUiTranslations &&
+    !showComplianceConfig && !showLanguageSettings && !showDataCategories;
+
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
@@ -154,7 +168,7 @@ export default function ConfigurationPage() {
 
           {/* ── Language Settings (pinned) */}
           <button
-            onClick={() => { setShowLanguageSettings(true); setShowUiTranslations(false); setSelectedGroup(null); setShowComplianceConfig(false); setAdding(false); }}
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowLanguageSettings(true); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showLanguageSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">Language Settings</div>
@@ -163,7 +177,7 @@ export default function ConfigurationPage() {
 
           {/* ── UI Translations (pinned) */}
           <button
-            onClick={() => { setShowUiTranslations(true); setShowLanguageSettings(false); setSelectedGroup(null); setShowComplianceConfig(false); setAdding(false); }}
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowUiTranslations(true); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showUiTranslations ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">UI Translations</div>
@@ -174,7 +188,7 @@ export default function ConfigurationPage() {
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-line bg-canvas-soft flex items-center justify-between">
             <span>Lookup Groups</span>
             <button
-              onClick={() => { setSelectedGroup(null); setShowUiTranslations(false); setShowLanguageSettings(false); setShowComplianceConfig(false); setAdding(true); setAddForm({ ...BLANK }); }}
+              onClick={() => { setSelectedGroup(null); resetNav(); setAdding(true); setAddForm({ ...BLANK }); }}
               className="text-brand-purple hover:underline font-semibold text-[11px]"
             >+ Add</button>
           </div>
@@ -190,12 +204,24 @@ export default function ConfigurationPage() {
           ))}
           {groups.length === 0 && <div className="p-4 text-xs text-muted">No lookup groups yet</div>}
 
+          {/* ── Data Management section */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
+            Data Management
+          </div>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowDataCategories(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showDataCategories ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Data Categories</div>
+            <div className="text-[10px] text-muted mt-0.5">Open Data · Privacy · Retention</div>
+          </button>
+
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
             Compliance
           </div>
           <button
-            onClick={() => { setShowComplianceConfig(true); setSelectedGroup(null); setShowUiTranslations(false); setShowLanguageSettings(false); setAdding(false); }}
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowComplianceConfig(true); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showComplianceConfig ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">Compliance Config</div>
@@ -227,8 +253,22 @@ export default function ConfigurationPage() {
         {/* ── Compliance Config panel ── */}
         {showComplianceConfig && <ComplianceConfigSection />}
 
+        {/* ── Data Categories panel ── */}
+        {showDataCategories && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-ink">Data Categories</h2>
+              <p className="text-xs text-muted mt-1">
+                Manage the shared category taxonomy used across Open Data, Privacy, and Retention.
+                Root categories can have sub-categories. Changes appear immediately in all modules.
+              </p>
+            </div>
+            <DataCategoriesTab />
+          </div>
+        )}
+
         {/* ── Empty state ── */}
-        {!selectedGroup && !adding && !showUiTranslations && !showComplianceConfig && !showLanguageSettings && (
+        {isNothingSelected && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="text-6xl">⚙️</div>
             <h2 className="text-xl font-semibold text-ink">Application Configuration</h2>
