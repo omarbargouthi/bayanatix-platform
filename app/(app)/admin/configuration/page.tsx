@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { UiTranslationsSection } from "./UiTranslationsSection";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { LanguageSettingsSection } from "./LanguageSettingsSection";
-import { DataCategoriesTab } from "@/components/retention/DataCategoriesTab";
+import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -263,7 +263,7 @@ export default function ConfigurationPage() {
                 Root categories can have sub-categories. Changes appear immediately in all modules.
               </p>
             </div>
-            <DataCategoriesTab />
+            <DataCategoriesConfig />
           </div>
         )}
 
