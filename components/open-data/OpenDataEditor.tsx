@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type {
   OpenDataset, OpenDataColumn, OpenDataDqIssue,
@@ -167,7 +167,25 @@ export function OpenDataEditor({
   userRole,
 }: Props) {
   const router = useRouter();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+
+  // ── Fetch dataset categories from the shared lookup table ──────────────
+  type LookupEntry = { en: string; ar: string | null };
+  const [categoryOptions, setCategoryOptions] = useState<{ code: string; label: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/lookups/all")
+      .then((r) => r.json())
+      .then((all: Record<string, Record<string, LookupEntry>>) => {
+        const group = all["DATASET_CATEGORY"] ?? {};
+        setCategoryOptions(
+          Object.entries(group).map(([code, entry]) => ({
+            code,
+            label: lang === "ar" && entry.ar ? entry.ar : entry.en,
+          })),
+        );
+      })
+      .catch(() => {});
+  }, [lang]);
 
   const STATUS_LABELS: Record<OpenDataStatus, string> = {
     DRAFT:            t.openData.statusDraft,
@@ -177,25 +195,6 @@ export function OpenDataEditor({
     REJECTED:         t.openData.statusRejected,
     PENDING:          t.openData.statusPending,
   };
-
-  const DATA_CATEGORY_OPTIONS: { value: string; label: string }[] = [
-    { value: "Economy and Finance",           label: t.openData.categories.economyFinance },
-    { value: "Education and Training",        label: t.openData.categories.educationTraining },
-    { value: "Health and Population",         label: t.openData.categories.healthPopulation },
-    { value: "Environment and Climate",       label: t.openData.categories.environmentClimate },
-    { value: "Real Estate and Housing",       label: t.openData.categories.realEstateHousing },
-    { value: "Transportation and Logistics",  label: t.openData.categories.transportationLogistics },
-    { value: "Government and Public Services",label: t.openData.categories.governmentPublicServices },
-    { value: "Demographics and Social",       label: t.openData.categories.demographicsSocial },
-    { value: "Agriculture and Food",          label: t.openData.categories.agricultureFood },
-    { value: "Energy and Utilities",          label: t.openData.categories.energyUtilities },
-    { value: "Security and Safety",           label: t.openData.categories.securitySafety },
-    { value: "Culture and Tourism",           label: t.openData.categories.cultureTourism },
-    { value: "Technology and Communications", label: t.openData.categories.technologyCommunications },
-    { value: "Infrastructure and Construction",label: t.openData.categories.infrastructureConstruction },
-    { value: "Legal and Judicial",            label: t.openData.categories.legalJudicial },
-    { value: "Science and Research",          label: t.openData.categories.scienceResearch },
-  ];
 
   const SEGMENT_OPTIONS_L: { value: string; label: string }[] = [
     { value: "Investors",               label: t.openData.segments.investors },
@@ -222,7 +221,7 @@ export function OpenDataEditor({
   const [datasetName,   setDatasetName]   = useState(dataset?.datasetName ?? "");
   const [description,   setDescription]  = useState(dataset?.descriptionText ?? "");
   const [department,    setDepartment]    = useState(dataset?.departmentText ?? "");
-  const [categoryText,  setCategoryText]  = useState(dataset?.categoryText ?? "");
+  const [categoryCode,  setCategoryCode]  = useState(dataset?.categoryCode ?? "");
   const [purpose,       setPurpose]       = useState(dataset?.purposeText ?? "");
   const [segments,      setSegments]      = useState<string[]>(
     Array.isArray(dataset?.beneficiarySegments) ? dataset.beneficiarySegments : [],
@@ -297,7 +296,7 @@ export function OpenDataEditor({
       datasetName:         datasetName.trim(),
       descriptionText:     description   || null,
       departmentText:      department    || null,
-      categoryText:        categoryText  || null,
+      categoryCode:        categoryCode  || null,
       purposeText:         purpose       || null,
       beneficiarySegments: segments,
       publishDate:         publishDate  || null,
@@ -507,14 +506,14 @@ export function OpenDataEditor({
 
               <Field label={t.openData.fieldCategory}>
                 <select
-                  value={categoryText}
-                  onChange={(e) => setCategoryText(e.target.value)}
+                  value={categoryCode}
+                  onChange={(e) => setCategoryCode(e.target.value)}
                   disabled={!isEditable}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple/30 disabled:bg-slate-50"
                 >
                   <option value="">{t.openData.selectCategory}</option>
-                  {DATA_CATEGORY_OPTIONS.map(({ value, label }) => (
-                    <option key={value} value={value}>{label}</option>
+                  {categoryOptions.map(({ code, label }) => (
+                    <option key={code} value={code}>{label}</option>
                   ))}
                 </select>
               </Field>

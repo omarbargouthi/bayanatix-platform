@@ -933,25 +933,6 @@ export type I18nStrings = {
     errCreateFailed:        string;
     errSaveFailed:          string;
     errSubmitFailed:        string;
-    // Data categories (for select dropdown)
-    categories: {
-      economyFinance:              string;
-      educationTraining:           string;
-      healthPopulation:            string;
-      environmentClimate:          string;
-      realEstateHousing:           string;
-      transportationLogistics:     string;
-      governmentPublicServices:    string;
-      demographicsSocial:          string;
-      agricultureFood:             string;
-      energyUtilities:             string;
-      securitySafety:              string;
-      cultureTourism:              string;
-      technologyCommunications:    string;
-      infrastructureConstruction:  string;
-      legalJudicial:               string;
-      scienceResearch:             string;
-    };
     // Beneficiary segments
     segments: {
       investors:              string;

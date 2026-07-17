@@ -37,7 +37,7 @@ export function OpenDataList({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   const datasets = initialDatasets;
   const total    = initialTotal;
@@ -207,7 +207,7 @@ export function OpenDataList({
 
                 {/* Category */}
                 <span className="text-sm text-slate-600 truncate pr-2">
-                  {ds.categoryText ?? "—"}
+                  {(lang === "ar" ? (ds.categoryLabelAr ?? ds.categoryText) : ds.categoryText) ?? "—"}
                 </span>
 
                 {/* Format */}
