@@ -119,7 +119,7 @@ export async function getOpenDataset(datasetId: number): Promise<OpenDataset | n
       to_char(d.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "updatedAt"
     FROM bayanat.open_datasets d
     LEFT JOIN bayanat.users                u   ON u.user_id = d.raised_by_user_id
-    LEFT JOIN bayanat.app_lookups          al  ON al.lookup_group = 'DATASET_CATEGORY' AND al.lookup_code = d.category_code
+    LEFT JOIN bayanat.data_categories      dc  ON dc.category_id = d.category_id
     LEFT JOIN bayanat.open_dataset_columns odc ON odc.dataset_id = d.dataset_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = odc.attribute_id AND abt.term_role = 'CLASSIFICATION'
