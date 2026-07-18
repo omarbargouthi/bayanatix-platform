@@ -195,8 +195,11 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
     LEFT JOIN bayanat.users u ON u.user_id = r.assigned_officer_user_id
     LEFT JOIN bayanat.foi_rejection_grounds fg ON fg.ground_code = r.rejection_ground_code
     LEFT JOIN bayanat.foi_assessments a ON a.foi_request_id = r.foi_request_id
-    LEFT JOIN bayanat.foi_quotes q ON q.foi_request_id = r.foi_request_id
-      AND q.status_code = 'ISSUED'
+    LEFT JOIN bayanat.foi_quotes q ON q.quote_id = (
+      SELECT quote_id FROM bayanat.foi_quotes
+      WHERE foi_request_id = r.foi_request_id
+      ORDER BY created_at DESC LIMIT 1
+    )
     WHERE r.foi_request_id = ${foiRequestId}
   `;
   return row ?? null;

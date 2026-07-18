@@ -58,7 +58,7 @@ export async function POST(req: Request, { params }: Ctx) {
         ${quotedAmount},
         ${JSON.stringify(breakdown)},
         ${body.estimatedDeliveryDays ?? Math.ceil(effortDays * 2)},
-        ${body.validUntilDate ?? null},
+        CURRENT_DATE + (${validityDays} * INTERVAL '1 day'),
         'ISSUED',
         ${session.userId}
       )
