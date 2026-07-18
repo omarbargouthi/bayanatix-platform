@@ -46,8 +46,9 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
     entityRoleCode:       dsa?.entityRoleCode       ?? "",
     isCrossBorder:        dsa?.isCrossBorder        ?? false,
   });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [saved,     setSaved]     = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (dsa) setForm({
@@ -72,15 +73,25 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
   async function save() {
     if (!dsaId) return;
     setSaving(true);
-    await fetch(`/api/sharing/dsas/${dsaId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    onSaved();
+    setSaveError(null);
+    try {
+      const r = await fetch(`/api/sharing/dsas/${dsaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) {
+        const payload = await r.json().catch(() => ({}));
+        throw new Error(payload.error ?? `Server error (HTTP ${r.status})`);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      onSaved();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed — please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const f = <K extends keyof typeof form>(key: K, val: typeof form[K]) =>
@@ -260,7 +271,10 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
       </div>
 
       {isEditable && (
-        <div className="flex justify-end">
+        <div className="flex flex-col items-end gap-2">
+          {saveError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 w-full">{saveError}</p>
+          )}
           <button onClick={save} disabled={saving} className="btn btn-primary">
             {saving ? "Saving…" : saved ? "✓ Saved" : "Save"}
           </button>
