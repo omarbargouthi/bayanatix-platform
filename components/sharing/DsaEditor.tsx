@@ -27,7 +27,7 @@ type LoadedDsa = {
   authorizations: DsaAuthorization[];
 };
 
-export function DsaEditor({ dsaId }: { dsaId: number | null }) {
+export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null; canClassify?: boolean }) {
   const router = useRouter();
   const [tab, setTab]         = useState<Tab>("general");
   const [data, setData]       = useState<LoadedDsa | null>(null);
@@ -163,7 +163,9 @@ export function DsaEditor({ dsaId }: { dsaId: number | null }) {
           <DsaDatasetsTab
             dsaId={dsaId}
             datasets={data?.datasets ?? []}
+            directionCode={dsa?.directionCode ?? "PROVIDER"}
             isEditable={isEditable}
+            canClassify={canClassify}
             onChanged={load}
           />
         )}

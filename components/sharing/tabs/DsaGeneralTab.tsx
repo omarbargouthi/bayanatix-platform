@@ -11,15 +11,30 @@ type Props = {
 };
 
 const SCOPES     = ["INTERNAL","EXTERNAL_GOV","EXTERNAL_PRIVATE"];
-const DIRECTIONS = ["PROVIDER","REQUESTER"];
-const SCOPE_LABELS: Record<string,string>  = { INTERNAL:"Internal", EXTERNAL_GOV:"External – Government", EXTERNAL_PRIVATE:"External – Private" };
-const DIR_LABELS:   Record<string,string>  = { PROVIDER:"Provider (we share out)", REQUESTER:"Requester (we receive)" };
+const SCOPE_LABELS: Record<string,string> = {
+  INTERNAL:         "Internal",
+  EXTERNAL_GOV:     "External – Government",
+  EXTERNAL_PRIVATE: "External – Private",
+};
+
+function getDirections(scope: string) {
+  const base = [
+    { value: "PROVIDER",      label: "Provider (we share out)" },
+    { value: "REQUESTER",     label: "Requester (we receive)" },
+  ];
+  if (scope !== "INTERNAL") {
+    base.push({ value: "BIDIRECTIONAL", label: "Bidirectional (we share and receive)" });
+  }
+  return base;
+}
 
 export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
   const [form, setForm] = useState({
     titleText:            dsa?.titleText            ?? "",
     sharingScopeCode:     dsa?.sharingScopeCode     ?? "INTERNAL",
     directionCode:        dsa?.directionCode        ?? "PROVIDER",
+    fromDepartmentText:   dsa?.fromDepartmentText   ?? "",
+    toDepartmentText:     dsa?.toDepartmentText     ?? "",
     counterpartyNameText: dsa?.counterpartyNameText ?? "",
     purposeText:          dsa?.purposeText          ?? "",
     legalBasisText:       dsa?.legalBasisText       ?? "",
@@ -39,6 +54,8 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
       titleText:            dsa.titleText            ?? "",
       sharingScopeCode:     dsa.sharingScopeCode     ?? "INTERNAL",
       directionCode:        dsa.directionCode        ?? "PROVIDER",
+      fromDepartmentText:   dsa.fromDepartmentText   ?? "",
+      toDepartmentText:     dsa.toDepartmentText     ?? "",
       counterpartyNameText: dsa.counterpartyNameText ?? "",
       purposeText:          dsa.purposeText          ?? "",
       legalBasisText:       dsa.legalBasisText       ?? "",
@@ -100,6 +117,8 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
     </select>
   );
 
+  const isInternal = form.sharingScopeCode === "INTERNAL";
+
   return (
     <div className="max-w-3xl space-y-6">
       <div className="card p-6 space-y-5">
@@ -108,11 +127,44 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
         {field("Title", inp("titleText", "e.g. Sharing Employee Data with HRSD"), true)}
 
         <div className="grid grid-cols-2 gap-4">
-          {field("Sharing Scope", sel("sharingScopeCode", SCOPES.map(s => ({ value: s, label: SCOPE_LABELS[s] }))), true)}
-          {field("Direction",     sel("directionCode",    DIRECTIONS.map(d => ({ value: d, label: DIR_LABELS[d] }))), true)}
+          {field("Sharing Scope", (
+            <select
+              className="input w-full"
+              disabled={!isEditable}
+              value={form.sharingScopeCode}
+              onChange={e => {
+                const scope = e.target.value;
+                // Reset direction to PROVIDER if switching to INTERNAL from a scope that had BIDIRECTIONAL
+                const directionCode = scope === "INTERNAL" && form.directionCode === "BIDIRECTIONAL"
+                  ? "PROVIDER"
+                  : form.directionCode;
+                setForm(prev => ({ ...prev, sharingScopeCode: scope, directionCode }));
+              }}
+            >
+              {SCOPES.map(s => <option key={s} value={s}>{SCOPE_LABELS[s]}</option>)}
+            </select>
+          ), true)}
+          {field("Direction", sel("directionCode", getDirections(form.sharingScopeCode)), true)}
         </div>
 
-        {field("Counterparty", inp("counterpartyNameText", "Receiving/providing organization or department"), true)}
+        {/* Department fields — Internal scope only */}
+        {isInternal && (
+          <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <div>
+              <p className="text-[10px] font-bold text-blue-700 uppercase mb-2">Internal Sharing Parties</p>
+            </div>
+            <div></div>
+            {field("From Department", inp("fromDepartmentText", "e.g. HR Department"), true)}
+            {field("To Department",   inp("toDepartmentText",   "e.g. Finance Department"), true)}
+          </div>
+        )}
+
+        {/* Counterparty — external scopes only */}
+        {!isInternal && field(
+          "Counterparty Organization",
+          inp("counterpartyNameText", "Receiving or providing organization"),
+          true,
+        )}
 
         {field("Purpose (Legitimate Purpose)", (
           <textarea

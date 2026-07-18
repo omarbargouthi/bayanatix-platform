@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUS_LABELS, STATUS_COLORS, SCOPE_LABELS, DIRECTION_LABELS } from "@/lib/sharing-routing";
 import type { DsaSummary } from "@/lib/queries/sharing";
@@ -28,6 +27,7 @@ export function DsaRegistry() {
   const [total, setTotal]       = useState(0);
   const [page, setPage]         = useState(1);
   const [search, setSearch]     = useState("");
+  const [deleting, setDeleting] = useState<number | null>(null);
   const [status, setStatus]     = useState("all");
   const [scope, setScope]       = useState("all");
   const [loading, setLoading]   = useState(true);
@@ -46,6 +46,14 @@ export function DsaRegistry() {
   }, [page, search, status, scope]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function deleteDsa(dsaId: number, title: string) {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setDeleting(dsaId);
+    await fetch(`/api/sharing/dsas/${dsaId}`, { method: "DELETE" });
+    setDeleting(null);
+    load();
+  }
 
   async function createDsa() {
     setCreating(true);
@@ -114,7 +122,7 @@ export function DsaRegistry() {
 
       {/* ── Table ── */}
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[1fr_130px_100px_120px_80px_90px_80px] gap-2 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
+        <div className="grid grid-cols-[1fr_130px_100px_120px_80px_90px_80px_36px] gap-2 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
           <div>Agreement</div>
           <div>Counterparty</div>
           <div>Scope</div>
@@ -122,6 +130,7 @@ export function DsaRegistry() {
           <div>Datasets</div>
           <div>Expiry</div>
           <div>Status</div>
+          <div></div>
         </div>
 
         {loading ? (
@@ -134,10 +143,10 @@ export function DsaRegistry() {
           </div>
         ) : (
           dsas.map(dsa => (
-            <Link
+            <div
               key={dsa.dsaId}
-              href={`/sharing/${dsa.dsaId}`}
-              className="grid grid-cols-[1fr_130px_100px_120px_80px_90px_80px] gap-2 px-5 py-3.5 border-b border-line-soft last:border-0 hover:bg-canvas-soft transition-colors items-center"
+              onClick={() => router.push(`/sharing/${dsa.dsaId}`)}
+              className="grid grid-cols-[1fr_130px_100px_120px_80px_90px_80px_36px] gap-2 px-5 py-3.5 border-b border-line-soft last:border-0 hover:bg-canvas-soft transition-colors items-center cursor-pointer"
             >
               <div>
                 <div className="font-medium text-sm text-ink truncate">{dsa.titleText}</div>
@@ -165,7 +174,19 @@ export function DsaRegistry() {
                   {STATUS_LABELS[dsa.statusCode] ?? dsa.statusCode}
                 </span>
               </div>
-            </Link>
+              <div className="flex justify-center">
+                {["DRAFT","RENEWAL_DRAFT"].includes(dsa.statusCode) && (
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteDsa(dsa.dsaId, dsa.titleText); }}
+                    disabled={deleting === dsa.dsaId}
+                    title="Delete draft"
+                    className="w-7 h-7 flex items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
+                  >
+                    {deleting === dsa.dsaId ? "…" : "✕"}
+                  </button>
+                )}
+              </div>
+            </div>
           ))
         )}
       </div>

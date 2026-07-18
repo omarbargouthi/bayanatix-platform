@@ -28,6 +28,8 @@ export type DsaDetail = DsaSummary & {
   dataFormatCode:           string | null;
   entityRoleCode:           string | null;
   isCrossBorder:            boolean;
+  fromDepartmentText:       string | null;
+  toDepartmentText:         string | null;
   securityControlsText:     string | null;
   storageConditionsText:    string | null;
   destructionMechanismText: string | null;
@@ -44,14 +46,19 @@ export type DsaDetail = DsaSummary & {
 };
 
 export type DsaDataset = {
-  dsaDatasetId:       number;
-  dsaId:              number;
-  entityId:           number;
-  entityName:         string;
-  schemaName:         string;
-  sourceName:         string;
-  filterCriteriaText: string | null;
-  attributeCount:     number;
+  dsaDatasetId:            number;
+  dsaId:                   number;
+  datasetDirection:        string;         // OUTBOUND | INBOUND
+  entityId:                number | null;  // null for inbound before catalog assignment
+  entityName:              string | null;
+  schemaName:              string | null;
+  sourceName:              string | null;
+  inboundNameText:         string | null;
+  inboundDescriptionText:  string | null;
+  inboundEntityId:         number | null;
+  inboundEntityName:       string | null;
+  filterCriteriaText:      string | null;
+  attributeCount:          number;
 };
 
 export type DsaAttribute = {
@@ -184,6 +191,8 @@ export async function getDsa(dsaId: number): Promise<DsaDetail | null> {
       d.contains_personal_data_indicator                        AS "containsPersonalData",
       d.entity_role_code                                        AS "entityRoleCode",
       d.is_cross_border                                         AS "isCrossBorder",
+      d.from_department_text                                    AS "fromDepartmentText",
+      d.to_department_text                                      AS "toDepartmentText",
       d.security_controls_text                                  AS "securityControlsText",
       d.storage_conditions_text                                 AS "storageConditionsText",
       d.destruction_mechanism_text                              AS "destructionMechanismText",
@@ -217,22 +226,36 @@ export async function getDsaDatasets(dsaId: number): Promise<DsaDataset[]> {
     SELECT
       dd.dsa_dataset_id                           AS "dsaDatasetId",
       dd.dsa_id                                   AS "dsaId",
+      dd.dataset_direction                        AS "datasetDirection",
       dd.entity_id                                AS "entityId",
       e.entity_name_text                          AS "entityName",
       s.schema_name_text                          AS "schemaName",
       COALESCE(src.source_name_text, '')          AS "sourceName",
+      dd.inbound_name_text                        AS "inboundNameText",
+      dd.inbound_description_text                 AS "inboundDescriptionText",
+      dd.inbound_entity_id                        AS "inboundEntityId",
+      ie.entity_name_text                         AS "inboundEntityName",
       dd.filter_criteria_text                     AS "filterCriteriaText",
       COUNT(da.dsa_attribute_id)::int             AS "attributeCount"
     FROM bayanat.dsa_datasets dd
-    JOIN bayanat.data_entities  e   ON e.entity_id   = dd.entity_id
-    JOIN bayanat.data_schemas   s   ON s.schema_id   = e.schema_id
-    LEFT JOIN bayanat.data_sources src ON src.data_source_id = s.data_source_id
-    LEFT JOIN bayanat.dsa_attributes da ON da.dsa_dataset_id = dd.dsa_dataset_id
+    LEFT JOIN bayanat.data_entities  e   ON e.entity_id   = dd.entity_id
+    LEFT JOIN bayanat.data_schemas   s   ON s.schema_id   = e.schema_id
+    LEFT JOIN bayanat.data_sources src   ON src.data_source_id = s.data_source_id
+    LEFT JOIN bayanat.data_entities  ie  ON ie.entity_id  = dd.inbound_entity_id
+    LEFT JOIN bayanat.dsa_attributes da  ON da.dsa_dataset_id = dd.dsa_dataset_id
     WHERE dd.dsa_id = ${dsaId}
-    GROUP BY dd.dsa_dataset_id, e.entity_name_text, s.schema_name_text, src.source_name_text
-    ORDER BY dd.dsa_dataset_id
+    GROUP BY dd.dsa_dataset_id, e.entity_name_text, s.schema_name_text,
+             src.source_name_text, ie.entity_name_text
+    ORDER BY dd.dataset_direction DESC, dd.dsa_dataset_id
   `;
-  return rows.map(r => ({ ...r, dsaDatasetId: Number(r.dsaDatasetId), dsaId: Number(r.dsaId), entityId: Number(r.entityId), attributeCount: Number(r.attributeCount ?? 0) }));
+  return rows.map(r => ({
+    ...r,
+    dsaDatasetId:   Number(r.dsaDatasetId),
+    dsaId:          Number(r.dsaId),
+    entityId:       r.entityId != null ? Number(r.entityId) : null,
+    inboundEntityId: r.inboundEntityId != null ? Number(r.inboundEntityId) : null,
+    attributeCount: Number(r.attributeCount ?? 0),
+  }));
 }
 
 export async function getDsaAttributes(dsaDatasetId: number): Promise<DsaAttribute[]> {

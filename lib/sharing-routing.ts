@@ -108,6 +108,7 @@ export const SCOPE_LABELS: Record<string, string> = {
 };
 
 export const DIRECTION_LABELS: Record<string, string> = {
-  PROVIDER:  "Provider",
-  REQUESTER: "Requester",
+  PROVIDER:      "Provider",
+  REQUESTER:     "Requester",
+  BIDIRECTIONAL: "Bidirectional",
 };
