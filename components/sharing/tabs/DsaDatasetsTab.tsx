@@ -51,6 +51,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
   const [attrOptions,    setAttrOptions]    = useState<AttrOption[]>([]);
   const [selectedAttrs,  setSelectedAttrs]  = useState<Set<number>>(new Set());
   const [addingOut,      setAddingOut]      = useState(false);
+  const [outboundError,  setOutboundError]  = useState<string | null>(null);
 
   // Inbound form
   const [showInboundForm, setShowInboundForm] = useState(false);
@@ -129,21 +130,32 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
   async function confirmAddOutbound() {
     if (!pickedEntityId || selectedAttrs.size === 0) return;
     setAddingOut(true);
-    await fetch(`/api/sharing/dsas/${dsaId}/datasets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        datasetDirection: "OUTBOUND",
-        entityId: pickedEntityId,
-        attributeIds: [...selectedAttrs],
-      }),
-    });
-    setAddingOut(false);
-    setShowPicker(false);
-    setPickedEntityId(null);
-    setSelectedAttrs(new Set());
-    setAttrMap({});
-    onChanged();
+    setOutboundError(null);
+    try {
+      const r = await fetch(`/api/sharing/dsas/${dsaId}/datasets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          datasetDirection: "OUTBOUND",
+          entityId: pickedEntityId,
+          attributeIds: [...selectedAttrs],
+        }),
+      });
+      if (!r.ok) {
+        const payload = await r.json().catch(() => ({}));
+        setOutboundError(payload.error ?? `Server error (HTTP ${r.status})`);
+        return;
+      }
+      setShowPicker(false);
+      setPickedEntityId(null);
+      setSelectedAttrs(new Set());
+      setAttrMap({});
+      onChanged();
+    } catch {
+      setOutboundError("Network error — please try again.");
+    } finally {
+      setAddingOut(false);
+    }
   }
 
   // ── Inbound manual add ────────────────────────────────────────────────────
@@ -512,15 +524,22 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-line flex justify-end gap-3">
-              <button onClick={() => { setShowPicker(false); setPickedEntityId(null); setSelectedAttrs(new Set()); }} className="btn">Cancel</button>
-              <button
-                onClick={confirmAddOutbound}
-                disabled={addingOut || !pickedEntityId || selectedAttrs.size === 0}
-                className="btn btn-primary"
-              >
-                {addingOut ? "Adding…" : `Add ${selectedAttrs.size} attribute${selectedAttrs.size !== 1 ? "s" : ""}`}
-              </button>
+            <div className="px-6 py-4 border-t border-line flex items-center justify-between gap-3">
+              <div className="flex-1">
+                {outboundError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-1.5">{outboundError}</p>
+                )}
+              </div>
+              <div className="flex gap-3 shrink-0">
+                <button onClick={() => { setShowPicker(false); setPickedEntityId(null); setSelectedAttrs(new Set()); setOutboundError(null); }} className="btn">Cancel</button>
+                <button
+                  onClick={confirmAddOutbound}
+                  disabled={addingOut || !pickedEntityId || selectedAttrs.size === 0}
+                  className="btn btn-primary"
+                >
+                  {addingOut ? "Adding…" : `Add ${selectedAttrs.size} attribute${selectedAttrs.size !== 1 ? "s" : ""}`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

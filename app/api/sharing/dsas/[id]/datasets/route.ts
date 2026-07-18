@@ -33,8 +33,8 @@ export async function POST(req: Request, { params }: Ctx) {
     const [row] = await sql`
       INSERT INTO bayanat.dsa_datasets (dsa_id, entity_id, filter_criteria_text, dataset_direction)
       VALUES (${dsaId}, ${Number(body.entityId)}, ${body.filterCriteriaText || null}, 'OUTBOUND')
-      ON CONFLICT ON CONSTRAINT idx_dsa_datasets_outbound_unique DO UPDATE
-        SET filter_criteria_text = EXCLUDED.filter_criteria_text
+      ON CONFLICT (dsa_id, entity_id) WHERE entity_id IS NOT NULL AND dataset_direction = 'OUTBOUND'
+        DO UPDATE SET filter_criteria_text = EXCLUDED.filter_criteria_text
       RETURNING dsa_dataset_id AS "dsaDatasetId"
     `;
 
