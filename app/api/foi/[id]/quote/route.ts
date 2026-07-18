@@ -122,7 +122,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
       WHERE quote_id = ${quote.quote_id}
     `;
 
-    const newStatus = decision === 'ACCEPTED' ? 'QUOTE_ACCEPTED' : 'QUOTE_DECLINED';
+    // If accepted: check for payment exemption — exempt requests skip payment step
+    let newStatus: string;
+    if (decision === 'DECLINED') {
+      newStatus = 'QUOTE_DECLINED';
+    } else {
+      const [asmRow] = await sql`
+        SELECT payment_exempt, exemption_approved FROM bayanat.foi_assessments WHERE foi_request_id = ${id}
+      `;
+      const exempt = asmRow?.payment_exempt === true && asmRow?.exemption_approved !== false;
+      newStatus = exempt ? 'QUOTE_ACCEPTED' : 'AWAITING_PAYMENT';
+    }
     await sql`
       UPDATE bayanat.foi_requests SET
         status_code = ${newStatus},

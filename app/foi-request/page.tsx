@@ -7,7 +7,11 @@ const DOMAINS_FALLBACK = [
   "Customer Service", "Procurement", "Strategy", "Other",
 ];
 
-const STATUS_STEP_LABELS: Record<string, { label: string; icon: string; done: boolean }[]> = {};
+const FORMAT_HINTS = ["Number", "Text", "Date", "SAR Amount", "Percentage", "Yes / No", "File / Document", "Other"];
+
+type AttributeRow = { name: string; description: string; formatHint: string };
+
+function newRow(): AttributeRow { return { name: "", description: "", formatHint: "" }; }
 
 export default function FoiSubmitPage() {
   const [step, setStep] = useState<"form" | "success">("form");
@@ -22,14 +26,23 @@ export default function FoiSubmitPage() {
     subject: "", description: "",
     domainCode: "", requestedFormat: "PDF",
   });
+  const [attributes, setAttributes] = useState<AttributeRow[]>([newRow()]);
 
   const f = (key: keyof typeof form, val: string) => setForm(prev => ({ ...prev, [key]: val }));
+
+  function updateAttr(idx: number, field: keyof AttributeRow, val: string) {
+    setAttributes(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r));
+  }
+  function addAttr() { setAttributes(prev => [...prev, newRow()]); }
+  function removeAttr(idx: number) { setAttributes(prev => prev.filter((_, i) => i !== idx)); }
 
   async function submit() {
     if (!form.fullName.trim()) { setError("Full name is required"); return; }
     if (!form.email.trim())    { setError("Email is required"); return; }
     if (!form.subject.trim())  { setError("Subject is required"); return; }
     if (!form.description.trim()) { setError("Description is required"); return; }
+    const filledAttrs = attributes.filter(a => a.name.trim());
+    if (filledAttrs.length === 0) { setError("Please add at least one data attribute you need"); return; }
 
     setSubmitting(true); setError(null);
     try {
@@ -40,6 +53,7 @@ export default function FoiSubmitPage() {
           ...form,
           domainCode: form.domainCode || null,
           channel: "PORTAL",
+          attributes: filledAttrs,
         }),
       });
       const payload = await r.json();
@@ -69,18 +83,14 @@ export default function FoiSubmitPage() {
 
         {step === "form" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-6">
+
             {/* Requester type */}
             <div className="flex gap-3">
               {["INDIVIDUAL","ORGANIZATION"].map(t => (
-                <button
-                  key={t}
-                  onClick={() => f("requesterType", t)}
+                <button key={t} onClick={() => f("requesterType", t)}
                   className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                    form.requesterType === t
-                      ? "border-brand-purple bg-brand-purple/5 text-brand-purple"
-                      : "border-gray-200 text-gray-600 hover:border-brand-purple/50"
-                  }`}
-                >
+                    form.requesterType === t ? "border-brand-purple bg-brand-purple/5 text-brand-purple" : "border-gray-200 text-gray-600 hover:border-brand-purple/50"
+                  }`}>
                   {t === "INDIVIDUAL" ? "👤 Individual" : "🏢 Organization"}
                 </button>
               ))}
@@ -118,7 +128,7 @@ export default function FoiSubmitPage() {
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Preferred Format</label>
                 <select className="input w-full" value={form.requestedFormat} onChange={e => f("requestedFormat", e.target.value)}>
-                  {["PDF","XLSX","CSV","JSON","PAPER"].map(f => <option key={f} value={f}>{f}</option>)}
+                  {["PDF","XLSX","CSV","JSON","PAPER"].map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
               </div>
             </div>
@@ -130,15 +140,9 @@ export default function FoiSubmitPage() {
                 <input className="input w-full" value={form.subject} onChange={e => f("subject", e.target.value)} placeholder="Brief title of the information you are requesting" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  className="input w-full h-28 resize-none"
-                  value={form.description}
-                  onChange={e => f("description", e.target.value)}
-                  placeholder="Describe the specific information you need — what, time period, scope, intended use…"
-                />
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Description <span className="text-red-500">*</span></label>
+                <textarea className="input w-full h-24 resize-none" value={form.description} onChange={e => f("description", e.target.value)}
+                  placeholder="Describe the specific information you need — what, time period, scope, intended use…" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Business Domain (optional)</label>
@@ -149,16 +153,59 @@ export default function FoiSubmitPage() {
               </div>
             </div>
 
+            {/* Structured attributes */}
+            <div className="pt-2 border-t border-gray-100 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Data Attributes Needed <span className="text-red-500">*</span></h3>
+                <p className="text-xs text-gray-500 mt-0.5">List each specific piece of information you need. The more detail you provide, the faster we can process your request.</p>
+              </div>
+
+              <div className="space-y-3">
+                {attributes.map((attr, idx) => (
+                  <div key={idx} className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100">
+                    <div className="flex items-start gap-2">
+                      <span className="w-6 h-6 flex-shrink-0 bg-brand-purple text-white text-[11px] font-bold rounded-full flex items-center justify-center mt-1">{idx + 1}</span>
+                      <div className="flex-1 space-y-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Attribute / Field Name <span className="text-red-500">*</span></label>
+                          <input className="input w-full text-sm" value={attr.name} onChange={e => updateAttr(idx, "name", e.target.value)}
+                            placeholder="e.g. Employee Count, Budget by Department, Invoice Total…" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Description / Purpose</label>
+                          <input className="input w-full text-sm" value={attr.description} onChange={e => updateAttr(idx, "description", e.target.value)}
+                            placeholder="Why do you need this? What level of detail? Which time period?" />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Expected Format / Type</label>
+                            <select className="input w-full text-sm" value={attr.formatHint} onChange={e => updateAttr(idx, "formatHint", e.target.value)}>
+                              <option value="">— Select format —</option>
+                              {FORMAT_HINTS.map(h => <option key={h} value={h}>{h}</option>)}
+                            </select>
+                          </div>
+                          {attributes.length > 1 && (
+                            <button onClick={() => removeAttr(idx)} className="mt-5 text-red-400 hover:text-red-600 text-xs font-semibold">Remove</button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={addAttr} disabled={attributes.length >= 20}
+                className="w-full py-2 rounded-lg border-2 border-dashed border-brand-purple/30 text-brand-purple text-sm font-medium hover:border-brand-purple/60 transition-colors">
+                + Add Another Attribute
+              </button>
+            </div>
+
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{error}</div>
             )}
 
             <div className="pt-2">
-              <button
-                onClick={submit}
-                disabled={submitting}
-                className="w-full btn btn-primary py-3 text-base"
-              >
+              <button onClick={submit} disabled={submitting} className="w-full btn btn-primary py-3 text-base">
                 {submitting ? "Submitting…" : "Submit Information Request"}
               </button>
               <p className="text-center text-xs text-gray-400 mt-3">
@@ -185,22 +232,21 @@ export default function FoiSubmitPage() {
               </div>
               <div>
                 <div className="text-xs text-gray-500 uppercase font-bold mb-1">Track Your Request</div>
-                <a
-                  href={result.trackingUrl}
-                  className="text-sm text-brand-purple hover:underline font-medium"
-                >
+                <a href={result.trackingUrl} className="text-sm text-brand-purple hover:underline font-medium">
                   {window.location.origin + result.trackingUrl}
                 </a>
               </div>
             </div>
 
             <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 text-xs text-amber-700 text-left">
-              <strong>Important:</strong> Save your tracking link. It is the only way to monitor your request status and accept or decline the quote. Keep your reference number safe.
+              <strong>Important:</strong> Save your tracking link. It is the only way to monitor your request status and accept or decline any quote. Keep your reference number safe.
             </div>
 
-            <button onClick={() => { setStep("form"); setResult(null); setForm({ requesterType:"INDIVIDUAL", fullName:"", email:"", phone:"", nationalId:"", preferredLanguage:"ar", subject:"", description:"", domainCode:"", requestedFormat:"PDF" }); }} className="btn btn-sm text-gray-500">
-              Submit Another Request
-            </button>
+            <button onClick={() => {
+              setStep("form"); setResult(null);
+              setForm({ requesterType:"INDIVIDUAL", fullName:"", email:"", phone:"", nationalId:"", preferredLanguage:"ar", subject:"", description:"", domainCode:"", requestedFormat:"PDF" });
+              setAttributes([newRow()]);
+            }} className="btn btn-sm text-gray-500">Submit Another Request</button>
           </div>
         )}
       </div>

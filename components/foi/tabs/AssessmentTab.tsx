@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import type { FoiCaseDetail } from "@/lib/queries/foi";
 import type { SessionUser } from "@/lib/types";
 
-type Props = { caseData: FoiCaseDetail; currentUser: SessionUser; onChanged: () => void };
+type Props = { caseData: FoiCaseDetail; totalPaid: number; currentUser: SessionUser; onChanged: () => void };
 
 const ELIGIBILITY_OPTS = [
   { value: "ELIGIBLE",       label: "Eligible — proceed with fulfillment" },
@@ -27,7 +27,7 @@ function suggestDays(complexity: string, columns: number, sources: number): numb
   return Math.max(0.5, parseFloat((base + colAdder + srcAdder).toFixed(1)));
 }
 
-export function AssessmentTab({ caseData, currentUser: _user, onChanged }: Props) {
+export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChanged }: Props) {
   const [dailyRate, setDailyRate] = useState<number>(2000);
 
   // Assessment form
@@ -47,6 +47,11 @@ export function AssessmentTab({ caseData, currentUser: _user, onChanged }: Props
   const [quoteNote,    setQuoteNote]    = useState("");
   const [issuingQuote, setIssuingQuote] = useState(false);
   const [quoteError,   setQuoteError]   = useState<string | null>(null);
+
+  // Payment exemption
+  const [paymentExempt,   setPaymentExempt]   = useState(caseData.paymentExempt ?? false);
+  const [exemptionReason, setExemptionReason] = useState(caseData.exemptionReason ?? "");
+  const [exemptEvidRef,   setExemptEvidRef]   = useState(caseData.exemptionEvidenceRef ?? "");
 
   // Quote decision
   const [quoteBusy,    setQuoteBusy]    = useState(false);
@@ -72,8 +77,14 @@ export function AssessmentTab({ caseData, currentUser: _user, onChanged }: Props
 
   const isAssessable = ["SUBMITTED","TRIAGE","CLARIFICATION_REQUESTED","ASSESSMENT","QUOTED"].includes(caseData.statusCode);
   const hasAssessment = !!caseData.assessmentId;
-  const canIssueQuote = hasAssessment && caseData.statusCode === "ASSESSMENT" && days > 0;
+  const canIssueQuote = hasAssessment && caseData.statusCode === "ASSESSMENT" && (days > 0 || eligibility === "ALREADY_PUBLIC" || paymentExempt);
   const hasQuote = !!caseData.quoteId;
+
+  // Start Fulfillment: available when quote is ACCEPTED and payment gate passes
+  const quotedAmt = caseData.quotedAmount ? Number(caseData.quotedAmount) : 0;
+  const isPaid = paymentExempt || quotedAmt === 0 || totalPaid >= quotedAmt;
+  const canStartFulfillment = hasQuote && caseData.quoteStatusCode === 'ACCEPTED'
+    && (caseData.statusCode === 'QUOTE_ACCEPTED' || (caseData.statusCode === 'AWAITING_PAYMENT' && isPaid));
 
   async function saveAssessment() {
     setSavingAssess(true); setAssessError(null);
@@ -82,13 +93,16 @@ export function AssessmentTab({ caseData, currentUser: _user, onChanged }: Props
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          eligibilityCode:    eligibility,
-          complexityCode:     complexity,
-          estimatedColumns:   parseInt(columns) || null,
-          estimatedSources:   parseInt(sources) || null,
-          estimatedEffortDays: parseFloat(effortDays),
+          eligibilityCode:      eligibility,
+          complexityCode:       complexity,
+          estimatedColumns:     parseInt(columns) || null,
+          estimatedSources:     parseInt(sources) || null,
+          estimatedEffortDays:  parseFloat(effortDays) || 0,
           notes,
-          alreadyPublicLink:  publicLink || null,
+          alreadyPublicLink:    publicLink || null,
+          paymentExempt,
+          exemptionReason:      exemptionReason || null,
+          exemptionEvidenceRef: exemptEvidRef || null,
         }),
       });
       const payload = await r.json();
@@ -212,11 +226,38 @@ export function AssessmentTab({ caseData, currentUser: _user, onChanged }: Props
               <textarea className="input w-full h-20 resize-none" disabled={!isAssessable} placeholder="Internal notes about eligibility, scope, complexity rationale…" value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
 
+            {/* Payment exemption */}
+            {isAssessable && (
+              <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={paymentExempt} onChange={e => setPaymentExempt(e.target.checked)} className="accent-amber-600 w-4 h-4" />
+                  <span className="text-sm font-semibold text-amber-800">Grant Payment Exemption</span>
+                </label>
+                {paymentExempt && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">Exemption Reason <span className="text-red-500">*</span></label>
+                      <input className="input w-full text-sm" placeholder="e.g. Academic research, Public interest, NGO partner…"
+                        value={exemptionReason} onChange={e => setExemptionReason(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">Supporting Evidence Reference</label>
+                      <input className="input w-full text-sm" placeholder="e.g. Letter ref, accreditation number, URL…"
+                        value={exemptEvidRef} onChange={e => setExemptEvidRef(e.target.value)} />
+                    </div>
+                    <p className="text-[11px] text-amber-700">The data owner will review and approve this exemption during the fulfillment workflow.</p>
+                    {caseData.exemptionApproved === true && <p className="text-[11px] text-green-700 font-semibold">✓ Exemption approved by owner</p>}
+                    {caseData.exemptionApproved === false && <p className="text-[11px] text-red-600 font-semibold">✗ Exemption rejected — payment required</p>}
+                  </>
+                )}
+              </div>
+            )}
+
             {isAssessable && (
               <div className="flex items-center justify-between">
                 {assessError && <p className="text-sm text-red-600">{assessError}</p>}
                 <div className="ml-auto">
-                  <button onClick={saveAssessment} disabled={savingAssess || !effortDays} className="btn btn-primary btn-sm">
+                  <button onClick={saveAssessment} disabled={savingAssess || (!effortDays && eligibility !== "ALREADY_PUBLIC" && !paymentExempt)} className="btn btn-primary btn-sm">
                     {savingAssess ? "Saving…" : hasAssessment ? "Update Assessment" : "Save Assessment"}
                   </button>
                 </div>
@@ -264,15 +305,27 @@ export function AssessmentTab({ caseData, currentUser: _user, onChanged }: Props
                   <button onClick={() => decideQuote("DECLINED")} disabled={quoteBusy} className="btn btn-sm border-red-300 text-red-600">{quoteBusy ? "…" : "✗ Declined"}</button>
                 </div>
               )}
-              {caseData.quoteStatusCode === 'ACCEPTED' && caseData.statusCode === 'QUOTE_ACCEPTED' && (
+              {caseData.statusCode === 'AWAITING_PAYMENT' && !isPaid && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+                  <strong>Payment required:</strong> SAR {quotedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })} must be paid in full before fulfillment can start.
+                  Received so far: SAR {totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}.
+                  Record the payment in the <strong>Payments</strong> tab.
+                </div>
+              )}
+              {canStartFulfillment && (
                 <div className="flex justify-end">
                   <button
                     onClick={async () => {
-                      await fetch(`/api/foi/${caseData.foiRequestId}`, {
+                      const r = await fetch(`/api/foi/${caseData.foiRequestId}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ action: "START_FULFILLMENT" }),
                       });
+                      if (!r.ok) {
+                        const d = await r.json().catch(() => ({}));
+                        alert(d.error ?? "Failed to start fulfillment");
+                        return;
+                      }
                       onChanged();
                     }}
                     className="btn btn-primary btn-sm"

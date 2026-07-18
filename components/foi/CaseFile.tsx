@@ -148,7 +148,7 @@ export function CaseFile({ foiRequestId, currentUser }: Props) {
           <RequestTab caseData={caseData} currentUser={currentUser} onChanged={load} />
         )}
         {activeTab === "assessment" && (
-          <AssessmentTab caseData={caseData} currentUser={currentUser} onChanged={load} />
+          <AssessmentTab caseData={caseData} totalPaid={totalPaid} currentUser={currentUser} onChanged={load} />
         )}
         {activeTab === "fulfillment" && (
           <FulfillmentTab caseData={caseData} currentUser={currentUser} onChanged={load} />

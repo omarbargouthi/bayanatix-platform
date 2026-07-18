@@ -28,7 +28,9 @@ export async function POST(req: Request, { params }: Ctx) {
       INSERT INTO bayanat.foi_assessments
         (foi_request_id, eligibility_code, complexity_code,
          estimated_columns_count, estimated_sources_count, estimated_effort_days,
-         involved_entities_json, already_public_link_text, notes_text, assessed_by_user_id, assessed_at)
+         involved_entities_json, already_public_link_text, notes_text,
+         payment_exempt, exemption_reason, exemption_evidence_ref,
+         assessed_by_user_id, assessed_at)
       VALUES (
         ${id},
         ${body.eligibilityCode ?? 'ELIGIBLE'},
@@ -39,6 +41,9 @@ export async function POST(req: Request, { params }: Ctx) {
         ${body.involvedEntities ? JSON.stringify(body.involvedEntities) : null},
         ${body.alreadyPublicLink?.trim() || null},
         ${body.notes?.trim() || null},
+        ${body.paymentExempt === true},
+        ${body.exemptionReason?.trim() || null},
+        ${body.exemptionEvidenceRef?.trim() || null},
         ${session.userId},
         NOW()
       )
@@ -51,6 +56,9 @@ export async function POST(req: Request, { params }: Ctx) {
         involved_entities_json    = EXCLUDED.involved_entities_json,
         already_public_link_text  = EXCLUDED.already_public_link_text,
         notes_text                = EXCLUDED.notes_text,
+        payment_exempt            = EXCLUDED.payment_exempt,
+        exemption_reason          = EXCLUDED.exemption_reason,
+        exemption_evidence_ref    = EXCLUDED.exemption_evidence_ref,
         assessed_by_user_id       = EXCLUDED.assessed_by_user_id,
         assessed_at               = NOW()
     `;

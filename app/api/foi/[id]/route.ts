@@ -130,6 +130,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
       `;
 
     } else if (action === "START_FULFILLMENT") {
+      // Gate: must have paid in full (unless exempt or free)
+      const [asmRow] = await sql`SELECT payment_exempt FROM bayanat.foi_assessments WHERE foi_request_id = ${id}`;
+      const [qRow] = await sql`SELECT quoted_amount FROM bayanat.foi_quotes WHERE foi_request_id = ${id} AND status_code = 'ACCEPTED'`;
+      const quotedAmt = Number(qRow?.quoted_amount ?? 0);
+      if (quotedAmt > 0 && !asmRow?.payment_exempt) {
+        const [paidRow] = await sql`
+          SELECT COALESCE(SUM(CASE WHEN payment_type_code = 'REFUND' THEN -amount ELSE amount END), 0) AS total
+          FROM bayanat.foi_payments WHERE foi_request_id = ${id}
+        `;
+        if (Number(paidRow.total) < quotedAmt) {
+          return NextResponse.json({ error: "Payment in full required before fulfillment can start" }, { status: 400 });
+        }
+      }
       await sql`
         UPDATE bayanat.foi_requests SET
           status_code = 'IN_FULFILLMENT',
@@ -140,19 +153,90 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
     } else if (action === "ADVANCE_STAGE") {
       const STAGES = [
-        'OWNER_IDENTIFICATION','OWNER_SCOPE_REVIEW','STEWARD_COORDINATION',
-        'TECHNICAL_COMPILATION','OWNER_PACKAGE_APPROVAL','DMO_RELEASE_APPROVAL',
-        'PAYMENT_CONFIRMATION','DELIVERY',
+        'OWNER_IDENTIFICATION','SOURCE_MAPPING','CLASSIFICATION_GATE',
+        'QUALITY_GATE','TECHNICAL_COMPILATION','OWNER_PACKAGE_APPROVAL',
+        'DMO_RELEASE_APPROVAL','DELIVERY',
       ];
       const [req2] = await sql`SELECT fulfillment_stage_code FROM bayanat.foi_requests WHERE foi_request_id = ${id}`;
-      const idx = STAGES.indexOf(req2.fulfillment_stage_code ?? '');
+      const currentStage = req2.fulfillment_stage_code ?? '';
+      const idx = STAGES.indexOf(currentStage);
       const nextStage = idx >= 0 && idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
       if (!nextStage) return NextResponse.json({ error: "Already at final stage" }, { status: 400 });
-      const newStatus = nextStage === 'DELIVERY' ? 'AWAITING_PAYMENT' : 'IN_FULFILLMENT';
+
+      // Gate: SOURCE_MAPPING → CLASSIFICATION_GATE: check all attributes have mappings
+      if (currentStage === 'SOURCE_MAPPING') {
+        const [unmapped] = await sql`
+          SELECT COUNT(*) AS cnt
+          FROM bayanat.foi_requested_attributes ra
+          WHERE ra.foi_request_id = ${id}
+            AND NOT EXISTS (
+              SELECT 1 FROM bayanat.foi_attribute_mappings m WHERE m.req_attr_id = ra.req_attr_id
+            )
+        `;
+        if (Number(unmapped.cnt) > 0) {
+          return NextResponse.json({ error: `${unmapped.cnt} attribute(s) still unmapped. Map all requested attributes before proceeding.` }, { status: 400 });
+        }
+      }
+
+      // Gate: CLASSIFICATION_GATE → QUALITY_GATE: block if any mapping is BLOCKED
+      if (currentStage === 'CLASSIFICATION_GATE') {
+        const [blocked] = await sql`
+          SELECT COUNT(*) AS cnt FROM bayanat.foi_attribute_mappings
+          WHERE foi_request_id = ${id} AND classification_status = 'BLOCKED'
+        `;
+        if (Number(blocked.cnt) > 0) {
+          return NextResponse.json({ error: `${blocked.cnt} column(s) are classified CONFIDENTIAL or higher. Remove or replace those mappings before proceeding.` }, { status: 400 });
+        }
+      }
+
+      // At QUALITY_GATE → TECHNICAL_COMPILATION: auto-create open dataset from CATALOG mappings
+      if (currentStage === 'QUALITY_GATE') {
+        const [foiRow] = await sql`
+          SELECT r.reference_code, r.subject_text, r.domain_code, r.linked_open_dataset_id
+          FROM bayanat.foi_requests r WHERE r.foi_request_id = ${id}
+        `;
+        if (!foiRow.linked_open_dataset_id) {
+          const catalogMappings = await sql`
+            SELECT m.data_attribute_id, COALESCE(da.friendly_name_text, da.physical_name_text) AS col_name, m.officer_notes,
+                   ROW_NUMBER() OVER (ORDER BY m.mapping_id) AS rn
+            FROM bayanat.foi_attribute_mappings m
+            JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
+            WHERE m.foi_request_id = ${id} AND m.source_type = 'CATALOG' AND m.data_attribute_id IS NOT NULL
+          `;
+          if (catalogMappings.length > 0) {
+            const [ds] = await sql`
+              INSERT INTO bayanat.open_datasets
+                (dataset_name_text, description_text, domain_code, purpose_text, status_code, raised_by_user_id)
+              VALUES (
+                ${foiRow.reference_code + ': ' + foiRow.subject_text},
+                ${'Open dataset created from Freedom of Information request ' + foiRow.reference_code},
+                ${foiRow.domain_code ?? null},
+                'FOI Fulfillment',
+                'DRAFT',
+                ${session.userId}
+              )
+              RETURNING dataset_id AS "datasetId"
+            `;
+            for (const cm of catalogMappings) {
+              await sql`
+                INSERT INTO bayanat.open_dataset_columns
+                  (dataset_id, attribute_id, publish_name, publish_desc, sort_order)
+                VALUES (${ds.datasetId}, ${cm.data_attribute_id}, ${cm.col_name}, ${cm.officer_notes ?? null}, ${Number(cm.rn)})
+                ON CONFLICT (dataset_id, attribute_id) DO NOTHING
+              `;
+            }
+            await sql`
+              UPDATE bayanat.foi_requests SET linked_open_dataset_id = ${ds.datasetId}, updated_at = NOW()
+              WHERE foi_request_id = ${id}
+            `;
+          }
+        }
+      }
+
       await sql`
         UPDATE bayanat.foi_requests SET
           fulfillment_stage_code = ${nextStage},
-          status_code = ${newStatus},
+          status_code = 'IN_FULFILLMENT',
           updated_at = NOW()
         WHERE foi_request_id = ${id}
       `;

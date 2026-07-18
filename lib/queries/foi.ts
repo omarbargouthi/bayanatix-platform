@@ -127,6 +127,11 @@ export type FoiCaseDetail = {
   estimatedEffortDays:       number | null;
   alreadyPublicLink:         string | null;
   assessmentNotes:           string | null;
+  // assessment — exemption
+  paymentExempt:             boolean;
+  exemptionReason:           string | null;
+  exemptionEvidenceRef:      string | null;
+  exemptionApproved:         boolean | null;
   // latest quote (nullable)
   quoteId:                   number | null;
   quotedAmount:              number | null;
@@ -136,6 +141,8 @@ export type FoiCaseDetail = {
   validUntilDate:            string | null;
   quoteStatusCode:           string | null;
   quoteDecisionAt:           string | null;
+  // linked open dataset
+  linkedOpenDatasetId:       number | null;
 };
 
 export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | null> {
@@ -181,6 +188,10 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
       a.estimated_effort_days    AS "estimatedEffortDays",
       a.already_public_link_text AS "alreadyPublicLink",
       a.notes_text               AS "assessmentNotes",
+      COALESCE(a.payment_exempt, false) AS "paymentExempt",
+      a.exemption_reason         AS "exemptionReason",
+      a.exemption_evidence_ref   AS "exemptionEvidenceRef",
+      a.exemption_approved       AS "exemptionApproved",
       q.quote_id                 AS "quoteId",
       q.quoted_amount            AS "quotedAmount",
       q.daily_rate_sar           AS "dailyRateSar",
@@ -188,7 +199,8 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
       q.estimated_delivery_days  AS "estimatedDeliveryDays",
       q.valid_until_date         AS "validUntilDate",
       q.status_code              AS "quoteStatusCode",
-      q.decision_at              AS "quoteDecisionAt"
+      q.decision_at              AS "quoteDecisionAt",
+      r.linked_open_dataset_id   AS "linkedOpenDatasetId"
     FROM bayanat.foi_requests r
     JOIN bayanat.foi_requesters rq ON rq.requester_id = r.requester_id
     LEFT JOIN bayanat.governance_domains gd ON gd.domain_code = r.domain_code

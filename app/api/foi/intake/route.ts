@@ -16,6 +16,7 @@ export async function POST(req: Request) {
     domainCode?: string | null;
     requestedFormat?: string;
     channel?: string;
+    attributes?: { name: string; description?: string; formatHint?: string }[];
   };
 
   try {
@@ -61,6 +62,18 @@ export async function POST(req: Request) {
       )
       RETURNING foi_request_id AS "foiRequestId", reference_code AS "referenceCode", access_token AS "accessToken"
     `;
+
+    // Save structured requested attributes
+    const attrs = body.attributes ?? [];
+    for (let i = 0; i < attrs.length; i++) {
+      const a = attrs[i];
+      if (!a.name?.trim()) continue;
+      await sql`
+        INSERT INTO bayanat.foi_requested_attributes
+          (foi_request_id, attribute_name_text, description_text, format_hint_text, sort_order)
+        VALUES (${request.foiRequestId}, ${a.name.trim()}, ${a.description?.trim() || null}, ${a.formatHint?.trim() || null}, ${i})
+      `;
+    }
 
     // Log acknowledgment communication
     await sql`
