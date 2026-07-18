@@ -55,7 +55,7 @@ export async function listFoiRequests(params: {
     JOIN bayanat.foi_requesters rq ON rq.requester_id = r.requester_id
     LEFT JOIN bayanat.users u ON u.user_id = r.assigned_officer_user_id
     WHERE
-      (${status ?? null}::TEXT IS NULL OR status = ${status ?? null}::TEXT
+      (${status ?? null}::TEXT IS NULL OR r.status_code = ${status ?? null}::TEXT
         OR (${status ?? null} = 'ACTIVE' AND r.status_code NOT IN ('CLOSED','DELIVERED','REJECTED','QUOTE_DECLINED','WITHDRAWN','APPEAL_DECIDED'))
       )
       AND (${search ?? null}::TEXT IS NULL
