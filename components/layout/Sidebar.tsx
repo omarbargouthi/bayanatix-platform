@@ -34,7 +34,7 @@ const NAV_DOMAINS_DEF = [
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
   { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },
-  { href: "/foi",            key: "foi"           as const, Icon: IconChat, badge: 3 },
+  { href: "/foi",            key: "foi"           as const, Icon: IconChat },
 ];
 
 const NAV_STANDALONE_DEF = [
