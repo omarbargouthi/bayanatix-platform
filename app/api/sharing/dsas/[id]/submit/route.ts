@@ -76,11 +76,13 @@ export async function POST(_req: Request, { params }: Ctx) {
       failures.push(`G1: ${unclassified.cnt} attribute(s) have no classification assigned. Open the Classification workspace to fix.`);
     }
 
-    // ── G2: Owner assigned on all datasets ───────────────────────────────────
+    // ── G2: Owner assigned on all outbound (catalog-linked) datasets ─────────
+    // Inbound datasets (entity_id IS NULL) have no catalog entity yet so are excluded.
     const [noOwner] = await sql`
       SELECT COUNT(*)::int AS cnt
       FROM bayanat.dsa_datasets dd
       WHERE dd.dsa_id = ${dsaId}
+        AND dd.entity_id IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM bayanat.asset_stakeholders s
           WHERE s.asset_type_code = 'DATA_ENTITIES'
