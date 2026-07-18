@@ -49,11 +49,17 @@ export function DsaEditor({ dsaId }: { dsaId: number | null }) {
     if (!dsaId) return;
     setSubmitting(true);
     setSubmitResult(null);
-    const r = await fetch(`/api/sharing/dsas/${dsaId}/submit`, { method: "POST" });
-    const result = await r.json();
-    setSubmitResult(result);
-    setSubmitting(false);
-    if (result.ok) load();
+    try {
+      const r = await fetch(`/api/sharing/dsas/${dsaId}/submit`, { method: "POST" });
+      const text = await r.text();
+      const result = text ? JSON.parse(text) : { ok: false, failures: [`Server error (HTTP ${r.status})`] };
+      setSubmitResult(result);
+      if (result.ok) load();
+    } catch (e) {
+      setSubmitResult({ ok: false, failures: ["Unexpected error — check the browser console."] });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const dsa = data?.dsa;
