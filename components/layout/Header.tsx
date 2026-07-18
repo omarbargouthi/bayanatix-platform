@@ -39,7 +39,7 @@ function HeaderIconBtn({
   );
 }
 
-export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[] }) {
+export function Header({ crumbs, user, contextTypes, collaborationHref }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[]; collaborationHref?: string }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
   const { lang, setLang, isRtl, secondaryLangDef } = useLang();
@@ -244,7 +244,7 @@ export function Header({ crumbs, user, contextTypes }: { crumbs: Crumb[]; user: 
         </HeaderIconBtn>
 
         {/* Collaboration */}
-        <HeaderIconBtn label="Collaboration" onClick={() => router.push("/collaboration")}>
+        <HeaderIconBtn label="Collaboration" onClick={() => router.push(collaborationHref ?? "/collaboration")}>
           <IconCollaborate className="w-[17px] h-[17px]" />
         </HeaderIconBtn>
 
