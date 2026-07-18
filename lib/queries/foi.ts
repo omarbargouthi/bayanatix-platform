@@ -198,7 +198,7 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
     LEFT JOIN bayanat.foi_quotes q ON q.quote_id = (
       SELECT quote_id FROM bayanat.foi_quotes
       WHERE foi_request_id = r.foi_request_id
-      ORDER BY created_at DESC LIMIT 1
+      ORDER BY issued_at DESC LIMIT 1
     )
     WHERE r.foi_request_id = ${foiRequestId}
   `;
