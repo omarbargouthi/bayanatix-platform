@@ -87,7 +87,7 @@ export async function POST(_req: Request, { params }: Ctx) {
           SELECT 1 FROM bayanat.asset_stakeholders s
           WHERE s.asset_type_code = 'DATA_ENTITIES'
             AND s.asset_id = dd.entity_id
-            AND s.role_code = 'DATA_OWNER'
+            AND s.role_code = 'OWNER'
         )
     `;
     if (Number(noOwner.cnt) > 0) {
