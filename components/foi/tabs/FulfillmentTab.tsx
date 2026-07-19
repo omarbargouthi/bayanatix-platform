@@ -71,6 +71,11 @@ type Mapping = {
   officerNotes: string | null;
   stewardNotifiedAt: string | null;
   collaborationThread: CollabNote[];
+  // Live DQ data (from dq_rules / dq_results, populated in GET)
+  dqRulesCount: number;
+  dqLatestStatus: string | null;
+  dqLatestFailPct: number | null;
+  dqLatestRunAt: string | null;
 };
 
 type CatalogItem = {
@@ -832,35 +837,103 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
               {runningQC ? "Running…" : "▶ Run DQ Check"}
             </button>
           </div>
+          <p className="text-xs text-muted">
+            DQ status is read live from the data quality system. Use <strong>Run DQ Check</strong> to store a formal quality review decision for each column.
+          </p>
           {loadingMap || runningQC ? <div className="py-4 text-center text-muted text-sm">Loading…</div> : (
             <>
               <div className="space-y-2">
-                {mappings.map(m => (
-                  <div key={m.mappingId} className={`px-4 py-3 rounded-xl border ${
-                    m.qualityStatus === "CLEARED" ? "border-green-200 bg-green-50" :
-                    m.qualityStatus === "FLAGGED" ? "border-amber-200 bg-amber-50" : "border-line bg-canvas-soft"
-                  }`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-sm font-semibold text-ink">{m.requestedAttributeName}</span>
-                        <span className="text-[10px] text-muted ml-2">
-                          {m.sourceType === "CATALOG"
-                            ? `${m.dataEntityDisplayName ?? ""} › ${m.dataAttributeDisplayName ?? m.dataAttributeName ?? ""}`
-                            : `Manual: ${m.manualColumnName ?? ""}`}
-                        </span>
+                {mappings.map(m => {
+                  // Derive display status from live DQ data (preferred) or stored quality_status
+                  const isManual    = m.sourceType !== "CATALOG";
+                  const noRules     = !isManual && m.dqRulesCount === 0;
+                  const hasRules    = !isManual && m.dqRulesCount > 0;
+                  const livePassed  = hasRules && m.dqLatestStatus === "PASSED";
+                  const liveFailed  = hasRules && m.dqLatestStatus === "FAILED";
+                  const neverRun    = hasRules && !m.dqLatestStatus;
+                  const failPct     = Number(m.dqLatestFailPct ?? 0);
+
+                  const cardClass = isManual || noRules
+                    ? "border-gray-100 bg-gray-50"
+                    : livePassed ? "border-green-200 bg-green-50"
+                    : liveFailed ? "border-amber-200 bg-amber-50"
+                    : neverRun   ? "border-blue-100 bg-blue-50"
+                    : m.qualityStatus === "CLEARED" ? "border-green-200 bg-green-50"
+                    : m.qualityStatus === "FLAGGED" ? "border-amber-200 bg-amber-50"
+                    : "border-line bg-canvas-soft";
+
+                  return (
+                    <div key={m.mappingId} className={`px-4 py-3 rounded-xl border ${cardClass}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-semibold text-ink">{m.requestedAttributeName}</span>
+                          <span className="text-[10px] text-muted ml-2">
+                            {isManual
+                              ? `Manual: ${[m.manualSystemName, m.manualEntityName, m.manualColumnName].filter(Boolean).join(" › ")}`
+                              : `${m.dataEntityDisplayName ?? ""} › ${m.dataAttributeDisplayName ?? m.dataAttributeName ?? ""}`}
+                          </span>
+                          {/* DQ status message */}
+                          <div className="mt-1">
+                            {isManual && (
+                              <p className="text-[11px] text-gray-500 italic">Manual source — no automated DQ indicator</p>
+                            )}
+                            {noRules && (
+                              <p className="text-[11px] text-gray-500 italic">No data quality indicator available for this column</p>
+                            )}
+                            {neverRun && (
+                              <p className="text-[11px] text-blue-700">
+                                {m.dqRulesCount} DQ rule{m.dqRulesCount !== 1 ? "s" : ""} defined — not yet executed. Click <strong>Run DQ Check</strong> to assess.
+                              </p>
+                            )}
+                            {livePassed && (
+                              <p className="text-[11px] text-green-700">
+                                DQ passed — {(100 - failPct).toFixed(1)}% pass rate
+                                {m.dqLatestRunAt && <span className="text-green-600"> · checked {fmtDate(m.dqLatestRunAt)}</span>}
+                              </p>
+                            )}
+                            {liveFailed && (
+                              <p className="text-[11px] text-amber-700">
+                                DQ issues detected — {failPct.toFixed(1)}% failure rate
+                                {m.dqLatestRunAt && <span className="text-amber-600"> · checked {fmtDate(m.dqLatestRunAt)}</span>}
+                              </p>
+                            )}
+                            {/* Show stored review decision if Run DQ Check was clicked */}
+                            {m.qualityStatus !== "PENDING" && (m.qualityNotes) && !livePassed && !liveFailed && !neverRun && !noRules && !isManual && (
+                              <p className="text-[11px] text-muted italic">{m.qualityNotes}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="shrink-0 flex flex-col items-end gap-1">
+                          {/* Live DQ badge */}
+                          {(isManual || noRules) && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">No DQ indicator</span>
+                          )}
+                          {neverRun && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{m.dqRulesCount} rule{m.dqRulesCount !== 1 ? "s" : ""} · not run</span>
+                          )}
+                          {livePassed && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">DQ Passed</span>
+                          )}
+                          {liveFailed && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">DQ Issues</span>
+                          )}
+                          {/* Stored review decision badge (shown after Run DQ Check) */}
+                          {m.qualityStatus !== "PENDING" && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              m.qualityStatus === "CLEARED" ? "bg-green-50 text-green-600 border border-green-200" :
+                              m.qualityStatus === "FLAGGED" ? "bg-amber-50 text-amber-600 border border-amber-200" :
+                              "bg-gray-50 text-gray-500 border border-gray-200"
+                            }`}>Review: {m.qualityStatus}</span>
+                          )}
+                        </div>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                        m.qualityStatus === "CLEARED" ? "bg-green-100 text-green-700" :
-                        m.qualityStatus === "FLAGGED" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
-                      }`}>{m.qualityStatus}</span>
                     </div>
-                    {m.qualityNotes && <p className="text-[11px] text-muted mt-1">{m.qualityNotes}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {qualityFlagged.length > 0 && (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                  <p className="text-xs text-amber-800"><strong>{qualityFlagged.length} column(s) flagged</strong> with DQ issues. Document in officer notes before advancing.</p>
+                  <p className="text-xs text-amber-800"><strong>{qualityFlagged.length} column(s) flagged</strong> in DQ review. Document concerns in officer notes before advancing.</p>
                 </div>
               )}
 

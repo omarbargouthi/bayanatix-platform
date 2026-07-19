@@ -333,3 +333,28 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Server error" }, { status: 500 });
   }
 }
+
+// DELETE — permanently remove an FOI request (only if not yet in fulfillment)
+export async function DELETE(_req: Request, { params }: Ctx) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const id = Number(params.id);
+  if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const [row] = await sql`
+    SELECT status_code, reference_code FROM bayanat.foi_requests WHERE foi_request_id = ${id}
+  `;
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const UNDELETABLE = new Set(["IN_FULFILLMENT", "DELIVERED", "APPEAL_OPEN"]);
+  if (UNDELETABLE.has(row.status_code)) {
+    return NextResponse.json({
+      error: `Cannot delete ${row.reference_code}: the request is ${row.status_code.replace(/_/g, " ").toLowerCase()}. Close or withdraw it first.`,
+    }, { status: 400 });
+  }
+
+  // Cascade deletes handle related records (communications, mappings, attributes, etc.)
+  await sql`DELETE FROM bayanat.foi_requests WHERE foi_request_id = ${id}`;
+  return NextResponse.json({ ok: true });
+}

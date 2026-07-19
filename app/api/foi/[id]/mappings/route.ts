@@ -50,7 +50,43 @@ export async function GET(_req: Request, { params }: Ctx) {
       m.quality_notes           AS "qualityNotes",
       m.officer_notes           AS "officerNotes",
       m.steward_notified_at     AS "stewardNotifiedAt",
-      m.updated_at              AS "updatedAt"
+      m.updated_at              AS "updatedAt",
+      -- Live DQ info: rules covering this attribute (attribute-level OR entity-level)
+      CASE WHEN m.data_attribute_id IS NULL OR m.source_type != 'CATALOG' THEN 0 ELSE (
+        SELECT COUNT(*) FROM bayanat.dq_rules ru
+        WHERE ru.is_active_indicator = true
+          AND (
+            (ru.asset_type_code = 'DATA_ATTRIBUTES' AND ru.asset_id = m.data_attribute_id)
+            OR (ru.asset_type_code = 'DATA_ENTITIES' AND ru.asset_id = da.entity_id)
+          )
+      ) END                     AS "dqRulesCount",
+      CASE WHEN m.data_attribute_id IS NULL OR m.source_type != 'CATALOG' THEN NULL ELSE (
+        SELECT r.status_code FROM bayanat.dq_results r
+        JOIN bayanat.dq_rules ru ON ru.rule_id = r.rule_id
+        WHERE (
+          (ru.asset_type_code = 'DATA_ATTRIBUTES' AND ru.asset_id = m.data_attribute_id)
+          OR (ru.asset_type_code = 'DATA_ENTITIES' AND ru.asset_id = da.entity_id)
+        )
+        ORDER BY r.execution_timestamp DESC LIMIT 1
+      ) END                     AS "dqLatestStatus",
+      CASE WHEN m.data_attribute_id IS NULL OR m.source_type != 'CATALOG' THEN NULL ELSE (
+        SELECT r.failure_percentage_number FROM bayanat.dq_results r
+        JOIN bayanat.dq_rules ru ON ru.rule_id = r.rule_id
+        WHERE (
+          (ru.asset_type_code = 'DATA_ATTRIBUTES' AND ru.asset_id = m.data_attribute_id)
+          OR (ru.asset_type_code = 'DATA_ENTITIES' AND ru.asset_id = da.entity_id)
+        )
+        ORDER BY r.execution_timestamp DESC LIMIT 1
+      ) END                     AS "dqLatestFailPct",
+      CASE WHEN m.data_attribute_id IS NULL OR m.source_type != 'CATALOG' THEN NULL ELSE (
+        SELECT r.execution_timestamp FROM bayanat.dq_results r
+        JOIN bayanat.dq_rules ru ON ru.rule_id = r.rule_id
+        WHERE (
+          (ru.asset_type_code = 'DATA_ATTRIBUTES' AND ru.asset_id = m.data_attribute_id)
+          OR (ru.asset_type_code = 'DATA_ENTITIES' AND ru.asset_id = da.entity_id)
+        )
+        ORDER BY r.execution_timestamp DESC LIMIT 1
+      ) END                     AS "dqLatestRunAt"
     FROM bayanat.foi_attribute_mappings m
     JOIN bayanat.foi_requested_attributes a ON a.req_attr_id = m.req_attr_id
     LEFT JOIN bayanat.data_sources ds ON ds.data_source_id = m.data_source_id
@@ -193,34 +229,73 @@ export async function PATCH(req: Request, { params }: Ctx) {
   try {
     // ── Quality check ────────────────────────────────────────────────────────
     if (body.action === "RUN_QUALITY_CHECK") {
-      const mappings = await sql`
-        SELECT m.mapping_id, m.data_attribute_id
+      // Catalog mappings: check DQ rules at attribute-level and entity-level
+      const catalogMaps = await sql`
+        SELECT m.mapping_id, m.data_attribute_id, da.entity_id
         FROM bayanat.foi_attribute_mappings m
+        JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
         WHERE m.foi_request_id = ${id} AND m.source_type = 'CATALOG' AND m.data_attribute_id IS NOT NULL
       `;
-      for (const m of mappings) {
+      for (const m of catalogMaps) {
+        // Count active DQ rules covering this attribute (attribute-level OR entity-level)
+        const [ruleCount] = await sql`
+          SELECT COUNT(*) AS cnt FROM bayanat.dq_rules
+          WHERE is_active_indicator = true
+            AND (
+              (asset_type_code = 'DATA_ATTRIBUTES' AND asset_id = ${m.data_attribute_id})
+              OR (asset_type_code = 'DATA_ENTITIES' AND asset_id = ${m.entity_id})
+            )
+        `;
+        if (Number(ruleCount.cnt) === 0) {
+          await sql`
+            UPDATE bayanat.foi_attribute_mappings SET
+              quality_status = 'CLEARED',
+              quality_notes  = 'No data quality indicator available for this column',
+              updated_at = NOW()
+            WHERE mapping_id = ${m.mapping_id}
+          `;
+          continue;
+        }
+        // Get latest DQ result for rules covering this attribute
         const [dqRow] = await sql`
-          SELECT r.status_code, r.failure_percentage_number
+          SELECT r.status_code, r.failure_percentage_number, r.execution_timestamp
           FROM bayanat.dq_results r
           JOIN bayanat.dq_rules ru ON ru.rule_id = r.rule_id
-          JOIN bayanat.data_attributes da ON da.entity_id = ru.entity_id
-          WHERE da.attribute_id = ${m.data_attribute_id}
+          WHERE ru.is_active_indicator = true
+            AND (
+              (ru.asset_type_code = 'DATA_ATTRIBUTES' AND ru.asset_id = ${m.data_attribute_id})
+              OR (ru.asset_type_code = 'DATA_ENTITIES' AND ru.asset_id = ${m.entity_id})
+            )
           ORDER BY r.execution_timestamp DESC LIMIT 1
         `;
-        const qStatus = dqRow ? (dqRow.status_code === 'PASSED' ? 'CLEARED' : 'FLAGGED') : 'CLEARED';
-        const qNotes  = dqRow
-          ? (dqRow.status_code === 'PASSED'
-            ? `DQ pass rate: ${100 - Number(dqRow.failure_percentage_number ?? 0)}%`
-            : `DQ failed: ${Number(dqRow.failure_percentage_number ?? 0).toFixed(1)}% failure rate`)
-          : 'No DQ rules defined for this column';
-        await sql`
-          UPDATE bayanat.foi_attribute_mappings SET quality_status = ${qStatus}, quality_notes = ${qNotes}, updated_at = NOW()
-          WHERE mapping_id = ${m.mapping_id}
-        `;
+        if (!dqRow) {
+          await sql`
+            UPDATE bayanat.foi_attribute_mappings SET
+              quality_status = 'PENDING',
+              quality_notes  = 'DQ rules are defined but have not been executed yet',
+              updated_at = NOW()
+            WHERE mapping_id = ${m.mapping_id}
+          `;
+        } else {
+          const passed  = dqRow.status_code === 'PASSED';
+          const failPct = Number(dqRow.failure_percentage_number ?? 0);
+          await sql`
+            UPDATE bayanat.foi_attribute_mappings SET
+              quality_status = ${passed ? 'CLEARED' : 'FLAGGED'},
+              quality_notes  = ${passed
+                ? `DQ passed — ${(100 - failPct).toFixed(1)}% pass rate (checked ${new Date(dqRow.execution_timestamp).toLocaleDateString()})`
+                : `DQ issues detected — ${failPct.toFixed(1)}% failure rate (checked ${new Date(dqRow.execution_timestamp).toLocaleDateString()})`},
+              updated_at = NOW()
+            WHERE mapping_id = ${m.mapping_id}
+          `;
+        }
       }
+      // Manual source mappings: no automated DQ
       await sql`
         UPDATE bayanat.foi_attribute_mappings SET
-          quality_status = 'CLEARED', quality_notes = 'Manual source — no automated DQ', updated_at = NOW()
+          quality_status = 'CLEARED',
+          quality_notes  = 'Manual source — no automated DQ indicator',
+          updated_at = NOW()
         WHERE foi_request_id = ${id} AND source_type = 'MANUAL' AND quality_status = 'PENDING'
       `;
       return NextResponse.json({ ok: true });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { FoiCaseDetail, FoiComm, FoiPayment } from "@/lib/queries/foi";
 import type { SessionUser } from "@/lib/types";
 import { RequestTab }       from "./tabs/RequestTab";
@@ -8,6 +9,8 @@ import { AssessmentTab }    from "./tabs/AssessmentTab";
 import { FulfillmentTab }   from "./tabs/FulfillmentTab";
 import { PaymentsTab }      from "./tabs/PaymentsTab";
 import { CommunicationsTab } from "./tabs/CommunicationsTab";
+
+const UNDELETABLE_STATUSES = new Set(["IN_FULFILLMENT","DELIVERED","APPEAL_OPEN"]);
 
 const TABS = [
   { key: "request",       label: "Request" },
@@ -49,11 +52,15 @@ const STATUS_LABELS: Record<string, string> = {
 type Props = { foiRequestId: number; currentUser: SessionUser };
 
 export function CaseFile({ foiRequestId, currentUser }: Props) {
-  const [activeTab, setActiveTab] = useState("request");
-  const [loading,   setLoading]   = useState(true);
-  const [caseData,  setCaseData]  = useState<FoiCaseDetail | null>(null);
-  const [comms,     setComms]     = useState<FoiComm[]>([]);
-  const [payments,  setPayments]  = useState<FoiPayment[]>([]);
+  const router = useRouter();
+  const [activeTab,     setActiveTab]     = useState("request");
+  const [loading,       setLoading]       = useState(true);
+  const [caseData,      setCaseData]      = useState<FoiCaseDetail | null>(null);
+  const [comms,         setComms]         = useState<FoiComm[]>([]);
+  const [payments,      setPayments]      = useState<FoiPayment[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
+  const [deleteErr,     setDeleteErr]     = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +79,19 @@ export function CaseFile({ foiRequestId, currentUser }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
+  async function deleteFoi() {
+    setDeleting(true); setDeleteErr(null);
+    try {
+      const r = await fetch(`/api/foi/${foiRequestId}`, { method: "DELETE" });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setDeleteErr(d.error ?? "Delete failed");
+        return;
+      }
+      router.push("/foi");
+    } finally { setDeleting(false); }
+  }
+
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-muted text-sm">Loading case…</div>;
   }
@@ -89,7 +109,7 @@ export function CaseFile({ foiRequestId, currentUser }: Props) {
       {/* Top bar */}
       <div className="px-8 py-4 border-b border-line bg-white flex items-center gap-4 shrink-0">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono text-sm font-bold text-brand-purple">{caseData.referenceCode}</span>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[caseData.statusCode] ?? "bg-gray-100 text-gray-600"}`}>
               {STATUS_LABELS[caseData.statusCode] ?? caseData.statusCode}
@@ -100,6 +120,30 @@ export function CaseFile({ foiRequestId, currentUser }: Props) {
           </div>
           <div className="text-base font-semibold text-ink mt-0.5 truncate">{caseData.subjectText}</div>
         </div>
+
+        {/* Delete button — only shown when request can safely be deleted */}
+        {!UNDELETABLE_STATUSES.has(caseData.statusCode) && (
+          <div className="shrink-0">
+            {!deleteConfirm ? (
+              <button onClick={() => { setDeleteConfirm(true); setDeleteErr(null); }}
+                className="btn btn-sm text-[11px] text-red-500 border-red-200 hover:border-red-400 hover:bg-red-50">
+                Delete Request
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                <span className="text-[11px] text-red-700 font-medium">Delete {caseData.referenceCode}?</span>
+                <button onClick={deleteFoi} disabled={deleting}
+                  className="text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded transition-colors">
+                  {deleting ? "…" : "Confirm"}
+                </button>
+                <button onClick={() => { setDeleteConfirm(false); setDeleteErr(null); }}
+                  className="text-[11px] text-red-500 hover:text-red-700">Cancel</button>
+              </div>
+            )}
+            {deleteErr && <p className="text-[10px] text-red-600 mt-1 text-right">{deleteErr}</p>}
+          </div>
+        )}
+
         {caseData.slaBusinessDaysLeft !== null && (
           <div className={`text-center px-3 py-1.5 rounded-lg ${
             (caseData.slaBusinessDaysLeft ?? 99) < 0 ? "bg-red-50 border border-red-100" :
