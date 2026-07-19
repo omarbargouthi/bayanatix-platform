@@ -44,10 +44,21 @@ export async function GET(req: Request) {
                COALESCE(a.friendly_name_text, a.physical_name_text) AS "displayName",
                a.data_type_text AS "dataType",
                a.description_text AS "description",
-               a.classification_code AS "classificationCode",
-               ct.class_name_text AS "classificationLabel"
+               -- Prefer the classification set through the catalog workflow (asset_business_terms → business_glossaries)
+               -- Fall back to the direct field on data_attributes for legacy seed data
+               COALESCE(bg.classification_code, a.classification_code) AS "classificationCode",
+               bg.term_name_text AS "classificationTermName",
+               ct.class_name_text AS "classificationLabel",
+               -- classificationMapped = true means the code exists in classification_types and can be used directly as FOI sensitivity
+               (ct.class_code IS NOT NULL) AS "classificationMapped"
         FROM bayanat.data_attributes a
-        LEFT JOIN bayanat.classification_types ct ON ct.class_code = a.classification_code
+        LEFT JOIN bayanat.asset_business_terms abt
+          ON abt.asset_type_code = 'DATA_ATTRIBUTES'
+         AND abt.asset_id        = a.attribute_id
+         AND abt.term_role       = 'CLASSIFICATION'
+        LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+        LEFT JOIN bayanat.classification_types ct
+          ON ct.class_code = COALESCE(bg.classification_code, a.classification_code)
         WHERE a.entity_id = ${entityId}
         ORDER BY a.physical_name_text
       `;

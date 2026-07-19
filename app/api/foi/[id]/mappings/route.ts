@@ -122,10 +122,14 @@ export async function POST(req: Request, { params }: Ctx) {
 
     if (body.sourceType === "CATALOG" && body.dataAttributeId) {
       const [catAttr] = await sql`
-        SELECT classification_code FROM bayanat.data_attributes
-        WHERE attribute_id = ${Number(body.dataAttributeId)}
+        SELECT COALESCE(bg.classification_code, a.classification_code) AS classification_code
+        FROM bayanat.data_attributes a
+        LEFT JOIN bayanat.asset_business_terms abt
+          ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+        LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+        WHERE a.attribute_id = ${Number(body.dataAttributeId)}
       `;
-      // Store the raw catalog code regardless of whether it maps to classification_types
+      // Store the resolved catalog code (business terms first, legacy field as fallback)
       catalogClassCode = catAttr?.classification_code ?? null;
 
       if (!resolvedSensitivity) {
@@ -228,12 +232,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
       if (!Number.isFinite(mappingId)) return NextResponse.json({ error: "mappingId required" }, { status: 400 });
       if (!body.note?.trim()) return NextResponse.json({ error: "note required" }, { status: 400 });
 
-      // Verify mapping belongs to this request
-      const [mapping] = await sql`
-        SELECT mapping_id, req_attr_id FROM bayanat.foi_attribute_mappings
-        WHERE mapping_id = ${mappingId} AND foi_request_id = ${id}
+      const [ctx] = await sql`
+        SELECT r.reference_code,
+               COALESCE(da.friendly_name_text, da.physical_name_text, m.manual_column_name, 'column') AS col_name
+        FROM bayanat.foi_attribute_mappings m
+        JOIN bayanat.foi_requests r ON r.foi_request_id = m.foi_request_id
+        LEFT JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
+        WHERE m.mapping_id = ${mappingId} AND m.foi_request_id = ${id}
       `;
-      if (!mapping) return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
+      if (!ctx) return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
+
+      const subject = `${ctx.reference_code} | ${ctx.col_name} — Classification Discussion`;
 
       await sql`
         INSERT INTO bayanat.foi_communications
@@ -241,7 +250,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
            subject_text, body_text, channel_code, sent_by_user_id)
         VALUES (
           ${id}, ${mappingId}, 'INTERNAL', 'STEWARD_COORDINATION',
-          'Classification coordination', ${body.note.trim()},
+          ${subject}, ${body.note.trim()},
           'INTERNAL', ${session.userId}
         )
       `;
@@ -266,6 +275,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
         return NextResponse.json({ error: "Invalid sensitivity code" }, { status: 400 });
       }
       const classStatus = classStatusFor(sensitivityCode);
+
+      const [ctx] = await sql`
+        SELECT r.reference_code,
+               COALESCE(da.friendly_name_text, da.physical_name_text, m.manual_column_name, 'column') AS col_name
+        FROM bayanat.foi_attribute_mappings m
+        JOIN bayanat.foi_requests r ON r.foi_request_id = m.foi_request_id
+        LEFT JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
+        WHERE m.mapping_id = ${mappingId} AND m.foi_request_id = ${id}
+      `;
+
       await sql`
         UPDATE bayanat.foi_attribute_mappings SET
           sensitivity_code = ${sensitivityCode},
@@ -274,15 +293,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
           updated_at = NOW()
         WHERE mapping_id = ${mappingId} AND foi_request_id = ${id}
       `;
-      // Log the resolution as a thread note
+
+      const subject = ctx
+        ? `${ctx.reference_code} | ${ctx.col_name} — Classification Confirmed`
+        : 'Classification Confirmed';
+      const noteBody = `Classification set to ${sensitivityCode}` + (body.notes ? `: ${body.notes.trim()}` : '');
+
       await sql`
         INSERT INTO bayanat.foi_communications
           (foi_request_id, mapping_id, direction_code, message_type_code,
            subject_text, body_text, channel_code, sent_by_user_id)
         VALUES (
           ${id}, ${mappingId}, 'INTERNAL', 'STEWARD_COORDINATION',
-          'Classification confirmed',
-          ${'Classification set to ' + sensitivityCode + (body.notes ? ': ' + body.notes.trim() : '')},
+          ${subject}, ${noteBody},
           'INTERNAL', ${session.userId}
         )
       `;
