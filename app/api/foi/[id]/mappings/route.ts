@@ -4,14 +4,16 @@ import { sql } from "@/lib/db";
 
 type Ctx = { params: { id: string } };
 
-const BLOCKED_SENSITIVITY = new Set(["CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET"]);
+// Codes that map 1-to-1 to classification_types.class_code (FOI sensitivity)
+const VALID_SENSITIVITY = new Set(["PUBLIC","INTERNAL","CONFIDENTIAL","RESTRICTED","SECRET","TOP_SECRET"]);
+const BLOCKED_SENSITIVITY = new Set(["CONFIDENTIAL","RESTRICTED","SECRET","TOP_SECRET"]);
 
-function classificationStatusFor(code: string | null | undefined): "PENDING" | "CLEARED" | "BLOCKED" {
-  if (!code) return "PENDING";
+function classStatusFor(code: string | null | undefined): "PENDING" | "CLEARED" | "BLOCKED" {
+  if (!code || !VALID_SENSITIVITY.has(code)) return "PENDING";
   return BLOCKED_SENSITIVITY.has(code) ? "BLOCKED" : "CLEARED";
 }
 
-// GET — all mappings with joined catalog labels
+// GET — all mappings with collaboration thread
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,29 +44,58 @@ export async function GET(_req: Request, { params }: Ctx) {
       m.sensitivity_code        AS "sensitivityCode",
       ct.class_name_text        AS "sensitivityLabel",
       m.catalog_class_code      AS "catalogClassCode",
-      ctc.class_name_text       AS "catalogClassLabel",
       m.classification_status   AS "classificationStatus",
       m.classification_notes    AS "classificationNotes",
       m.quality_status          AS "qualityStatus",
       m.quality_notes           AS "qualityNotes",
       m.officer_notes           AS "officerNotes",
       m.steward_notified_at     AS "stewardNotifiedAt",
-      m.steward_notification_notes AS "stewardNotificationNotes",
       m.updated_at              AS "updatedAt"
     FROM bayanat.foi_attribute_mappings m
     JOIN bayanat.foi_requested_attributes a ON a.req_attr_id = m.req_attr_id
     LEFT JOIN bayanat.data_sources ds ON ds.data_source_id = m.data_source_id
     LEFT JOIN bayanat.data_entities de ON de.entity_id = m.data_entity_id
     LEFT JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
-    LEFT JOIN bayanat.classification_types ct  ON ct.class_code  = m.sensitivity_code
-    LEFT JOIN bayanat.classification_types ctc ON ctc.class_code = m.catalog_class_code
+    LEFT JOIN bayanat.classification_types ct ON ct.class_code = m.sensitivity_code
     WHERE m.foi_request_id = ${id}
     ORDER BY a.sort_order, m.mapping_id
   `;
-  return NextResponse.json(rows);
+
+  // Fetch collaboration threads for all mappings in one query
+  const typedRows = rows as unknown as Array<{ mappingId: number }>;
+  const mappingIds = typedRows.map(r => r.mappingId).filter(Boolean);
+  let threads: Record<number, CollabNote[]> = {};
+  if (mappingIds.length > 0) {
+    const notes = await sql`
+      SELECT
+        c.comm_id        AS "commId",
+        c.mapping_id     AS "mappingId",
+        c.body_text      AS "body",
+        c.sent_at        AS "sentAt",
+        c.direction_code AS "direction",
+        COALESCE(u.full_name, 'System') AS "senderName"
+      FROM bayanat.foi_communications c
+      LEFT JOIN bayanat.users u ON u.user_id = c.sent_by_user_id
+      WHERE c.mapping_id = ANY(${mappingIds}::int[])
+      ORDER BY c.sent_at ASC
+    `;
+    for (const n of notes as unknown as CollabNote[]) {
+      if (!threads[n.mappingId]) threads[n.mappingId] = [];
+      threads[n.mappingId].push(n);
+    }
+  }
+
+  const result = typedRows.map(r => ({
+    ...r,
+    collaborationThread: threads[r.mappingId] ?? [],
+  }));
+
+  return NextResponse.json(result);
 }
 
-// POST — upsert a single mapping (one per requested attribute)
+type CollabNote = { commId: number; mappingId: number; body: string; sentAt: string; direction: string; senderName: string };
+
+// POST — upsert a single mapping
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -85,29 +116,33 @@ export async function POST(req: Request, { params }: Ctx) {
   }
 
   try {
-    // For CATALOG mappings, auto-read classification from the catalog attribute
     let catalogClassCode: string | null = null;
     let resolvedSensitivity: string | null = body.sensitivityCode || null;
     let classNotes: string | null = body.classificationNotes?.trim() || null;
 
     if (body.sourceType === "CATALOG" && body.dataAttributeId) {
       const [catAttr] = await sql`
-        SELECT classification_code FROM bayanat.data_attributes WHERE attribute_id = ${Number(body.dataAttributeId)}
+        SELECT classification_code FROM bayanat.data_attributes
+        WHERE attribute_id = ${Number(body.dataAttributeId)}
       `;
+      // Store the raw catalog code regardless of whether it maps to classification_types
       catalogClassCode = catAttr?.classification_code ?? null;
 
-      if (!resolvedSensitivity && catalogClassCode) {
-        // Officer hasn't manually set sensitivity — use catalog classification
-        resolvedSensitivity = catalogClassCode;
-      }
-
-      if (!catalogClassCode && !resolvedSensitivity) {
-        // Column not classified in catalog and officer hasn't set it
-        classNotes = classNotes ?? "Column is not classified in the data catalog. Coordinate with the data steward before proceeding.";
+      if (!resolvedSensitivity) {
+        if (catalogClassCode && VALID_SENSITIVITY.has(catalogClassCode)) {
+          // Direct 1-to-1 map: PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, SECRET, TOP_SECRET
+          resolvedSensitivity = catalogClassCode;
+        } else if (catalogClassCode) {
+          // Non-standard code (PII, SENSITIVE, etc.) — officer must set manually
+          classNotes = classNotes ?? `Catalog classification "${catalogClassCode}" requires officer review — please set the FOI sensitivity classification manually.`;
+        } else {
+          // No classification in catalog at all
+          classNotes = classNotes ?? "Column is not classified in the data catalog. Coordinate with the data steward to obtain the classification before proceeding.";
+        }
       }
     }
 
-    const classStatus = classificationStatusFor(resolvedSensitivity);
+    const classStatus = classStatusFor(resolvedSensitivity);
 
     await sql`DELETE FROM bayanat.foi_attribute_mappings WHERE foi_request_id = ${id} AND req_attr_id = ${reqAttrId}`;
 
@@ -130,7 +165,6 @@ export async function POST(req: Request, { params }: Ctx) {
                 catalog_class_code AS "catalogClassCode",
                 sensitivity_code AS "sensitivityCode"
     `;
-
     return NextResponse.json(row, { status: 201 });
   } catch (err) {
     console.error("[FOI MAPPINGS POST]", err);
@@ -138,7 +172,7 @@ export async function POST(req: Request, { params }: Ctx) {
   }
 }
 
-// PATCH — quality check or steward notification
+// PATCH — quality check | notify steward | add collaboration note | mark classified
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -153,14 +187,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
 
   try {
-    // ── Quality check ──────────────────────────────────────────────────────────
+    // ── Quality check ────────────────────────────────────────────────────────
     if (body.action === "RUN_QUALITY_CHECK") {
       const mappings = await sql`
         SELECT m.mapping_id, m.data_attribute_id
         FROM bayanat.foi_attribute_mappings m
         WHERE m.foi_request_id = ${id} AND m.source_type = 'CATALOG' AND m.data_attribute_id IS NOT NULL
       `;
-
       for (const m of mappings) {
         const [dqRow] = await sql`
           SELECT r.status_code, r.failure_percentage_number
@@ -168,49 +201,102 @@ export async function PATCH(req: Request, { params }: Ctx) {
           JOIN bayanat.dq_rules ru ON ru.rule_id = r.rule_id
           JOIN bayanat.data_attributes da ON da.entity_id = ru.entity_id
           WHERE da.attribute_id = ${m.data_attribute_id}
-          ORDER BY r.execution_timestamp DESC
-          LIMIT 1
+          ORDER BY r.execution_timestamp DESC LIMIT 1
         `;
-
-        const qStatus = dqRow
-          ? (dqRow.status_code === 'PASSED' ? 'CLEARED' : 'FLAGGED')
-          : 'CLEARED';
-        const qNotes = dqRow
+        const qStatus = dqRow ? (dqRow.status_code === 'PASSED' ? 'CLEARED' : 'FLAGGED') : 'CLEARED';
+        const qNotes  = dqRow
           ? (dqRow.status_code === 'PASSED'
             ? `DQ pass rate: ${100 - Number(dqRow.failure_percentage_number ?? 0)}%`
-            : `DQ check failed: ${Number(dqRow.failure_percentage_number ?? 0).toFixed(1)}% failure rate`)
+            : `DQ failed: ${Number(dqRow.failure_percentage_number ?? 0).toFixed(1)}% failure rate`)
           : 'No DQ rules defined for this column';
-
         await sql`
-          UPDATE bayanat.foi_attribute_mappings SET
-            quality_status = ${qStatus}, quality_notes = ${qNotes}, updated_at = NOW()
+          UPDATE bayanat.foi_attribute_mappings SET quality_status = ${qStatus}, quality_notes = ${qNotes}, updated_at = NOW()
           WHERE mapping_id = ${m.mapping_id}
         `;
       }
-
       await sql`
         UPDATE bayanat.foi_attribute_mappings SET
-          quality_status = 'CLEARED', quality_notes = 'Manual source — no automated DQ available', updated_at = NOW()
+          quality_status = 'CLEARED', quality_notes = 'Manual source — no automated DQ', updated_at = NOW()
         WHERE foi_request_id = ${id} AND source_type = 'MANUAL' AND quality_status = 'PENDING'
+      `;
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Add collaboration note (steward coordination thread) ──────────────────
+    if (body.action === "ADD_COLLABORATION_NOTE") {
+      const mappingId = Number(body.mappingId);
+      if (!Number.isFinite(mappingId)) return NextResponse.json({ error: "mappingId required" }, { status: 400 });
+      if (!body.note?.trim()) return NextResponse.json({ error: "note required" }, { status: 400 });
+
+      // Verify mapping belongs to this request
+      const [mapping] = await sql`
+        SELECT mapping_id, req_attr_id FROM bayanat.foi_attribute_mappings
+        WHERE mapping_id = ${mappingId} AND foi_request_id = ${id}
+      `;
+      if (!mapping) return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
+
+      await sql`
+        INSERT INTO bayanat.foi_communications
+          (foi_request_id, mapping_id, direction_code, message_type_code,
+           subject_text, body_text, channel_code, sent_by_user_id)
+        VALUES (
+          ${id}, ${mappingId}, 'INTERNAL', 'STEWARD_COORDINATION',
+          'Classification coordination', ${body.note.trim()},
+          'INTERNAL', ${session.userId}
+        )
+      `;
+
+      // First note also stamps steward_notified_at
+      await sql`
+        UPDATE bayanat.foi_attribute_mappings SET
+          steward_notified_at = COALESCE(steward_notified_at, NOW()),
+          updated_at = NOW()
+        WHERE mapping_id = ${mappingId}
       `;
 
       return NextResponse.json({ ok: true });
     }
 
-    // ── Notify steward ─────────────────────────────────────────────────────────
+    // ── Mark classified — officer receives classification from steward ─────────
+    if (body.action === "MARK_CLASSIFIED") {
+      const mappingId = Number(body.mappingId);
+      if (!Number.isFinite(mappingId)) return NextResponse.json({ error: "mappingId required" }, { status: 400 });
+      const sensitivityCode: string = body.sensitivityCode;
+      if (!VALID_SENSITIVITY.has(sensitivityCode)) {
+        return NextResponse.json({ error: "Invalid sensitivity code" }, { status: 400 });
+      }
+      const classStatus = classStatusFor(sensitivityCode);
+      await sql`
+        UPDATE bayanat.foi_attribute_mappings SET
+          sensitivity_code = ${sensitivityCode},
+          classification_status = ${classStatus},
+          classification_notes = ${body.notes?.trim() || null},
+          updated_at = NOW()
+        WHERE mapping_id = ${mappingId} AND foi_request_id = ${id}
+      `;
+      // Log the resolution as a thread note
+      await sql`
+        INSERT INTO bayanat.foi_communications
+          (foi_request_id, mapping_id, direction_code, message_type_code,
+           subject_text, body_text, channel_code, sent_by_user_id)
+        VALUES (
+          ${id}, ${mappingId}, 'INTERNAL', 'STEWARD_COORDINATION',
+          'Classification confirmed',
+          ${'Classification set to ' + sensitivityCode + (body.notes ? ': ' + body.notes.trim() : '')},
+          'INTERNAL', ${session.userId}
+        )
+      `;
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Notify steward (legacy — kept for backward compat) ────────────────────
     if (body.action === "NOTIFY_STEWARD") {
       const mappingId = Number(body.mappingId);
       if (!Number.isFinite(mappingId)) return NextResponse.json({ error: "mappingId required" }, { status: 400 });
-
-      // Fetch mapping details to build the notification
       const [mapping] = await sql`
-        SELECT m.mapping_id, m.data_source_id, m.data_entity_id, m.data_attribute_id,
-               da.physical_name_text AS attr_name,
-               COALESCE(da.friendly_name_text, da.physical_name_text) AS attr_display,
-               de.entity_name_text,
-               ds.source_name_text,
-               a.attribute_name_text AS req_attr_name,
-               r.subject_text, r.reference_code
+        SELECT m.mapping_id, a.attribute_name_text, r.reference_code, r.subject_text,
+               da.physical_name_text AS attr_name, COALESCE(da.friendly_name_text, da.physical_name_text) AS attr_display,
+               de.entity_name_text, ds.source_name_text
         FROM bayanat.foi_attribute_mappings m
         JOIN bayanat.foi_requested_attributes a ON a.req_attr_id = m.req_attr_id
         JOIN bayanat.foi_requests r ON r.foi_request_id = m.foi_request_id
@@ -221,45 +307,25 @@ export async function PATCH(req: Request, { params }: Ctx) {
       `;
       if (!mapping) return NextResponse.json({ error: "Mapping not found" }, { status: 404 });
 
-      // Try to find a steward for this data source
-      let stewardUserId: string | null = null;
-      if (mapping.data_source_id) {
-        const [stewardRow] = await sql`
-          SELECT user_id FROM bayanat.asset_stakeholders
-          WHERE asset_type_code = 'DATA_SOURCE' AND asset_id = ${mapping.data_source_id}
-            AND role_code IN ('BIZ_STEWARD', 'TECH_STEWARD')
-          ORDER BY role_code
-          LIMIT 1
-        `;
-        stewardUserId = stewardRow?.user_id ?? null;
-      }
+      const msg = body.message?.trim()
+        || `Classification required for column "${mapping.attr_display ?? mapping.attr_name}" (table: ${mapping.entity_name_text ?? "—"}, source: ${mapping.source_name_text ?? "—"}) to fulfil FOI ${mapping.reference_code}: "${mapping.subject_text}". Please classify this column at your earliest convenience.`;
 
-      const notifMsg = body.message?.trim()
-        || `Classification required: column "${mapping.attr_display ?? mapping.attr_name}" in ${mapping.source_name_text ?? "the source system"} (table: ${mapping.entity_name_text ?? "—"}) is unclassified. It is needed to fulfill FOI request ${mapping.reference_code}: "${mapping.subject_text}". Please classify this column so the request can proceed.`;
-
-      // Log as a FOI communication (internal steward coordination)
       await sql`
         INSERT INTO bayanat.foi_communications
-          (foi_request_id, direction_code, message_type_code, subject_text, body_text, channel_code, sent_by_user_id)
+          (foi_request_id, mapping_id, direction_code, message_type_code,
+           subject_text, body_text, channel_code, sent_by_user_id)
         VALUES (
-          ${id}, 'INTERNAL', 'STEWARD_COORDINATION',
+          ${id}, ${mappingId}, 'INTERNAL', 'STEWARD_COORDINATION',
           ${'Classification request: ' + (mapping.attr_display ?? mapping.attr_name ?? 'column')},
-          ${notifMsg},
-          'INTERNAL',
-          ${session.userId}
+          ${msg}, 'INTERNAL', ${session.userId}
         )
       `;
-
-      // Mark the mapping as steward-notified
       await sql`
         UPDATE bayanat.foi_attribute_mappings SET
-          steward_notified_at = NOW(),
-          steward_notification_notes = ${notifMsg},
-          updated_at = NOW()
+          steward_notified_at = COALESCE(steward_notified_at, NOW()), updated_at = NOW()
         WHERE mapping_id = ${mappingId}
       `;
-
-      return NextResponse.json({ ok: true, stewardUserId });
+      return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

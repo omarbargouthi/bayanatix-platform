@@ -35,6 +35,15 @@ type ReqAttr = {
   requestedFormatHint: string | null;
 };
 
+type CollabNote = {
+  commId: number;
+  mappingId: number;
+  body: string;
+  sentAt: string;
+  direction: string;
+  senderName: string;
+};
+
 type Mapping = {
   mappingId: number;
   reqAttrId: number;
@@ -61,7 +70,7 @@ type Mapping = {
   qualityNotes: string | null;
   officerNotes: string | null;
   stewardNotifiedAt: string | null;
-  stewardNotificationNotes: string | null;
+  collaborationThread: CollabNote[];
 };
 
 type CatalogItem = {
@@ -71,6 +80,7 @@ type CatalogItem = {
   dataType?: string;
   classificationCode?: string | null;
   classificationLabel?: string | null;
+  classificationMapped?: boolean;
 };
 
 type MapForm = {
@@ -99,45 +109,49 @@ function SensChip({ code }: { code: string | null }) {
   return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${opt.bg} ${opt.color}`}>{opt.label}</span>;
 }
 
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+}
+
 export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Props) {
   const currentIdx    = STAGES.findIndex(s => s.code === caseData.fulfillmentStageCode);
   const inFulfillment = caseData.statusCode === "IN_FULFILLMENT";
   const stage         = caseData.fulfillmentStageCode;
 
-  // Stage advancement
   const [advancing, setAdvancing] = useState(false);
   const [advErr,    setAdvErr]    = useState<string | null>(null);
 
-  // Delivery form
   const [delivRef, setDelivRef] = useState("");
   const [delivMsg, setDelivMsg] = useState("");
 
-  // Source mapping data
   const [reqAttrs,    setReqAttrs]    = useState<ReqAttr[]>([]);
   const [mappings,    setMappings]    = useState<Mapping[]>([]);
   const [loadingMap,  setLoadingMap]  = useState(false);
   const [editingAttr, setEditingAttr] = useState<number | null>(null);
 
-  // Catalog cascade
   const [sources,  setSources]  = useState<CatalogItem[]>([]);
   const [entities, setEntities] = useState<CatalogItem[]>([]);
   const [attrs,    setAttrs]    = useState<CatalogItem[]>([]);
 
-  // Mapping form
   const [mapForm,   setMapForm]   = useState<MapForm>(emptyForm());
-  // Classification detected from the selected catalog attribute
-  const [catalogClassDetected, setCatalogClassDetected] = useState<{ code: string | null; label: string | null } | null>(null);
+  const [catalogClassDetected, setCatalogClassDetected] = useState<{
+    code: string | null; label: string | null; mapped: boolean;
+  } | null>(null);
   const [savingMap, setSavingMap] = useState(false);
   const [mapErr,    setMapErr]    = useState<string | null>(null);
 
-  // Steward notification
-  const [notifyingAttr, setNotifyingAttr] = useState<number | null>(null); // mappingId
-  const [notifyMsg,     setNotifyMsg]     = useState("");
-  const [sendingNotif,  setSendingNotif]  = useState(false);
+  // Per-mapping collaboration thread state
+  const [threadNotes, setThreadNotes] = useState<Record<number, string>>({});
+  const [sendingNote, setSendingNote] = useState<number | null>(null);
+  // Per-mapping "Mark as Classified" form
+  const [markClassifyId, setMarkClassifyId] = useState<number | null>(null);
+  const [markSensCode,   setMarkSensCode]   = useState("");
+  const [markNotes,      setMarkNotes]      = useState("");
+  const [markSaving,     setMarkSaving]     = useState(false);
+  // Which mapping threads are expanded
+  const [expandedThread, setExpandedThread] = useState<Set<number>>(new Set());
 
   const [runningQC, setRunningQC] = useState(false);
-
-  // ── Data loading ─────────────────────────────────────────────────────────────
 
   const loadMappingData = useCallback(async () => {
     setLoadingMap(true);
@@ -185,32 +199,34 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
     if (!attrId) { setCatalogClassDetected(null); return; }
     const found = attrs.find(a => String(a.id) === attrId);
     if (found) {
-      const cls = { code: found.classificationCode ?? null, label: found.classificationLabel ?? null };
+      const cls = {
+        code:   found.classificationCode ?? null,
+        label:  found.classificationLabel ?? null,
+        mapped: found.classificationMapped ?? false,
+      };
       setCatalogClassDetected(cls);
-      // Auto-fill sensitivity from catalog if officer hasn't manually set it
-      if (!mapForm.sensitivityCode && cls.code) {
+      // Only auto-fill sensitivity when the catalog code maps 1:1 to a FOI sensitivity code
+      if (!mapForm.sensitivityCode && cls.code && cls.mapped) {
         setMapForm(f => ({ ...f, sensitivityCode: cls.code! }));
       }
     }
   }
 
-  // ── Mapping edit ──────────────────────────────────────────────────────────────
-
   function openEdit(reqAttrId: number) {
     const ex = mappings.find(m => m.reqAttrId === reqAttrId);
     if (ex) {
       setMapForm({
-        sourceType:      ex.sourceType,
-        dataSourceId:    String(ex.dataSourceId  ?? ""),
-        dataEntityId:    String(ex.dataEntityId  ?? ""),
-        dataAttributeId: String(ex.dataAttributeId ?? ""),
+        sourceType:       ex.sourceType,
+        dataSourceId:     String(ex.dataSourceId  ?? ""),
+        dataEntityId:     String(ex.dataEntityId  ?? ""),
+        dataAttributeId:  String(ex.dataAttributeId ?? ""),
         manualSystemName: ex.manualSystemName ?? "",
         manualEntityName: ex.manualEntityName ?? "",
         manualColumnName: ex.manualColumnName ?? "",
         sensitivityCode:  ex.sensitivityCode ?? "",
         officerNotes:     ex.officerNotes ?? "",
       });
-      setCatalogClassDetected(ex.catalogClassCode ? { code: ex.catalogClassCode, label: ex.catalogClassLabel ?? null } : null);
+      setCatalogClassDetected(ex.catalogClassCode ? { code: ex.catalogClassCode, label: ex.catalogClassLabel ?? null, mapped: false } : null);
       if (ex.dataSourceId) {
         fetch(`/api/foi/catalog-lookup?type=entities&sourceId=${ex.dataSourceId}`).then(r => r.json()).then(d => setEntities(d ?? [])).catch(() => {});
       }
@@ -229,7 +245,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
     setMapErr(null);
     if (mapForm.sourceType === "CATALOG" && !mapForm.dataAttributeId) { setMapErr("Select a column from the catalog"); return; }
     if (mapForm.sourceType === "MANUAL"  && !mapForm.manualColumnName.trim()) { setMapErr("Column / field name is required"); return; }
-    // Allow saving without sensitivity only for unclassified catalog columns (gate enforces later)
+    if (mapForm.sourceType === "MANUAL"  && !mapForm.sensitivityCode) { setMapErr("Sensitivity classification is required for manual mappings"); return; }
 
     setSavingMap(true);
     try {
@@ -247,7 +263,6 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
         body.manualSystemName = mapForm.manualSystemName || null;
         body.manualEntityName = mapForm.manualEntityName || null;
         body.manualColumnName = mapForm.manualColumnName;
-        if (!mapForm.sensitivityCode) { setMapErr("Sensitivity classification is required for manual mappings"); setSavingMap(false); return; }
       }
 
       const r = await fetch(`/api/foi/${caseData.foiRequestId}/mappings`, {
@@ -268,16 +283,32 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
     await loadMappingData();
   }
 
-  async function sendStewardNotification(mappingId: number) {
-    setSendingNotif(true);
+  async function sendCollabNote(mappingId: number) {
+    const note = (threadNotes[mappingId] ?? "").trim();
+    if (!note) return;
+    setSendingNote(mappingId);
     try {
       await fetch(`/api/foi/${caseData.foiRequestId}/mappings`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "NOTIFY_STEWARD", mappingId, message: notifyMsg || undefined }),
+        body: JSON.stringify({ action: "ADD_COLLABORATION_NOTE", mappingId, note }),
       });
-      setNotifyingAttr(null); setNotifyMsg("");
+      setThreadNotes(n => ({ ...n, [mappingId]: "" }));
+      setExpandedThread(s => new Set([...s, mappingId]));
       await loadMappingData();
-    } finally { setSendingNotif(false); }
+    } finally { setSendingNote(null); }
+  }
+
+  async function markClassified() {
+    if (!markClassifyId || !markSensCode) return;
+    setMarkSaving(true);
+    try {
+      await fetch(`/api/foi/${caseData.foiRequestId}/mappings`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "MARK_CLASSIFIED", mappingId: markClassifyId, sensitivityCode: markSensCode, notes: markNotes }),
+      });
+      setMarkClassifyId(null); setMarkSensCode(""); setMarkNotes("");
+      await loadMappingData();
+    } finally { setMarkSaving(false); }
   }
 
   async function runQualityCheck() {
@@ -316,15 +347,10 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
     } finally { setAdvancing(false); }
   }
 
-  // ── Gate checks ───────────────────────────────────────────────────────────────
-
   const allMapped       = reqAttrs.length > 0 && reqAttrs.every(a => mappings.some(m => m.reqAttrId === a.reqAttrId));
   const blockedMappings = mappings.filter(m => m.classificationStatus === "BLOCKED");
   const pendingMappings = mappings.filter(m => m.classificationStatus === "PENDING");
-  const unclassifiedInCatalog = mappings.filter(m => m.sourceType === "CATALOG" && !m.catalogClassCode && !m.sensitivityCode);
   const qualityFlagged  = mappings.filter(m => m.qualityStatus === "FLAGGED");
-
-  // ── Render ────────────────────────────────────────────────────────────────────
 
   if (!stage && !inFulfillment) {
     return (
@@ -382,27 +408,30 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
             <span className="text-[11px] text-muted">{mappings.length} / {reqAttrs.length} mapped</span>
           </div>
           <p className="text-xs text-muted">
-            Map each attribute to a source column. When mapped to a catalog column, the classification is read automatically.
-            If a column is unclassified in the catalog, coordinate with the data steward before proceeding.
+            Map each attribute to a source column. Classification is read automatically from the catalog.
+            For unclassified columns, use the collaboration thread to coordinate with the data steward.
           </p>
 
           {loadingMap ? (
             <div className="py-6 text-center text-muted text-sm">Loading…</div>
           ) : reqAttrs.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted italic">
-              No structured attributes were submitted with this request.
-            </div>
+            <div className="py-6 text-center text-sm text-muted italic">No structured attributes were submitted with this request.</div>
           ) : (
             <div className="space-y-3">
               {reqAttrs.map(a => {
                 const mapping   = mappings.find(m => m.reqAttrId === a.reqAttrId);
                 const isEditing = editingAttr === a.reqAttrId;
-                const needsSteward = mapping?.sourceType === "CATALOG" && !mapping.catalogClassCode && !mapping.sensitivityCode;
-                const isNotifying  = notifyingAttr === mapping?.mappingId;
+                // Column is unclassified if catalog-mapped but no catalog code AND no sensitivity set
+                const needsClassification = mapping?.sourceType === "CATALOG" && !mapping.sensitivityCode;
+                // Non-standard catalog code (PII, SENSITIVE) also needs officer to set FOI sensitivity
+                const hasNonstandardCode  = mapping?.catalogClassCode && !mapping.sensitivityCode;
+                const showThread = mapping && (needsClassification || hasNonstandardCode || (mapping.collaborationThread?.length ?? 0) > 0);
+                const thread     = mapping?.collaborationThread ?? [];
+                const isThreadExpanded = expandedThread.has(mapping?.mappingId ?? -1);
 
                 return (
                   <div key={a.reqAttrId} className="border border-line rounded-xl overflow-hidden">
-                    {/* Attribute header */}
+                    {/* Attribute header row */}
                     <div className={`px-4 py-3 flex items-start gap-3 ${isEditing ? "bg-brand-purple/5" : "bg-canvas-soft"}`}>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -415,15 +444,32 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                                 mapping.classificationStatus === "BLOCKED" ? "bg-red-100 text-red-700" :
                                 "bg-amber-100 text-amber-700"
                               }`}>{mapping.classificationStatus}</span>
-                              <SensChip code={mapping.sensitivityCode} />
+                              {mapping.sensitivityCode && <SensChip code={mapping.sensitivityCode} />}
                               {mapping.catalogClassCode && (
-                                <span className="text-[10px] text-blue-600 italic">catalog: {mapping.catalogClassLabel ?? mapping.catalogClassCode}</span>
+                                <span className="text-[10px] italic text-blue-600">
+                                  catalog: {mapping.catalogClassLabel ?? mapping.catalogClassCode}
+                                </span>
                               )}
-                              {needsSteward && !mapping.stewardNotifiedAt && (
-                                <span className="text-[10px] text-orange-600 font-semibold bg-orange-50 px-1.5 py-0.5 rounded">Unclassified in catalog</span>
+                              {needsClassification && !mapping.catalogClassCode && (
+                                <span className="text-[10px] bg-orange-50 text-orange-700 font-semibold px-1.5 py-0.5 rounded">
+                                  Unclassified in catalog
+                                </span>
+                              )}
+                              {hasNonstandardCode && (
+                                <span className="text-[10px] bg-purple-50 text-purple-700 font-semibold px-1.5 py-0.5 rounded">
+                                  Needs FOI sensitivity
+                                </span>
                               )}
                               {mapping.stewardNotifiedAt && (
-                                <span className="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">Steward notified {new Date(mapping.stewardNotifiedAt).toLocaleDateString()}</span>
+                                <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded">
+                                  Steward notified {new Date(mapping.stewardNotifiedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                              {thread.length > 0 && (
+                                <button onClick={() => setExpandedThread(s => { const n = new Set(s); if (n.has(mapping.mappingId)) n.delete(mapping.mappingId); else n.add(mapping.mappingId); return n; })}
+                                  className="text-[10px] text-brand-purple hover:underline ml-1">
+                                  {isThreadExpanded ? "Hide" : `Thread (${thread.length})`}
+                                </button>
                               )}
                             </>
                           ) : (
@@ -447,28 +493,110 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         {!isEditing && (
                           <button onClick={() => openEdit(a.reqAttrId)} className="btn btn-sm text-[11px]">{mapping ? "Edit" : "+ Map"}</button>
                         )}
-                        {mapping && !isEditing && needsSteward && !mapping.stewardNotifiedAt && (
-                          <button onClick={() => { setNotifyingAttr(mapping.mappingId); setNotifyMsg(""); }} className="btn btn-sm text-[11px] border-teal-400 text-teal-700">Notify Steward</button>
-                        )}
                         {mapping && !isEditing && (
                           <button onClick={() => deleteMapping(mapping.mappingId)} className="btn btn-sm text-[11px] text-red-500 border-red-200 hover:border-red-400">×</button>
                         )}
                       </div>
                     </div>
 
-                    {/* Steward notification form */}
-                    {isNotifying && mapping && (
-                      <div className="px-4 py-3 border-t border-line bg-teal-50 space-y-2">
-                        <p className="text-xs font-semibold text-teal-800">Notify data steward to classify this column</p>
-                        <textarea className="input w-full text-sm h-16 resize-none"
-                          placeholder="Optional message to the steward (a default message will be sent if left empty)…"
-                          value={notifyMsg} onChange={e => setNotifyMsg(e.target.value)} />
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => setNotifyingAttr(null)} className="btn btn-sm text-[11px]">Cancel</button>
-                          <button onClick={() => sendStewardNotification(mapping.mappingId)} disabled={sendingNotif} className="btn btn-primary btn-sm text-[11px]">
-                            {sendingNotif ? "Sending…" : "Send Notification"}
-                          </button>
+                    {/* ── Collaboration thread ── (shown for unclassified or when notes exist) */}
+                    {showThread && !isEditing && (
+                      <div className="border-t border-line">
+                        {/* Thread header */}
+                        <div className="px-4 py-2 bg-teal-50 flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-teal-800">
+                            Steward Coordination Thread
+                            {thread.length > 0 && <span className="ml-1 text-teal-600">({thread.length} note{thread.length !== 1 ? "s" : ""})</span>}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {!mapping!.sensitivityCode && (
+                              <button onClick={() => { setMarkClassifyId(mapping!.mappingId); setMarkSensCode(""); setMarkNotes(""); }}
+                                className="text-[10px] font-semibold text-white bg-teal-600 hover:bg-teal-700 px-2 py-0.5 rounded transition-colors">
+                                Mark as Classified
+                              </button>
+                            )}
+                            {thread.length > 0 && (
+                              <button onClick={() => setExpandedThread(s => { const n = new Set(s); if (n.has(mapping!.mappingId)) n.delete(mapping!.mappingId); else n.add(mapping!.mappingId); return n; })}
+                                className="text-[10px] text-teal-700 hover:underline">
+                                {isThreadExpanded ? "Collapse" : "Expand"}
+                              </button>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Message history */}
+                        {(isThreadExpanded || thread.length === 0) && thread.length > 0 && (
+                          <div className="px-4 py-2 space-y-2 bg-white max-h-48 overflow-y-auto">
+                            {thread.map(note => (
+                              <div key={note.commId} className="flex gap-2">
+                                <div className="shrink-0 w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[9px] font-bold">
+                                  {note.senderName.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[11px] font-semibold text-ink">{note.senderName}</span>
+                                    <span className="text-[10px] text-muted">{fmtDate(note.sentAt)}</span>
+                                  </div>
+                                  <p className="text-xs text-ink-soft whitespace-pre-wrap">{note.body}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Mark as Classified inline form */}
+                        {markClassifyId === mapping!.mappingId && (
+                          <div className="px-4 py-3 bg-teal-50/60 border-t border-teal-100 space-y-2">
+                            <p className="text-xs font-semibold text-teal-800">Set FOI sensitivity classification</p>
+                            <p className="text-[11px] text-teal-700">
+                              {mapping!.catalogClassCode
+                                ? `Catalog code is "${mapping!.catalogClassCode}". Select the equivalent FOI sensitivity below.`
+                                : "Select the sensitivity classification confirmed by the steward."}
+                            </p>
+                            <div className="flex gap-2 items-end">
+                              <div className="flex-1">
+                                <select className="input w-full text-sm" value={markSensCode} onChange={e => setMarkSensCode(e.target.value)}>
+                                  <option value="">— Select sensitivity —</option>
+                                  {SENSITIVITY_OPTIONS.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
+                                </select>
+                              </div>
+                              <div className="flex-1">
+                                <input className="input w-full text-sm" placeholder="Notes (optional)" value={markNotes} onChange={e => setMarkNotes(e.target.value)} />
+                              </div>
+                            </div>
+                            {markSensCode && BLOCKED_SENSITIVITIES.has(markSensCode) && (
+                              <p className="text-[10px] text-red-600">⚠ This will block the request at the Classification Gate.</p>
+                            )}
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => setMarkClassifyId(null)} className="btn btn-sm text-[11px]">Cancel</button>
+                              <button onClick={markClassified} disabled={!markSensCode || markSaving} className="btn btn-primary btn-sm text-[11px]">
+                                {markSaving ? "Saving…" : "Confirm Classification"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Add note input */}
+                        {markClassifyId !== mapping!.mappingId && (
+                          <div className="px-4 py-3 border-t border-teal-100 bg-white">
+                            <div className="flex gap-2">
+                              <textarea
+                                className="input flex-1 text-sm h-10 resize-none"
+                                placeholder="Add a note to the steward or log an update…"
+                                value={threadNotes[mapping!.mappingId] ?? ""}
+                                onChange={e => setThreadNotes(n => ({ ...n, [mapping!.mappingId]: e.target.value }))}
+                                onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendCollabNote(mapping!.mappingId); }}
+                              />
+                              <button
+                                onClick={() => sendCollabNote(mapping!.mappingId)}
+                                disabled={sendingNote === mapping!.mappingId || !(threadNotes[mapping!.mappingId] ?? "").trim()}
+                                className="btn btn-sm text-[11px] self-end">
+                                {sendingNote === mapping!.mappingId ? "…" : "Send"}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-muted mt-1">Cmd/Ctrl+Enter to send</p>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -512,7 +640,8 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                                   <option value="">— Select —</option>
                                   {attrs.map(a => (
                                     <option key={a.id} value={a.id}>
-                                      {a.displayName ?? a.name}{a.dataType ? ` (${a.dataType})` : ""}{a.classificationCode ? ` [${a.classificationCode}]` : " [unclassified]"}
+                                      {a.displayName ?? a.name}{a.dataType ? ` (${a.dataType})` : ""}
+                                      {a.classificationCode ? ` [${a.classificationCode}]` : " [unclassified]"}
                                     </option>
                                   ))}
                                 </select>
@@ -522,15 +651,29 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                             {/* Catalog classification feedback */}
                             {mapForm.dataAttributeId && catalogClassDetected !== null && (
                               catalogClassDetected.code ? (
-                                <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-                                  <span className="text-xs text-blue-700">Classification read from catalog:</span>
-                                  <SensChip code={catalogClassDetected.code} />
-                                  <span className="text-xs text-blue-600">(auto-filled below)</span>
-                                </div>
+                                catalogClassDetected.mapped ? (
+                                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+                                    <span className="text-xs text-blue-700">Classification read from catalog:</span>
+                                    <SensChip code={catalogClassDetected.code} />
+                                    <span className="text-xs text-blue-600">(auto-filled below)</span>
+                                  </div>
+                                ) : (
+                                  <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                                    <p className="text-xs font-semibold text-purple-800">
+                                      Catalog code: <strong>{catalogClassDetected.code}</strong>
+                                    </p>
+                                    <p className="text-xs text-purple-700 mt-0.5">
+                                      This code ({catalogClassDetected.code}) is an internal catalog classification and does not map directly to an FOI sensitivity level.
+                                      Save the mapping, then use the collaboration thread to confirm the correct FOI sensitivity with the steward, and use <strong>Mark as Classified</strong> to set it.
+                                    </p>
+                                  </div>
+                                )
                               ) : (
                                 <div className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
                                   <p className="text-xs font-semibold text-orange-800">⚠ Column is not classified in the data catalog</p>
-                                  <p className="text-xs text-orange-700 mt-0.5">Save this mapping first, then use <strong>Notify Steward</strong> to ask the responsible steward to classify this column before proceeding to the Classification Gate.</p>
+                                  <p className="text-xs text-orange-700 mt-0.5">
+                                    Save this mapping, then use the <strong>Steward Coordination Thread</strong> to ask the responsible steward to classify this column before advancing.
+                                  </p>
                                 </div>
                               )
                             )}
@@ -560,11 +703,14 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                             <label className="block text-[10px] font-bold text-muted uppercase mb-1">
                               Sensitivity Classification
                               {mapForm.sourceType === "MANUAL" && <span className="text-red-500"> *</span>}
-                              {mapForm.sourceType === "CATALOG" && <span className="text-muted font-normal"> (auto-filled from catalog)</span>}
+                              {mapForm.sourceType === "CATALOG" && <span className="text-muted font-normal"> (auto-filled or set via thread)</span>}
                             </label>
                             <select className="input w-full text-sm" value={mapForm.sensitivityCode}
                               onChange={e => setMapForm(f => ({ ...f, sensitivityCode: e.target.value }))}>
-                              <option value="">{mapForm.sourceType === "CATALOG" && !catalogClassDetected?.code ? "— Pending steward classification —" : "— Select —"}</option>
+                              <option value="">
+                                {mapForm.sourceType === "CATALOG" && (!catalogClassDetected?.code || !catalogClassDetected?.mapped)
+                                  ? "— Pending classification —" : "— Select —"}
+                              </option>
                               {SENSITIVITY_OPTIONS.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
                             </select>
                             {mapForm.sensitivityCode && BLOCKED_SENSITIVITIES.has(mapForm.sensitivityCode) && (
@@ -593,11 +739,10 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
             </div>
           )}
 
-          {/* Unclassified warning summary */}
-          {unclassifiedInCatalog.length > 0 && (
+          {pendingMappings.length > 0 && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
               <p className="text-xs font-semibold text-orange-800">
-                {unclassifiedInCatalog.length} column(s) are not classified in the catalog — notify the responsible steward to complete classification before advancing.
+                {pendingMappings.length} column(s) still pending classification — use the steward thread on each card to resolve before advancing.
               </p>
             </div>
           )}
@@ -769,7 +914,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {/* ── DELIVERED ── */}
       {caseData.statusCode === "DELIVERED" && (
         <div className="card p-5 bg-green-50 border border-green-200 space-y-2">
-          <h2 className="font-semibold text-sm text-green-800">✓ Case Delivered & Closed</h2>
+          <h2 className="font-semibold text-sm text-green-800">✓ Case Delivered &amp; Closed</h2>
           <p className="text-xs text-green-700">Delivery reference: <span className="font-mono">{caseData.deliveryReference}</span></p>
           {caseData.linkedOpenDatasetId && (
             <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="text-xs text-brand-purple hover:underline block">
