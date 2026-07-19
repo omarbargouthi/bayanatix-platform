@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC_PREFIXES = ["/login", "/api/auth/login", "/api/auth/logout", "/_next", "/favicon", "/logo.svg"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/_next",
+  "/favicon",
+  "/logo.svg",
+  "/foi-request",           // public FOI intake form + tracking
+  "/api/foi/intake",        // public intake submission
+];
 
 function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/") || pathname === "/logo.svg");
