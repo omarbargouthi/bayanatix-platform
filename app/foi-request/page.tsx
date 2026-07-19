@@ -2,11 +2,6 @@
 
 import { useState } from "react";
 
-const DOMAINS_FALLBACK = [
-  "Finance", "Human Resources", "Operations", "Legal", "IT",
-  "Customer Service", "Procurement", "Strategy", "Other",
-];
-
 const FORMAT_HINTS = ["Number", "Text", "Date", "SAR Amount", "Percentage", "Yes / No", "File / Document", "Other"];
 
 type AttributeRow = { name: string; description: string; formatHint: string };
@@ -24,7 +19,7 @@ export default function FoiSubmitPage() {
     fullName: "", email: "", phone: "", nationalId: "",
     preferredLanguage: "ar",
     subject: "", description: "",
-    domainCode: "", requestedFormat: "PDF",
+    requestedFormat: "PDF",
   });
   const [attributes, setAttributes] = useState<AttributeRow[]>([newRow()]);
 
@@ -51,7 +46,7 @@ export default function FoiSubmitPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          domainCode: form.domainCode || null,
+          domainCode: null,
           channel: "PORTAL",
           attributes: filledAttrs,
         }),
@@ -143,13 +138,6 @@ export default function FoiSubmitPage() {
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Description <span className="text-red-500">*</span></label>
                 <textarea className="input w-full h-24 resize-none" value={form.description} onChange={e => f("description", e.target.value)}
                   placeholder="Describe the specific information you need — what, time period, scope, intended use…" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Business Domain (optional)</label>
-                <select className="input w-full" value={form.domainCode} onChange={e => f("domainCode", e.target.value)}>
-                  <option value="">— Select if known —</option>
-                  {DOMAINS_FALLBACK.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
               </div>
             </div>
 
@@ -244,7 +232,7 @@ export default function FoiSubmitPage() {
 
             <button onClick={() => {
               setStep("form"); setResult(null);
-              setForm({ requesterType:"INDIVIDUAL", fullName:"", email:"", phone:"", nationalId:"", preferredLanguage:"ar", subject:"", description:"", domainCode:"", requestedFormat:"PDF" });
+              setForm({ requesterType:"INDIVIDUAL", fullName:"", email:"", phone:"", nationalId:"", preferredLanguage:"ar", subject:"", description:"", requestedFormat:"PDF" });
               setAttributes([newRow()]);
             }} className="btn btn-sm text-gray-500">Submit Another Request</button>
           </div>

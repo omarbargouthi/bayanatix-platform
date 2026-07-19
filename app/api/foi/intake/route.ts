@@ -56,7 +56,7 @@ export async function POST(req: Request) {
         ${body.channel ?? "PORTAL"},
         ${subject.trim()},
         ${description.trim()},
-        ${body.domainCode || null},
+        null,
         ${body.requestedFormat ?? "PDF"},
         'SUBMITTED'
       )
