@@ -39,14 +39,17 @@ export async function GET(req: Request) {
       const entityId = Number(searchParams.get("entityId"));
       if (!Number.isFinite(entityId)) return NextResponse.json({ error: "entityId required" }, { status: 400 });
       const rows = await sql`
-        SELECT attribute_id AS "id",
-               physical_name_text AS "name",
-               COALESCE(friendly_name_text, physical_name_text) AS "displayName",
-               data_type_text AS "dataType",
-               description_text AS "description"
-        FROM bayanat.data_attributes
-        WHERE entity_id = ${entityId}
-        ORDER BY physical_name_text
+        SELECT a.attribute_id AS "id",
+               a.physical_name_text AS "name",
+               COALESCE(a.friendly_name_text, a.physical_name_text) AS "displayName",
+               a.data_type_text AS "dataType",
+               a.description_text AS "description",
+               a.classification_code AS "classificationCode",
+               ct.class_name_text AS "classificationLabel"
+        FROM bayanat.data_attributes a
+        LEFT JOIN bayanat.classification_types ct ON ct.class_code = a.classification_code
+        WHERE a.entity_id = ${entityId}
+        ORDER BY a.physical_name_text
       `;
       return NextResponse.json(rows);
     }

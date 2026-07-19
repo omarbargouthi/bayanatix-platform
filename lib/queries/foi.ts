@@ -141,6 +141,8 @@ export type FoiCaseDetail = {
   validUntilDate:            string | null;
   quoteStatusCode:           string | null;
   quoteDecisionAt:           string | null;
+  adjustmentReason:          string | null;
+  adjustmentApproved:        boolean | null;
   // linked open dataset
   linkedOpenDatasetId:       number | null;
 };
@@ -200,6 +202,8 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
       q.valid_until_date         AS "validUntilDate",
       q.status_code              AS "quoteStatusCode",
       q.decision_at              AS "quoteDecisionAt",
+      q.adjustment_reason        AS "adjustmentReason",
+      q.adjustment_approved      AS "adjustmentApproved",
       r.linked_open_dataset_id   AS "linkedOpenDatasetId"
     FROM bayanat.foi_requests r
     JOIN bayanat.foi_requesters rq ON rq.requester_id = r.requester_id
