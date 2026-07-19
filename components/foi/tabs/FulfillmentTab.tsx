@@ -153,6 +153,13 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
 
   const [runningQC, setRunningQC] = useState(false);
 
+  // Delivery type choice (QUALITY_GATE → TECHNICAL_COMPILATION)
+  const [deliveryType,    setDeliveryType]    = useState<"OPEN_DATA"|"ONE_OFF"|"">(
+    (caseData.foiDeliveryType as "OPEN_DATA"|"ONE_OFF") ?? ""
+  );
+  const [datasetName,     setDatasetName]     = useState("");
+  const [datasetDesc,     setDatasetDesc]     = useState("");
+
   const loadMappingData = useCallback(async () => {
     setLoadingMap(true);
     try {
@@ -856,10 +863,73 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                   <p className="text-xs text-amber-800"><strong>{qualityFlagged.length} column(s) flagged</strong> with DQ issues. Document in officer notes before advancing.</p>
                 </div>
               )}
+
+              {/* ── Delivery type choice ── */}
+              <div className="border border-line rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-ink">How should this data be delivered?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setDeliveryType("OPEN_DATA")}
+                    className={`text-left p-3 rounded-xl border-2 transition-colors ${
+                      deliveryType === "OPEN_DATA"
+                        ? "border-brand-purple bg-brand-purple/5"
+                        : "border-line hover:border-brand-purple/40"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-ink">Publish as Open Data</p>
+                    <p className="text-[11px] text-muted mt-1">
+                      Creates a publishable open dataset. Recommended when the requested information is commonly useful and has long-term value. Goes through the full Open Data approval workflow.
+                    </p>
+                    {deliveryType === "OPEN_DATA" && (
+                      <span className="mt-2 inline-block text-[10px] font-bold text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-full">Selected</span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setDeliveryType("ONE_OFF")}
+                    className={`text-left p-3 rounded-xl border-2 transition-colors ${
+                      deliveryType === "ONE_OFF"
+                        ? "border-teal-600 bg-teal-50"
+                        : "border-line hover:border-teal-400/40"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-ink">One-off Delivery</p>
+                    <p className="text-[11px] text-muted mt-1">
+                      Creates a reference record under <strong>FOI One-off Records</strong> — not published to the open data portal. Retained for audit and traceability with a link back to this FOI request.
+                    </p>
+                    {deliveryType === "ONE_OFF" && (
+                      <span className="mt-2 inline-block text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">Selected</span>
+                    )}
+                  </button>
+                </div>
+
+                {deliveryType && (
+                  <div className="space-y-2 pt-1">
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted uppercase mb-1">
+                        Dataset Name <span className="font-normal text-muted">(optional — defaults to FOI reference + subject)</span>
+                      </label>
+                      <input className="input w-full text-sm" placeholder={`${caseData.referenceCode}: ${caseData.subjectText}`}
+                        value={datasetName} onChange={e => setDatasetName(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted uppercase mb-1">
+                        Description <span className="font-normal text-muted">(optional override)</span>
+                      </label>
+                      <textarea className="input w-full text-sm h-16 resize-none" placeholder="Auto-generated if left empty…"
+                        value={datasetDesc} onChange={e => setDatasetDesc(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {advErr && <p className="text-sm text-red-600">{advErr}</p>}
               <div className="flex justify-end pt-1">
-                <button onClick={() => advance()} disabled={advancing} className="btn btn-primary btn-sm">
-                  {advancing ? "…" : "Proceed → Create Open Data Dataset"}
+                <button
+                  onClick={() => advance({ deliveryType, datasetName: datasetName || undefined, datasetDescription: datasetDesc || undefined })}
+                  disabled={advancing || !deliveryType}
+                  className="btn btn-primary btn-sm"
+                >
+                  {advancing ? "…" : deliveryType === "ONE_OFF" ? "Create Record & Advance →" : "Create Open Dataset & Advance →"}
                 </button>
               </div>
             </>
@@ -871,13 +941,29 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {inFulfillment && stage !== "SOURCE_MAPPING" && stage !== "CLASSIFICATION_GATE" && stage !== "QUALITY_GATE" && stage !== "DELIVERY" && (
         <div className="card p-5 space-y-3">
           {stage === "TECHNICAL_COMPILATION" && caseData.linkedOpenDatasetId && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-800">
-              Open Data dataset{" "}
-              <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-semibold">
-                #{caseData.linkedOpenDatasetId}
-              </a>{" "}
-              auto-created from this request&apos;s catalog mappings. Publish it after compilation.
-            </div>
+            caseData.foiDeliveryType === "ONE_OFF" ? (
+              <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 space-y-1">
+                <p className="text-sm font-semibold text-teal-800">One-off Delivery Record created</p>
+                <p className="text-xs text-teal-700">
+                  Reference record{" "}
+                  <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-medium">
+                    #{caseData.linkedOpenDatasetId}
+                  </a>{" "}
+                  created under <strong>FOI One-off Records</strong> — retained for audit and traceability, not published to the open data portal.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 space-y-1">
+                <p className="text-sm font-semibold text-blue-800">Open Data dataset created</p>
+                <p className="text-xs text-blue-700">
+                  Dataset{" "}
+                  <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-semibold">
+                    #{caseData.linkedOpenDatasetId}
+                  </a>{" "}
+                  created from this FOI request&apos;s column mappings. Complete compilation then publish through the Open Data workflow.
+                </p>
+              </div>
+            )
           )}
           {advErr && <p className="text-sm text-red-600">{advErr}</p>}
           <div className="flex justify-end">
@@ -920,11 +1006,19 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {/* ── DELIVERED ── */}
       {caseData.statusCode === "DELIVERED" && (
         <div className="card p-5 bg-green-50 border border-green-200 space-y-2">
-          <h2 className="font-semibold text-sm text-green-800">✓ Case Delivered &amp; Closed</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-sm text-green-800">✓ Case Delivered &amp; Closed</h2>
+            {caseData.foiDeliveryType === "ONE_OFF" && (
+              <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">One-off Delivery</span>
+            )}
+            {caseData.foiDeliveryType === "OPEN_DATA" && (
+              <span className="text-[10px] font-bold bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded-full">Open Data</span>
+            )}
+          </div>
           <p className="text-xs text-green-700">Delivery reference: <span className="font-mono">{caseData.deliveryReference}</span></p>
           {caseData.linkedOpenDatasetId && (
             <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="text-xs text-brand-purple hover:underline block">
-              → View Open Data dataset #{caseData.linkedOpenDatasetId}
+              → {caseData.foiDeliveryType === "ONE_OFF" ? "View one-off record" : "View Open Data dataset"} #{caseData.linkedOpenDatasetId}
             </a>
           )}
         </div>

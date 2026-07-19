@@ -189,42 +189,95 @@ export async function PATCH(req: Request, { params }: Ctx) {
         }
       }
 
-      // At QUALITY_GATE → TECHNICAL_COMPILATION: auto-create open dataset from CATALOG mappings
+      // At QUALITY_GATE → TECHNICAL_COMPILATION: officer must choose delivery type
       if (currentStage === 'QUALITY_GATE') {
+        const deliveryType: string = body.deliveryType;
+        if (!['OPEN_DATA','ONE_OFF'].includes(deliveryType)) {
+          return NextResponse.json({ error: "deliveryType is required: OPEN_DATA or ONE_OFF" }, { status: 400 });
+        }
+
         const [foiRow] = await sql`
           SELECT r.reference_code, r.subject_text, r.domain_code, r.linked_open_dataset_id
           FROM bayanat.foi_requests r WHERE r.foi_request_id = ${id}
         `;
+
+        // Save delivery type on the FOI request
+        await sql`
+          UPDATE bayanat.foi_requests SET foi_delivery_type = ${deliveryType}, updated_at = NOW()
+          WHERE foi_request_id = ${id}
+        `;
+
         if (!foiRow.linked_open_dataset_id) {
-          const catalogMappings = await sql`
-            SELECT m.data_attribute_id, COALESCE(da.friendly_name_text, da.physical_name_text) AS col_name, m.officer_notes,
-                   ROW_NUMBER() OVER (ORDER BY m.mapping_id) AS rn
+          // Fetch ALL mappings (CATALOG + MANUAL), ordered by mapping_id
+          const allMappings = await sql`
+            SELECT
+              m.mapping_id,
+              m.source_type,
+              m.data_attribute_id,
+              COALESCE(da.friendly_name_text, da.physical_name_text)  AS catalog_col_name,
+              m.manual_system_name,
+              m.manual_entity_name,
+              m.manual_column_name,
+              m.officer_notes,
+              ROW_NUMBER() OVER (ORDER BY m.mapping_id) AS rn
             FROM bayanat.foi_attribute_mappings m
-            JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
-            WHERE m.foi_request_id = ${id} AND m.source_type = 'CATALOG' AND m.data_attribute_id IS NOT NULL
+            LEFT JOIN bayanat.data_attributes da ON da.attribute_id = m.data_attribute_id
+            WHERE m.foi_request_id = ${id}
+            ORDER BY m.mapping_id
           `;
-          if (catalogMappings.length > 0) {
+
+          if (allMappings.length > 0) {
+            // Category 101 = "FOI One-off Records" (from migration 057)
+            const categoryId = deliveryType === 'ONE_OFF' ? 101 : null;
+            const purposeText = deliveryType === 'ONE_OFF'
+              ? 'One-off FOI delivery — for record and audit purposes only; not published to open data portal'
+              : 'Open dataset created from FOI request — available for public reuse';
+            const datasetName = (body.datasetName?.trim()) || (foiRow.reference_code + ': ' + foiRow.subject_text);
+            const datasetDesc  = (body.datasetDescription?.trim()) || (
+              deliveryType === 'ONE_OFF'
+                ? `One-off data delivery for FOI request ${foiRow.reference_code}: "${foiRow.subject_text}". Retained for audit and traceability; not published to the open data portal.`
+                : `Open dataset created from Freedom of Information request ${foiRow.reference_code}: "${foiRow.subject_text}".`
+            );
+
             const [ds] = await sql`
               INSERT INTO bayanat.open_datasets
-                (dataset_name_text, description_text, domain_code, purpose_text, status_code, raised_by_user_id)
+                (dataset_name_text, description_text, domain_code, purpose_text,
+                 category_id, foi_request_id, status_code, raised_by_user_id)
               VALUES (
-                ${foiRow.reference_code + ': ' + foiRow.subject_text},
-                ${'Open dataset created from Freedom of Information request ' + foiRow.reference_code},
+                ${datasetName},
+                ${datasetDesc},
                 ${foiRow.domain_code ?? null},
-                'FOI Fulfillment',
+                ${purposeText},
+                ${categoryId},
+                ${id},
                 'DRAFT',
                 ${session.userId}
               )
               RETURNING dataset_id AS "datasetId"
             `;
-            for (const cm of catalogMappings) {
-              await sql`
-                INSERT INTO bayanat.open_dataset_columns
-                  (dataset_id, attribute_id, publish_name, publish_desc, sort_order)
-                VALUES (${ds.datasetId}, ${cm.data_attribute_id}, ${cm.col_name}, ${cm.officer_notes ?? null}, ${Number(cm.rn)})
-                ON CONFLICT (dataset_id, attribute_id) DO NOTHING
-              `;
+
+            let sortOrder = 1;
+            for (const m of allMappings) {
+              if (m.source_type === 'CATALOG' && m.data_attribute_id) {
+                // Catalog-mapped column: link by attribute_id
+                await sql`
+                  INSERT INTO bayanat.open_dataset_columns
+                    (dataset_id, attribute_id, publish_name, publish_desc, sort_order)
+                  VALUES (${ds.datasetId}, ${m.data_attribute_id}, ${m.catalog_col_name}, ${m.officer_notes ?? null}, ${sortOrder})
+                  ON CONFLICT DO NOTHING
+                `;
+              } else {
+                // Manual source: store description text, no attribute_id
+                const manualLabel = [m.manual_system_name, m.manual_entity_name, m.manual_column_name].filter(Boolean).join(' › ');
+                await sql`
+                  INSERT INTO bayanat.open_dataset_columns
+                    (dataset_id, attribute_id, manual_source_text, publish_name, publish_desc, sort_order)
+                  VALUES (${ds.datasetId}, NULL, ${manualLabel || 'Manual source'}, ${m.manual_column_name ?? 'Column'}, ${m.officer_notes ?? null}, ${sortOrder})
+                `;
+              }
+              sortOrder++;
             }
+
             await sql`
               UPDATE bayanat.foi_requests SET linked_open_dataset_id = ${ds.datasetId}, updated_at = NOW()
               WHERE foi_request_id = ${id}
