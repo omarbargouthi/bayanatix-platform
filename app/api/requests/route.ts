@@ -70,7 +70,7 @@ export async function GET(req: Request) {
     ${mine === "raised" ? sql`AND ar.raised_by_user_id = ${session.userId}` : sql``}
     ${mine === "owned" ? sql`AND ar.status_code IN ('OPEN','IN_PROGRESS')` : sql``}
     ${status ? sql`AND ar.status_code = ${status}` : sql``}
-    ORDER BY ar.created_at DESC
+    ORDER BY "createdAt" DESC
   `;
 
   if (rows.length === 0) return NextResponse.json([]);

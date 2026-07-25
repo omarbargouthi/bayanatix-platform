@@ -6,6 +6,7 @@ import type {
   OpenDataset, OpenDataColumn, OpenDataDqIssue,
   OpenDataFormat, OpenDataRefresh, OpenDataStatus,
 } from "@/lib/types";
+import type { OpenDataWorkflowProgress } from "@/lib/queries/open-data";
 import { ColumnPickerPanel } from "./ColumnPickerPanel";
 import { useLang } from "@/lib/lang-context";
 
@@ -20,6 +21,7 @@ type Props = {
   canEdit: boolean;
   userId: string;
   userRole: string;
+  workflowProgress: OpenDataWorkflowProgress | null;
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -165,6 +167,7 @@ export function OpenDataEditor({
   canEdit,
   userId: _userId,
   userRole,
+  workflowProgress,
 }: Props) {
   const router = useRouter();
   const { t, lang } = useLang();
@@ -750,25 +753,35 @@ export function OpenDataEditor({
             subtitle={t.openData.sectionApprovalSub}
           />
 
-          {/* Workflow stages diagram */}
+          {/* Workflow stages diagram — key must match bayanat.workflow_stages.stage_name_text (English, DB-stable) regardless of UI language */}
           <div className="grid grid-cols-4 gap-3">
-            {[
-              { stage: 1, name: t.openData.stageStewardReview, role: t.openData.roleSteward,  sla: "3 days", active: status === "PENDING_APPROVAL" },
-              { stage: 2, name: t.openData.stageOwnerApproval, role: t.openData.roleOwner,    sla: "5 days", active: false },
-              { stage: 3, name: t.openData.stagePrivacyReview, role: t.openData.rolePrivacy,  sla: "3 days", note: hasPii ? undefined : t.openData.skippedNoPii, active: false },
-              { stage: 4, name: t.openData.stageDmoSignoff,    role: t.openData.roleDmo,      sla: "3 days", active: false },
-            ].map((s) => (
-              <div
-                key={s.stage}
-                className={`rounded-xl border p-4 ${s.active ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}
-              >
-                <div className="text-xs font-semibold text-slate-400 mb-1">Stage {s.stage}</div>
-                <div className="font-medium text-sm text-slate-800">{s.name}</div>
-                <div className="text-xs text-slate-500 mt-1">{s.role}</div>
-                <div className="text-xs text-slate-400 mt-0.5">SLA: {s.sla}</div>
-                {s.note && <div className="text-xs text-slate-400 mt-1 italic">{s.note}</div>}
-              </div>
-            ))}
+            {([
+              { stage: 1, key: "Steward Review", name: t.openData.stageStewardReview, role: t.openData.roleSteward,  sla: "3 days" },
+              { stage: 2, key: "Owner Approval", name: t.openData.stageOwnerApproval, role: t.openData.roleOwner,    sla: "5 days" },
+              { stage: 3, key: "Privacy Review", name: t.openData.stagePrivacyReview, role: t.openData.rolePrivacy,  sla: "3 days", note: hasPii ? undefined : t.openData.skippedNoPii },
+              { stage: 4, key: "DMO Sign-off",   name: t.openData.stageDmoSignoff,    role: t.openData.roleDmo,      sla: "3 days" },
+            ] as const).map((s) => {
+              const done   = workflowProgress?.completedStageNames.includes(s.key) ?? false;
+              const active = workflowProgress?.currentStageName === s.key;
+              return (
+                <div
+                  key={s.stage}
+                  className={`rounded-xl border p-4 ${
+                    done   ? "border-green-200 bg-green-50" :
+                    active ? "border-amber-200 bg-amber-50" :
+                             "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-slate-400 mb-1">
+                    Stage {s.stage}{done && <span className="text-green-600 ml-1">✓</span>}
+                  </div>
+                  <div className="font-medium text-sm text-slate-800">{s.name}</div>
+                  <div className="text-xs text-slate-500 mt-1">{s.role}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">SLA: {s.sla}</div>
+                  {s.note && <div className="text-xs text-slate-400 mt-1 italic">{s.note}</div>}
+                </div>
+              );
+            })}
           </div>
 
           {/* Current status panel */}

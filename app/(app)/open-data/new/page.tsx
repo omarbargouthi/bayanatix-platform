@@ -35,6 +35,7 @@ export default async function NewOpenDataPage() {
           initialColumns={[]}
           initialDqIssues={[]}
           dimensions={dimensions}
+          workflowProgress={null}
           canEdit={true}
           userId={user.userId}
           userRole={user.role}

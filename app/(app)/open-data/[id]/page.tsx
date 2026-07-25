@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { getOpenDataset, getDatasetColumns, getDatasetDqIssues } from "@/lib/queries/open-data";
+import { getOpenDataset, getDatasetColumns, getDatasetDqIssues, getOpenDatasetWorkflowProgress } from "@/lib/queries/open-data";
 import { OpenDataEditor } from "@/components/open-data/OpenDataEditor";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
   if (!user) redirect("/login");
 
   const datasetId = Number(params.id);
-  const [dataset, columns, dqIssues, dimensions] = await Promise.all([
+  const [dataset, columns, dqIssues, dimensions, workflowProgress] = await Promise.all([
     getOpenDataset(datasetId),
     getDatasetColumns(datasetId),
     getDatasetDqIssues(datasetId),
@@ -20,6 +20,7 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
       SELECT dimension_code AS code, dimension_name_text AS name
       FROM bayanat.dq_dimensions ORDER BY dimension_code
     `,
+    getOpenDatasetWorkflowProgress(datasetId),
   ]);
 
   if (!dataset) notFound();
@@ -47,6 +48,7 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
           initialColumns={columns}
           initialDqIssues={dqIssues}
           dimensions={dimensions}
+          workflowProgress={workflowProgress}
           canEdit={canEdit}
           userId={user.userId}
           userRole={user.role}

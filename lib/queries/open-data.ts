@@ -229,3 +229,45 @@ export async function getDatasetDqIssues(datasetId: number): Promise<OpenDataDqI
     attributeId: r.attributeId != null ? Number(r.attributeId) : null,
   }));
 }
+
+// ── Workflow progress (for the approval stage cards) ───────────────────────────
+
+export type OpenDataWorkflowProgress = {
+  currentStageName:    string | null;
+  completedStageNames: string[];
+  workflowStatus:      string | null;
+};
+
+export async function getOpenDatasetWorkflowProgress(datasetId: number): Promise<OpenDataWorkflowProgress | null> {
+  const [req] = await sql<{ requestId: number }[]>`
+    SELECT art.request_id AS "requestId"
+    FROM bayanat.asset_request_targets art
+    JOIN bayanat.asset_requests ar ON ar.request_id = art.request_id
+    WHERE art.asset_type_code = 'OPEN_DATASET' AND art.asset_id = ${datasetId}
+      AND ar.request_type_code IN ('PUBLISH_OPEN_DATA', 'PUBLISH_OPEN_DATA_PI')
+    ORDER BY art.request_id DESC LIMIT 1
+  `;
+  if (!req) return null;
+
+  const [inst] = await sql<{ instanceId: number; status: string; currentStageName: string | null }[]>`
+    SELECT wi.instance_id AS "instanceId", wi.status_code AS "status", ws.stage_name_text AS "currentStageName"
+    FROM bayanat.workflow_instances wi
+    LEFT JOIN bayanat.workflow_stages ws ON ws.stage_id = wi.current_stage_id
+    WHERE wi.request_id = ${req.requestId}
+    ORDER BY wi.instance_id DESC LIMIT 1
+  `;
+  if (!inst) return null;
+
+  const completed = await sql<{ stageName: string }[]>`
+    SELECT DISTINCT ws.stage_name_text AS "stageName"
+    FROM bayanat.workflow_stage_history h
+    JOIN bayanat.workflow_stages ws ON ws.stage_id = h.stage_id
+    WHERE h.instance_id = ${inst.instanceId} AND h.completed_at IS NOT NULL
+  `;
+
+  return {
+    currentStageName:    inst.currentStageName,
+    completedStageNames: completed.map((c) => c.stageName),
+    workflowStatus:      inst.status,
+  };
+}

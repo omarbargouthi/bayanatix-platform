@@ -177,6 +177,25 @@ export async function startWorkflow(requestId: number, requestTypeCode: string, 
   await enterStage(inst.instanceId, first, requestId, requestTitle);
 }
 
+// When a workflow completes, some request types need their target asset's own
+// status updated — the workflow engine only tracks asset_requests/workflow_instances
+// and has no generic way to know what "approved" means for an arbitrary asset type.
+async function finalizeTargetAsset(requestId: number, requestTypeCode: string, approved: boolean): Promise<void> {
+  if (requestTypeCode !== "PUBLISH_OPEN_DATA" && requestTypeCode !== "PUBLISH_OPEN_DATA_PI") return;
+
+  const [target] = await sql<{ assetId: number }[]>`
+    SELECT asset_id AS "assetId" FROM bayanat.asset_request_targets
+    WHERE request_id = ${requestId} AND asset_type_code = 'OPEN_DATASET' LIMIT 1
+  `;
+  if (!target) return;
+
+  await sql`
+    UPDATE bayanat.open_datasets
+    SET status_code = ${approved ? "APPROVED" : "REJECTED"}, updated_at = NOW()
+    WHERE dataset_id = ${target.assetId}
+  `;
+}
+
 export async function advanceWorkflow(
   requestId:    number,
   actorUserId:  string,
@@ -185,15 +204,17 @@ export async function advanceWorkflow(
   notes?:       string,
 ): Promise<{ done: boolean; nextStageName?: string }> {
   const [inst] = await sql<{
-    instanceId: number; workflowId: number; currentStageId: number; stageOrder: number; isFinal: boolean;
+    instanceId: number; workflowId: number; currentStageId: number; stageOrder: number; isFinal: boolean; requestTypeCode: string;
   }[]>`
     SELECT wi.instance_id        AS "instanceId",
            wi.workflow_id        AS "workflowId",
            wi.current_stage_id   AS "currentStageId",
            ws.stage_order        AS "stageOrder",
-           ws.is_final           AS "isFinal"
+           ws.is_final           AS "isFinal",
+           ar.request_type_code  AS "requestTypeCode"
     FROM bayanat.workflow_instances wi
     JOIN bayanat.workflow_stages ws ON ws.stage_id = wi.current_stage_id
+    JOIN bayanat.asset_requests ar ON ar.request_id = wi.request_id
     WHERE wi.request_id = ${requestId} AND wi.status_code = 'ACTIVE'
   `;
   if (!inst) throw new Error("No active workflow for this request");
@@ -210,6 +231,7 @@ export async function advanceWorkflow(
   if (inst.isFinal || outcome === "REJECTED") {
     await sql`UPDATE bayanat.workflow_instances SET status_code='COMPLETED', completed_at=NOW(), current_stage_id=NULL WHERE instance_id=${inst.instanceId}`;
     await sql`UPDATE bayanat.asset_requests SET status_code=${finalStatus}, updated_at=NOW() WHERE request_id=${requestId}`;
+    await finalizeTargetAsset(requestId, inst.requestTypeCode, finalStatus === "RESOLVED");
     return { done: true };
   }
 
@@ -222,6 +244,7 @@ export async function advanceWorkflow(
   if (!next) {
     await sql`UPDATE bayanat.workflow_instances SET status_code='COMPLETED', completed_at=NOW(), current_stage_id=NULL WHERE instance_id=${inst.instanceId}`;
     await sql`UPDATE bayanat.asset_requests SET status_code='RESOLVED', updated_at=NOW() WHERE request_id=${requestId}`;
+    await finalizeTargetAsset(requestId, inst.requestTypeCode, true);
     return { done: true };
   }
 
