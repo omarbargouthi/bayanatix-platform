@@ -43,6 +43,17 @@ export function computeApprovalStations(opts: {
   return stations;
 }
 
+// Maps a DSA's current status to the approval station that is actively awaiting a decision.
+// A station's dsa_approvals row can stay PENDING forever even after the workflow has moved
+// past it (when it wasn't required, e.g. no Privacy Review), so this — not station_order —
+// is the source of truth for which station is currently actionable.
+export const STATUS_TO_STATION: Record<string, string> = {
+  OWNER_REVIEW:   "DATA_OWNER",
+  PRIVACY_REVIEW: "DATA_PRIVACY",
+  DMO_REVIEW:     "DMO_REVIEW",
+  EXEC_APPROVAL:  "EXEC_DELEGATE",
+};
+
 export function nextStatusAfterApproval(
   currentStatus: string,
   decisionCode: "APPROVED" | "REJECTED" | "RETURNED",

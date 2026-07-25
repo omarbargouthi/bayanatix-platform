@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { DsaDataset, DsaAttribute } from "@/lib/queries/sharing";
+import type { ColumnDqRule } from "@/app/api/open-data/column-dq/route";
 
 type Entity       = { entityId: number; entityName: string; schemaName: string; sourceName: string };
 type ClassTerm    = { glossaryId: number; termName: string; classCode: string };
@@ -11,6 +12,33 @@ const TREATMENT_LABELS: Record<string,string> = {
   AS_IS:"As-Is", MASKED:"Masked", ANONYMIZED:"Anonymized",
   PSEUDONYMIZED:"Pseudonymized", AGGREGATED:"Aggregated",
 };
+
+function DqScoreBadge({ score }: { score: number | null }) {
+  if (score == null) return <span className="text-[11px] text-slate-400">—</span>;
+  const pct   = Math.round(score);
+  const color = pct >= 80
+    ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+    : pct >= 50
+    ? "text-amber-600 bg-amber-50 border-amber-200"
+    : "text-red-600 bg-red-50 border-red-200";
+  return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${color}`}>{pct}%</span>;
+}
+
+function RuleStatusBadge({ status, score }: { status: string | null; score: number | null }) {
+  if (!status) return <span className="text-[10px] text-slate-400">Not run</span>;
+  const cfg = status === "PASSED"
+    ? { bg: "bg-emerald-50 text-emerald-700", icon: "✓" }
+    : status === "FAILED"
+    ? { bg: "bg-red-50 text-red-600",     icon: "✗" }
+    : { bg: "bg-slate-100 text-slate-500",  icon: "!" };
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${cfg.bg}`}>
+      <span>{cfg.icon}</span>
+      {status}
+      {score != null && <span className="opacity-70">({Math.round(score)}%)</span>}
+    </span>
+  );
+}
 
 const CLASS_COLORS: Record<string,string> = {
   PUBLIC:"bg-green-100 text-green-700", INTERNAL:"bg-blue-100 text-blue-700",
@@ -42,6 +70,22 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
   const [classTerms,      setClassTerms]      = useState<ClassTerm[] | null>(null);
   const [classifyingAttr, setClassifyingAttr] = useState<number | null>(null); // attrId being classified
   const [classifyBusy,    setClassifyBusy]    = useState(false);
+
+  // DQ rules per attribute (attributeId → rules), fetched lazily — same source as Open Data
+  const [dqRules,      setDqRules]      = useState<Record<number, ColumnDqRule[]>>({});
+  const [dqLoading,    setDqLoading]    = useState<Record<number, boolean>>({});
+
+  async function fetchDqRules(attributeId: number) {
+    if (dqRules[attributeId] !== undefined) return;
+    setDqLoading(p => ({ ...p, [attributeId]: true }));
+    try {
+      const r = await fetch(`/api/open-data/column-dq?attributeId=${attributeId}`);
+      const data = await r.json();
+      setDqRules(p => ({ ...p, [attributeId]: Array.isArray(data) ? data : [] }));
+    } finally {
+      setDqLoading(p => ({ ...p, [attributeId]: false }));
+    }
+  }
 
   // Outbound picker modal
   const [showPicker,     setShowPicker]     = useState(false);
@@ -207,10 +251,12 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
     const effectiveClass = attr.classificationCodeSnapshot ?? attr.liveClassCode;
     const unclassified   = !effectiveClass;
     const isClassifying  = classifyingAttr === attr.attributeId;
+    const rules          = dqRules[attr.attributeId];
+    const rulesLoading   = dqLoading[attr.attributeId];
 
     return (
       <div key={attr.dsaAttributeId} className="border-b border-line-soft last:border-0">
-        <div className="grid grid-cols-[1fr_130px_60px_120px] gap-2 px-5 py-2.5 items-center">
+        <div className="grid grid-cols-[1fr_130px_60px_100px_120px] gap-2 px-5 py-2.5 items-center">
           <div>
             <div className="text-sm font-medium text-ink">{attr.physicalName}</div>
             {attr.friendlyName && <div className="text-[11px] text-muted">{attr.friendlyName}</div>}
@@ -239,7 +285,38 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
           <div className="text-[11px] text-muted">
             {TREATMENT_LABELS[attr.treatmentCode] ?? attr.treatmentCode}
           </div>
+          <div className="flex items-center gap-1.5">
+            <DqScoreBadge score={attr.dqScore} />
+            {attr.dqRuleCount > 0 && (
+              <button
+                onClick={() => fetchDqRules(attr.attributeId)}
+                className="text-[10px] text-sky-600 hover:underline shrink-0"
+              >
+                {rules !== undefined ? "hide" : `${attr.dqRuleCount} rule${attr.dqRuleCount > 1 ? "s" : ""} ↓`}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* DQ rules panel */}
+        {rulesLoading && (
+          <div className="mx-5 mb-2 text-[11px] text-slate-400 animate-pulse">Loading DQ rules…</div>
+        )}
+        {rules && rules.length > 0 && (
+          <div className="mx-5 mb-3 p-3 bg-sky-50/60 border border-sky-100 rounded-lg space-y-1.5">
+            {rules.map(rule => (
+              <div key={rule.ruleId} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-[11px] font-medium text-slate-700 truncate">{rule.ruleName}</span>
+                  {rule.dimensionName && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">{rule.dimensionName}</span>
+                  )}
+                </div>
+                <RuleStatusBadge status={rule.lastStatus} score={rule.lastScore} />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Inline classification panel */}
         {isClassifying && classTerms && (
@@ -330,11 +407,12 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
               <div className="p-4 text-muted text-sm italic">No attributes selected.</div>
             ) : (
               <div>
-                <div className="grid grid-cols-[1fr_130px_60px_120px] gap-2 px-5 py-2 bg-canvas-soft text-[10px] uppercase tracking-wider text-muted font-bold border-b border-line">
+                <div className="grid grid-cols-[1fr_130px_60px_100px_120px] gap-2 px-5 py-2 bg-canvas-soft text-[10px] uppercase tracking-wider text-muted font-bold border-b border-line">
                   <div>Attribute</div>
                   <div>Classification</div>
                   <div>PI</div>
                   <div>Treatment</div>
+                  <div>DQ</div>
                 </div>
                 {attrMap[ds.dsaDatasetId].map(attr => renderAttributeRow(attr, ds.dsaDatasetId))}
               </div>

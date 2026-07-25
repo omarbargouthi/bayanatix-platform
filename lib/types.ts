@@ -328,6 +328,7 @@ export type Notification = {
   actionLabel:    string | null;
   actionHref:     string | null;
   createdAt:      string;
+  actioned:       boolean;
 };
 
 // ── Collaboration ─────────────────────────────────────────────────────────────

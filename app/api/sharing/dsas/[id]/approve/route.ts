@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { nextStatusAfterApproval } from "@/lib/sharing-routing";
+import { nextStatusAfterApproval, STATUS_TO_STATION } from "@/lib/sharing-routing";
 
 type Ctx = { params: { id: string } };
 
@@ -20,7 +20,16 @@ export async function POST(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Comments required for rejection/return" }, { status: 400 });
   }
 
-  // Record the decision
+  const [dsaBefore] = await sql`SELECT status_code FROM bayanat.data_sharing_agreements WHERE dsa_id = ${dsaId}`;
+  if (!dsaBefore) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const activeStation = STATUS_TO_STATION[dsaBefore.status_code];
+  if (!activeStation) {
+    return NextResponse.json({ error: `No approval station is currently active (DSA status: ${dsaBefore.status_code}).` }, { status: 409 });
+  }
+
+  // Record the decision — only the station matching the DSA's current status may be decided,
+  // so approvals execute strictly in sequence like the Open Data workflow.
   const [updated] = await sql`
     UPDATE bayanat.dsa_approvals SET
       decision_code         = ${decision},
@@ -29,10 +38,13 @@ export async function POST(req: Request, { params }: Ctx) {
       comments_text         = ${comments || null},
       delegation_evidence_ref = ${delegationEvidenceRef || null}
     WHERE approval_id = ${approvalId} AND dsa_id = ${dsaId} AND decision_code = 'PENDING'
+      AND station_code = ${activeStation}
     RETURNING station_code AS "stationCode"
   `;
 
-  if (!updated) return NextResponse.json({ error: "Approval not found or already decided" }, { status: 404 });
+  if (!updated) {
+    return NextResponse.json({ error: "This approval station is not active yet — approvals must be decided in order." }, { status: 409 });
+  }
 
   // Compute next DSA status
   const [dsa] = await sql`SELECT status_code FROM bayanat.data_sharing_agreements WHERE dsa_id = ${dsaId}`;

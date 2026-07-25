@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { DsaApproval, DsaDetail } from "@/lib/queries/sharing";
-import { STATUS_LABELS } from "@/lib/sharing-routing";
+import { STATUS_LABELS, STATUS_TO_STATION } from "@/lib/sharing-routing";
 
 type Props = {
   dsaId:     number;
@@ -31,6 +31,7 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
   const [comments, setComments]   = useState("");
   const [delegRef, setDelegRef]   = useState("");
   const [saving,   setSaving]     = useState(false);
+  const [error,    setError]      = useState<string | null>(null);
 
   const inApproval = dsa && !["DRAFT","RENEWAL_DRAFT","APPROVED","ACTIVE","SUSPENDED","TERMINATED","EXPIRED"].includes(dsa.statusCode);
 
@@ -40,12 +41,19 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
       return;
     }
     setSaving(true);
-    await fetch(`/api/sharing/dsas/${dsaId}/approve`, {
+    setError(null);
+    const r = await fetch(`/api/sharing/dsas/${dsaId}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approvalId, decision, comments, delegationEvidenceRef: stationCode === "EXEC_DELEGATE" ? delegRef : undefined }),
     });
     setSaving(false);
+    if (!r.ok) {
+      const payload = await r.json().catch(() => ({}));
+      setError(payload.error ?? "Failed to record decision");
+      onChanged();
+      return;
+    }
     setDeciding(null);
     setComments("");
     setDelegRef("");
@@ -72,12 +80,19 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
         </p>
       </div>
 
-      {/* Timeline */}
+      {/* Timeline — stations execute sequentially: only the station matching the DSA's
+          current status is actionable, matching the Open Data approval workflow. A
+          non-required station's row can stay PENDING forever even after the workflow
+          has moved past it, so this — not "first PENDING in order" — is the source of
+          truth for which station is active. */}
+      {(() => {
+        const activeStation = dsa ? STATUS_TO_STATION[dsa.statusCode] : undefined;
+        return (
       <div className="relative">
         {approvals.map((ap, idx) => {
-          const isActive  = ap.decisionCode === "PENDING" && inApproval;
+          const isActive  = ap.decisionCode === "PENDING" && inApproval && ap.stationCode === activeStation;
           const isPast    = ap.decisionCode === "APPROVED";
-          const isFuture  = ap.decisionCode === "PENDING" && !inApproval;
+          const isFuture  = ap.decisionCode === "PENDING" && ap.stationCode !== activeStation;
 
           return (
             <div key={ap.approvalId} className="flex gap-4">
@@ -155,8 +170,9 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
                         />
                       </div>
                     )}
+                    {error && <p className="text-sm text-red-600">{error}</p>}
                     <div className="flex gap-2 justify-end">
-                      <button className="btn" onClick={() => setDeciding(null)}>Cancel</button>
+                      <button className="btn" onClick={() => { setDeciding(null); setError(null); }}>Cancel</button>
                       <button
                         className="btn btn-primary"
                         disabled={saving}
@@ -181,6 +197,8 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
           );
         })}
       </div>
+        );
+      })()}
 
       {/* SLA note */}
       <div className="text-[11px] text-muted border-t border-line pt-3">

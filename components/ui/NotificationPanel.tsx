@@ -157,8 +157,16 @@ export function NotificationPanel({ open, onClose }: Props) {
                 </div>
 
                 {/* Title */}
-                <div className={`text-[13px] leading-snug mb-1 ${!n.isRead ? "font-semibold text-ink" : "font-medium text-ink-soft"}`}>
-                  {n.title}
+                <div className={`flex items-center gap-1.5 text-[13px] leading-snug mb-1 ${!n.isRead ? "font-semibold text-ink" : "font-medium text-ink-soft"}`}>
+                  {n.actioned && (
+                    <span
+                      title="Action taken"
+                      className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold"
+                    >
+                      ✓
+                    </span>
+                  )}
+                  <span>{n.title}</span>
                 </div>
 
                 {/* Body */}
