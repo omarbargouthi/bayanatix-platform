@@ -278,7 +278,9 @@ export async function getDsaAttributes(dsaDatasetId: number): Promise<DsaAttribu
       ct.class_code                               AS "liveClassCode",
       COALESCE(bg.is_pii_indicator, false)        AS "liveIsPii",
       das.overall_score                           AS "dqScore",
-      COALESCE(das.rule_count, 0)::int            AS "dqRuleCount"
+      -- dq_attribute_scores is a periodically-computed cache that can lag or be empty;
+      -- count live from dq_rules so the affordance shows up even before scores are (re)run.
+      COALESCE(dqr.rule_count, 0)::int            AS "dqRuleCount"
     FROM bayanat.dsa_attributes da
     JOIN bayanat.data_attributes a ON a.attribute_id = da.attribute_id
     LEFT JOIN bayanat.asset_business_terms abt
@@ -286,6 +288,10 @@ export async function getDsaAttributes(dsaDatasetId: number): Promise<DsaAttribu
     LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     LEFT JOIN bayanat.classification_types ct ON ct.class_code = bg.classification_code
     LEFT JOIN bayanat.dq_attribute_scores das ON das.attribute_id = da.attribute_id
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) AS rule_count FROM bayanat.dq_rules r
+      WHERE r.asset_type_code = 'DATA_ATTRIBUTES' AND r.asset_id = da.attribute_id AND r.is_active_indicator = true
+    ) dqr ON true
     WHERE da.dsa_dataset_id = ${dsaDatasetId}
     ORDER BY a.physical_name_text
   `;

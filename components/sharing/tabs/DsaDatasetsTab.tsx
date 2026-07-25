@@ -13,8 +13,12 @@ const TREATMENT_LABELS: Record<string,string> = {
   PSEUDONYMIZED:"Pseudonymized", AGGREGATED:"Aggregated",
 };
 
-function DqScoreBadge({ score }: { score: number | null }) {
-  if (score == null) return <span className="text-[11px] text-slate-400">—</span>;
+function DqScoreBadge({ score, ruleCount }: { score: number | null; ruleCount: number }) {
+  if (score == null) {
+    return ruleCount > 0
+      ? <span className="text-[10px] text-slate-400 italic">Not scored</span>
+      : <span className="text-[11px] text-slate-400">—</span>;
+  }
   const pct   = Math.round(score);
   const color = pct >= 80
     ? "text-emerald-600 bg-emerald-50 border-emerald-200"
@@ -286,7 +290,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
             {TREATMENT_LABELS[attr.treatmentCode] ?? attr.treatmentCode}
           </div>
           <div className="flex items-center gap-1.5">
-            <DqScoreBadge score={attr.dqScore} />
+            <DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} />
             {attr.dqRuleCount > 0 && (
               <button
                 onClick={() => fetchDqRules(attr.attributeId)}
