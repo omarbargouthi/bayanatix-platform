@@ -11,6 +11,8 @@ type Conn = {
   crawlStatus: string; crawlErrorText: string | null;
   crawledSchemaCount: number; crawledTableCount: number; crawledColumnCount: number;
   lastDiscoveryTimestamp: string | null; createdAtTimestamp: string;
+  lineageEnabled: boolean; lineageScanViews: boolean; lineageScanMatviews: boolean;
+  lineageScanProcedures: boolean; lineageScanFunctions: boolean;
 };
 
 type CrawlJob = {
@@ -40,6 +42,22 @@ const DB_TYPES = [
 
 const DB_ICON: Record<string, string> = {
   POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶",
+};
+
+// Database types the crawler can actually connect to (ORACLE has no working driver yet).
+const LINEAGE_APPLICABLE_TYPES = ["POSTGRES", "MYSQL", "MSSQL"];
+// Database types the lineage scan *engine* currently supports end-to-end (AST parsing
+// via libpg-query + pg_get_viewdef/pg_get_functiondef are Postgres-specific). MySQL/SQL
+// Server show the configuration section as a placeholder for a future scanner.
+const LINEAGE_SCANNER_IMPLEMENTED = ["POSTGRES"];
+
+type LineageCfg = {
+  lineageEnabled: boolean; lineageScanViews: boolean; lineageScanMatviews: boolean;
+  lineageScanProcedures: boolean; lineageScanFunctions: boolean;
+};
+const BLANK_LINEAGE_CFG: LineageCfg = {
+  lineageEnabled: false, lineageScanViews: true, lineageScanMatviews: true,
+  lineageScanProcedures: true, lineageScanFunctions: true,
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -87,6 +105,13 @@ export default function DataSourcesPage() {
   const [cfgIncludes, setCfgIncludes] = useState("");
   const [cfgExcludes, setCfgExcludes] = useState("");
   const [cfgPatterns, setCfgPatterns] = useState("");
+
+  // Lineage scan config state
+  const [lineageCfg, setLineageCfg]     = useState<LineageCfg>({ ...BLANK_LINEAGE_CFG });
+  const [lineageSaving, setLineageSaving] = useState(false);
+  const [lineageSaved, setLineageSaved] = useState(false);
+  const [scanning, setScanning]         = useState(false);
+  const [scanResult, setScanResult]     = useState<{ ok: boolean; message: string } | null>(null);
 
   // Governance default user picker state (per field)
   const [govSearch, setGovSearch]     = useState<Record<string, string>>({});
@@ -190,6 +215,22 @@ export default function DataSourcesPage() {
       loadJobs(selected.connectionId);
       setJobLogs(new Map());
       setExpandedJobId(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.connectionId]);
+
+  // Sync lineage config form from the selected connection (only when switching connections,
+  // not on every poll refresh of `selected`, so in-progress edits aren't clobbered).
+  useEffect(() => {
+    if (selected) {
+      setLineageCfg({
+        lineageEnabled: selected.lineageEnabled,
+        lineageScanViews: selected.lineageScanViews,
+        lineageScanMatviews: selected.lineageScanMatviews,
+        lineageScanProcedures: selected.lineageScanProcedures,
+        lineageScanFunctions: selected.lineageScanFunctions,
+      });
+      setScanResult(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.connectionId]);
@@ -299,6 +340,40 @@ export default function DataSourcesPage() {
     const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
     setSelected(fresh);
     setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+  }
+
+  async function handleSaveLineageCfg() {
+    if (!selected) return;
+    setLineageSaving(true);
+    try {
+      const r = await fetch(`/api/admin/sources/${selected.connectionId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lineageCfg),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+      const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
+      setSelected(fresh);
+      setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
+      setLineageSaved(true);
+      setTimeout(() => setLineageSaved(false), 2000);
+    } finally { setLineageSaving(false); }
+  }
+
+  async function handleRunLineageScan() {
+    if (!selected) return;
+    setScanning(true); setScanResult(null);
+    try {
+      const r = await fetch("/api/lineage/scan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId: selected.connectionId }),
+      });
+      const data = await r.json();
+      setScanResult(r.ok
+        ? { ok: true, message: `Scan started (run #${data.scanRunId}). View results in the Data Lineage graph or catalog table pages.` }
+        : { ok: false, message: data.error || "Scan failed" });
+    } catch (e) {
+      setScanResult({ ok: false, message: (e as Error).message });
+    } finally { setScanning(false); }
   }
 
   async function handleDelete() {
@@ -552,6 +627,77 @@ export default function DataSourcesPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Data Lineage */}
+                {LINEAGE_APPLICABLE_TYPES.includes(selected.dbTypeCode) && (
+                  <div className="bg-white border border-line rounded-xl p-6">
+                    <h3 className="text-sm font-semibold text-ink mb-1">Data Lineage</h3>
+                    <p className="text-xs text-muted mb-5">
+                      Scan views, materialized views, procedures, and functions to automatically discover column-level data lineage for this source.
+                    </p>
+
+                    {!LINEAGE_SCANNER_IMPLEMENTED.includes(selected.dbTypeCode) && (
+                      <div className="mb-4 rounded-lg px-4 py-2.5 text-xs bg-amber-50 text-amber-800 border border-amber-200">
+                        Lineage scanning for {DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode} is not implemented yet — the scanner currently supports PostgreSQL only. This section is shown as a preview of the upcoming capability.
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <button type="button"
+                          disabled={!LINEAGE_SCANNER_IMPLEMENTED.includes(selected.dbTypeCode)}
+                          onClick={() => setLineageCfg(c => ({ ...c, lineageEnabled: !c.lineageEnabled }))}
+                          className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-40 ${lineageCfg.lineageEnabled ? "bg-brand-purple" : "bg-gray-300"}`}>
+                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${lineageCfg.lineageEnabled ? "left-5" : "left-0.5"}`} />
+                        </button>
+                        <label className="text-sm text-ink font-medium">Enable Lineage Scanning</label>
+                      </div>
+
+                      {lineageCfg.lineageEnabled && (
+                        <div className="pl-13 space-y-2">
+                          <div className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Object Types to Scan</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {([
+                              { label: "Views",               field: "lineageScanViews"      as keyof LineageCfg },
+                              { label: "Materialized Views",   field: "lineageScanMatviews"   as keyof LineageCfg },
+                              { label: "Procedures",           field: "lineageScanProcedures" as keyof LineageCfg },
+                              { label: "Functions",            field: "lineageScanFunctions"  as keyof LineageCfg },
+                            ]).map(({ label, field }) => (
+                              <label key={field} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                                <input type="checkbox" className="w-4 h-4 accent-brand-purple"
+                                  checked={lineageCfg[field]}
+                                  onChange={e => setLineageCfg(c => ({ ...c, [field]: e.target.checked }))} />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 pt-1">
+                        <button onClick={handleSaveLineageCfg} disabled={lineageSaving} className="btn btn-primary btn-sm">
+                          {lineageSaving ? "Saving…" : "Save Lineage Settings"}
+                        </button>
+                        {lineageSaved && <span className="text-xs text-green-700 font-semibold">✓ Saved</span>}
+                        {lineageCfg.lineageEnabled && LINEAGE_SCANNER_IMPLEMENTED.includes(selected.dbTypeCode) && (
+                          <button onClick={handleRunLineageScan} disabled={scanning || selected.crawledTableCount === 0}
+                            title={selected.crawledTableCount === 0 ? "Crawl this source at least once first" : undefined}
+                            className="px-4 py-2 text-sm font-semibold border border-brand-purple text-brand-purple rounded-lg hover:bg-brand-purple hover:text-white disabled:opacity-50 transition-colors flex items-center gap-2">
+                            {scanning && <span className="w-3 h-3 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />}
+                            {scanning ? "Scanning…" : "Run Lineage Scan"}
+                          </button>
+                        )}
+                      </div>
+
+                      {scanResult && (
+                        <div className={`rounded-lg px-4 py-3 text-sm flex items-start gap-2 ${scanResult.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+                          <span className="text-base">{scanResult.ok ? "✓" : "✗"}</span>
+                          <span>{scanResult.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Test Connection */}
                 <div className="bg-white border border-line rounded-xl p-6">

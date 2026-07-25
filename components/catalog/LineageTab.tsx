@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { sql } from "@/lib/db";
 
 type LineageLink = {
@@ -77,6 +78,12 @@ export async function LineageTab({ entityId, entityName }: { entityId: number; e
         <p className="text-sm text-muted max-w-sm mx-auto">
           Lineage links between tables are built automatically when views are crawled, or can be added manually by a data steward.
         </p>
+        <Link
+          href={`/lineage?assetType=DATA_ENTITIES&assetId=${entityId}`}
+          className="mt-4 inline-block text-sm text-brand-purple hover:underline font-medium"
+        >
+          Open lineage graph →
+        </Link>
       </div>
     );
   }
@@ -85,7 +92,15 @@ export async function LineageTab({ entityId, entityName }: { entityId: number; e
     <div className="space-y-5">
       {/* Visual flow diagram */}
       <div className="card p-6">
-        <h3 className="font-bold text-sm mb-5">Data Flow</h3>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-sm">Data Flow</h3>
+          <Link
+            href={`/lineage?assetType=DATA_ENTITIES&assetId=${entityId}`}
+            className="text-xs text-brand-purple hover:underline font-medium"
+          >
+            View full lineage graph →
+          </Link>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Upstream sources */}
           {upstream.length > 0 && (

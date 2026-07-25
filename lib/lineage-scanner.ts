@@ -46,15 +46,20 @@ export function splitStatements(text: string): string[] {
   const withBoundaries = text.replace(BLOCK_KEYWORDS, (m) => m + ";");
   const stmts: string[] = [];
   let depth = 0, inSingle = false, inDouble = false, dollarTag: string | null = null, start = 0;
+  let inLineComment = false, inBlockComment = false;
   const t = withBoundaries;
   for (let i = 0; i < t.length; i++) {
     const c = t[i];
+    if (inLineComment) { if (c === "\n") inLineComment = false; continue; }
+    if (inBlockComment) { if (c === "*" && t[i + 1] === "/") { i++; inBlockComment = false; } continue; }
     if (dollarTag) {
       if (t.startsWith(dollarTag, i)) { i += dollarTag.length - 1; dollarTag = null; }
       continue;
     }
     if (inSingle) { if (c === "'" && t[i + 1] === "'") { i++; } else if (c === "'") inSingle = false; continue; }
     if (inDouble) { if (c === '"') inDouble = false; continue; }
+    if (c === "-" && t[i + 1] === "-") { inLineComment = true; i++; continue; }
+    if (c === "/" && t[i + 1] === "*") { inBlockComment = true; i++; continue; }
     if (c === "'") { inSingle = true; continue; }
     if (c === '"') { inDouble = true; continue; }
     if (c === "$") {
@@ -441,13 +446,21 @@ export async function runLineageScan(connectionId: number, triggeredByUserId: st
   const [conn] = await sql<{
     connectionName: string; hostAddress: string; portNumber: number; databaseName: string | null;
     defaultSchema: string | null; usernameText: string | null; passwordText: string | null; sslEnabled: boolean;
+    lineageEnabled: boolean; lineageScanViews: boolean; lineageScanMatviews: boolean;
+    lineageScanProcedures: boolean; lineageScanFunctions: boolean;
   }[]>`
     SELECT connection_name AS "connectionName", host_address AS "hostAddress", port_number AS "portNumber",
            database_name AS "databaseName", default_schema AS "defaultSchema",
-           username_text AS "usernameText", password_text AS "passwordText", ssl_enabled AS "sslEnabled"
+           username_text AS "usernameText", password_text AS "passwordText", ssl_enabled AS "sslEnabled",
+           coalesce(lineage_enabled, false)        AS "lineageEnabled",
+           coalesce(lineage_scan_views, true)      AS "lineageScanViews",
+           coalesce(lineage_scan_matviews, true)   AS "lineageScanMatviews",
+           coalesce(lineage_scan_procedures, true) AS "lineageScanProcedures",
+           coalesce(lineage_scan_functions, true)  AS "lineageScanFunctions"
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!conn) throw new Error("Connection not found");
+  if (!conn.lineageEnabled) throw new Error("Lineage scanning is not enabled for this connection — enable it under Data Lineage settings first.");
 
   const [dataSource] = await sql<{ id: number }[]>`
     SELECT data_source_id AS id FROM bayanat.data_sources WHERE connection_id = ${connectionId} LIMIT 1
@@ -479,23 +492,31 @@ export async function runLineageScan(connectionId: number, triggeredByUserId: st
       ? pg`n.nspname = ${conn.defaultSchema}`
       : pg`n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%'`;
 
-    // ── Harvest views + matviews ──────────────────────────────────────────
-    const viewRows = await pg<{ schema: string; name: string; def: string; kind: string }[]>`
+    // ── Harvest views + matviews (each independently toggleable per connection config) ──
+    const relkinds: string[] = [
+      ...(conn.lineageScanViews ? ["v"] : []),
+      ...(conn.lineageScanMatviews ? ["m"] : []),
+    ];
+    const viewRows = relkinds.length === 0 ? [] : await pg<{ schema: string; name: string; def: string; kind: string }[]>`
       SELECT n.nspname AS schema, c.relname AS name, pg_get_viewdef(c.oid, true) AS def,
              CASE WHEN c.relkind = 'm' THEN 'MATVIEW' ELSE 'VIEW' END AS kind
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind IN ('v', 'm') AND ${schemaFilter}
+      WHERE c.relkind = ANY(${relkinds}) AND ${schemaFilter}
     `;
 
-    // ── Harvest procedures + functions (plpgsql/sql only) ──────────────────
-    const routineRows = await pg<{ schema: string; name: string; def: string; kind: string }[]>`
+    // ── Harvest procedures + functions (plpgsql/sql only, each independently toggleable) ──
+    const prokinds: string[] = [
+      ...(conn.lineageScanProcedures ? ["p"] : []),
+      ...(conn.lineageScanFunctions ? ["f", "a", "w"] : []),
+    ];
+    const routineRows = prokinds.length === 0 ? [] : await pg<{ schema: string; name: string; def: string; kind: string }[]>`
       SELECT n.nspname AS schema, p.proname AS name, pg_get_functiondef(p.oid) AS def,
              CASE WHEN p.prokind = 'p' THEN 'PROCEDURE' ELSE 'FUNCTION' END AS kind
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
       JOIN pg_language l ON l.oid = p.prolang
-      WHERE l.lanname IN ('plpgsql', 'sql') AND ${schemaFilter}
+      WHERE l.lanname IN ('plpgsql', 'sql') AND p.prokind = ANY(${prokinds}) AND ${schemaFilter}
     `;
 
     const sourceObjects: SourceObject[] = [

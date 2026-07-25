@@ -95,6 +95,11 @@ export type DataSourceConnection = {
   crawledColumnCount:  number;
   lastDiscoveryTimestamp: string | null;
   createdAtTimestamp:  string;
+  lineageEnabled:        boolean;
+  lineageScanViews:      boolean;
+  lineageScanMatviews:   boolean;
+  lineageScanProcedures: boolean;
+  lineageScanFunctions:  boolean;
 };
 
 const COLS = sql.unsafe(`
@@ -118,7 +123,12 @@ const COLS = sql.unsafe(`
   coalesce(crawled_table_count,0)  AS "crawledTableCount",
   coalesce(crawled_column_count,0) AS "crawledColumnCount",
   last_discovery_timestamp::text  AS "lastDiscoveryTimestamp",
-  created_at_timestamp::text      AS "createdAtTimestamp"
+  created_at_timestamp::text      AS "createdAtTimestamp",
+  coalesce(lineage_enabled, false)         AS "lineageEnabled",
+  coalesce(lineage_scan_views, true)       AS "lineageScanViews",
+  coalesce(lineage_scan_matviews, true)    AS "lineageScanMatviews",
+  coalesce(lineage_scan_procedures, true)  AS "lineageScanProcedures",
+  coalesce(lineage_scan_functions, true)   AS "lineageScanFunctions"
 `);
 
 export async function listConnections(): Promise<DataSourceConnection[]> {
@@ -159,6 +169,8 @@ export async function updateConnection(connectionId: number, data: {
   databaseName?: string | null; serviceName?: string | null; defaultSchema?: string | null;
   usernameText?: string | null; passwordText?: string | null; sslEnabled?: boolean;
   isActiveBoolean?: boolean;
+  lineageEnabled?: boolean; lineageScanViews?: boolean; lineageScanMatviews?: boolean;
+  lineageScanProcedures?: boolean; lineageScanFunctions?: boolean;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.connection_registry SET
@@ -172,7 +184,12 @@ export async function updateConnection(connectionId: number, data: {
       username_text    = coalesce(${data.usernameText    ?? null}, username_text),
       ssl_enabled      = coalesce(${data.sslEnabled      ?? null}, ssl_enabled),
       is_active_boolean= coalesce(${data.isActiveBoolean ?? null}, is_active_boolean),
-      password_text    = CASE WHEN ${data.passwordText ?? null} IS NOT NULL THEN ${data.passwordText ?? null} ELSE password_text END
+      password_text    = CASE WHEN ${data.passwordText ?? null} IS NOT NULL THEN ${data.passwordText ?? null} ELSE password_text END,
+      lineage_enabled        = coalesce(${data.lineageEnabled        ?? null}, lineage_enabled),
+      lineage_scan_views      = coalesce(${data.lineageScanViews      ?? null}, lineage_scan_views),
+      lineage_scan_matviews   = coalesce(${data.lineageScanMatviews   ?? null}, lineage_scan_matviews),
+      lineage_scan_procedures = coalesce(${data.lineageScanProcedures ?? null}, lineage_scan_procedures),
+      lineage_scan_functions  = coalesce(${data.lineageScanFunctions  ?? null}, lineage_scan_functions)
     WHERE connection_id = ${connectionId}
   `;
 }
