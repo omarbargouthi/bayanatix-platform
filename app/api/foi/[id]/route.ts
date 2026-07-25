@@ -259,12 +259,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
             let sortOrder = 1;
             for (const m of allMappings) {
               if (m.source_type === 'CATALOG' && m.data_attribute_id) {
-                // Catalog-mapped column: link by attribute_id
+                // Catalog-mapped column: link by attribute_id. Two distinct requested
+                // attributes can legitimately map to the same catalog column, so every
+                // mapping gets its own row here — nothing should be silently dropped.
                 await sql`
                   INSERT INTO bayanat.open_dataset_columns
                     (dataset_id, attribute_id, publish_name, publish_desc, sort_order)
                   VALUES (${ds.datasetId}, ${m.data_attribute_id}, ${m.catalog_col_name}, ${m.officer_notes ?? null}, ${sortOrder})
-                  ON CONFLICT DO NOTHING
                 `;
               } else {
                 // Manual source: store description text, no attribute_id
@@ -283,6 +284,27 @@ export async function PATCH(req: Request, { params }: Ctx) {
               WHERE foi_request_id = ${id}
             `;
           }
+        }
+      }
+
+      // Gate: TECHNICAL_COMPILATION → OWNER_PACKAGE_APPROVAL: the linked open data
+      // record must be fully processed (submitted past DRAFT/PENDING) before the
+      // package can move on for owner review.
+      if (currentStage === 'TECHNICAL_COMPILATION') {
+        const [dsRow] = await sql`
+          SELECT d.status_code AS "statusCode", d.dataset_name_text AS "datasetName"
+          FROM bayanat.foi_requests r
+          JOIN bayanat.open_datasets d ON d.dataset_id = r.linked_open_dataset_id
+          WHERE r.foi_request_id = ${id}
+        `;
+        const PROCESSED_STATUSES = new Set(['PENDING_APPROVAL', 'APPROVED', 'PUBLISHED']);
+        if (!dsRow) {
+          return NextResponse.json({ error: "No open data record is linked to this request yet. Complete Quality Gate first." }, { status: 400 });
+        }
+        if (!PROCESSED_STATUSES.has(dsRow.statusCode)) {
+          return NextResponse.json({
+            error: `"${dsRow.datasetName}" is not fully processed yet (status: ${dsRow.statusCode}). Open the linked Open Data record, complete its details and columns, and submit it for approval before advancing.`,
+          }, { status: 400 });
         }
       }
 

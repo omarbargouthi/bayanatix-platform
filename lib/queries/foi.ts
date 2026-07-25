@@ -146,6 +146,8 @@ export type FoiCaseDetail = {
   // linked open dataset
   linkedOpenDatasetId:       number | null;
   foiDeliveryType:           string | null;
+  linkedOpenDatasetStatus:   string | null;
+  linkedOpenDatasetName:     string | null;
 };
 
 export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | null> {
@@ -206,7 +208,9 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
       q.adjustment_reason        AS "adjustmentReason",
       q.adjustment_approved      AS "adjustmentApproved",
       r.linked_open_dataset_id   AS "linkedOpenDatasetId",
-      r.foi_delivery_type        AS "foiDeliveryType"
+      r.foi_delivery_type        AS "foiDeliveryType",
+      od.status_code             AS "linkedOpenDatasetStatus",
+      od.dataset_name_text       AS "linkedOpenDatasetName"
     FROM bayanat.foi_requests r
     JOIN bayanat.foi_requesters rq ON rq.requester_id = r.requester_id
     LEFT JOIN bayanat.governance_domains gd ON gd.domain_code = r.domain_code
@@ -218,6 +222,7 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
       WHERE foi_request_id = r.foi_request_id
       ORDER BY issued_at DESC LIMIT 1
     )
+    LEFT JOIN bayanat.open_datasets od ON od.dataset_id = r.linked_open_dataset_id
     WHERE r.foi_request_id = ${foiRequestId}
   `;
   return row ?? null;

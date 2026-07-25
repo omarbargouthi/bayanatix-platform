@@ -169,8 +169,8 @@ export function OpenDataList({
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             {/* Grid header */}
             <div
-              className="grid text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 bg-slate-50 border-b border-slate-200"
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr auto" }}
+              className="grid gap-x-3 text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 bg-slate-50 border-b border-slate-200"
+              style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 96px" }}
             >
               <span>{t.openData.colDataset}</span>
               <span>{t.openData.colCategory}</span>
@@ -188,8 +188,8 @@ export function OpenDataList({
               return (
               <div
                 key={ds.datasetId}
-                className="grid items-center px-4 py-3.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
-                style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr auto" }}
+                className="grid gap-x-3 items-center px-4 py-3.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 96px" }}
               >
                 <Link href={`/open-data/${ds.datasetId}`} className="contents">
                 {/* Name + description */}
@@ -206,7 +206,7 @@ export function OpenDataList({
                 </div>
 
                 {/* Category */}
-                <span className="text-sm text-slate-600 truncate pr-2">
+                <span className="text-sm text-slate-600 truncate">
                   {(lang === "ar" ? (ds.categoryLabelAr ?? ds.categoryText) : ds.categoryText) ?? "—"}
                 </span>
 
@@ -232,7 +232,7 @@ export function OpenDataList({
                 </Link>
 
                 {/* Delete / Retract action */}
-                <div className="pl-2">
+                <div>
                   {canDelete && (isDraft || isPublished) && (
                     <button
                       onClick={(e) => handleDelete(ds, e)}

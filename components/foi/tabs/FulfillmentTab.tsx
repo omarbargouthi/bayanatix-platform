@@ -27,6 +27,7 @@ const SENSITIVITY_OPTIONS = [
 ];
 
 const BLOCKED_SENSITIVITIES = new Set(["CONFIDENTIAL","RESTRICTED","SECRET","TOP_SECRET"]);
+const OPEN_DATA_PROCESSED_STATUSES = new Set(["PENDING_APPROVAL","APPROVED","PUBLISHED"]);
 
 type ReqAttr = {
   reqAttrId: number;
@@ -1011,7 +1012,12 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       )}
 
       {/* ── TECHNICAL_COMPILATION and later ── */}
-      {inFulfillment && stage !== "SOURCE_MAPPING" && stage !== "CLASSIFICATION_GATE" && stage !== "QUALITY_GATE" && stage !== "DELIVERY" && (
+      {inFulfillment && stage !== "SOURCE_MAPPING" && stage !== "CLASSIFICATION_GATE" && stage !== "QUALITY_GATE" && stage !== "DELIVERY" && (() => {
+        const dsStatus     = caseData.linkedOpenDatasetStatus;
+        const dsProcessed  = !!dsStatus && OPEN_DATA_PROCESSED_STATUSES.has(dsStatus);
+        const gateBlocking = stage === "TECHNICAL_COMPILATION" && !dsProcessed;
+
+        return (
         <div className="card p-5 space-y-3">
           {stage === "TECHNICAL_COMPILATION" && caseData.linkedOpenDatasetId && (
             caseData.foiDeliveryType === "ONE_OFF" ? (
@@ -1038,14 +1044,30 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
               </div>
             )
           )}
+
+          {gateBlocking && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1">
+              <p className="text-sm font-semibold text-amber-800">Dataset not fully processed yet</p>
+              <p className="text-xs text-amber-700">
+                Status: <strong>{dsStatus ?? "—"}</strong>. Open the linked{" "}
+                {caseData.linkedOpenDatasetId ? (
+                  <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-medium">
+                    Open Data record
+                  </a>
+                ) : "Open Data record"}, complete its details and columns, and submit it for approval before advancing.
+              </p>
+            </div>
+          )}
+
           {advErr && <p className="text-sm text-red-600">{advErr}</p>}
           <div className="flex justify-end">
-            <button onClick={() => advance()} disabled={advancing} className="btn btn-primary btn-sm">
+            <button onClick={() => advance()} disabled={advancing || gateBlocking} className="btn btn-primary btn-sm">
               {advancing ? "…" : "Mark Stage Complete → Advance"}
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── DELIVERY ── */}
       {inFulfillment && stage === "DELIVERY" && (

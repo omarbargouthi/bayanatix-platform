@@ -53,7 +53,7 @@ export async function GET(_req: Request, { params }: Ctx) {
       m.updated_at              AS "updatedAt",
       -- Live DQ info: rules covering this attribute (attribute-level OR entity-level)
       CASE WHEN m.data_attribute_id IS NULL OR m.source_type != 'CATALOG' THEN 0 ELSE (
-        SELECT COUNT(*) FROM bayanat.dq_rules ru
+        SELECT COUNT(*)::int FROM bayanat.dq_rules ru
         WHERE ru.is_active_indicator = true
           AND (
             (ru.asset_type_code = 'DATA_ATTRIBUTES' AND ru.asset_id = m.data_attribute_id)

@@ -30,16 +30,28 @@ export async function POST(req: Request, { params }: Ctx) {
 
   const body: { attributeId: number; publishName?: string; publishDesc?: string; sortOrder?: number } = await req.json();
 
-  const [row] = await sql<{ odColumnId: number }[]>`
-    INSERT INTO bayanat.open_dataset_columns
-      (dataset_id, attribute_id, publish_name, publish_desc, sort_order)
-    VALUES
-      (${datasetId}, ${body.attributeId}, ${body.publishName ?? null}, ${body.publishDesc ?? null}, ${body.sortOrder ?? 0})
-    ON CONFLICT (dataset_id, attribute_id) DO UPDATE
-      SET publish_name = EXCLUDED.publish_name,
-          publish_desc = EXCLUDED.publish_desc
-    RETURNING od_column_id AS "odColumnId"
+  const [existing] = await sql<{ odColumnId: number }[]>`
+    SELECT od_column_id AS "odColumnId" FROM bayanat.open_dataset_columns
+    WHERE dataset_id = ${datasetId} AND attribute_id = ${body.attributeId}
   `;
+
+  let row: { odColumnId: number };
+  if (existing) {
+    [row] = await sql<{ odColumnId: number }[]>`
+      UPDATE bayanat.open_dataset_columns
+      SET publish_name = ${body.publishName ?? null}, publish_desc = ${body.publishDesc ?? null}
+      WHERE od_column_id = ${existing.odColumnId}
+      RETURNING od_column_id AS "odColumnId"
+    `;
+  } else {
+    [row] = await sql<{ odColumnId: number }[]>`
+      INSERT INTO bayanat.open_dataset_columns
+        (dataset_id, attribute_id, publish_name, publish_desc, sort_order)
+      VALUES
+        (${datasetId}, ${body.attributeId}, ${body.publishName ?? null}, ${body.publishDesc ?? null}, ${body.sortOrder ?? 0})
+      RETURNING od_column_id AS "odColumnId"
+    `;
+  }
 
   await sql`UPDATE bayanat.open_datasets SET updated_at = NOW() WHERE dataset_id = ${datasetId}`;
 
