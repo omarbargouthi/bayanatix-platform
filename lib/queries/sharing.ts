@@ -95,6 +95,18 @@ export type DsaApproval = {
   delegationEvidenceRef:  string | null;
 };
 
+export type DsaDqIssue = {
+  issueId:       number;
+  dsaId:         number;
+  attributeId:   number;
+  columnName:    string | null;
+  dimensionCode: string | null;
+  dimensionName: string | null;
+  issueText:     string;
+  severityCode:  "BLOCKER" | "WARNING" | "INFO";
+  createdAt:     string;
+};
+
 export type DsaAuthorization = {
   authorizationId:      number;
   dsaId:                number;
@@ -302,6 +314,34 @@ export async function getDsaAttributes(dsaDatasetId: number): Promise<DsaAttribu
     attributeId:    Number(r.attributeId),
     dqScore:        r.dqScore != null ? Number(r.dqScore) : null,
     dqRuleCount:    Number(r.dqRuleCount ?? 0),
+  }));
+}
+
+// ── DQ Issues ─────────────────────────────────────────────────────────────────
+
+export async function getDsaDqIssues(dsaId: number): Promise<DsaDqIssue[]> {
+  const rows = await sql<DsaDqIssue[]>`
+    SELECT
+      i.issue_id                                AS "issueId",
+      i.dsa_id                                  AS "dsaId",
+      i.attribute_id                            AS "attributeId",
+      a.physical_name_text                      AS "columnName",
+      i.dimension_code                          AS "dimensionCode",
+      dim.dimension_name_text                   AS "dimensionName",
+      i.issue_text                              AS "issueText",
+      i.severity_code                           AS "severityCode",
+      to_char(i.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt"
+    FROM bayanat.dsa_dataset_dq_issues i
+    LEFT JOIN bayanat.data_attributes a   ON a.attribute_id   = i.attribute_id
+    LEFT JOIN bayanat.dq_dimensions   dim ON dim.dimension_code = i.dimension_code
+    WHERE i.dsa_id = ${dsaId}
+    ORDER BY i.issue_id
+  `;
+  return rows.map(r => ({
+    ...r,
+    issueId:     Number(r.issueId),
+    dsaId:       Number(r.dsaId),
+    attributeId: Number(r.attributeId),
   }));
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { getDsa, getDsaDatasets, getDsaApprovals, getDsaAuthorizations } from "@/lib/queries/sharing";
+import { getDsa, getDsaDatasets, getDsaApprovals, getDsaAuthorizations, getDsaDqIssues } from "@/lib/queries/sharing";
 
 type Ctx = { params: { id: string } };
 
@@ -12,16 +12,17 @@ export async function GET(_req: Request, { params }: Ctx) {
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  const [dsa, datasets, approvals, authorizations] = await Promise.all([
+  const [dsa, datasets, approvals, authorizations, dqIssues] = await Promise.all([
     getDsa(id),
     getDsaDatasets(id),
     getDsaApprovals(id),
     getDsaAuthorizations(id),
+    getDsaDqIssues(id),
   ]);
 
   if (!dsa) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json({ dsa, datasets, approvals, authorizations });
+  return NextResponse.json({ dsa, datasets, approvals, authorizations, dqIssues });
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {

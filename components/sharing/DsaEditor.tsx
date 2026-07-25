@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { STATUS_LABELS, STATUS_COLORS, SCOPE_LABELS } from "@/lib/sharing-routing";
-import type { DsaDetail, DsaDataset, DsaApproval, DsaAuthorization } from "@/lib/queries/sharing";
+import type { DsaDetail, DsaDataset, DsaApproval, DsaAuthorization, DsaDqIssue } from "@/lib/queries/sharing";
 import { DsaGeneralTab }    from "./tabs/DsaGeneralTab";
 import { DsaDatasetsTab }   from "./tabs/DsaDatasetsTab";
 import { DsaTermsTab }      from "./tabs/DsaTermsTab";
@@ -25,6 +25,7 @@ type LoadedDsa = {
   datasets:       DsaDataset[];
   approvals:      DsaApproval[];
   authorizations: DsaAuthorization[];
+  dqIssues:       DsaDqIssue[];
 };
 
 export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null; canClassify?: boolean }) {
@@ -166,6 +167,7 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
             directionCode={dsa?.directionCode ?? "PROVIDER"}
             isEditable={isEditable}
             canClassify={canClassify}
+            dqIssues={data?.dqIssues ?? []}
             onChanged={load}
           />
         )}

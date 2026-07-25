@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { DsaDataset, DsaAttribute } from "@/lib/queries/sharing";
+import type { DsaDataset, DsaAttribute, DsaDqIssue } from "@/lib/queries/sharing";
 import type { ColumnDqRule } from "@/app/api/open-data/column-dq/route";
 
 type Entity       = { entityId: number; entityName: string; schemaName: string; sourceName: string };
@@ -54,16 +54,33 @@ const CLASS_COLORS: Record<string,string> = {
   SECRET:"bg-red-100 text-red-700", TOP_SECRET:"bg-gray-800 text-white",
 };
 
+type DqDimension = { code: string; name: string };
+
+type DqIssueFormState = {
+  open:      boolean;
+  issueId:   number | null;
+  dimension: string;
+  text:      string;
+  severity:  string;
+};
+
+const SEVERITY_COLORS: Record<string,string> = {
+  BLOCKER: "text-red-600 bg-red-50",
+  WARNING: "text-amber-600 bg-amber-50",
+  INFO:    "text-slate-500 bg-slate-100",
+};
+
 type Props = {
   dsaId:         number;
   datasets:      DsaDataset[];
   directionCode: string;
   isEditable:    boolean;
   canClassify:   boolean;
+  dqIssues:      DsaDqIssue[];
   onChanged:     () => void;
 };
 
-export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, canClassify, onChanged }: Props) {
+export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, canClassify, dqIssues, onChanged }: Props) {
   const outbound = datasets.filter(d => d.datasetDirection === "OUTBOUND");
   const inbound  = datasets.filter(d => d.datasetDirection === "INBOUND");
 
@@ -93,6 +110,85 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
     } finally {
       setDqLoading(p => ({ ...p, [attributeId]: false }));
     }
+  }
+
+  // DQ issue notes — same pattern as Open Data's ColumnPickerPanel
+  const [dqDimensions,  setDqDimensions]  = useState<DqDimension[] | null>(null);
+  const [dimsLoading,   setDimsLoading]   = useState(false);
+  const [dqForms,       setDqForms]       = useState<Record<number, DqIssueFormState>>({});
+  const [dqIssueSaving, setDqIssueSaving] = useState(false);
+
+  async function ensureDimensions() {
+    if (dqDimensions !== null || dimsLoading) return;
+    setDimsLoading(true);
+    try {
+      const r = await fetch("/api/sharing/dq-dimensions");
+      const data = await r.json();
+      setDqDimensions(Array.isArray(data) ? data : []);
+    } finally {
+      setDimsLoading(false);
+    }
+  }
+
+  function openNewIssueForm(attributeId: number) {
+    ensureDimensions();
+    setDqForms(p => ({ ...p, [attributeId]: { open: true, issueId: null, dimension: "", text: "", severity: "WARNING" } }));
+  }
+
+  function openEditIssueForm(attributeId: number, issue: DsaDqIssue) {
+    ensureDimensions();
+    setDqForms(p => ({
+      ...p,
+      [attributeId]: { open: true, issueId: issue.issueId, dimension: issue.dimensionCode ?? "", text: issue.issueText, severity: issue.severityCode },
+    }));
+  }
+
+  function closeDqForm(attributeId: number) {
+    setDqForms(p => ({ ...p, [attributeId]: { ...p[attributeId], open: false } }));
+  }
+
+  function updateDqFormField(attributeId: number, field: keyof DqIssueFormState, value: string) {
+    setDqForms(p => ({ ...p, [attributeId]: { ...p[attributeId], [field]: value } }));
+  }
+
+  async function submitDqIssue(attributeId: number) {
+    const form = dqForms[attributeId];
+    if (!form?.text.trim()) return;
+    setDqIssueSaving(true);
+    try {
+      if (form.issueId != null) {
+        await fetch(`/api/sharing/dsas/${dsaId}/dq-issues`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            issueId: form.issueId,
+            dimensionCode: form.dimension || null,
+            issueText: form.text.trim(),
+            severityCode: form.severity,
+          }),
+        });
+      } else {
+        await fetch(`/api/sharing/dsas/${dsaId}/dq-issues`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attributeId,
+            dimensionCode: form.dimension || null,
+            issueText: form.text.trim(),
+            severityCode: form.severity,
+          }),
+        });
+      }
+      closeDqForm(attributeId);
+      onChanged();
+    } finally {
+      setDqIssueSaving(false);
+    }
+  }
+
+  async function removeDqIssue(issueId: number) {
+    await fetch(`/api/sharing/dsas/${dsaId}/dq-issues?issueId=${issueId}`, { method: "DELETE" });
+    onChanged();
   }
 
   // Outbound picker modal
@@ -261,6 +357,8 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
     const isClassifying  = classifyingAttr === attr.attributeId;
     const rules          = dqRules[attr.attributeId];
     const rulesLoading   = dqLoading[attr.attributeId];
+    const attrIssues     = dqIssues.filter(i => i.attributeId === attr.attributeId);
+    const dqForm         = dqForms[attr.attributeId];
 
     return (
       <div key={attr.dsaAttributeId} className="border-b border-line-soft last:border-0">
@@ -303,6 +401,15 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 {rules !== undefined ? "hide" : `${attr.dqRuleCount} rule${attr.dqRuleCount > 1 ? "s" : ""} ↓`}
               </button>
             )}
+            {isEditable && !dqForm?.open && (
+              <button
+                onClick={() => openNewIssueForm(attr.attributeId)}
+                className="text-[10px] text-muted hover:text-brand-purple shrink-0"
+                title="Add a DQ issue note"
+              >
+                + Issue
+              </button>
+            )}
           </div>
         </div>
 
@@ -323,6 +430,78 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 <RuleStatusBadge status={rule.lastStatus} score={rule.lastScore} />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* DQ issue notes */}
+        {attrIssues.length > 0 && (
+          <div className="mx-5 mb-2 space-y-1.5">
+            {attrIssues.map(issue => (
+              <div key={issue.issueId} className="flex items-start justify-between gap-2 bg-canvas-soft rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {issue.dimensionName && (
+                      <span className="text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{issue.dimensionName}</span>
+                    )}
+                    <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${SEVERITY_COLORS[issue.severityCode]}`}>
+                      {issue.severityCode}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-ink mt-0.5">{issue.issueText}</p>
+                </div>
+                {isEditable && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => openEditIssueForm(attr.attributeId, issue)} className="text-[11px] text-sky-500 hover:text-sky-700">Edit</button>
+                    <button onClick={() => removeDqIssue(issue.issueId)} className="text-[11px] text-red-400 hover:text-red-600">×</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* DQ issue add/edit form */}
+        {dqForm?.open && (
+          <div className="mx-5 mb-3 p-3 bg-amber-50 border border-amber-100 rounded-lg space-y-2">
+            <p className="text-[11px] font-medium text-amber-700">
+              {dqForm.issueId != null ? "Edit DQ Issue Note" : "Add DQ Issue Note"}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={dqForm.dimension}
+                onChange={e => updateDqFormField(attr.attributeId, "dimension", e.target.value)}
+                className="input input-sm text-[12px]"
+              >
+                <option value="">— DQ Dimension (optional) —</option>
+                {(dqDimensions ?? []).map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+              </select>
+              <select
+                value={dqForm.severity}
+                onChange={e => updateDqFormField(attr.attributeId, "severity", e.target.value)}
+                className="input input-sm text-[12px]"
+              >
+                <option value="INFO">Info</option>
+                <option value="WARNING">Warning</option>
+                <option value="BLOCKER">Blocker</option>
+              </select>
+            </div>
+            <textarea
+              value={dqForm.text}
+              onChange={e => updateDqFormField(attr.attributeId, "text", e.target.value)}
+              placeholder="Describe the data quality issue for this column…"
+              rows={2}
+              className="input w-full text-[12px] resize-none"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => closeDqForm(attr.attributeId)} className="btn btn-sm text-[11px]" disabled={dqIssueSaving}>Cancel</button>
+              <button
+                onClick={() => submitDqIssue(attr.attributeId)}
+                disabled={!dqForm.text.trim() || dqIssueSaving}
+                className="btn btn-primary btn-sm text-[11px]"
+              >
+                {dqIssueSaving ? "Saving…" : dqForm.issueId != null ? "Save Changes" : "Save Issue"}
+              </button>
+            </div>
           </div>
         )}
 
