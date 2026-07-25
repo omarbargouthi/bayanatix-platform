@@ -6,8 +6,8 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   Handle,
@@ -71,7 +71,6 @@ type ItemNodeData = {
   meta?: string;
   color: string;
   href?: string;
-  onNavigate?: (href: string) => void;
 };
 
 // ── Group icons ────────────────────────────────────────────────────────────────
@@ -86,46 +85,44 @@ const GROUP_ICONS: Record<string, string> = {
   parentTable: "🗄️",
 };
 
-// ── Custom node: Center asset ──────────────────────────────────────────────────
+// ── Custom node: Center asset — same "current asset" card language as the
+// Lineage graph's LineageNodeCard (brand-purple border/pill, badge chip).
 
 function CenterNode({ data }: NodeProps) {
   const d = data as unknown as CenterNodeData;
   const isColumn = d.assetType === "DATA_ATTRIBUTES";
-  const icon = isColumn ? "📊" : "🗄️";
+  const icon = isColumn ? "▥" : "▤";
   const badge = isColumn ? "Column" : d.isView ? "View" : "Table";
-  const badgeBg    = isColumn ? "#ede9fe" : d.isView ? "#e0e7ff" : "#f0fdf4";
-  const badgeColor = isColumn ? "#6d28d9" : d.isView ? "#4338ca" : "#166534";
+  const badgeClass = isColumn ? "bg-purple-100 text-purple-700" : d.isView ? "bg-teal-100 text-teal-700" : "bg-indigo-100 text-indigo-700";
 
   return (
-    <div
-      style={{ borderColor: "#201C55", width: 160 }}
-      className="bg-white border-2 rounded-xl shadow-lg px-4 py-3 text-center"
-    >
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <div className="text-lg mb-1">{icon}</div>
-      <div className="font-bold text-[13px] text-[#201C55] truncate" title={d.name}>
-        {d.name}
+    <div className="relative rounded-xl border-2 border-brand-purple bg-white shadow-md px-3.5 py-3 w-[190px] text-center">
+      <Handle type="source" position={Position.Right} className="!bg-slate-400 !w-2 !h-2 !border-0" />
+      <Handle type="target" position={Position.Left} className="!bg-slate-400 !w-2 !h-2 !border-0" />
+
+      <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white bg-brand-purple px-2 py-0.5 rounded-full whitespace-nowrap">
+        CURRENT ASSET
+      </div>
+
+      <div className="flex items-center justify-center gap-1.5 mb-1 min-w-0">
+        <span className="text-sky-500 text-sm shrink-0">{icon}</span>
+        <span className="text-sm font-semibold text-brand-purple truncate" title={d.name}>{d.name}</span>
       </div>
       {d.rowCount != null && (
-        <div className="text-[10px] text-gray-500 mt-0.5">
-          {d.rowCount.toLocaleString()} rows
-        </div>
+        <div className="text-[10px] text-slate-400">{d.rowCount.toLocaleString()} rows</div>
       )}
       {isColumn && d.description && (
-        <div className="text-[10px] text-gray-500 mt-0.5 font-mono">{d.description}</div>
+        <div className="text-[10px] text-slate-400 font-mono truncate">{d.description}</div>
       )}
-      <div
-        className="mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block"
-        style={{ background: badgeBg, color: badgeColor }}
-      >
+      <div className={`mt-1.5 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${badgeClass}`}>
         {badge}
       </div>
     </div>
   );
 }
 
-// ── Custom node: Group pill ────────────────────────────────────────────────────
+// ── Custom node: category card — same card shell as item/center nodes instead
+// of a free-floating pill, so every node in the graph reads as one family.
 
 function GroupNode({ data }: NodeProps) {
   const d = data as unknown as GroupNodeData;
@@ -134,38 +131,31 @@ function GroupNode({ data }: NodeProps) {
   return (
     <div
       onClick={() => hasItems && d.onToggle(d.groupId)}
-      style={{ borderColor: d.color, cursor: hasItems ? "pointer" : "default" }}
-      className="flex items-center gap-2 px-3 py-2 rounded-full border-2 bg-white shadow-md select-none min-w-[120px]"
+      style={{ borderColor: hasItems ? d.color : "#e2e8f0" }}
+      className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 bg-white shadow-sm select-none min-w-[130px]"
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Left} className="!bg-slate-400 !w-2 !h-2 !border-0" />
+      <Handle type="source" position={Position.Right} className="!bg-slate-400 !w-2 !h-2 !border-0" />
 
-      <span className="text-base">{GROUP_ICONS[d.groupId] ?? "•"}</span>
-      <span
-        className="text-[12px] font-semibold"
-        style={{ color: hasItems ? d.color : "#9ca3af" }}
-      >
+      <span className="text-sm shrink-0">{GROUP_ICONS[d.groupId] ?? "•"}</span>
+      <span className="text-[12px] font-semibold truncate" style={{ color: hasItems ? d.color : "#94a3b8", cursor: hasItems ? "pointer" : "default" }}>
         {d.label}
       </span>
       <span
-        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-        style={{
-          background: hasItems ? d.color + "22" : "#f3f4f6",
-          color: hasItems ? d.color : "#9ca3af",
-        }}
+        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-auto shrink-0"
+        style={{ background: hasItems ? `${d.color}1a` : "#f1f5f9", color: hasItems ? d.color : "#94a3b8" }}
       >
         {d.count}
       </span>
       {hasItems && (
-        <span className="text-[10px]" style={{ color: d.color }}>
-          {d.expanded ? "▲" : "▼"}
-        </span>
+        <span className="text-[9px] shrink-0" style={{ color: d.color }}>{d.expanded ? "︿" : "⌄"}</span>
       )}
     </div>
   );
 }
 
-// ── Custom node: Item card ─────────────────────────────────────────────────────
+// ── Custom node: item card — same rounded-lg/border-slate-200 card language
+// used for leaf items, matching the Lineage graph's node sizing/typography.
 
 function ItemNode({ data }: NodeProps) {
   const d = data as unknown as ItemNodeData;
@@ -174,18 +164,15 @@ function ItemNode({ data }: NodeProps) {
   return (
     <div
       onClick={() => d.href && router.push(d.href)}
-      style={{
-        borderLeftColor: d.color,
-        cursor: d.href ? "pointer" : "default",
-      }}
-      className="bg-white border border-gray-200 border-l-4 rounded-lg px-3 py-2 shadow-sm min-w-[140px] max-w-[180px] hover:shadow-md transition-shadow"
+      style={{ borderLeftColor: d.color }}
+      className={`bg-white border border-slate-200 border-l-4 rounded-lg px-3 py-2 shadow-sm min-w-[140px] max-w-[180px] hover:shadow-md hover:border-brand-purple/40 transition-shadow ${d.href ? "cursor-pointer" : ""}`}
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <div className="text-[12px] font-semibold text-gray-800 truncate" title={d.label}>
+      <Handle type="target" position={Position.Left} className="!bg-slate-400 !w-2 !h-2 !border-0" />
+      <div className="text-[12px] font-semibold text-ink truncate" title={d.label}>
         {d.label}
       </div>
       {d.meta && (
-        <div className="text-[10px] text-gray-400 mt-0.5 truncate">{d.meta}</div>
+        <div className="text-[10px] text-slate-400 mt-0.5 truncate">{d.meta}</div>
       )}
     </div>
   );
@@ -256,7 +243,7 @@ function buildNodesAndEdges(
       source: "center",
       target: groupNodeId,
       type: "smoothstep",
-      style: { stroke: group.color, strokeWidth: 2 },
+      style: { stroke: group.color, strokeWidth: 1.75 },
     });
 
     if (isExpanded && group.items.length > 0) {
@@ -309,10 +296,12 @@ function buildNodesAndEdges(
 function MindMapInner({
   assetId,
   assetType,
+  entityName,
   height = 600,
 }: {
   assetId: number;
   assetType: string;
+  entityName: string;
   height?: number;
 }) {
   const [data, setData] = useState<MindMapData | null>(null);
@@ -367,7 +356,7 @@ function MindMapInner({
 
   if (loading) {
     return (
-      <div className="w-full flex items-center justify-center" style={{ height: 600 }}>
+      <div className="w-full flex items-center justify-center" style={{ height }}>
         <div className="animate-spin w-8 h-8 border-2 border-brand-purple border-t-transparent rounded-full" />
       </div>
     );
@@ -381,7 +370,8 @@ function MindMapInner({
     );
   }
 
-  const allEmpty = data.groups.every((g) => g.items.length === 0);
+  const expandableGroups = data.groups.filter((g) => g.items.length > 0);
+  const allEmpty = expandableGroups.length === 0;
   if (allEmpty) {
     return (
       <div className="card p-10 text-center">
@@ -394,25 +384,64 @@ function MindMapInner({
     );
   }
 
+  const allExpanded = expandableGroups.every((g) => expandedGroups.has(g.id));
+
   return (
-    <div className="w-full rounded-xl overflow-hidden border border-line" style={{ height }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        nodeOrigin={[0.5, 0.5]}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.3}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background />
-        <Controls />
-        <MiniMap zoomable pannable />
-      </ReactFlow>
+    <div className="w-full rounded-xl overflow-hidden border border-line flex flex-col" style={{ height }}>
+      {/* ── Top bar — same shell as the Lineage graph's top bar ── */}
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-line shrink-0 flex-wrap">
+        <span className="text-xs font-semibold text-ink-soft truncate max-w-[220px]" title={entityName}>
+          Relationships · {entityName}
+        </span>
+
+        <div className="flex rounded-lg border border-line overflow-hidden text-xs font-medium">
+          <button
+            onClick={() => setExpandedGroups(new Set(expandableGroups.map((g) => g.id)))}
+            className={`px-3 py-1.5 transition-colors ${allExpanded ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas-soft"}`}
+          >
+            Expand all
+          </button>
+          <button
+            onClick={() => setExpandedGroups(new Set())}
+            className={`px-3 py-1.5 border-l border-line transition-colors ${expandedGroups.size === 0 ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas-soft"}`}
+          >
+            Collapse all
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 ml-auto text-[11px] text-muted flex-wrap">
+          {data.groups.map((g) => (
+            <span key={g.id} className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
+              {g.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Canvas — same background/controls treatment as the Lineage graph ── */}
+      <div className="flex-1 relative bg-[#f4f6fc]">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          nodeOrigin={[0.5, 0.5]}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.2}
+          maxZoom={1.5}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#d8dcee" />
+          <Controls position="bottom-center" showInteractive={false} />
+        </ReactFlow>
+
+        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur border border-line rounded-full px-3 py-1.5 text-[11px] text-muted shadow-sm">
+          Click a category to expand · drag to pan · scroll to zoom
+        </div>
+      </div>
     </div>
   );
 }
@@ -423,7 +452,7 @@ export function MindMapTab({
   assetId,
   assetType,
   entityName,
-  height,
+  height = 600,
 }: {
   assetId: number;
   assetType: string;
@@ -431,16 +460,8 @@ export function MindMapTab({
   height?: number;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-sm text-ink">
-          Relationships — {entityName}
-        </h3>
-        <p className="text-[11px] text-muted">Click a group to expand its items</p>
-      </div>
-      <ReactFlowProvider>
-        <MindMapInner assetId={assetId} assetType={assetType} height={height} />
-      </ReactFlowProvider>
-    </div>
+    <ReactFlowProvider>
+      <MindMapInner assetId={assetId} assetType={assetType} entityName={entityName} height={height} />
+    </ReactFlowProvider>
   );
 }
