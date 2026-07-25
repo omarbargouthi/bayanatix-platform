@@ -39,6 +39,7 @@ export default async function OpenDataPage({
           initialPage={page}
           canCreate={user.role === "ADMIN" || user.role === "STEWARD" || user.role === "OFFICER"}
           currentUserId={user.userId}
+          currentUserRole={user.role}
         />
       </main>
     </>

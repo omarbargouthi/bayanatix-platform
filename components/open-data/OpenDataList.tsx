@@ -23,6 +23,7 @@ type Props = {
   initialPage: number;
   canCreate: boolean;
   currentUserId: string;
+  currentUserRole: string;
 };
 
 export function OpenDataList({
@@ -33,6 +34,7 @@ export function OpenDataList({
   initialPage,
   canCreate,
   currentUserId,
+  currentUserRole,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -182,7 +184,7 @@ export function OpenDataList({
             </div>
 
             {datasets.map((ds) => {
-              const canDelete = ds.raisedByUserId === currentUserId;
+              const canDelete = ds.raisedByUserId === currentUserId || currentUserRole === "ADMIN" || currentUserRole === "STEWARD";
               const isPublished = ds.statusCode === "PUBLISHED";
               const isDraft = ds.statusCode === "DRAFT" || ds.statusCode === "PENDING";
               return (
