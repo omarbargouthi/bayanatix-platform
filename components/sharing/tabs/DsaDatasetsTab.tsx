@@ -6,7 +6,11 @@ import type { ColumnDqRule } from "@/app/api/open-data/column-dq/route";
 
 type Entity       = { entityId: number; entityName: string; schemaName: string; sourceName: string };
 type ClassTerm    = { glossaryId: number; termName: string; classCode: string };
-type AttrOption   = { attributeId: number; physicalName: string; friendlyName: string | null; liveClassCode: string | null; liveIsPii: boolean };
+type AttrOption   = {
+  attributeId: number; physicalName: string; friendlyName: string | null;
+  liveClassCode: string | null; liveIsPii: boolean;
+  dqScore: number | null; dqRuleCount: number;
+};
 
 const TREATMENT_LABELS: Record<string,string> = {
   AS_IS:"As-Is", MASKED:"Masked", ANONYMIZED:"Anonymized",
@@ -597,6 +601,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                             <span className="text-[9px] text-red-500 italic shrink-0">Unclassified</span>
                           )}
                           {attr.liveIsPii && <span className="text-[9px] text-purple-600 font-semibold shrink-0">PI</span>}
+                          <span className="shrink-0"><DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} /></span>
                         </label>
                       ))}
                       {attrOptions.length === 0 && <div className="p-4 text-muted text-sm italic">No attributes found</div>}

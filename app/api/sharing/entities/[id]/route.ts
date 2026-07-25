@@ -19,15 +19,27 @@ export async function GET(_req: Request, { params }: Ctx) {
       a.friendly_name_text                        AS "friendlyName",
       a.data_type_text                            AS "dataType",
       ct.class_code                               AS "liveClassCode",
-      COALESCE(bg.is_pii_indicator, false)        AS "liveIsPii"
+      COALESCE(bg.is_pii_indicator, false)        AS "liveIsPii",
+      das.overall_score                           AS "dqScore",
+      COALESCE(dqr.rule_count, 0)::int            AS "dqRuleCount"
     FROM bayanat.data_attributes a
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries bg  ON bg.glossary_id = abt.glossary_id
     LEFT JOIN bayanat.classification_types ct ON ct.class_code  = bg.classification_code
+    LEFT JOIN bayanat.dq_attribute_scores das ON das.attribute_id = a.attribute_id
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) AS rule_count FROM bayanat.dq_rules r
+      WHERE r.asset_type_code = 'DATA_ATTRIBUTES' AND r.asset_id = a.attribute_id AND r.is_active_indicator = true
+    ) dqr ON true
     WHERE a.entity_id = ${entityId}
     ORDER BY a.physical_name_text
   `;
 
-  return NextResponse.json(rows.map(r => ({ ...r, attributeId: Number(r.attributeId) })));
+  return NextResponse.json(rows.map(r => ({
+    ...r,
+    attributeId: Number(r.attributeId),
+    dqScore:     r.dqScore != null ? Number(r.dqScore) : null,
+    dqRuleCount: Number(r.dqRuleCount ?? 0),
+  })));
 }
