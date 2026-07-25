@@ -8,6 +8,7 @@ export const ar: I18nStrings = {
     reports:           "التقارير",
     governance:        "حوكمة البيانات",
     catalog:           "كتالوج البيانات",
+    lineage:           "مسار البيانات",
     quality:           "جودة البيانات",
     classification:    "التصنيف",
     privacy:           "خصوصية البيانات",

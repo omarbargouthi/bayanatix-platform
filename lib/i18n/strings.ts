@@ -14,6 +14,7 @@ export type I18nStrings = {
     // Domain modules
     governance:       string;
     catalog:          string;
+    lineage:          string;
     quality:          string;
     classification:   string;
     privacy:          string;

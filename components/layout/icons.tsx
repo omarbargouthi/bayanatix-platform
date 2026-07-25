@@ -61,6 +61,15 @@ export const IconLines = ({ className }: P) => (
   </svg>
 );
 
+export const IconLineage = ({ className }: P) => (
+  <svg {...base(className)}>
+    <circle cx="5" cy="6" r="2.3" />
+    <circle cx="5" cy="18" r="2.3" />
+    <circle cx="19" cy="12" r="2.3" />
+    <path d="M7.2 6.8 16.8 11.2M7.2 17.2 16.8 12.8" />
+  </svg>
+);
+
 export const IconLock = ({ className }: P) => (
   <svg {...base(className)}>
     <rect x="3" y="11" width="18" height="11" rx="2" />

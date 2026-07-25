@@ -8,6 +8,7 @@ export const en: I18nStrings = {
     reports:           "Reports",
     governance:        "Data Governance",
     catalog:           "Data Catalog",
+    lineage:           "Data Lineage",
     quality:           "Data Quality",
     classification:    "Classification",
     privacy:           "Data Privacy",

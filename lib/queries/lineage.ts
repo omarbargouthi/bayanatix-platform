@@ -243,6 +243,7 @@ export type LineageGraphNode = {
   qualityStatus:     LineageQualityStatus;
   dqTagCount:        number;
   columnCount:       number;
+  rowCountEstimate:  number | null;
   isCurrent:         boolean;
   hasUpstreamIssue:  boolean; // FR-4.4: any upstream node in this graph is CRITICAL/WARNING
   // Columns touched by an edge in this graph (attribute-level scope only) — the
@@ -277,7 +278,7 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
   const rows = await sql<{
     entityId: number; entityName: string; layerCode: LineageLayerCode | null;
     schemaName: string | null; sourceName: string | null; ownerName: string | null;
-    qualityStatus: LineageQualityStatus; dqTagCount: number; columnCount: number;
+    qualityStatus: LineageQualityStatus; dqTagCount: number; columnCount: number; rowCountEstimate: number | null;
   }[]>`
     SELECT
       e.entity_id                               AS "entityId",
@@ -288,7 +289,8 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
       owner.full_name                           AS "ownerName",
       COALESCE(qual.status, 'UNKNOWN')          AS "qualityStatus",
       (SELECT COUNT(*)::int FROM bayanat.asset_tags at WHERE at.asset_type_code = 'DATA_ENTITIES' AND at.asset_id = e.entity_id) AS "dqTagCount",
-      (SELECT COUNT(*)::int FROM bayanat.data_attributes da WHERE da.entity_id = e.entity_id) AS "columnCount"
+      (SELECT COUNT(*)::int FROM bayanat.data_attributes da WHERE da.entity_id = e.entity_id) AS "columnCount",
+      e.row_count_estimate                      AS "rowCountEstimate"
     FROM bayanat.data_entities e
     LEFT JOIN bayanat.data_schemas s   ON s.schema_id = e.schema_id
     LEFT JOIN bayanat.data_sources src ON src.data_source_id = s.data_source_id
@@ -324,6 +326,7 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
       entityId: Number(r.entityId), entityName: r.entityName, layerCode: r.layerCode,
       schemaName: r.schemaName, sourceName: r.sourceName, ownerName: r.ownerName,
       qualityStatus: r.qualityStatus, dqTagCount: Number(r.dqTagCount), columnCount: Number(r.columnCount),
+      rowCountEstimate: r.rowCountEstimate != null ? Number(r.rowCountEstimate) : null,
       isCurrent: Number(r.entityId) === currentEntityId, hasUpstreamIssue: false, columns: [],
     },
   ]));
@@ -337,23 +340,40 @@ export async function getLineageGraph(
   downDepth: number,
 ): Promise<LineageGraph> {
   // Resolve the focus asset into the traversal scope's own id space.
-  let focusAssetId = assetId;
+  let focusAssetId = assetId; // entity id when scope=ENTITY_LEVEL
   let focusColumnName: string | null = null;
+  let traversalIds: number[] = [assetId];
+
   if (scope === "ENTITY_LEVEL" && assetType === "DATA_ATTRIBUTES") {
     const [row] = await sql<{ entityId: number }[]>`SELECT entity_id AS "entityId" FROM bayanat.data_attributes WHERE attribute_id = ${assetId}`;
     focusAssetId = row?.entityId ?? assetId;
+    traversalIds = [focusAssetId];
   }
-  if (scope === "ATTRIBUTE_LEVEL" && assetType === "DATA_ATTRIBUTES") {
-    const [row] = await sql<{ name: string }[]>`SELECT physical_name_text AS name FROM bayanat.data_attributes WHERE attribute_id = ${assetId}`;
-    focusColumnName = row?.name ?? null;
+  if (scope === "ATTRIBUTE_LEVEL") {
+    if (assetType === "DATA_ATTRIBUTES") {
+      const [row] = await sql<{ name: string }[]>`SELECT physical_name_text AS name FROM bayanat.data_attributes WHERE attribute_id = ${assetId}`;
+      focusColumnName = row?.name ?? null;
+      traversalIds = [assetId];
+    } else {
+      // Toggled to column-level while focused on a whole entity (no specific
+      // column chosen yet) — traverse from every column of that entity and
+      // union the results, so the toggle preserves context instead of coming
+      // back empty (there's no single "the" attribute to traverse from).
+      const rows = await sql<{ attributeId: number }[]>`SELECT attribute_id AS "attributeId" FROM bayanat.data_attributes WHERE entity_id = ${assetId}`;
+      traversalIds = rows.map((r) => Number(r.attributeId));
+    }
   }
 
-  const [downRaw, upRaw, downFull, upFull] = await Promise.all([
-    sql<RawImpactRow[]>`SELECT impact_level AS "depth", downstream_asset_id AS "assetId", lineage_id AS "lineageId", transformation_logic AS "transformationLogicText" FROM bayanat.fn_get_downstream_impact(${focusAssetId}, ${scope}, ${downDepth})`,
-    sql<RawImpactRow[]>`SELECT impact_level AS "depth", upstream_asset_id AS "assetId", lineage_id AS "lineageId", transformation_logic AS "transformationLogicText" FROM bayanat.fn_get_upstream_impact(${focusAssetId}, ${scope}, ${upDepth})`,
-    sql<{ assetId: number }[]>`SELECT DISTINCT downstream_asset_id AS "assetId" FROM bayanat.fn_get_downstream_impact(${focusAssetId}, ${scope}, 10)`,
-    sql<{ assetId: number }[]>`SELECT DISTINCT upstream_asset_id AS "assetId" FROM bayanat.fn_get_upstream_impact(${focusAssetId}, ${scope}, 10)`,
-  ]);
+  const perId = await Promise.all(traversalIds.map((id) => Promise.all([
+    sql<RawImpactRow[]>`SELECT impact_level AS "depth", downstream_asset_id AS "assetId", lineage_id AS "lineageId", transformation_logic AS "transformationLogicText" FROM bayanat.fn_get_downstream_impact(${id}, ${scope}, ${downDepth})`,
+    sql<RawImpactRow[]>`SELECT impact_level AS "depth", upstream_asset_id AS "assetId", lineage_id AS "lineageId", transformation_logic AS "transformationLogicText" FROM bayanat.fn_get_upstream_impact(${id}, ${scope}, ${upDepth})`,
+    sql<{ assetId: number }[]>`SELECT DISTINCT downstream_asset_id AS "assetId" FROM bayanat.fn_get_downstream_impact(${id}, ${scope}, 10)`,
+    sql<{ assetId: number }[]>`SELECT DISTINCT upstream_asset_id AS "assetId" FROM bayanat.fn_get_upstream_impact(${id}, ${scope}, 10)`,
+  ])));
+  const downRaw = perId.flatMap((r) => r[0]);
+  const upRaw = perId.flatMap((r) => r[1]);
+  const downFull = perId.flatMap((r) => r[2]);
+  const upFull = perId.flatMap((r) => r[3]);
 
   const lineageIds = [...new Set([...downRaw, ...upRaw].map((r) => r.lineageId))];
   const edgeRows = lineageIds.length === 0 ? [] : await sql<{
@@ -397,14 +417,14 @@ export async function getLineageGraph(
   // ATTRIBUTE_LEVEL: nodes are still entities (tables), each carrying the specific
   // columns touched by this traversal — matching the Figma's table-card-with-
   // column-subtitle layout rather than one node per column.
-  const attrIds = [...new Set([focusAssetId, ...downRaw.map((r) => r.assetId), ...upRaw.map((r) => r.assetId)])];
+  const attrIds = [...new Set([...traversalIds, ...downRaw.map((r) => r.assetId), ...upRaw.map((r) => r.assetId)])];
   const attrRows = attrIds.length === 0 ? [] : await sql<{ attributeId: number; name: string; entityId: number }[]>`
     SELECT attribute_id AS "attributeId", physical_name_text AS name, entity_id AS "entityId"
     FROM bayanat.data_attributes WHERE attribute_id = ANY(${attrIds})
   `;
   const attrById = new Map(attrRows.map((a) => [Number(a.attributeId), a]));
   const entityIds = [...new Set(attrRows.map((a) => Number(a.entityId)))];
-  const focusEntityId = attrById.get(focusAssetId)?.entityId ?? focusAssetId;
+  const focusEntityId = assetType === "DATA_ENTITIES" ? assetId : (attrById.get(assetId)?.entityId ?? assetId);
   const nodeMap = await resolveEntityNodes(entityIds, focusEntityId);
 
   for (const a of attrRows) {
@@ -432,8 +452,12 @@ export async function getLineageGraph(
   const entityEdgeRows = edges.map((e) => ({ sourceAssetId: e.sourceEntityId, targetAssetId: e.targetEntityId }));
   markUpstreamIssues(nodeMap, entityEdgeRows as { sourceAssetId: number; targetAssetId: number }[], focusEntityId);
 
+  const focusName = assetType === "DATA_ENTITIES"
+    ? (nodeMap.get(focusEntityId)?.entityName ?? "Unknown")
+    : (attrById.get(assetId)?.name ?? "Unknown");
+
   return {
-    focus: { assetType: "DATA_ATTRIBUTES", assetId: focusAssetId, entityId: focusEntityId, name: attrById.get(focusAssetId)?.name ?? "Unknown", columnName: focusColumnName },
+    focus: { assetType, assetId, entityId: focusEntityId, name: focusName, columnName: focusColumnName },
     nodes: [...nodeMap.values()],
     edges,
     counts,
