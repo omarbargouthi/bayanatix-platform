@@ -756,11 +756,11 @@ export function OpenDataEditor({
           {/* Workflow stages diagram — key must match bayanat.workflow_stages.stage_name_text (English, DB-stable) regardless of UI language */}
           <div className="grid grid-cols-4 gap-3">
             {([
-              { stage: 1, key: "Steward Review", name: t.openData.stageStewardReview, role: t.openData.roleSteward,  sla: "3 days" },
-              { stage: 2, key: "Owner Approval", name: t.openData.stageOwnerApproval, role: t.openData.roleOwner,    sla: "5 days" },
+              { stage: 1, key: "Steward Review", name: t.openData.stageStewardReview, role: t.openData.roleSteward,  sla: "3 days", note: undefined as string | undefined },
+              { stage: 2, key: "Owner Approval", name: t.openData.stageOwnerApproval, role: t.openData.roleOwner,    sla: "5 days", note: undefined as string | undefined },
               { stage: 3, key: "Privacy Review", name: t.openData.stagePrivacyReview, role: t.openData.rolePrivacy,  sla: "3 days", note: hasPii ? undefined : t.openData.skippedNoPii },
-              { stage: 4, key: "DMO Sign-off",   name: t.openData.stageDmoSignoff,    role: t.openData.roleDmo,      sla: "3 days" },
-            ] as const).map((s) => {
+              { stage: 4, key: "DMO Sign-off",   name: t.openData.stageDmoSignoff,    role: t.openData.roleDmo,      sla: "3 days", note: undefined as string | undefined },
+            ]).map((s) => {
               const done   = workflowProgress?.completedStageNames.includes(s.key) ?? false;
               const active = workflowProgress?.currentStageName === s.key;
               return (

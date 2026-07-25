@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
+    "@types/dagre": "^0.7.54",
     "@xyflow/react": "^12.10.2",
     "bcryptjs": "2.4.3",
     "clsx": "2.1.1",
+    "dagre": "^0.8.5",
     "jose": "5.9.6",
     "mssql": "^12.5.2",
     "mysql2": "^3.22.3",
