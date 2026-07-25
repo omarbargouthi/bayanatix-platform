@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MarkerType,
   useNodesState, useEdgesState, type Node, type Edge,
@@ -55,13 +55,17 @@ function layoutNodes(nodes: Node[], edges: Edge[]): Node[] {
 const LEGEND_ITEMS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "DASHBOARD"];
 
 function LineageGraphInner({
-  initialAssetType, initialAssetId, canManage,
+  initialAssetType, initialAssetId, canManage, preserveParams = {},
 }: {
   initialAssetType: AssetType | null;
   initialAssetId: number | null;
   canManage: boolean;
+  // Extra query params (e.g. { tab: "Lineage" }) to keep alongside assetType/assetId when
+  // this graph is embedded inside a host page's own URL, rather than the standalone route.
+  preserveParams?: Record<string, string>;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [focus, setFocus] = useState<{ assetType: AssetType; assetId: number } | null>(
     initialAssetType && initialAssetId ? { assetType: initialAssetType, assetId: initialAssetId } : null,
@@ -96,7 +100,8 @@ function LineageGraphInner({
         setSelectedEntityId(g.focus.entityId);
       })
       .finally(() => setLoading(false));
-    router.replace(`/lineage?assetType=${focus.assetType}&assetId=${focus.assetId}`, { scroll: false });
+    const params = new URLSearchParams({ ...preserveParams, assetType: focus.assetType, assetId: String(focus.assetId) });
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus, scope, upDepth, downDepth]);
 
@@ -370,7 +375,7 @@ function LineageGraphInner({
   );
 }
 
-export function LineageGraphClient(props: { initialAssetType: AssetType | null; initialAssetId: number | null; canManage: boolean }) {
+export function LineageGraphClient(props: { initialAssetType: AssetType | null; initialAssetId: number | null; canManage: boolean; preserveParams?: Record<string, string> }) {
   return (
     <ReactFlowProvider>
       <LineageGraphInner {...props} />

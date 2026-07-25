@@ -9,7 +9,7 @@ import { useLang } from "@/lib/lang-context";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI, IconLineage,
+  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI,
 } from "./icons";
 
 type Item = {
@@ -29,7 +29,6 @@ const NAV_TOP_DEF = [
 const NAV_DOMAINS_DEF = [
   { href: "/governance",     key: "governance"    as const, Icon: IconCircle },
   { href: "/catalog",        key: "catalog"       as const, Icon: IconBook },
-  { href: "/lineage",        key: "lineage"       as const, Icon: IconLineage },
   { href: "/quality",        key: "quality"       as const, Icon: IconCheck },
   { href: "/classification", key: "classification"as const, Icon: IconLines },
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },

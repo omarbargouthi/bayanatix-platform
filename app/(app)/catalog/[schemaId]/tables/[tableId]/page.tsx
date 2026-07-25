@@ -224,7 +224,7 @@ export default async function TablePage({
 
         {/* ── Lineage tab ──────────────────────────────────────────────── */}
         {activeTab === "Lineage" && (
-          <LineageTab entityId={entity.entityId} entityName={entity.entityName} />
+          <LineageTab entityId={entity.entityId} entityName={entity.entityName} canManage={user.role === "ADMIN" || user.role === "STEWARD"} />
         )}
 
         {/* ── Relationships tab ────────────────────────────────────────── */}

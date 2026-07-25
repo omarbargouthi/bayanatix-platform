@@ -543,6 +543,13 @@ type GovernanceDefaults = {
   defaultTechStewardId: string | null;
 };
 
+// Non-destructive, idempotent sync (find-or-create + update-in-place, matched by name),
+// mirroring the same pattern already used by the lineage scanner's ensureSchema/ensureEntity/
+// ensureAttribute. A prior version deleted-and-recreated the whole schema/entity/attribute
+// tree on every crawl, which is simple but breaks the moment any other module (DSA datasets,
+// lineage edges, Open Data columns, DQ rules, ...) holds a foreign key into data_entities —
+// the DELETE aborts with an FK violation and the entire crawl fails. Preserving row identity
+// across re-crawls avoids that class of failure entirely.
 async function saveCrawlResults(
   connectionId: number, connectionName: string, dbTypeCode: string,
   hostAddress: string, databaseName: string | null,
@@ -553,7 +560,6 @@ async function saveCrawlResults(
     SELECT data_source_id AS id FROM bayanat.data_sources WHERE connection_id = ${connectionId}
   `;
   let sourceId: number;
-  // Snapshot row counts before the cascade-delete so we can store prev_row_count
   const prevCounts = new Map<string, number | null>();
   if (existing.length > 0) {
     sourceId = existing[0].id;
@@ -564,7 +570,6 @@ async function saveCrawlResults(
       WHERE s.data_source_id = ${sourceId}
     `;
     for (const r of snapRows) prevCounts.set(r.name, r.cnt != null ? Number(r.cnt) : null);
-    await sql`DELETE FROM bayanat.data_schemas WHERE data_source_id = ${sourceId}`;
   } else {
     const [row] = await sql<{ id: number }[]>`
       INSERT INTO bayanat.data_sources
@@ -575,20 +580,44 @@ async function saveCrawlResults(
     sourceId = row.id;
   }
 
+  const touchedSchemaIds: number[] = [];
+  const touchedEntityIds: number[] = [];
+  const touchedAttributeIds: number[] = [];
+
   for (const schema of result.schemas) {
-    const [schRow] = await sql<{ id: number }[]>`
-      INSERT INTO bayanat.data_schemas (data_source_id, schema_name_text)
-      VALUES (${sourceId}, ${schema.name}) RETURNING schema_id AS id
+    const [existingSchema] = await sql<{ id: number }[]>`
+      SELECT schema_id AS id FROM bayanat.data_schemas WHERE data_source_id = ${sourceId} AND schema_name_text = ${schema.name}
     `;
+    const schemaId = existingSchema
+      ? existingSchema.id
+      : (await sql<{ id: number }[]>`
+          INSERT INTO bayanat.data_schemas (data_source_id, schema_name_text)
+          VALUES (${sourceId}, ${schema.name}) RETURNING schema_id AS id
+        `)[0].id;
+    touchedSchemaIds.push(schemaId);
 
     for (const table of schema.tables) {
-      const [entRow] = await sql<{ id: number }[]>`
-        INSERT INTO bayanat.data_entities
-          (schema_id, entity_name_text, display_name_text, is_view_indicator, source_description_text)
-        VALUES (${schRow.id}, ${table.name}, ${table.name}, ${table.isView}, ${table.comment ?? null})
-        RETURNING entity_id AS id
+      const [existingEntity] = await sql<{ id: number }[]>`
+        SELECT entity_id AS id FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${table.name}
       `;
-      const entityId = entRow.id;
+      let entityId: number;
+      if (existingEntity) {
+        entityId = existingEntity.id;
+        await sql`
+          UPDATE bayanat.data_entities SET
+            is_view_indicator = ${table.isView},
+            source_description_text = ${table.comment ?? null}
+          WHERE entity_id = ${entityId}
+        `;
+      } else {
+        entityId = (await sql<{ id: number }[]>`
+          INSERT INTO bayanat.data_entities
+            (schema_id, entity_name_text, display_name_text, is_view_indicator, source_description_text)
+          VALUES (${schemaId}, ${table.name}, ${table.name}, ${table.isView}, ${table.comment ?? null})
+          RETURNING entity_id AS id
+        `)[0].id;
+      }
+      touchedEntityIds.push(entityId);
 
       // Apply default governance roles from crawl config (fire-and-forget — non-blocking)
       void applyGovernanceDefaults(
@@ -619,13 +648,30 @@ async function saveCrawlResults(
       }
 
       for (const col of table.columns) {
-        const [attrRow] = await sql<{ id: number }[]>`
-          INSERT INTO bayanat.data_attributes
-            (entity_id, physical_name_text, friendly_name_text, data_type_text,
-             is_nullable_indicator, is_primary_key_indicator, source_description_text)
-          VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey}, ${col.comment ?? null})
-          RETURNING attribute_id AS id
+        const [existingAttr] = await sql<{ id: number }[]>`
+          SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${entityId} AND physical_name_text = ${col.name}
         `;
+        let attributeId: number;
+        if (existingAttr) {
+          attributeId = existingAttr.id;
+          await sql`
+            UPDATE bayanat.data_attributes SET
+              data_type_text = ${col.dataType},
+              is_nullable_indicator = ${col.isNullable},
+              is_primary_key_indicator = ${col.isPrimaryKey},
+              source_description_text = ${col.comment ?? null}
+            WHERE attribute_id = ${attributeId}
+          `;
+        } else {
+          attributeId = (await sql<{ id: number }[]>`
+            INSERT INTO bayanat.data_attributes
+              (entity_id, physical_name_text, friendly_name_text, data_type_text,
+               is_nullable_indicator, is_primary_key_indicator, source_description_text)
+            VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey}, ${col.comment ?? null})
+            RETURNING attribute_id AS id
+          `)[0].id;
+        }
+        touchedAttributeIds.push(attributeId);
 
         if (profileId && col.profile) {
           await sql`
@@ -633,7 +679,7 @@ async function saveCrawlResults(
               (profile_id, attribute_id, null_count, null_pct, distinct_count,
                min_value, max_value, top_values)
             VALUES (
-              ${profileId}, ${attrRow.id},
+              ${profileId}, ${attributeId},
               ${col.profile.nullCount}, ${col.profile.nullPct}, ${col.profile.distinctCount},
               ${col.profile.minValue}, ${col.profile.maxValue},
               ${JSON.stringify(col.profile.topValues)}::jsonb
@@ -643,6 +689,43 @@ async function saveCrawlResults(
         }
       }
     }
+  }
+
+  // Remove columns/tables/schemas that existed from a previous crawl of this source but
+  // weren't found this time (dropped or renamed at the source). Each delete is attempted
+  // independently and skipped — not fatal — if another module still references the row;
+  // that row is simply left in place as stale rather than aborting the whole crawl.
+  const staleAttrs = await sql<{ id: number }[]>`
+    SELECT a.attribute_id AS id FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    WHERE s.data_source_id = ${sourceId}
+      AND a.attribute_id != ALL(${touchedAttributeIds.length > 0 ? touchedAttributeIds : [-1]})
+  `;
+  for (const row of staleAttrs) {
+    try { await sql`DELETE FROM bayanat.data_attributes WHERE attribute_id = ${row.id}`; }
+    catch { /* referenced elsewhere (DQ rules, DSA columns, Open Data columns, ...) — left as stale */ }
+  }
+
+  const staleEntities = await sql<{ id: number }[]>`
+    SELECT e.entity_id AS id FROM bayanat.data_entities e
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    WHERE s.data_source_id = ${sourceId}
+      AND e.entity_id != ALL(${touchedEntityIds.length > 0 ? touchedEntityIds : [-1]})
+  `;
+  for (const row of staleEntities) {
+    try { await sql`DELETE FROM bayanat.data_entities WHERE entity_id = ${row.id}`; }
+    catch { /* referenced elsewhere (DSA datasets, lineage edges, ...) — left as stale */ }
+  }
+
+  const staleSchemas = await sql<{ id: number }[]>`
+    SELECT schema_id AS id FROM bayanat.data_schemas
+    WHERE data_source_id = ${sourceId}
+      AND schema_id != ALL(${touchedSchemaIds.length > 0 ? touchedSchemaIds : [-1]})
+  `;
+  for (const row of staleSchemas) {
+    try { await sql`DELETE FROM bayanat.data_schemas WHERE schema_id = ${row.id}`; }
+    catch { /* still has entities that couldn't be removed — left as stale */ }
   }
 }
 
