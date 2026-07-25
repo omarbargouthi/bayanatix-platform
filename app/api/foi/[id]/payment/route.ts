@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: Ctx) {
         ${body.paymentTypeCode ?? 'FULFILLMENT_FEE'},
         ${amount},
         ${body.referenceText?.trim() || null},
-        ${body.receivedAt ?? null},
+        ${body.receivedAt ?? new Date()},
         ${body.notes?.trim() || null},
         ${session.userId}
       )
