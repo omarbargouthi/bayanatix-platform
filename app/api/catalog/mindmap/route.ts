@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   // ── Column-level mindmap ───────────────────────────────────────────────────
   if (assetType === "DATA_ATTRIBUTES") {
-    const [attrRows, termRows, tagRows, dqRows, requestRows] = await Promise.all([
+    const [attrRows, termRows, tagRows, dqRows, requestRows, openDataRows, dsaRows] = await Promise.all([
       sql<{
         id: number; name: string; dataType: string;
         parentEntityId: number; parentEntityName: string;
@@ -84,6 +84,29 @@ export async function GET(req: Request) {
         JOIN bayanat.asset_requests ar ON ar.request_id = art.request_id
         WHERE art.asset_type_code = 'DATA_ATTRIBUTES' AND art.asset_id = ${assetId}
       `,
+
+      sql<{ id: number; label: string; meta: string | null; datasetId: number }[]>`
+        SELECT
+          odc.od_column_id     AS id,
+          od.dataset_name_text AS label,
+          od.status_code       AS meta,
+          od.dataset_id        AS "datasetId"
+        FROM bayanat.open_dataset_columns odc
+        JOIN bayanat.open_datasets od ON od.dataset_id = odc.dataset_id
+        WHERE odc.attribute_id = ${assetId} AND od.deleted_at IS NULL
+      `,
+
+      sql<{ id: number; label: string; meta: string | null; dsaId: number }[]>`
+        SELECT
+          da.dsa_attribute_id                                AS id,
+          dsa.title_text                                     AS label,
+          CONCAT(dd.dataset_direction, ' · ', dsa.status_code) AS meta,
+          dsa.dsa_id                                          AS "dsaId"
+        FROM bayanat.dsa_attributes da
+        JOIN bayanat.dsa_datasets dd ON dd.dsa_dataset_id = da.dsa_dataset_id
+        JOIN bayanat.data_sharing_agreements dsa ON dsa.dsa_id = dd.dsa_id
+        WHERE da.attribute_id = ${assetId}
+      `,
     ]);
 
     if (attrRows.length === 0) {
@@ -144,13 +167,31 @@ export async function GET(req: Request) {
           href: `/requests/${r.requestId}`,
         })),
       },
+      {
+        id: "openData",
+        label: "Open Data",
+        color: "#0d9488",
+        items: openDataRows.map((r) => ({
+          id: String(r.id), label: r.label, meta: r.meta ?? undefined,
+          href: `/open-data/${r.datasetId}`,
+        })),
+      },
+      {
+        id: "dataSharing",
+        label: "Data Sharing",
+        color: "#db2777",
+        items: dsaRows.map((r) => ({
+          id: String(r.id), label: r.label, meta: r.meta ?? undefined,
+          href: `/sharing/${r.dsaId}`,
+        })),
+      },
     ];
 
     return NextResponse.json({ asset, groups });
   }
 
   // ── Table-level mindmap (DATA_ENTITIES) ────────────────────────────────────
-  const [entityRows, termRows, tagRows, dqRows, requestRows, stewardRows, lineageRows] =
+  const [entityRows, termRows, tagRows, dqRows, requestRows, stewardRows, lineageRows, openDataRows, dsaRows] =
     await Promise.all([
       sql<{ id: number; name: string; rowCount: number | null; isView: boolean; description: string | null }[]>`
         SELECT
@@ -235,6 +276,28 @@ export async function GET(req: Request) {
         LEFT JOIN bayanat.data_entities te ON te.entity_id = dl.target_asset_id
         WHERE (dl.source_asset_id = ${assetId} OR dl.target_asset_id = ${assetId})
       `,
+
+      sql<{ id: number; label: string; meta: string | null }[]>`
+        SELECT DISTINCT
+          od.dataset_id        AS id,
+          od.dataset_name_text AS label,
+          od.status_code       AS meta
+        FROM bayanat.open_dataset_columns odc
+        JOIN bayanat.data_attributes a ON a.attribute_id = odc.attribute_id
+        JOIN bayanat.open_datasets od ON od.dataset_id = odc.dataset_id
+        WHERE a.entity_id = ${assetId} AND od.deleted_at IS NULL
+      `,
+
+      sql<{ id: number; label: string; meta: string | null; dsaId: number }[]>`
+        SELECT DISTINCT
+          dd.dsa_dataset_id                                    AS id,
+          dsa.title_text                                       AS label,
+          CONCAT(dd.dataset_direction, ' · ', dsa.status_code) AS meta,
+          dsa.dsa_id                                            AS "dsaId"
+        FROM bayanat.dsa_datasets dd
+        JOIN bayanat.data_sharing_agreements dsa ON dsa.dsa_id = dd.dsa_id
+        WHERE dd.entity_id = ${assetId} OR dd.inbound_entity_id = ${assetId}
+      `,
     ]);
 
   if (entityRows.length === 0) {
@@ -290,6 +353,24 @@ export async function GET(req: Request) {
       color: "#6366f1",
       items: lineageRows.map((r) => ({
         id: String(r.id), label: r.label ?? "Unknown", meta: r.direction,
+      })),
+    },
+    {
+      id: "openData",
+      label: "Open Data",
+      color: "#0d9488",
+      items: openDataRows.map((r) => ({
+        id: String(r.id), label: r.label, meta: r.meta ?? undefined,
+        href: `/open-data/${r.id}`,
+      })),
+    },
+    {
+      id: "dataSharing",
+      label: "Data Sharing",
+      color: "#db2777",
+      items: dsaRows.map((r) => ({
+        id: String(r.id), label: r.label, meta: r.meta ?? undefined,
+        href: `/sharing/${r.dsaId}`,
       })),
     },
   ];

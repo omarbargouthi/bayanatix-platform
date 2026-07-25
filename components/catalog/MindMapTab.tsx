@@ -83,6 +83,8 @@ const GROUP_ICONS: Record<string, string> = {
   stewards:    "👤",
   lineage:     "⛓️",
   parentTable: "🗄️",
+  openData:    "🌐",
+  dataSharing: "🤝",
 };
 
 // ── Custom node: Center asset — same "current asset" card language as the
