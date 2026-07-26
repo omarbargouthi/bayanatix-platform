@@ -309,6 +309,7 @@ function MindMapInner({
   const [data, setData] = useState<MindMapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set());
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -319,6 +320,7 @@ function MindMapInner({
       .then((r) => r.json())
       .then((d: MindMapData) => {
         setData(d);
+        setVisibleGroups(new Set(d.groups.map((g) => g.id)));
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -336,10 +338,23 @@ function MindMapInner({
     });
   }, []);
 
+  const toggleGroupVisible = useCallback((groupId: string) => {
+    setVisibleGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!data) return;
 
-    const { nodes: builtNodes, edges: builtEdges } = buildNodesAndEdges(data, expandedGroups);
+    const filteredData: MindMapData = { ...data, groups: data.groups.filter((g) => visibleGroups.has(g.id)) };
+    const { nodes: builtNodes, edges: builtEdges } = buildNodesAndEdges(filteredData, expandedGroups);
 
     const patchedNodes = builtNodes.map((n) => {
       if (n.type === "groupNode") {
@@ -354,7 +369,7 @@ function MindMapInner({
 
     setNodes(patchedNodes);
     setEdges(builtEdges);
-  }, [data, expandedGroups, handleToggle, setNodes, setEdges]);
+  }, [data, expandedGroups, visibleGroups, handleToggle, setNodes, setEdges]);
 
   if (loading) {
     return (
@@ -412,12 +427,26 @@ function MindMapInner({
         </div>
 
         <div className="flex items-center gap-3 ml-auto text-[11px] text-muted flex-wrap">
-          {data.groups.map((g) => (
-            <span key={g.id} className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
-              {g.label}
-            </span>
-          ))}
+          {data.groups.map((g) => {
+            const isVisible = visibleGroups.has(g.id);
+            return (
+              <label
+                key={g.id}
+                className={`flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${isVisible ? "" : "opacity-40"}`}
+                title={isVisible ? `Hide ${g.label}` : `Show ${g.label}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isVisible}
+                  onChange={() => toggleGroupVisible(g.id)}
+                  className="w-3 h-3 rounded border-line cursor-pointer"
+                  style={{ accentColor: g.color }}
+                />
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
+                {g.label}
+              </label>
+            );
+          })}
         </div>
       </div>
 
