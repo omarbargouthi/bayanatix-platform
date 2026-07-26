@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import type { DsaDetail } from "@/lib/queries/sharing";
+import { useLang } from "@/lib/lang-context";
+import { scopeLabels } from "@/lib/sharing-routing";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 type Props = {
   dsaId:      number | null;
@@ -10,25 +13,23 @@ type Props = {
   onSaved:    () => void;
 };
 
-const SCOPES     = ["INTERNAL","EXTERNAL_GOV","EXTERNAL_PRIVATE"];
-const SCOPE_LABELS: Record<string,string> = {
-  INTERNAL:         "Internal",
-  EXTERNAL_GOV:     "External – Government",
-  EXTERNAL_PRIVATE: "External – Private",
-};
+const SCOPES = ["INTERNAL","EXTERNAL_GOV","EXTERNAL_PRIVATE"];
 
-function getDirections(scope: string) {
+function getDirections(scope: string, s: I18nStrings["sharing"]) {
   const base = [
-    { value: "PROVIDER",      label: "Provider (we share out)" },
-    { value: "REQUESTER",     label: "Requester (we receive)" },
+    { value: "PROVIDER",      label: s.general.directionProviderFull },
+    { value: "REQUESTER",     label: s.general.directionRequesterFull },
   ];
   if (scope !== "INTERNAL") {
-    base.push({ value: "BIDIRECTIONAL", label: "Bidirectional (we share and receive)" });
+    base.push({ value: "BIDIRECTIONAL", label: s.general.directionBidirectionalFull });
   }
   return base;
 }
 
 export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
+  const { t } = useLang();
+  const s = t.sharing;
+  const SCOPE_LABELS = scopeLabels(s);
   const [form, setForm] = useState({
     titleText:            dsa?.titleText            ?? "",
     sharingScopeCode:     dsa?.sharingScopeCode     ?? "INTERNAL",
@@ -88,7 +89,7 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
       setTimeout(() => setSaved(false), 2000);
       onSaved();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed — please try again.");
+      setSaveError(err instanceof Error ? err.message : s.unexpectedError);
     } finally {
       setSaving(false);
     }
@@ -123,22 +124,23 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
       value={String(form[key] ?? "")}
       onChange={e => f(key, e.target.value as typeof form[typeof key])}
     >
-      <option value="">— Select —</option>
+      <option value="">{s.selectPlaceholder}</option>
       {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
 
   const isInternal = form.sharingScopeCode === "INTERNAL";
+  const g = s.general;
 
   return (
     <div className="max-w-3xl space-y-6">
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-ink text-sm">Agreement Details</h2>
+        <h2 className="font-semibold text-ink text-sm">{g.sectionDetails}</h2>
 
-        {field("Title", inp("titleText", "e.g. Sharing Employee Data with HRSD"), true)}
+        {field(g.fieldTitle, inp("titleText", g.fieldTitlePh), true)}
 
         <div className="grid grid-cols-2 gap-4">
-          {field("Sharing Scope", (
+          {field(g.fieldScope, (
             <select
               className="input w-full"
               disabled={!isEditable}
@@ -152,46 +154,46 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
                 setForm(prev => ({ ...prev, sharingScopeCode: scope, directionCode }));
               }}
             >
-              {SCOPES.map(s => <option key={s} value={s}>{SCOPE_LABELS[s]}</option>)}
+              {SCOPES.map(sc => <option key={sc} value={sc}>{SCOPE_LABELS[sc]}</option>)}
             </select>
           ), true)}
-          {field("Direction", sel("directionCode", getDirections(form.sharingScopeCode)), true)}
+          {field(g.fieldDirection, sel("directionCode", getDirections(form.sharingScopeCode, s)), true)}
         </div>
 
         {/* Department fields — Internal scope only */}
         {isInternal && (
           <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
             <div>
-              <p className="text-[10px] font-bold text-blue-700 uppercase mb-2">Internal Sharing Parties</p>
+              <p className="text-[10px] font-bold text-blue-700 uppercase mb-2">{g.internalParties}</p>
             </div>
             <div></div>
-            {field("From Department", inp("fromDepartmentText", "e.g. HR Department"), true)}
-            {field("To Department",   inp("toDepartmentText",   "e.g. Finance Department"), true)}
+            {field(g.fieldFromDept, inp("fromDepartmentText", g.fieldFromDeptPh), true)}
+            {field(g.fieldToDept,   inp("toDepartmentText",   g.fieldToDeptPh), true)}
           </div>
         )}
 
         {/* Counterparty — external scopes only */}
         {!isInternal && field(
-          "Counterparty Organization",
-          inp("counterpartyNameText", "Receiving or providing organization"),
+          g.fieldCounterparty,
+          inp("counterpartyNameText", g.fieldCounterpartyPh),
           true,
         )}
 
-        {field("Purpose (Legitimate Purpose)", (
+        {field(g.fieldPurpose, (
           <textarea
             className="input w-full h-20 resize-none"
             disabled={!isEditable}
-            placeholder="Describe the legal or business purpose for this data sharing…"
+            placeholder={g.fieldPurposePh}
             value={form.purposeText}
             onChange={e => f("purposeText", e.target.value)}
           />
         ), true)}
 
-        {field("Legal Basis", (
+        {field(g.fieldLegalBasis, (
           <textarea
             className="input w-full h-16 resize-none"
             disabled={!isEditable}
-            placeholder="Statute, mandate, or consent basis…"
+            placeholder={g.fieldLegalBasisPh}
             value={form.legalBasisText}
             onChange={e => f("legalBasisText", e.target.value)}
           />
@@ -199,15 +201,15 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
       </div>
 
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-ink text-sm">Sharing Parameters</h2>
+        <h2 className="font-semibold text-ink text-sm">{g.sectionParams}</h2>
 
         <div className="grid grid-cols-2 gap-4">
-          {field("Effective Start Date", (
+          {field(g.fieldStart, (
             <input type="date" className="input w-full" disabled={!isEditable}
               value={form.effectiveStartDate}
               onChange={e => f("effectiveStartDate", e.target.value)} />
           ), true)}
-          {field("Effective End Date", (
+          {field(g.fieldEnd, (
             <input type="date" className="input w-full" disabled={!isEditable}
               value={form.effectiveEndDate}
               onChange={e => f("effectiveEndDate", e.target.value)} />
@@ -215,37 +217,37 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          {field("Frequency", sel("sharingFrequencyCode", [
-            { value:"ONE_TIME", label:"One-time" },
-            { value:"DAILY",    label:"Daily" },
-            { value:"WEEKLY",   label:"Weekly" },
-            { value:"MONTHLY",  label:"Monthly" },
-            { value:"ON_DEMAND",label:"On-demand" },
-            { value:"REAL_TIME",label:"Real-time" },
+          {field(g.fieldFrequency, sel("sharingFrequencyCode", [
+            { value:"ONE_TIME", label:s.freq.oneTime },
+            { value:"DAILY",    label:s.freq.daily },
+            { value:"WEEKLY",   label:s.freq.weekly },
+            { value:"MONTHLY",  label:s.freq.monthly },
+            { value:"ON_DEMAND",label:s.freq.onDemand },
+            { value:"REAL_TIME",label:s.freq.realTime },
           ]), true)}
-          {field("Transfer Method", sel("sharingMethodCode", [
-            { value:"API",              label:"API" },
-            { value:"SFTP",             label:"SFTP" },
-            { value:"GSB",              label:"GSB (Govt Service Bus)" },
-            { value:"SECURE_PORTAL",    label:"Secure Portal" },
-            { value:"ENCRYPTED_MEDIA",  label:"Encrypted Media" },
-            { value:"DIRECT_DB_LINK",   label:"Direct DB Link" },
+          {field(g.fieldMethod, sel("sharingMethodCode", [
+            { value:"API",              label:s.method.api },
+            { value:"SFTP",             label:s.method.sftp },
+            { value:"GSB",              label:s.method.gsb },
+            { value:"SECURE_PORTAL",    label:s.method.securePortal },
+            { value:"ENCRYPTED_MEDIA",  label:s.method.encryptedMedia },
+            { value:"DIRECT_DB_LINK",   label:s.method.directDbLink },
           ]), true)}
-          {field("Data Format", sel("dataFormatCode", [
-            { value:"JSON",    label:"JSON" },
-            { value:"XML",     label:"XML" },
-            { value:"CSV",     label:"CSV" },
-            { value:"PARQUET", label:"Parquet" },
-            { value:"XLSX",    label:"Excel (XLSX)" },
-            { value:"PDF",     label:"PDF" },
-            { value:"OTHER",   label:"Other" },
+          {field(g.fieldFormat, sel("dataFormatCode", [
+            { value:"JSON",    label:s.format.json },
+            { value:"XML",     label:s.format.xml },
+            { value:"CSV",     label:s.format.csv },
+            { value:"PARQUET", label:s.format.parquet },
+            { value:"XLSX",    label:s.format.xlsx },
+            { value:"PDF",     label:s.format.pdf },
+            { value:"OTHER",   label:s.format.other },
           ]), true)}
         </div>
 
-        {field("PDPL Entity Role", sel("entityRoleCode", [
-          { value:"CONTROLLER", label:"Controller — we determine the purpose" },
-          { value:"PROCESSOR",  label:"Processor — we act on another Controller's behalf" },
-          { value:"MIXED",      label:"Mixed — depends on the dataset" },
+        {field(g.fieldPdplRole, sel("entityRoleCode", [
+          { value:"CONTROLLER", label:g.roleController },
+          { value:"PROCESSOR",  label:g.roleProcessor },
+          { value:"MIXED",      label:g.roleMixed },
         ]), true)}
 
         <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
@@ -259,11 +261,11 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
           />
           <div>
             <label htmlFor="crossBorder" className="text-sm font-medium text-ink cursor-pointer">
-              Cross-border transfer (recipient outside Saudi Arabia)
+              {g.crossBorderLabel}
             </label>
             {form.isCrossBorder && (
               <div className="text-[11px] text-red-600 mt-0.5 font-medium">
-                ⛔ Cross-border transfer is blocked in v1. This will fail the readiness check.
+                {g.crossBorderWarning}
               </div>
             )}
           </div>
@@ -276,7 +278,7 @@ export function DsaGeneralTab({ dsaId, dsa, isEditable, onSaved }: Props) {
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 w-full">{saveError}</p>
           )}
           <button onClick={save} disabled={saving} className="btn btn-primary">
-            {saving ? "Saving…" : saved ? "✓ Saved" : "Save"}
+            {saving ? t.common.saving : saved ? s.savedCheck : t.common.save}
           </button>
         </div>
       )}

@@ -1032,6 +1032,387 @@ export type I18nStrings = {
     dqSaveIssueBtn:         string;
   };
 
+  // ── Relationships (catalog mind-map) ───────────────────────────────────────
+  relationships: {
+    tabTitlePrefix: string;   // "Relationships" — rendered as "{tabTitlePrefix} · {name}"
+    expandAll:      string;
+    collapseAll:    string;
+    canvasHint:     string;
+    loadFailed:     string;
+    emptyTitle:     string;
+    emptyDesc:      string;
+    currentAsset:   string;
+    rowsSuffix:     string;   // "{n} rows"
+    moreSuffix:     string;   // "+{n} more"
+    hideCategory:   string;   // "Hide {name}"
+    showCategory:   string;   // "Show {name}"
+    badges: {
+      table:  string;
+      view:   string;
+      column: string;
+    };
+    groups: {
+      terms:       string;
+      tags:        string;
+      dq:          string;
+      requests:    string;
+      stewards:    string;
+      lineage:     string;
+      openData:    string;
+      dataSharing: string;
+      parentTable: string;
+    };
+  };
+
+  // ── Data Lineage graph ──────────────────────────────────────────────────────
+  lineage: {
+    searchPlaceholder: string;
+    tableLevel:         string;
+    columnLevel:         string;
+    upstreamLabel:       string;   // "Upstream {n}"
+    downstreamLabel:     string;   // "Downstream {n}"
+    emptyPrompt:         string;
+    loadingLineage:      string;
+    canvasHint:          string;
+    currentAsset:        string;
+    loadingColumns:      string;
+    layers: {
+      source:    string;
+      raw:       string;
+      staging:   string;
+      table:     string;
+      view:      string;
+      dashboard: string;
+    };
+    detail: {
+      quality:    string;
+      owner:      string;
+      rows:       string;
+      columns:    string;
+      downstream: string;
+      upstream:   string;
+    };
+    quality: {
+      good:     string;
+      unknown:  string;
+      critical: string;
+      warning:  string;
+    };
+    edge: {
+      transformation: string;
+      process:        string;
+      autoScanned:    string;
+      manual:         string;
+      confirm:        string;
+      confirming:     string;
+      confirmed:      string;
+    };
+    impact: {
+      titleDownstream: string;
+      titleUpstream:   string;
+      fromLabel:       string;   // "from {name}"
+      loading:         string;
+      assets:          string;
+      layers:          string;
+      dqIssues:        string;
+      noneDownstream:  string;
+      noneUpstream:    string;
+      hopLabel:        string;   // "Hop {n}"
+      schemaLabel:     string;   // "Schema: {name}"
+      ownerLabel:      string;   // "Owner: {name}"
+      viaLabel:        string;   // "via {name}"
+      exportCsv:       string;
+    };
+  };
+
+  // ── Data Sharing Agreements ─────────────────────────────────────────────────
+  sharing: {
+    // Registry (list) page
+    pageTitle:        string;
+    pageDesc:         string;
+    newAgreement:     string;
+    creatingEllipsis: string;
+    summaryActive:    string;
+    summaryPending:   string;
+    summaryExpiring:  string;
+    searchPlaceholder:string;
+    allStatuses:      string;
+    allScopes:        string;
+    colAgreement:     string;
+    colCounterparty:  string;
+    colScope:         string;
+    colMaxClass:      string;
+    colDatasets:      string;
+    colExpiry:        string;
+    colStatus:        string;
+    noAgreements:     string;
+    createFirst:      string;
+    notSet:           string;
+    deleteDraftTitle: string;
+    agreementsTotal:  string;   // "{n} agreements"
+    prevPage:         string;
+    nextPage:         string;
+    pageOf:           string;   // "Page {page} / {total}"
+    deleteConfirm:    string;   // 'Delete "{title}"? This cannot be undone.'
+    piBadge:          string;
+
+    // Editor shell
+    backToAgreements:    string;
+    newAgreementTitle:   string;
+    expiresLabel:        string;  // "Expires {date}"
+    containsPersonalData:string;
+    submitForApproval:   string;
+    validatingEllipsis:  string;
+    readinessFailedTitle:string;
+    submittedSuccess:    string;
+    unexpectedError:     string;
+    serverErrorTemplate: string;  // "Server error (HTTP {status})"
+    tabGeneral:          string;
+    tabDatasets:         string;
+    tabTerms:            string;
+    tabAuthorizations:   string;
+    tabApprovals:        string;
+    selectPlaceholder:   string;
+    savedCheck:          string;
+
+    general: {
+      sectionDetails:       string;
+      fieldTitle:           string;
+      fieldTitlePh:         string;
+      fieldScope:           string;
+      fieldDirection:       string;
+      internalParties:      string;
+      fieldFromDept:        string;
+      fieldFromDeptPh:      string;
+      fieldToDept:          string;
+      fieldToDeptPh:        string;
+      fieldCounterparty:    string;
+      fieldCounterpartyPh:  string;
+      fieldPurpose:         string;
+      fieldPurposePh:       string;
+      fieldLegalBasis:      string;
+      fieldLegalBasisPh:    string;
+      sectionParams:        string;
+      fieldStart:           string;
+      fieldEnd:             string;
+      fieldFrequency:       string;
+      fieldMethod:          string;
+      fieldFormat:          string;
+      fieldPdplRole:        string;
+      crossBorderLabel:     string;
+      crossBorderWarning:   string;
+      directionProviderFull:      string;
+      directionRequesterFull:     string;
+      directionBidirectionalFull: string;
+      roleController: string;
+      roleProcessor:  string;
+      roleMixed:      string;
+    };
+
+    freq: {
+      oneTime:  string;
+      daily:    string;
+      weekly:   string;
+      monthly:  string;
+      onDemand: string;
+      realTime: string;
+    };
+    method: {
+      api:             string;
+      sftp:            string;
+      gsb:             string;
+      securePortal:    string;
+      encryptedMedia:  string;
+      directDbLink:    string;
+    };
+    format: {
+      json:    string;
+      xml:     string;
+      csv:     string;
+      parquet: string;
+      xlsx:    string;
+      pdf:     string;
+      other:   string;
+    };
+
+    terms: {
+      sectionSecurity:          string;
+      fieldSecurityControls:    string;
+      fieldSecurityControlsPh:  string;
+      fieldStorageConditions:   string;
+      fieldStorageConditionsPh: string;
+      sectionObligations:       string;
+      fieldDestruction:         string;
+      fieldDestructionPh:       string;
+      fieldLiability:           string;
+      fieldLiabilityPh:         string;
+      fieldReview:              string;
+      fieldReviewPh:            string;
+      sectionReferences:        string;
+      fieldRiskRef:             string;
+      fieldRiskRefPh:           string;
+      riskRefHint:              string;
+      fieldSignedDoc:           string;
+      fieldSignedDocPh:         string;
+      signedDocHint:            string;
+    };
+
+    approvals: {
+      emptyState:            string;
+      progressTitle:         string;
+      progressDesc:          string;
+      currentStatusLabel:    string;  // "Current status: {status}"
+      optionalLabel:         string;
+      commentsLabel:         string;
+      commentsPhApproved:    string;
+      commentsPhOther:       string;
+      delegationRefLabel:    string;
+      delegationRefPh:       string;
+      recordDecisionBtn:     string;
+      confirmBtn:            string;
+      commentsRequiredAlert: string;
+      decisionFailedError:   string;
+      slaNote:               string;
+      station: {
+        dataOwner:    string;
+        dataPrivacy:  string;
+        dmoReview:    string;
+        execDelegate: string;
+      };
+      decision: {
+        pending:  string;
+        approved: string;
+        rejected: string;
+        returned: string;
+      };
+    };
+
+    auth: {
+      processorNoticeTitle: string;
+      processorNoticeText:  string;
+      controllerNoticeTitle:string;
+      controllerNoticeText: string;
+      sectionTitle:         string;
+      addBtn:               string;
+      newTitle:             string;
+      fieldControllerName:  string;
+      fieldControllerNamePh:string;
+      fieldEvidenceRef:     string;
+      fieldEvidenceRefPh:   string;
+      fieldScope:           string;
+      fieldScopePh:         string;
+      fieldIssued:          string;
+      fieldValidUntil:      string;
+      noneYet:              string;
+      noneRequired:         string;
+      refLabel:             string;  // "Ref: {ref}"
+      issuedLabel:          string;  // "Issued: {date}"
+      validUntilLabel:      string;  // "Valid until: {date}"
+      verifiedByLabel:      string;  // "✓ Verified by {name}"
+      pendingVerification:  string;
+      removeConfirm:        string;
+    };
+
+    datasets: {
+      outboundTitle:       string;
+      outboundDesc:        string;
+      addFromCatalogBtn:   string;
+      noOutboundYet:       string;
+      noOutboundHint:      string;
+      inboundTitle:        string;
+      inboundDesc:         string;
+      addInboundBtn:       string;
+      inboundFormTitle:    string;
+      fieldDatasetName:    string;
+      fieldDatasetNamePh:  string;
+      fieldDescPh:         string;
+      addingEllipsis:      string;
+      noInboundYet:        string;
+      noInboundHint:       string;
+      unknownEntity:       string;
+      unnamedDataset:      string;
+      linkedLabel:         string;  // "Linked: {name}"
+      assignBtn:           string;
+      notLinkedYet:        string;
+      attributesCountLabel:string;  // "{n} attributes"
+      removeBtn:           string;
+      removeConfirm:       string;
+      noAttrsSelected:     string;
+      colAttribute:        string;
+      colClassification:   string;
+      colPi:               string;
+      colTreatment:        string;
+      colDq:               string;
+      unclassifiedBadge:   string;
+      classifyLink:        string;
+      piLabel:             string;
+      notScoredLabel:      string;
+      rulesLink:           string;  // "{n} rules"
+      hideLink:            string;
+      addIssueLink:        string;
+      addIssueTitle:       string;
+      loadingDqRules:      string;
+      notRunLabel:         string;
+      editDqIssueTitle:    string;
+      addDqIssueTitle:     string;
+      dqDimensionPlaceholder: string;
+      dqIssuePlaceholder:  string;
+      saveChangesBtn:      string;
+      saveIssueBtn:        string;
+      assignClassLabel:    string;
+      selectTermPlaceholder: string;
+      addOutboundModalTitle: string;
+      searchTablesPh:      string;
+      noTablesFound:       string;
+      selectAttrsLabel:    string;  // "Select Attributes ({n} selected)"
+      selectAllBtn:        string;
+      deselectAllBtn:      string;
+      noAttrsFound:        string;
+      selectTablePrompt:   string;
+      addAttrsBtn:         string;  // "Add {n} attributes"
+      linkModalTitle:      string;
+      searchCatalogPh:     string;
+      searchTablePrompt:   string;
+      treatment: {
+        asIs:          string;
+        masked:        string;
+        anonymized:    string;
+        pseudonymized: string;
+        aggregated:    string;
+      };
+      severity: {
+        info:    string;
+        warning: string;
+        blocker: string;
+      };
+    };
+
+    status: {
+      draft:         string;
+      validation:    string;
+      ownerReview:   string;
+      privacyReview: string;
+      dmoReview:     string;
+      execApproval:  string;
+      approved:      string;
+      active:        string;
+      suspended:     string;
+      terminated:    string;
+      expired:       string;
+      renewalDraft:  string;
+    };
+    scope: {
+      internal:        string;
+      externalGov:     string;
+      externalPrivate: string;
+    };
+    direction: {
+      provider:      string;
+      requester:     string;
+      bidirectional: string;
+    };
+  };
+
   // ── Classification ───────────────────────────────────────────────────────────
   classification: {
     pageTitle:              string;

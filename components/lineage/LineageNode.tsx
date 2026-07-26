@@ -2,10 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Handle, Position } from "@xyflow/react";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
-export const LAYER_LABELS: Record<string, string> = {
-  SOURCE: "Source", RAW: "Raw", STAGING: "Staging", TABLE: "Table", VIEW: "View", DASHBOARD: "Dashboard",
-};
+export function layerLabels(t: I18nStrings["lineage"]): Record<string, string> {
+  return {
+    SOURCE: t.layers.source, RAW: t.layers.raw, STAGING: t.layers.staging,
+    TABLE: t.layers.table, VIEW: t.layers.view, DASHBOARD: t.layers.dashboard,
+  };
+}
 
 export const LAYER_COLORS: Record<string, string> = {
   SOURCE:    "bg-slate-100 text-slate-600",
@@ -33,12 +37,14 @@ export type LineageNodeData = {
   columns: LineageNodeColumn[]; // columns on the traced path (attribute-level scope)
   scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
   onSelectColumn: (entityId: number, attributeId: number, name: string) => void;
+  t: I18nStrings["lineage"];
 };
 
 export function LineageNodeCard({ data }: { data: LineageNodeData }) {
   const [expanded, setExpanded] = useState(false);
   const [allColumns, setAllColumns] = useState<{ attributeId: number; name: string; qualityStatus: string }[] | null>(null);
   const [loadingCols, setLoadingCols] = useState(false);
+  const labels = layerLabels(data.t);
 
   useEffect(() => {
     if (!expanded || allColumns !== null) return;
@@ -63,7 +69,7 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
 
       {data.isCurrent && (
         <div className="absolute -top-6 left-0 text-[10px] font-bold text-white bg-brand-purple px-2 py-0.5 rounded-full whitespace-nowrap">
-          CURRENT ASSET
+          {data.t.currentAsset}
         </div>
       )}
 
@@ -71,7 +77,7 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
         <span className="text-sky-500 text-sm shrink-0">▤</span>
         <span className="text-sm font-semibold text-brand-purple truncate flex-1 min-w-0">{data.entityName}</span>
         <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${LAYER_COLORS[data.layerCode ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
-          {LAYER_LABELS[data.layerCode ?? ""] ?? data.layerCode ?? "—"}
+          {labels[data.layerCode ?? ""] ?? data.layerCode ?? "—"}
         </span>
       </div>
 
@@ -83,7 +89,7 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
         {(data.qualityStatus === "CRITICAL" || data.qualityStatus === "WARNING") && (
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${data.qualityStatus === "CRITICAL" ? "bg-red-500" : "bg-amber-500"}`}
-            title={`Quality: ${data.qualityStatus}`}
+            title={`${data.t.detail.quality}: ${data.qualityStatus === "CRITICAL" ? data.t.quality.critical : data.t.quality.warning}`}
           />
         )}
         {data.hasUpstreamIssue && (
@@ -93,13 +99,13 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
           onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
           className="text-[10px] text-slate-400 hover:text-brand-purple ml-auto transition-colors"
         >
-          {data.columnCount} column{data.columnCount === 1 ? "" : "s"} {expanded ? "︿" : "⌄"}
+          {data.columnCount} {data.t.detail.columns} {expanded ? "︿" : "⌄"}
         </button>
       </div>
 
       {expanded && (
         <div className="mt-1.5 pt-1.5 border-t border-slate-100 space-y-0.5 max-h-32 overflow-y-auto nice-scroll">
-          {loadingCols && <div className="text-[10px] text-slate-400 py-1">Loading…</div>}
+          {loadingCols && <div className="text-[10px] text-slate-400 py-1">{data.t.loadingColumns}</div>}
           {allColumns?.map((c) => (
             <button
               key={c.attributeId}

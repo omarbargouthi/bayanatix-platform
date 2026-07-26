@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -55,6 +57,7 @@ type CenterNodeData = {
   isView: boolean;
   assetType?: string;
   description?: string | null;
+  t: I18nStrings["relationships"];
 };
 
 type GroupNodeData = {
@@ -94,7 +97,7 @@ function CenterNode({ data }: NodeProps) {
   const d = data as unknown as CenterNodeData;
   const isColumn = d.assetType === "DATA_ATTRIBUTES";
   const icon = isColumn ? "▥" : "▤";
-  const badge = isColumn ? "Column" : d.isView ? "View" : "Table";
+  const badge = isColumn ? d.t.badges.column : d.isView ? d.t.badges.view : d.t.badges.table;
   const badgeClass = isColumn ? "bg-purple-100 text-purple-700" : d.isView ? "bg-teal-100 text-teal-700" : "bg-indigo-100 text-indigo-700";
 
   return (
@@ -103,7 +106,7 @@ function CenterNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} className="!bg-slate-400 !w-2 !h-2 !border-0" />
 
       <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white bg-brand-purple px-2 py-0.5 rounded-full whitespace-nowrap">
-        CURRENT ASSET
+        {d.t.currentAsset}
       </div>
 
       <div className="flex items-center justify-center gap-1.5 mb-1 min-w-0">
@@ -111,7 +114,7 @@ function CenterNode({ data }: NodeProps) {
         <span className="text-sm font-semibold text-brand-purple truncate" title={d.name}>{d.name}</span>
       </div>
       {d.rowCount != null && (
-        <div className="text-[10px] text-slate-400">{d.rowCount.toLocaleString()} rows</div>
+        <div className="text-[10px] text-slate-400">{d.t.rowsSuffix.replace("{n}", d.rowCount.toLocaleString())}</div>
       )}
       {isColumn && d.description && (
         <div className="text-[10px] text-slate-400 font-mono truncate">{d.description}</div>
@@ -194,7 +197,8 @@ function degToRad(deg: number) {
 
 function buildNodesAndEdges(
   data: MindMapData,
-  expandedGroups: Set<string>
+  expandedGroups: Set<string>,
+  t: I18nStrings["relationships"],
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -209,6 +213,7 @@ function buildNodesAndEdges(
       isView: data.asset.isView,
       assetType: data.asset.assetType,
       description: data.asset.description,
+      t,
     } as unknown as Record<string, unknown>,
   });
 
@@ -225,6 +230,7 @@ function buildNodesAndEdges(
     const isExpanded = expandedGroups.has(group.id);
 
     const groupNodeId = `group-${group.id}`;
+    const groupLabel = t.groups[group.id as keyof typeof t.groups] ?? group.label;
 
     nodes.push({
       id: groupNodeId,
@@ -232,7 +238,7 @@ function buildNodesAndEdges(
       position: { x: gx, y: gy },
       data: {
         groupId: group.id,
-        label: group.label,
+        label: groupLabel,
         color: group.color,
         count: group.items.length,
         expanded: isExpanded,
@@ -252,7 +258,7 @@ function buildNodesAndEdges(
       const visibleItems = group.items.slice(0, MAX_ITEMS);
       const hasMore = group.items.length > MAX_ITEMS;
       const displayItems = hasMore
-        ? [...visibleItems, { id: `more-${group.id}`, label: `+${group.items.length - MAX_ITEMS} more` }]
+        ? [...visibleItems, { id: `more-${group.id}`, label: t.moreSuffix.replace("{n}", String(group.items.length - MAX_ITEMS)) }]
         : visibleItems;
 
       const spreadDeg = Math.min(80, displayItems.length * 18);
@@ -306,6 +312,7 @@ function MindMapInner({
   entityName: string;
   height?: number;
 }) {
+  const { t } = useLang();
   const [data, setData] = useState<MindMapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -354,7 +361,7 @@ function MindMapInner({
     if (!data) return;
 
     const filteredData: MindMapData = { ...data, groups: data.groups.filter((g) => visibleGroups.has(g.id)) };
-    const { nodes: builtNodes, edges: builtEdges } = buildNodesAndEdges(filteredData, expandedGroups);
+    const { nodes: builtNodes, edges: builtEdges } = buildNodesAndEdges(filteredData, expandedGroups, t.relationships);
 
     const patchedNodes = builtNodes.map((n) => {
       if (n.type === "groupNode") {
@@ -369,7 +376,7 @@ function MindMapInner({
 
     setNodes(patchedNodes);
     setEdges(builtEdges);
-  }, [data, expandedGroups, visibleGroups, handleToggle, setNodes, setEdges]);
+  }, [data, expandedGroups, visibleGroups, handleToggle, setNodes, setEdges, t.relationships]);
 
   if (loading) {
     return (
@@ -382,7 +389,7 @@ function MindMapInner({
   if (!data) {
     return (
       <div className="card p-10 text-center">
-        <h3 className="font-semibold text-ink mb-1">Failed to load relationships</h3>
+        <h3 className="font-semibold text-ink mb-1">{t.relationships.loadFailed}</h3>
       </div>
     );
   }
@@ -393,9 +400,9 @@ function MindMapInner({
     return (
       <div className="card p-10 text-center">
         <div className="text-4xl mb-3">🕸️</div>
-        <h3 className="font-semibold text-ink mb-1">No relationships found</h3>
+        <h3 className="font-semibold text-ink mb-1">{t.relationships.emptyTitle}</h3>
         <p className="text-sm text-muted max-w-sm mx-auto">
-          This asset has no linked business terms, tags, DQ rules, requests, stewards, or lineage yet.
+          {t.relationships.emptyDesc}
         </p>
       </div>
     );
@@ -408,7 +415,7 @@ function MindMapInner({
       {/* ── Top bar — same shell as the Lineage graph's top bar ── */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-line shrink-0 flex-wrap">
         <span className="text-xs font-semibold text-ink-soft truncate max-w-[220px]" title={entityName}>
-          Relationships · {entityName}
+          {t.relationships.tabTitlePrefix} · {entityName}
         </span>
 
         <div className="flex rounded-lg border border-line overflow-hidden text-xs font-medium">
@@ -416,24 +423,25 @@ function MindMapInner({
             onClick={() => setExpandedGroups(new Set(expandableGroups.map((g) => g.id)))}
             className={`px-3 py-1.5 transition-colors ${allExpanded ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas-soft"}`}
           >
-            Expand all
+            {t.relationships.expandAll}
           </button>
           <button
             onClick={() => setExpandedGroups(new Set())}
             className={`px-3 py-1.5 border-l border-line transition-colors ${expandedGroups.size === 0 ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas-soft"}`}
           >
-            Collapse all
+            {t.relationships.collapseAll}
           </button>
         </div>
 
         <div className="flex items-center gap-3 ml-auto text-[11px] text-muted flex-wrap">
           {data.groups.map((g) => {
             const isVisible = visibleGroups.has(g.id);
+            const groupLabel = t.relationships.groups[g.id as keyof typeof t.relationships.groups] ?? g.label;
             return (
               <label
                 key={g.id}
                 className={`flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${isVisible ? "" : "opacity-40"}`}
-                title={isVisible ? `Hide ${g.label}` : `Show ${g.label}`}
+                title={isVisible ? t.relationships.hideCategory.replace("{name}", groupLabel) : t.relationships.showCategory.replace("{name}", groupLabel)}
               >
                 <input
                   type="checkbox"
@@ -443,7 +451,7 @@ function MindMapInner({
                   style={{ accentColor: g.color }}
                 />
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
-                {g.label}
+                {groupLabel}
               </label>
             );
           })}
@@ -470,7 +478,7 @@ function MindMapInner({
         </ReactFlow>
 
         <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur border border-line rounded-full px-3 py-1.5 text-[11px] text-muted shadow-sm">
-          Click a category to expand · drag to pan · scroll to zoom
+          {t.relationships.canvasHint}
         </div>
       </div>
     </div>

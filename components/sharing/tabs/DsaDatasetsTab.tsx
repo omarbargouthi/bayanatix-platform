@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import type { DsaDataset, DsaAttribute, DsaDqIssue } from "@/lib/queries/sharing";
 import type { ColumnDqRule } from "@/app/api/open-data/column-dq/route";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 type Entity       = { entityId: number; entityName: string; schemaName: string; sourceName: string };
 type ClassTerm    = { glossaryId: number; termName: string; classCode: string };
@@ -12,15 +14,17 @@ type AttrOption   = {
   dqScore: number | null; dqRuleCount: number;
 };
 
-const TREATMENT_LABELS: Record<string,string> = {
-  AS_IS:"As-Is", MASKED:"Masked", ANONYMIZED:"Anonymized",
-  PSEUDONYMIZED:"Pseudonymized", AGGREGATED:"Aggregated",
-};
+function treatmentLabels(ds: I18nStrings["sharing"]["datasets"]): Record<string,string> {
+  return {
+    AS_IS: ds.treatment.asIs, MASKED: ds.treatment.masked, ANONYMIZED: ds.treatment.anonymized,
+    PSEUDONYMIZED: ds.treatment.pseudonymized, AGGREGATED: ds.treatment.aggregated,
+  };
+}
 
-function DqScoreBadge({ score, ruleCount }: { score: number | null; ruleCount: number }) {
+function DqScoreBadge({ score, ruleCount, ds }: { score: number | null; ruleCount: number; ds: I18nStrings["sharing"]["datasets"] }) {
   if (score == null) {
     return ruleCount > 0
-      ? <span className="text-[10px] text-slate-400 italic">Not scored</span>
+      ? <span className="text-[10px] text-slate-400 italic">{ds.notScoredLabel}</span>
       : <span className="text-[11px] text-slate-400">—</span>;
   }
   const pct   = Math.round(score);
@@ -32,8 +36,8 @@ function DqScoreBadge({ score, ruleCount }: { score: number | null; ruleCount: n
   return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${color}`}>{pct}%</span>;
 }
 
-function RuleStatusBadge({ status, score }: { status: string | null; score: number | null }) {
-  if (!status) return <span className="text-[10px] text-slate-400">Not run</span>;
+function RuleStatusBadge({ status, score, ds }: { status: string | null; score: number | null; ds: I18nStrings["sharing"]["datasets"] }) {
+  if (!status) return <span className="text-[10px] text-slate-400">{ds.notRunLabel}</span>;
   const cfg = status === "PASSED"
     ? { bg: "bg-emerald-50 text-emerald-700", icon: "✓" }
     : status === "FAILED"
@@ -81,6 +85,10 @@ type Props = {
 };
 
 export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, canClassify, dqIssues, onChanged }: Props) {
+  const { t } = useLang();
+  const ds = t.sharing.datasets;
+  const TREATMENT_LABELS = treatmentLabels(ds);
+  const SEVERITY_LABELS: Record<string,string> = { INFO: ds.severity.info, WARNING: ds.severity.warning, BLOCKER: ds.severity.blocker };
   const outbound = datasets.filter(d => d.datasetDirection === "OUTBOUND");
   const inbound  = datasets.filter(d => d.datasetDirection === "INBOUND");
 
@@ -228,7 +236,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
   }
 
   async function removeDataset(dsaDatasetId: number) {
-    if (!confirm("Remove this dataset and all its attributes from the agreement?")) return;
+    if (!confirm(ds.removeConfirm)) return;
     await fetch(`/api/sharing/dsas/${dsaId}/datasets?dsaDatasetId=${dsaDatasetId}`, { method: "DELETE" });
     setAttrMap(m => { const n = { ...m }; delete n[dsaDatasetId]; return n; });
     onChanged();
@@ -370,7 +378,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
           <div className="flex items-center gap-1.5">
             {effectiveClass
               ? <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${CLASS_COLORS[effectiveClass] ?? "bg-gray-100 text-gray-600"}`}>{effectiveClass}</span>
-              : <span className="text-[10px] text-red-500 italic font-medium">Unclassified</span>}
+              : <span className="text-[10px] text-red-500 italic font-medium">{ds.unclassifiedBadge}</span>}
             {unclassified && canClassify && !isClassifying && (
               <button
                 onClick={async () => {
@@ -379,35 +387,35 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 }}
                 className="text-[10px] text-blue-600 hover:underline shrink-0"
               >
-                Classify
+                {ds.classifyLink}
               </button>
             )}
           </div>
           <div className="text-[11px]">
             {(attr.isPersonalData || attr.liveIsPii)
-              ? <span className="text-purple-600 font-medium">PI</span>
+              ? <span className="text-purple-600 font-medium">{ds.piLabel}</span>
               : <span className="text-muted">—</span>}
           </div>
           <div className="text-[11px] text-muted">
             {TREATMENT_LABELS[attr.treatmentCode] ?? attr.treatmentCode}
           </div>
           <div className="flex items-center gap-1.5">
-            <DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} />
+            <DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} ds={ds} />
             {attr.dqRuleCount > 0 && (
               <button
                 onClick={() => fetchDqRules(attr.attributeId)}
                 className="text-[10px] text-sky-600 hover:underline shrink-0"
               >
-                {rules !== undefined ? "hide" : `${attr.dqRuleCount} rule${attr.dqRuleCount > 1 ? "s" : ""} ↓`}
+                {rules !== undefined ? ds.hideLink : `${ds.rulesLink.replace("{n}", String(attr.dqRuleCount))} ↓`}
               </button>
             )}
             {isEditable && !dqForm?.open && (
               <button
                 onClick={() => openNewIssueForm(attr.attributeId)}
                 className="text-[10px] text-muted hover:text-brand-purple shrink-0"
-                title="Add a DQ issue note"
+                title={ds.addIssueTitle}
               >
-                + Issue
+                {ds.addIssueLink}
               </button>
             )}
           </div>
@@ -415,7 +423,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
 
         {/* DQ rules panel */}
         {rulesLoading && (
-          <div className="mx-5 mb-2 text-[11px] text-slate-400 animate-pulse">Loading DQ rules…</div>
+          <div className="mx-5 mb-2 text-[11px] text-slate-400 animate-pulse">{ds.loadingDqRules}</div>
         )}
         {rules && rules.length > 0 && (
           <div className="mx-5 mb-3 p-3 bg-sky-50/60 border border-sky-100 rounded-lg space-y-1.5">
@@ -427,7 +435,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">{rule.dimensionName}</span>
                   )}
                 </div>
-                <RuleStatusBadge status={rule.lastStatus} score={rule.lastScore} />
+                <RuleStatusBadge status={rule.lastStatus} score={rule.lastScore} ds={ds} />
               </div>
             ))}
           </div>
@@ -444,14 +452,14 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                       <span className="text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{issue.dimensionName}</span>
                     )}
                     <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${SEVERITY_COLORS[issue.severityCode]}`}>
-                      {issue.severityCode}
+                      {SEVERITY_LABELS[issue.severityCode] ?? issue.severityCode}
                     </span>
                   </div>
                   <p className="text-[12px] text-ink mt-0.5">{issue.issueText}</p>
                 </div>
                 {isEditable && (
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => openEditIssueForm(attr.attributeId, issue)} className="text-[11px] text-sky-500 hover:text-sky-700">Edit</button>
+                    <button onClick={() => openEditIssueForm(attr.attributeId, issue)} className="text-[11px] text-sky-500 hover:text-sky-700">{t.common.edit}</button>
                     <button onClick={() => removeDqIssue(issue.issueId)} className="text-[11px] text-red-400 hover:text-red-600">×</button>
                   </div>
                 )}
@@ -464,7 +472,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
         {dqForm?.open && (
           <div className="mx-5 mb-3 p-3 bg-amber-50 border border-amber-100 rounded-lg space-y-2">
             <p className="text-[11px] font-medium text-amber-700">
-              {dqForm.issueId != null ? "Edit DQ Issue Note" : "Add DQ Issue Note"}
+              {dqForm.issueId != null ? ds.editDqIssueTitle : ds.addDqIssueTitle}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <select
@@ -472,7 +480,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 onChange={e => updateDqFormField(attr.attributeId, "dimension", e.target.value)}
                 className="input input-sm text-[12px]"
               >
-                <option value="">— DQ Dimension (optional) —</option>
+                <option value="">{ds.dqDimensionPlaceholder}</option>
                 {(dqDimensions ?? []).map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
               </select>
               <select
@@ -480,26 +488,26 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 onChange={e => updateDqFormField(attr.attributeId, "severity", e.target.value)}
                 className="input input-sm text-[12px]"
               >
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="BLOCKER">Blocker</option>
+                <option value="INFO">{ds.severity.info}</option>
+                <option value="WARNING">{ds.severity.warning}</option>
+                <option value="BLOCKER">{ds.severity.blocker}</option>
               </select>
             </div>
             <textarea
               value={dqForm.text}
               onChange={e => updateDqFormField(attr.attributeId, "text", e.target.value)}
-              placeholder="Describe the data quality issue for this column…"
+              placeholder={ds.dqIssuePlaceholder}
               rows={2}
               className="input w-full text-[12px] resize-none"
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => closeDqForm(attr.attributeId)} className="btn btn-sm text-[11px]" disabled={dqIssueSaving}>Cancel</button>
+              <button onClick={() => closeDqForm(attr.attributeId)} className="btn btn-sm text-[11px]" disabled={dqIssueSaving}>{t.common.cancel}</button>
               <button
                 onClick={() => submitDqIssue(attr.attributeId)}
                 disabled={!dqForm.text.trim() || dqIssueSaving}
                 className="btn btn-primary btn-sm text-[11px]"
               >
-                {dqIssueSaving ? "Saving…" : dqForm.issueId != null ? "Save Changes" : "Save Issue"}
+                {dqIssueSaving ? t.common.saving : dqForm.issueId != null ? ds.saveChangesBtn : ds.saveIssueBtn}
               </button>
             </div>
           </div>
@@ -508,7 +516,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
         {/* Inline classification panel */}
         {isClassifying && classTerms && (
           <div className="mx-5 mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-3">
-            <span className="text-[11px] text-blue-700 font-semibold shrink-0">Assign classification:</span>
+            <span className="text-[11px] text-blue-700 font-semibold shrink-0">{ds.assignClassLabel}</span>
             <select
               className="input input-sm flex-1 text-[12px]"
               defaultValue=""
@@ -519,10 +527,10 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
               }}
               disabled={classifyBusy}
             >
-              <option value="">— Select term —</option>
-              {classTerms.map(t => (
-                <option key={t.glossaryId} value={t.glossaryId}>
-                  {t.termName} ({t.classCode})
+              <option value="">{ds.selectTermPlaceholder}</option>
+              {classTerms.map(ct => (
+                <option key={ct.glossaryId} value={ct.glossaryId}>
+                  {ct.termName} ({ct.classCode})
                 </option>
               ))}
             </select>
@@ -539,69 +547,69 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
     );
   }
 
-  function renderDatasetCard(ds: DsaDataset, type: "OUTBOUND" | "INBOUND") {
+  function renderDatasetCard(dataset: DsaDataset, type: "OUTBOUND" | "INBOUND") {
     const label  = type === "OUTBOUND"
-      ? (ds.entityName ?? "Unknown entity")
-      : (ds.inboundNameText ?? "Unnamed");
+      ? (dataset.entityName ?? ds.unknownEntity)
+      : (dataset.inboundNameText ?? ds.unnamedDataset);
     const sublabel = type === "OUTBOUND"
-      ? `${ds.sourceName ?? ""} › ${ds.schemaName ?? ""}`
-      : (ds.inboundDescriptionText ?? "");
+      ? `${dataset.sourceName ?? ""} › ${dataset.schemaName ?? ""}`
+      : (dataset.inboundDescriptionText ?? "");
 
     return (
-      <div key={ds.dsaDatasetId} className="card overflow-hidden">
+      <div key={dataset.dsaDatasetId} className="card overflow-hidden">
         <div
           className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-canvas-soft"
-          onClick={() => type === "OUTBOUND" && toggleExpand(ds.dsaDatasetId)}
+          onClick={() => type === "OUTBOUND" && toggleExpand(dataset.dsaDatasetId)}
         >
           {type === "OUTBOUND" && (
-            <span className="text-muted text-[11px]">{expanded === ds.dsaDatasetId ? "▼" : "▶"}</span>
+            <span className="text-muted text-[11px]">{expanded === dataset.dsaDatasetId ? "▼" : "▶"}</span>
           )}
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-ink">{label}</div>
             {sublabel && <div className="text-[11px] text-muted truncate">{sublabel}</div>}
             {type === "INBOUND" && (
               <div className="mt-1 flex items-center gap-2">
-                {ds.inboundEntityId
-                  ? <span className="text-[10px] text-green-600 font-medium">Linked: {ds.inboundEntityName}</span>
+                {dataset.inboundEntityId
+                  ? <span className="text-[10px] text-green-600 font-medium">{ds.linkedLabel.replace("{name}", dataset.inboundEntityName ?? "")}</span>
                   : isEditable
                     ? <button
-                        onClick={e => { e.stopPropagation(); setAssigningDatasetId(ds.dsaDatasetId); setAssignSearch(""); }}
+                        onClick={e => { e.stopPropagation(); setAssigningDatasetId(dataset.dsaDatasetId); setAssignSearch(""); }}
                         className="text-[10px] text-brand-purple hover:underline font-medium"
-                      >+ Assign to catalog entity</button>
-                    : <span className="text-[10px] text-amber-600 italic">Not yet linked to catalog</span>
+                      >{ds.assignBtn}</button>
+                    : <span className="text-[10px] text-amber-600 italic">{ds.notLinkedYet}</span>
                 }
               </div>
             )}
           </div>
           {type === "OUTBOUND" && (
-            <span className="text-[11px] text-muted">{ds.attributeCount} attributes</span>
+            <span className="text-[11px] text-muted">{ds.attributesCountLabel.replace("{n}", String(dataset.attributeCount))}</span>
           )}
           {isEditable && (
             <button
-              onClick={e => { e.stopPropagation(); removeDataset(ds.dsaDatasetId); }}
+              onClick={e => { e.stopPropagation(); removeDataset(dataset.dsaDatasetId); }}
               className="text-[11px] text-red-400 hover:text-red-600 px-2"
             >
-              Remove
+              {ds.removeBtn}
             </button>
           )}
         </div>
 
-        {type === "OUTBOUND" && expanded === ds.dsaDatasetId && (
+        {type === "OUTBOUND" && expanded === dataset.dsaDatasetId && (
           <div className="border-t border-line">
-            {!attrMap[ds.dsaDatasetId] ? (
-              <div className="p-4 text-muted text-sm">Loading…</div>
-            ) : attrMap[ds.dsaDatasetId].length === 0 ? (
-              <div className="p-4 text-muted text-sm italic">No attributes selected.</div>
+            {!attrMap[dataset.dsaDatasetId] ? (
+              <div className="p-4 text-muted text-sm">{t.common.loading}</div>
+            ) : attrMap[dataset.dsaDatasetId].length === 0 ? (
+              <div className="p-4 text-muted text-sm italic">{ds.noAttrsSelected}</div>
             ) : (
               <div>
                 <div className="grid grid-cols-[1fr_130px_60px_100px_120px] gap-2 px-5 py-2 bg-canvas-soft text-[10px] uppercase tracking-wider text-muted font-bold border-b border-line">
-                  <div>Attribute</div>
-                  <div>Classification</div>
-                  <div>PI</div>
-                  <div>Treatment</div>
-                  <div>DQ</div>
+                  <div>{ds.colAttribute}</div>
+                  <div>{ds.colClassification}</div>
+                  <div>{ds.colPi}</div>
+                  <div>{ds.colTreatment}</div>
+                  <div>{ds.colDq}</div>
                 </div>
-                {attrMap[ds.dsaDatasetId].map(attr => renderAttributeRow(attr, ds.dsaDatasetId))}
+                {attrMap[dataset.dsaDatasetId].map(attr => renderAttributeRow(attr, dataset.dsaDatasetId))}
               </div>
             )}
           </div>
@@ -619,21 +627,21 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
         <section>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-semibold text-ink text-sm">Outbound — Data We Share</h2>
-              <p className="text-xs text-muted mt-0.5">Select catalog entities and explicitly pick each attribute to be shared.</p>
+              <h2 className="font-semibold text-ink text-sm">{ds.outboundTitle}</h2>
+              <p className="text-xs text-muted mt-0.5">{ds.outboundDesc}</p>
             </div>
             {isEditable && (
-              <button onClick={() => setShowPicker(true)} className="btn btn-primary btn-sm">+ Add from Catalog</button>
+              <button onClick={() => setShowPicker(true)} className="btn btn-primary btn-sm">{ds.addFromCatalogBtn}</button>
             )}
           </div>
 
           {outbound.length === 0 ? (
             <div className="card p-8 text-center text-muted text-sm">
-              No outbound datasets yet.{isEditable && " Click \"Add from Catalog\" to select tables."}
+              {ds.noOutboundYet}{isEditable && ds.noOutboundHint}
             </div>
           ) : (
             <div className="space-y-3">
-              {outbound.map(ds => renderDatasetCard(ds, "OUTBOUND"))}
+              {outbound.map(o => renderDatasetCard(o, "OUTBOUND"))}
             </div>
           )}
         </section>
@@ -644,45 +652,45 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
         <section>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-semibold text-ink text-sm">Inbound — Data We Receive</h2>
+              <h2 className="font-semibold text-ink text-sm">{ds.inboundTitle}</h2>
               <p className="text-xs text-muted mt-0.5">
-                Describe data you will receive. Once it lands in your data sources, link it to a catalog entity.
+                {ds.inboundDesc}
               </p>
             </div>
             {isEditable && !showInboundForm && (
-              <button onClick={() => setShowInboundForm(true)} className="btn btn-primary btn-sm">+ Add Inbound Dataset</button>
+              <button onClick={() => setShowInboundForm(true)} className="btn btn-primary btn-sm">{ds.addInboundBtn}</button>
             )}
           </div>
 
           {showInboundForm && (
             <div className="card p-5 mb-4 space-y-4 border-2 border-dashed border-brand-purple/30">
-              <h3 className="font-medium text-sm text-ink">Describe the inbound data</h3>
+              <h3 className="font-medium text-sm text-ink">{ds.inboundFormTitle}</h3>
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Dataset Name <span className="text-red-500">*</span></label>
+                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{ds.fieldDatasetName} <span className="text-red-500">*</span></label>
                 <input
                   className="input w-full"
-                  placeholder="e.g. Employee Demographics from HRSD"
+                  placeholder={ds.fieldDatasetNamePh}
                   value={inboundName}
                   onChange={e => setInboundName(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Description</label>
+                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{t.common.description}</label>
                 <textarea
                   className="input w-full h-16 resize-none"
-                  placeholder="What data is expected, format, frequency…"
+                  placeholder={ds.fieldDescPh}
                   value={inboundDesc}
                   onChange={e => setInboundDesc(e.target.value)}
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <button onClick={() => { setShowInboundForm(false); setInboundName(""); setInboundDesc(""); }} className="btn btn-sm">Cancel</button>
+                <button onClick={() => { setShowInboundForm(false); setInboundName(""); setInboundDesc(""); }} className="btn btn-sm">{t.common.cancel}</button>
                 <button
                   onClick={confirmAddInbound}
                   disabled={addingIn || !inboundName.trim()}
                   className="btn btn-primary btn-sm"
                 >
-                  {addingIn ? "Adding…" : "Add Inbound Dataset"}
+                  {addingIn ? ds.addingEllipsis : ds.addInboundBtn}
                 </button>
               </div>
             </div>
@@ -690,11 +698,11 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
 
           {inbound.length === 0 && !showInboundForm ? (
             <div className="card p-8 text-center text-muted text-sm">
-              No inbound datasets yet.{isEditable && " Click \"Add Inbound Dataset\" to describe what you will receive."}
+              {ds.noInboundYet}{isEditable && ds.noInboundHint}
             </div>
           ) : (
             <div className="space-y-3">
-              {inbound.map(ds => renderDatasetCard(ds, "INBOUND"))}
+              {inbound.map(i => renderDatasetCard(i, "INBOUND"))}
             </div>
           )}
         </section>
@@ -705,7 +713,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-[700px] max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-line flex items-center justify-between">
-              <h3 className="font-semibold text-ink">Add Outbound Dataset</h3>
+              <h3 className="font-semibold text-ink">{ds.addOutboundModalTitle}</h3>
               <button onClick={() => { setShowPicker(false); setPickedEntityId(null); setSelectedAttrs(new Set()); }} className="text-muted hover:text-ink text-xl">×</button>
             </div>
 
@@ -715,7 +723,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 <div className="p-3 border-b border-line">
                   <input
                     className="input w-full input-sm"
-                    placeholder="Search tables…"
+                    placeholder={ds.searchTablesPh}
                     value={entitySearch}
                     onChange={e => setEntitySearch(e.target.value)}
                     autoFocus
@@ -732,18 +740,18 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                       <div className="text-[10px] text-muted truncate">{e.sourceName} › {e.schemaName}</div>
                     </button>
                   ))}
-                  {entities.length === 0 && <div className="p-4 text-muted text-sm italic">No tables found</div>}
+                  {entities.length === 0 && <div className="p-4 text-muted text-sm italic">{ds.noTablesFound}</div>}
                 </div>
               </div>
 
               {/* Right: attribute selection */}
               <div className="flex-1 flex flex-col min-w-0">
                 {!pickedEntityId ? (
-                  <div className="flex-1 flex items-center justify-center text-muted text-sm">Select a table on the left</div>
+                  <div className="flex-1 flex items-center justify-center text-muted text-sm">{ds.selectTablePrompt}</div>
                 ) : (
                   <>
                     <div className="px-4 py-2.5 border-b border-line text-[11px] font-semibold text-muted uppercase flex items-center justify-between">
-                      <span>Select Attributes ({selectedAttrs.size} selected)</span>
+                      <span>{ds.selectAttrsLabel.replace("{n}", String(selectedAttrs.size))}</span>
                       <button
                         onClick={() => {
                           if (selectedAttrs.size === attrOptions.length) setSelectedAttrs(new Set());
@@ -751,7 +759,7 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                         }}
                         className="text-brand-purple hover:underline text-[11px]"
                       >
-                        {selectedAttrs.size === attrOptions.length ? "Deselect all" : "Select all"}
+                        {selectedAttrs.size === attrOptions.length ? ds.deselectAllBtn : ds.selectAllBtn}
                       </button>
                     </div>
                     <div className="flex-1 overflow-y-auto">
@@ -761,9 +769,9 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                             type="checkbox"
                             checked={selectedAttrs.has(attr.attributeId)}
                             onChange={() => {
-                              const s = new Set(selectedAttrs);
-                              s.has(attr.attributeId) ? s.delete(attr.attributeId) : s.add(attr.attributeId);
-                              setSelectedAttrs(s);
+                              const sel = new Set(selectedAttrs);
+                              sel.has(attr.attributeId) ? sel.delete(attr.attributeId) : sel.add(attr.attributeId);
+                              setSelectedAttrs(sel);
                             }}
                             className="w-4 h-4 accent-brand-purple"
                           />
@@ -777,13 +785,13 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                             </span>
                           )}
                           {!attr.liveClassCode && (
-                            <span className="text-[9px] text-red-500 italic shrink-0">Unclassified</span>
+                            <span className="text-[9px] text-red-500 italic shrink-0">{ds.unclassifiedBadge}</span>
                           )}
-                          {attr.liveIsPii && <span className="text-[9px] text-purple-600 font-semibold shrink-0">PI</span>}
-                          <span className="shrink-0"><DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} /></span>
+                          {attr.liveIsPii && <span className="text-[9px] text-purple-600 font-semibold shrink-0">{ds.piLabel}</span>}
+                          <span className="shrink-0"><DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} ds={ds} /></span>
                         </label>
                       ))}
-                      {attrOptions.length === 0 && <div className="p-4 text-muted text-sm italic">No attributes found</div>}
+                      {attrOptions.length === 0 && <div className="p-4 text-muted text-sm italic">{ds.noAttrsFound}</div>}
                     </div>
                   </>
                 )}
@@ -797,13 +805,13 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 )}
               </div>
               <div className="flex gap-3 shrink-0">
-                <button onClick={() => { setShowPicker(false); setPickedEntityId(null); setSelectedAttrs(new Set()); setOutboundError(null); }} className="btn">Cancel</button>
+                <button onClick={() => { setShowPicker(false); setPickedEntityId(null); setSelectedAttrs(new Set()); setOutboundError(null); }} className="btn">{t.common.cancel}</button>
                 <button
                   onClick={confirmAddOutbound}
                   disabled={addingOut || !pickedEntityId || selectedAttrs.size === 0}
                   className="btn btn-primary"
                 >
-                  {addingOut ? "Adding…" : `Add ${selectedAttrs.size} attribute${selectedAttrs.size !== 1 ? "s" : ""}`}
+                  {addingOut ? ds.addingEllipsis : ds.addAttrsBtn.replace("{n}", String(selectedAttrs.size))}
                 </button>
               </div>
             </div>
@@ -816,13 +824,13 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-[480px] max-h-[60vh] flex flex-col">
             <div className="px-6 py-4 border-b border-line flex items-center justify-between">
-              <h3 className="font-semibold text-ink">Link to Catalog Entity</h3>
+              <h3 className="font-semibold text-ink">{ds.linkModalTitle}</h3>
               <button onClick={() => { setAssigningDatasetId(null); setAssignSearch(""); }} className="text-muted hover:text-ink text-xl">×</button>
             </div>
             <div className="p-4 border-b border-line">
               <input
                 className="input w-full"
-                placeholder="Search catalog tables…"
+                placeholder={ds.searchCatalogPh}
                 value={assignSearch}
                 onChange={e => setAssignSearch(e.target.value)}
                 autoFocus
@@ -841,11 +849,11 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
                 </button>
               ))}
               {assignEntities.length === 0 && (
-                <div className="p-5 text-muted text-sm italic text-center">Search for a table above</div>
+                <div className="p-5 text-muted text-sm italic text-center">{ds.searchTablePrompt}</div>
               )}
             </div>
             <div className="px-6 py-3 border-t border-line text-right">
-              <button onClick={() => { setAssigningDatasetId(null); setAssignSearch(""); }} className="btn btn-sm">Cancel</button>
+              <button onClick={() => { setAssigningDatasetId(null); setAssignSearch(""); }} className="btn btn-sm">{t.common.cancel}</button>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { DsaDetail } from "@/lib/queries/sharing";
+import { useLang } from "@/lib/lang-context";
 
 type Props = {
   dsaId:      number | null;
@@ -11,6 +12,9 @@ type Props = {
 };
 
 export function DsaTermsTab({ dsaId, dsa, isEditable, onSaved }: Props) {
+  const { t } = useLang();
+  const s = t.sharing;
+  const tm = s.terms;
   const [form, setForm] = useState({
     securityControlsText:      dsa?.securityControlsText      ?? "",
     storageConditionsText:     dsa?.storageConditionsText     ?? "",
@@ -54,10 +58,10 @@ export function DsaTermsTab({ dsaId, dsa, isEditable, onSaved }: Props) {
 
   const isExternal = dsa?.sharingScopeCode !== "INTERNAL";
 
-  const textArea = (key: keyof typeof form, ph: string, required = false) => (
+  const textArea = (key: keyof typeof form, label: string, ph: string, required = false) => (
     <div>
       <label className="block text-[11px] font-semibold text-muted uppercase mb-1">
-        {key.replace(/([A-Z])/g, " $1").replace("Text","").trim()}
+        {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <textarea
@@ -73,54 +77,54 @@ export function DsaTermsTab({ dsaId, dsa, isEditable, onSaved }: Props) {
   return (
     <div className="max-w-3xl space-y-6">
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-ink text-sm">Security & Storage</h2>
-        {textArea("securityControlsText", "Encryption in transit/at rest, access controls, MFA requirements…", true)}
-        {textArea("storageConditionsText", "Where the recipient stores the data, retention limits at their end…", true)}
+        <h2 className="font-semibold text-ink text-sm">{tm.sectionSecurity}</h2>
+        {textArea("securityControlsText", tm.fieldSecurityControls, tm.fieldSecurityControlsPh, true)}
+        {textArea("storageConditionsText", tm.fieldStorageConditions, tm.fieldStorageConditionsPh, true)}
       </div>
 
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-ink text-sm">Obligations</h2>
-        {textArea("destructionMechanismText", "How and when the recipient must destroy or return data at agreement end…", true)}
-        {textArea("liabilityTermsText", "Non-compliance liability allocation between provider and recipient…", true)}
-        {textArea("reviewTermsText", "Conditions for data review, modification, or re-consent during the term…")}
+        <h2 className="font-semibold text-ink text-sm">{tm.sectionObligations}</h2>
+        {textArea("destructionMechanismText", tm.fieldDestruction, tm.fieldDestructionPh, true)}
+        {textArea("liabilityTermsText", tm.fieldLiability, tm.fieldLiabilityPh, true)}
+        {textArea("reviewTermsText", tm.fieldReview, tm.fieldReviewPh)}
       </div>
 
       <div className="card p-6 space-y-5">
-        <h2 className="font-semibold text-ink text-sm">References & Evidence</h2>
+        <h2 className="font-semibold text-ink text-sm">{tm.sectionReferences}</h2>
 
         <div>
           <label className="block text-[11px] font-semibold text-muted uppercase mb-1">
-            Risk Assessment Reference{isExternal && <span className="text-red-500 ml-0.5">*</span>}
+            {tm.fieldRiskRef}{isExternal && <span className="text-red-500 ml-0.5">*</span>}
           </label>
           <input
             className="input w-full"
             disabled={!isEditable}
-            placeholder="Document reference / SharePoint path to the sharing risk assessment (NDI DSI.MQ.4)"
+            placeholder={tm.fieldRiskRefPh}
             value={form.riskAssessmentRef}
             onChange={f("riskAssessmentRef")}
           />
           {isExternal && (
-            <p className="text-[10px] text-muted mt-1">Required for all external agreements (NDI DSI.MQ.4).</p>
+            <p className="text-[10px] text-muted mt-1">{tm.riskRefHint}</p>
           )}
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Signed Document Reference</label>
+          <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{tm.fieldSignedDoc}</label>
           <input
             className="input w-full"
             disabled={!isEditable}
-            placeholder="Pointer to the executed/signed agreement document"
+            placeholder={tm.fieldSignedDocPh}
             value={form.signedDocumentRef}
             onChange={f("signedDocumentRef")}
           />
-          <p className="text-[10px] text-muted mt-1">Required before the agreement can move to ACTIVE status.</p>
+          <p className="text-[10px] text-muted mt-1">{tm.signedDocHint}</p>
         </div>
       </div>
 
       {isEditable && (
         <div className="flex justify-end">
           <button onClick={save} disabled={saving} className="btn btn-primary">
-            {saving ? "Saving…" : saved ? "✓ Saved" : "Save"}
+            {saving ? t.common.saving : saved ? s.savedCheck : t.common.save}
           </button>
         </div>
       )}

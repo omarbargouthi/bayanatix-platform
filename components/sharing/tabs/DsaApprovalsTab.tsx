@@ -2,20 +2,14 @@
 
 import { useState } from "react";
 import type { DsaApproval, DsaDetail } from "@/lib/queries/sharing";
-import { STATUS_LABELS, STATUS_TO_STATION } from "@/lib/sharing-routing";
+import { statusLabels, STATUS_TO_STATION } from "@/lib/sharing-routing";
+import { useLang } from "@/lib/lang-context";
 
 type Props = {
   dsaId:     number;
   approvals: DsaApproval[];
   dsa:       DsaDetail | null;
   onChanged: () => void;
-};
-
-const STATION_LABELS: Record<string,string> = {
-  DATA_OWNER:    "Data Owner",
-  DATA_PRIVACY:  "Data Privacy Officer",
-  DMO_REVIEW:    "DMO Review",
-  EXEC_DELEGATE: "Executive Delegate",
 };
 
 const DECISION_COLORS: Record<string,string> = {
@@ -26,6 +20,22 @@ const DECISION_COLORS: Record<string,string> = {
 };
 
 export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
+  const { t } = useLang();
+  const s = t.sharing;
+  const av = s.approvals;
+  const STATUS_LABELS = statusLabels(s);
+  const STATION_LABELS: Record<string,string> = {
+    DATA_OWNER:    av.station.dataOwner,
+    DATA_PRIVACY:  av.station.dataPrivacy,
+    DMO_REVIEW:    av.station.dmoReview,
+    EXEC_DELEGATE: av.station.execDelegate,
+  };
+  const DECISION_LABELS: Record<string,string> = {
+    PENDING:  av.decision.pending,
+    APPROVED: av.decision.approved,
+    REJECTED: av.decision.rejected,
+    RETURNED: av.decision.returned,
+  };
   const [deciding, setDeciding]   = useState<number | null>(null);
   const [decision, setDecision]   = useState<"APPROVED"|"REJECTED"|"RETURNED">("APPROVED");
   const [comments, setComments]   = useState("");
@@ -37,7 +47,7 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
 
   async function submitDecision(approvalId: number, stationCode: string) {
     if ((decision === "REJECTED" || decision === "RETURNED") && !comments.trim()) {
-      alert("Comments are required for rejection or return.");
+      alert(av.commentsRequiredAlert);
       return;
     }
     setSaving(true);
@@ -50,7 +60,7 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
     setSaving(false);
     if (!r.ok) {
       const payload = await r.json().catch(() => ({}));
-      setError(payload.error ?? "Failed to record decision");
+      setError(payload.error ?? av.decisionFailedError);
       onChanged();
       return;
     }
@@ -64,7 +74,7 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
     return (
       <div className="max-w-3xl">
         <div className="card p-10 text-center text-muted text-sm">
-          The approval cycle will appear here once the agreement is submitted for review.
+          {av.emptyState}
         </div>
       </div>
     );
@@ -73,10 +83,10 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
   return (
     <div className="max-w-2xl space-y-4">
       <div>
-        <h2 className="font-semibold text-ink">Approval Progress</h2>
+        <h2 className="font-semibold text-ink">{av.progressTitle}</h2>
         <p className="text-xs text-muted mt-0.5">
-          Stations execute sequentially. A rejection at any station returns the agreement to Draft.
-          Current status: <span className="font-medium">{STATUS_LABELS[dsa?.statusCode ?? ""] ?? dsa?.statusCode}</span>
+          {av.progressDesc}
+          {" "}{av.currentStatusLabel.replace("{status}", "")}<span className="font-medium">{STATUS_LABELS[dsa?.statusCode ?? ""] ?? dsa?.statusCode}</span>
         </p>
       </div>
 
@@ -116,9 +126,9 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
               <div className="flex-1 pb-5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm text-ink">{STATION_LABELS[ap.stationCode] ?? ap.stationCode}</span>
-                  {!ap.requiredIndicator && <span className="text-[10px] text-muted">(optional)</span>}
+                  {!ap.requiredIndicator && <span className="text-[10px] text-muted">{av.optionalLabel}</span>}
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${DECISION_COLORS[ap.decisionCode] ?? "bg-gray-100 text-gray-500"}`}>
-                    {ap.decisionCode}
+                    {DECISION_LABELS[ap.decisionCode] ?? ap.decisionCode}
                   </span>
                 </div>
 
@@ -146,25 +156,25 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
                               : "border-line text-muted"
                           }`}
                         >
-                          {d}
+                          {DECISION_LABELS[d]}
                         </button>
                       ))}
                     </div>
                     <div>
-                      <label className="label">Comments {(decision !== "APPROVED") && <span className="text-red-500">*</span>}</label>
+                      <label className="label">{av.commentsLabel} {(decision !== "APPROVED") && <span className="text-red-500">*</span>}</label>
                       <textarea
                         className="input w-full h-16 resize-none"
-                        placeholder={decision === "APPROVED" ? "Optional comments…" : "Required — explain the reason…"}
+                        placeholder={decision === "APPROVED" ? av.commentsPhApproved : av.commentsPhOther}
                         value={comments}
                         onChange={e => setComments(e.target.value)}
                       />
                     </div>
                     {ap.stationCode === "EXEC_DELEGATE" && decision === "APPROVED" && (
                       <div>
-                        <label className="label">Delegation Instrument Reference *</label>
+                        <label className="label">{av.delegationRefLabel}</label>
                         <input
                           className="input w-full"
-                          placeholder="Reference to the delegation document"
+                          placeholder={av.delegationRefPh}
                           value={delegRef}
                           onChange={e => setDelegRef(e.target.value)}
                         />
@@ -172,13 +182,13 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
                     )}
                     {error && <p className="text-sm text-red-600">{error}</p>}
                     <div className="flex gap-2 justify-end">
-                      <button className="btn" onClick={() => { setDeciding(null); setError(null); }}>Cancel</button>
+                      <button className="btn" onClick={() => { setDeciding(null); setError(null); }}>{t.common.cancel}</button>
                       <button
                         className="btn btn-primary"
                         disabled={saving}
                         onClick={() => submitDecision(ap.approvalId, ap.stationCode)}
                       >
-                        {saving ? "Saving…" : "Confirm"}
+                        {saving ? t.common.saving : av.confirmBtn}
                       </button>
                     </div>
                   </div>
@@ -189,7 +199,7 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
                     onClick={() => setDeciding(ap.approvalId)}
                     className="mt-2 btn btn-primary btn-sm"
                   >
-                    Record Decision
+                    {av.recordDecisionBtn}
                   </button>
                 )}
               </div>
@@ -202,7 +212,7 @@ export function DsaApprovalsTab({ dsaId, approvals, dsa, onChanged }: Props) {
 
       {/* SLA note */}
       <div className="text-[11px] text-muted border-t border-line pt-3">
-        Target SLAs: Request evaluation ≤ 30 days · Agreement execution ≤ 60 days · Appeals ≤ 14 days (NDMO Data Sharing Regulations)
+        {av.slaNote}
       </div>
     </div>
   );

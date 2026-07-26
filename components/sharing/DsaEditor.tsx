@@ -2,23 +2,27 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { STATUS_LABELS, STATUS_COLORS, SCOPE_LABELS } from "@/lib/sharing-routing";
+import { statusLabels, STATUS_COLORS, scopeLabels } from "@/lib/sharing-routing";
 import type { DsaDetail, DsaDataset, DsaApproval, DsaAuthorization, DsaDqIssue } from "@/lib/queries/sharing";
 import { DsaGeneralTab }    from "./tabs/DsaGeneralTab";
 import { DsaDatasetsTab }   from "./tabs/DsaDatasetsTab";
 import { DsaTermsTab }      from "./tabs/DsaTermsTab";
 import { DsaApprovalsTab }  from "./tabs/DsaApprovalsTab";
 import { DsaAuthorizationsTab } from "./tabs/DsaAuthorizationsTab";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 type Tab = "general" | "datasets" | "terms" | "authorizations" | "approvals";
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "general",        label: "General" },
-  { key: "datasets",       label: "Datasets & Attributes" },
-  { key: "terms",          label: "Terms & Controls" },
-  { key: "authorizations", label: "Privacy & Authorization" },
-  { key: "approvals",      label: "Approvals" },
-];
+function tabs(s: I18nStrings["sharing"]): { key: Tab; label: string }[] {
+  return [
+    { key: "general",        label: s.tabGeneral },
+    { key: "datasets",       label: s.tabDatasets },
+    { key: "terms",          label: s.tabTerms },
+    { key: "authorizations", label: s.tabAuthorizations },
+    { key: "approvals",      label: s.tabApprovals },
+  ];
+}
 
 type LoadedDsa = {
   dsa:            DsaDetail;
@@ -30,6 +34,10 @@ type LoadedDsa = {
 
 export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null; canClassify?: boolean }) {
   const router = useRouter();
+  const { t } = useLang();
+  const s = t.sharing;
+  const STATUS_LABELS = statusLabels(s);
+  const SCOPE_LABELS = scopeLabels(s);
   const [tab, setTab]         = useState<Tab>("general");
   const [data, setData]       = useState<LoadedDsa | null>(null);
   const [loading, setLoading] = useState(dsaId !== null);
@@ -53,11 +61,11 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
     try {
       const r = await fetch(`/api/sharing/dsas/${dsaId}/submit`, { method: "POST" });
       const text = await r.text();
-      const result = text ? JSON.parse(text) : { ok: false, failures: [`Server error (HTTP ${r.status})`] };
+      const result = text ? JSON.parse(text) : { ok: false, failures: [s.serverErrorTemplate.replace("{status}", String(r.status))] };
       setSubmitResult(result);
       if (result.ok) load();
     } catch (e) {
-      setSubmitResult({ ok: false, failures: ["Unexpected error — check the browser console."] });
+      setSubmitResult({ ok: false, failures: [s.unexpectedError] });
     } finally {
       setSubmitting(false);
     }
@@ -67,7 +75,7 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
   const isDraft = !dsa || ["DRAFT","RENEWAL_DRAFT"].includes(dsa.statusCode);
   const isEditable = isDraft;
 
-  if (loading) return <div className="p-8 text-muted">Loading…</div>;
+  if (loading) return <div className="p-8 text-muted">{t.common.loading}</div>;
 
   return (
     <div className="flex flex-col h-full">
@@ -75,7 +83,7 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
       <div className="px-8 pt-6 pb-0 flex items-start justify-between border-b border-line bg-white">
         <div className="pb-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/sharing")} className="text-muted hover:text-ink text-sm">← Agreements</button>
+            <button onClick={() => router.push("/sharing")} className="text-muted hover:text-ink text-sm">{s.backToAgreements}</button>
             {dsa?.dsaReferenceCode && (
               <span className="font-mono text-[11px] text-brand-purple">{dsa.dsaReferenceCode}</span>
             )}
@@ -86,15 +94,15 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
             )}
           </div>
           <h1 className="text-xl font-bold text-ink mt-1">
-            {dsa?.titleText ?? "New Agreement"}
+            {dsa?.titleText ?? s.newAgreementTitle}
           </h1>
           {dsa && (
             <div className="flex items-center gap-4 mt-1 text-xs text-muted">
               <span>{SCOPE_LABELS[dsa.sharingScopeCode] ?? dsa.sharingScopeCode}</span>
               {dsa.counterpartyNameText && <span>→ {dsa.counterpartyNameText}</span>}
-              {dsa.effectiveEndDate && <span>Expires {dsa.effectiveEndDate}</span>}
+              {dsa.effectiveEndDate && <span>{s.expiresLabel.replace("{date}", dsa.effectiveEndDate)}</span>}
               {dsa.containsPersonalData && (
-                <span className="text-purple-600 font-medium">Contains Personal Data</span>
+                <span className="text-purple-600 font-medium">{s.containsPersonalData}</span>
               )}
             </div>
           )}
@@ -108,7 +116,7 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
               disabled={submitting}
               className="btn btn-primary"
             >
-              {submitting ? "Validating…" : "Submit for Approval"}
+              {submitting ? s.validatingEllipsis : s.submitForApproval}
             </button>
           )}
         </div>
@@ -117,7 +125,7 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
       {/* ── Submit result banner ─────────────────────────────────────── */}
       {submitResult && !submitResult.ok && (
         <div className="mx-8 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <div className="font-semibold text-red-700 text-sm mb-2">Readiness check failed — resolve before submitting:</div>
+          <div className="font-semibold text-red-700 text-sm mb-2">{s.readinessFailedTitle}</div>
           <ul className="list-disc list-inside space-y-1">
             {submitResult.failures?.map((f, i) => (
               <li key={i} className="text-sm text-red-600">{f}</li>
@@ -127,24 +135,24 @@ export function DsaEditor({ dsaId, canClassify = false }: { dsaId: number | null
       )}
       {submitResult?.ok && (
         <div className="mx-8 mt-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium">
-          ��� Submitted successfully. Agreement moved to Owner Review.
+          {s.submittedSuccess}
         </div>
       )}
 
       {/* ── Tabs ────────────────────────────────────────────────────── */}
       <div className="px-8 bg-white border-b border-line">
         <div className="flex gap-1">
-          {TABS.map(t => (
+          {tabs(s).map(tb => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tb.key}
+              onClick={() => setTab(tb.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.key
+                tab === tb.key
                   ? "border-brand-purple text-brand-purple"
                   : "border-transparent text-muted hover:text-ink"
               }`}
             >
-              {t.label}
+              {tb.label}
             </button>
           ))}
         </div>

@@ -82,20 +82,24 @@ export function nextStatusAfterApproval(
   }
 }
 
-export const STATUS_LABELS: Record<string, string> = {
-  DRAFT:          "Draft",
-  VALIDATION:     "Validation",
-  OWNER_REVIEW:   "Owner Review",
-  PRIVACY_REVIEW: "Privacy Review",
-  DMO_REVIEW:     "DMO Review",
-  EXEC_APPROVAL:  "Exec Approval",
-  APPROVED:       "Approved",
-  ACTIVE:         "Active",
-  SUSPENDED:      "Suspended",
-  TERMINATED:     "Terminated",
-  EXPIRED:        "Expired",
-  RENEWAL_DRAFT:  "Renewal Draft",
-};
+import type { I18nStrings } from "./i18n/strings";
+
+export function statusLabels(t: I18nStrings["sharing"]): Record<string, string> {
+  return {
+    DRAFT:          t.status.draft,
+    VALIDATION:     t.status.validation,
+    OWNER_REVIEW:   t.status.ownerReview,
+    PRIVACY_REVIEW: t.status.privacyReview,
+    DMO_REVIEW:     t.status.dmoReview,
+    EXEC_APPROVAL:  t.status.execApproval,
+    APPROVED:       t.status.approved,
+    ACTIVE:         t.status.active,
+    SUSPENDED:      t.status.suspended,
+    TERMINATED:     t.status.terminated,
+    EXPIRED:        t.status.expired,
+    RENEWAL_DRAFT:  t.status.renewalDraft,
+  };
+}
 
 export const STATUS_COLORS: Record<string, string> = {
   DRAFT:          "bg-gray-100 text-gray-600",
@@ -112,14 +116,18 @@ export const STATUS_COLORS: Record<string, string> = {
   RENEWAL_DRAFT:  "bg-sky-100 text-sky-700",
 };
 
-export const SCOPE_LABELS: Record<string, string> = {
-  INTERNAL:         "Internal",
-  EXTERNAL_GOV:     "External – Government",
-  EXTERNAL_PRIVATE: "External – Private",
-};
+export function scopeLabels(t: I18nStrings["sharing"]): Record<string, string> {
+  return {
+    INTERNAL:         t.scope.internal,
+    EXTERNAL_GOV:     t.scope.externalGov,
+    EXTERNAL_PRIVATE: t.scope.externalPrivate,
+  };
+}
 
-export const DIRECTION_LABELS: Record<string, string> = {
-  PROVIDER:      "Provider",
-  REQUESTER:     "Requester",
-  BIDIRECTIONAL: "Bidirectional",
-};
+export function directionLabels(t: I18nStrings["sharing"]): Record<string, string> {
+  return {
+    PROVIDER:      t.direction.provider,
+    REQUESTER:     t.direction.requester,
+    BIDIRECTIONAL: t.direction.bidirectional,
+  };
+}
