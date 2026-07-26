@@ -403,6 +403,169 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
   } finally { await pool.close(); }
 }
 
+// ── CSV / Excel (flat files) ─────────────────────────────────────────────────
+// Reuses the same schema→table→column catalog shape as database sources: a
+// single file (or a directory of files) becomes one "schema" — named after
+// the directory — and each CSV file, or each sheet within an Excel workbook,
+// becomes one "table". Since flat files carry no declared column types,
+// dataType is inferred by sampling each column's values (XLSX hands back real
+// JS number/boolean/Date types under raw+cellDates mode, so this is a type
+// check, not string parsing).
+
+const FILE_EXTENSIONS: Record<string, string[]> = {
+  CSV:   [".csv"],
+  EXCEL: [".xlsx", ".xls", ".xlsm"],
+};
+
+// CSV carries no cell-type metadata at all — every value XLSX hands back for a
+// .csv file is a plain string, even "12500" or "true". Excel workbooks do give
+// back real JS number/boolean/Date values for typed cells, but a column can
+// still mix genuinely-typed cells with text ones. So every value is classified
+// by inspecting its actual JS type first, falling back to pattern-matching the
+// string form — this handles both sources through one path.
+type ValueKind = "int" | "num" | "bool" | "date" | "text" | "null";
+
+function detectValueKind(raw: unknown): ValueKind {
+  if (raw === null || raw === undefined) return "null";
+  if (typeof raw === "number") return Number.isInteger(raw) ? "int" : "num";
+  if (typeof raw === "boolean") return "bool";
+  if (raw instanceof Date) return "date";
+  const s = String(raw).trim();
+  if (s === "") return "null";
+  if (/^(true|false)$/i.test(s)) return "bool";
+  if (/^-?\d+$/.test(s)) return "int";
+  if (/^-?\d+\.\d+$/.test(s)) return "num";
+  if (/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/.test(s) && !isNaN(Date.parse(s))) return "date";
+  return "text";
+}
+
+function inferColumnsFromRows(headers: string[], rows: unknown[][]): { name: string; dataType: string; isNullable: boolean }[] {
+  return headers.map((name, idx) => {
+    let sawNull = false;
+    const kinds = new Set<ValueKind>();
+    for (const row of rows) {
+      const kind = detectValueKind(row[idx]);
+      if (kind === "null") { sawNull = true; continue; }
+      kinds.add(kind);
+    }
+    let dataType = "text";
+    if (kinds.size === 1) {
+      const only = [...kinds][0];
+      dataType = only === "int" ? "integer" : only === "num" ? "numeric" : only === "bool" ? "boolean" : only === "date" ? "date" : "text";
+    } else if (kinds.size > 0 && [...kinds].every(k => k === "int" || k === "num")) {
+      dataType = "numeric"; // mixed whole numbers and decimals — numeric is the common supertype
+    }
+    return { name, dataType, isNullable: sawNull };
+  });
+}
+
+function profileFileColumn(rows: unknown[][], idx: number, sampleSize: number): ColProfile {
+  let nullCount = 0;
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const v = row[idx];
+    if (v === null || v === undefined || v === "") { nullCount++; continue; }
+    const s = v instanceof Date ? v.toISOString().slice(0, 10) : String(v);
+    counts.set(s, (counts.get(s) ?? 0) + 1);
+  }
+  const sortedVals = [...counts.keys()].sort();
+  const topValues = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([value, count]) => ({ value, count }));
+  return {
+    nullCount,
+    nullPct: sampleSize > 0 ? Math.round((nullCount / sampleSize) * 10000) / 100 : 0,
+    distinctCount: counts.size,
+    minValue: sortedVals[0] ?? null,
+    maxValue: sortedVals[sortedVals.length - 1] ?? null,
+    topValues,
+  };
+}
+
+// `rootPath` is stored in the connection's host_address field — file sources have
+// no network host, so that column is repurposed to hold a file or directory path.
+function listSourceFiles(fs: typeof import("node:fs"), path: typeof import("node:path"), rootPath: string, dbTypeCode: string): { files: string[]; schemaName: string } {
+  if (!fs.existsSync(rootPath)) throw new Error(`Path not found: ${rootPath}`);
+  const stat = fs.statSync(rootPath);
+  const exts = FILE_EXTENSIONS[dbTypeCode] ?? [];
+
+  if (stat.isDirectory()) {
+    const files = fs.readdirSync(rootPath)
+      .filter(f => exts.includes(path.extname(f).toLowerCase()))
+      .map(f => path.join(rootPath, f))
+      .sort();
+    return { files, schemaName: path.basename(rootPath) || "files" };
+  }
+  if (stat.isFile()) {
+    return { files: [rootPath], schemaName: path.basename(path.dirname(rootPath)) || "files" };
+  }
+  throw new Error(`Path is neither a file nor a directory: ${rootPath}`);
+}
+
+async function crawlFile(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLogger): Promise<CrawlResult> {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let XLSX: any;
+  try { XLSX = await import("xlsx"); }
+  catch { throw new Error("xlsx package not installed — run: npm install xlsx"); }
+
+  if (!cfg.hostAddress) throw new Error("File or directory path is required");
+  const { files, schemaName } = listSourceFiles(fs, path, cfg.hostAddress, cfg.dbTypeCode);
+  await logger.info(`Found ${files.length} ${cfg.dbTypeCode} file(s) at ${cfg.hostAddress}`);
+
+  if (!schemaIncluded(schemaName, config)) {
+    await logger.info(`Skipping schema: ${schemaName} (excluded by config)`);
+    return summarise([]);
+  }
+
+  const tables: CrawlTable[] = [];
+
+  for (const filePath of files) {
+    const fileBase = path.basename(filePath, path.extname(filePath));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let workbook: any;
+    try {
+      workbook = XLSX.readFile(filePath, { cellDates: true, raw: true });
+    } catch (e) {
+      await logger.warn(`  Failed to read ${filePath}: ${(e as Error).message}`);
+      continue;
+    }
+
+    const multiSheet = workbook.SheetNames.length > 1;
+    for (const sheetName of workbook.SheetNames as string[]) {
+      const tableName = multiSheet ? `${fileBase}_${sheetName}` : fileBase;
+      if (!tableIncluded(tableName, config)) continue;
+
+      const sheet = workbook.Sheets[sheetName];
+      const grid: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+      if (grid.length === 0) { await logger.warn(`  ${tableName}: empty sheet, skipped`); continue; }
+
+      const headers = (grid[0] as unknown[]).map((h, i) => (h == null || String(h).trim() === "") ? `column_${i + 1}` : String(h).trim());
+      const dataRows = grid.slice(1);
+
+      const inferred = inferColumnsFromRows(headers, dataRows);
+      const columns: CrawlColumn[] = inferred.map(c => ({
+        name: c.name, dataType: c.dataType, isNullable: c.isNullable,
+        isPrimaryKey: false, defaultValue: null, comment: null,
+      }));
+
+      let sampleSize: number | undefined;
+      if (config?.profilingEnabled) {
+        const limit = config.profilingMode === "FULL" ? dataRows.length
+          : config.profilingMode === "TOP_PCT" ? Math.ceil(dataRows.length * (config.profilingLimit / 100))
+          : Math.min(config.profilingLimit, dataRows.length);
+        const sampleRows = dataRows.slice(0, limit);
+        sampleSize = sampleRows.length;
+        columns.forEach((col, idx) => { col.profile = profileFileColumn(sampleRows, idx, sampleSize!); });
+      }
+
+      tables.push({ name: tableName, isView: false, columns, comment: null, rowCount: dataRows.length, sampleSize });
+      await logger.info(`  → ${tableName}: ${columns.length} columns, ${dataRows.length} rows`);
+    }
+  }
+
+  return summarise(tables.length > 0 ? [{ name: schemaName, tables }] : []);
+}
+
 // ── Oracle ────────────────────────────────────────────────────────────────────
 
 async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLogger): Promise<CrawlResult> {
@@ -528,6 +691,15 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
     }
     if (cfg.dbTypeCode === "ORACLE") {
       return { ok: false, message: "Oracle: install oracledb native driver (npm install oracledb) + Oracle Instant Client" };
+    }
+    if (cfg.dbTypeCode === "CSV" || cfg.dbTypeCode === "EXCEL") {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      if (!cfg.hostAddress) return { ok: false, message: "File or directory path is required" };
+      const { files } = listSourceFiles(fs, path, cfg.hostAddress, cfg.dbTypeCode);
+      return files.length > 0
+        ? { ok: true, message: `Found ${files.length} ${cfg.dbTypeCode} file(s)` }
+        : { ok: false, message: `No ${cfg.dbTypeCode === "CSV" ? ".csv" : ".xlsx/.xls"} files found at that path` };
     }
     return { ok: false, message: `Unknown DB type: ${cfg.dbTypeCode}` };
   } catch (e: unknown) {
@@ -783,6 +955,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     else if (cfgRow.dbTypeCode === "MYSQL")    result = await crawlMysql(cfgRow, config, logger);
     else if (cfgRow.dbTypeCode === "MSSQL")    result = await crawlMssql(cfgRow, config, logger);
     else if (cfgRow.dbTypeCode === "ORACLE")   result = await crawlOracle(cfgRow, config, logger);
+    else if (cfgRow.dbTypeCode === "CSV" || cfgRow.dbTypeCode === "EXCEL") result = await crawlFile(cfgRow, config, logger);
     else throw new Error(`Unsupported DB type: ${cfgRow.dbTypeCode}`);
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);

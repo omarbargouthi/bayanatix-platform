@@ -38,11 +38,18 @@ const DB_TYPES = [
   { value: "MYSQL",    label: "MySQL",      port: 3306 },
   { value: "MSSQL",    label: "SQL Server", port: 1433 },
   { value: "ORACLE",   label: "Oracle DB",  port: 1521 },
+  { value: "CSV",      label: "CSV File(s)",          port: 0 },
+  { value: "EXCEL",    label: "Excel Workbook(s)",    port: 0 },
 ];
 
 const DB_ICON: Record<string, string> = {
-  POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶",
+  POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶", CSV: "📄", EXCEL: "📊",
 };
+
+// CSV/EXCEL are flat-file sources: no network host/port/credentials, just a
+// file or directory path (stored in hostAddress — repurposed for this case).
+const FILE_TYPES = ["CSV", "EXCEL"];
+const isFileType = (dbTypeCode: string) => FILE_TYPES.includes(dbTypeCode);
 
 // Database types the crawler can actually connect to (ORACLE has no working driver yet).
 const LINEAGE_APPLICABLE_TYPES = ["POSTGRES", "MYSQL", "MSSQL"];
@@ -409,7 +416,7 @@ export default function DataSourcesPage() {
                 <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[c.connectionStatus] ?? "bg-gray-300"}`} title={`Connection: ${c.connectionStatus}`} />
               </div>
               <div className="mt-1 pl-6 flex items-center gap-2">
-                <span className="text-[10px] text-muted truncate">{c.hostAddress}/{c.databaseName || "—"}</span>
+                <span className="text-[10px] text-muted truncate">{isFileType(c.dbTypeCode) ? c.hostAddress : `${c.hostAddress}/${c.databaseName || "—"}`}</span>
                 {c.crawlStatus !== "IDLE" && (
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CRAWL_DOT[c.crawlStatus] ?? "bg-gray-300"}`} title={`Crawl: ${c.crawlStatus}`} />
                 )}
@@ -428,7 +435,7 @@ export default function DataSourcesPage() {
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="text-6xl">🗄</div>
             <h2 className="text-xl font-semibold text-ink">Onboard a Data Source</h2>
-            <p className="text-muted text-sm max-w-md">Connect to PostgreSQL, MySQL, SQL Server, or Oracle databases. Test the connection, then crawl to discover schemas, tables, and columns automatically.</p>
+            <p className="text-muted text-sm max-w-md">Connect to PostgreSQL, MySQL, SQL Server, or Oracle databases — or point at a CSV/Excel file or folder. Test the connection, then crawl to discover schemas, tables, and columns automatically.</p>
             <button onClick={startAdd} className="mt-2 px-5 py-2.5 bg-brand-purple text-white text-sm font-semibold rounded-lg hover:bg-brand-deep transition-colors">
               + Add Data Source
             </button>
@@ -458,6 +465,16 @@ export default function DataSourcesPage() {
                   </select>
                 </div>
 
+                {isFileType(form.dbTypeCode) ? (
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-ink mb-1">File or Directory Path *</label>
+                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.hostAddress} onChange={e => setForm(f => ({ ...f, hostAddress: e.target.value }))} placeholder={form.dbTypeCode === "CSV" ? "C:\\data\\sales.csv or C:\\data\\csv-exports" : "C:\\data\\report.xlsx or C:\\data\\workbooks"} />
+                    <p className="text-[11px] text-muted mt-1">
+                      A single file is crawled as one table{form.dbTypeCode === "EXCEL" ? " per sheet" : ""}. A directory is crawled as one schema — every {form.dbTypeCode === "CSV" ? ".csv file" : ".xlsx/.xls workbook"} inside becomes its own table{form.dbTypeCode === "EXCEL" ? "(s)" : ""}. Server-side path — must be reachable by the app process.
+                    </p>
+                  </div>
+                ) : (
+                <>
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1">Port *</label>
                   <input type="number" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.portNumber} onChange={e => setForm(f => ({ ...f, portNumber: Number(e.target.value) }))} />
@@ -497,6 +514,8 @@ export default function DataSourcesPage() {
                   </button>
                   <label className="text-sm text-ink">Enable SSL / TLS</label>
                 </div>
+                </>
+                )}
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -826,7 +845,11 @@ export default function DataSourcesPage() {
                 <div className="bg-white border border-line rounded-xl p-6">
                   <h3 className="text-sm font-semibold text-ink mb-4">Connection Summary</h3>
                   <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    {[
+                    {(isFileType(selected.dbTypeCode) ? [
+                      ["Type", DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
+                      ["Path", selected.hostAddress],
+                      ["Added", new Date(selected.createdAtTimestamp).toLocaleDateString()],
+                    ] : [
                       ["Type",     DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
                       ["Host",     selected.hostAddress],
                       ["Port",     String(selected.portNumber)],
@@ -835,7 +858,7 @@ export default function DataSourcesPage() {
                       ["Username", selected.usernameText || "—"],
                       ["SSL",      selected.sslEnabled ? "Enabled" : "Disabled"],
                       ["Added",    new Date(selected.createdAtTimestamp).toLocaleDateString()],
-                    ].map(([k, v]) => (
+                    ]).map(([k, v]) => (
                       <div key={k}>
                         <div className="text-[10px] text-muted uppercase tracking-wide font-semibold">{k}</div>
                         <div className="text-ink text-[13px] font-mono">{v}</div>

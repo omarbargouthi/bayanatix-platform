@@ -17,7 +17,7 @@ const KINDS: { kind: AssetKind; label: string; desc: string; icon: string }[] = 
   { kind: "BUSINESS_TERM",     label: "Business Term",     desc: "A defined business concept",        icon: "🏷️" },
 ];
 
-const SOURCE_TYPES = ["POSTGRESQL","MYSQL","MSSQL","ORACLE","SNOWFLAKE","BIGQUERY","SAP","DATABRICKS","OTHER"];
+const SOURCE_TYPES = ["POSTGRESQL","MYSQL","MSSQL","ORACLE","SNOWFLAKE","BIGQUERY","SAP","DATABRICKS","CSV","EXCEL","OTHER"];
 const TABLE_TYPES  = [
   { value:"",              label:"— None —" },
   { value:"TRANSACTIONAL", label:"Transactional" },
