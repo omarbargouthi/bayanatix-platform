@@ -66,7 +66,11 @@ export function DsaRegistry() {
     const r = await fetch("/api/sharing/dsas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ titleText: s.newAgreementTitle, sharingScopeCode: "INTERNAL", directionCode: "PROVIDER" }),
+      // Stored as literal data (not a display string), so this must stay a fixed,
+      // language-neutral value — using the live-translated label here would bake
+      // whatever UI language was active at creation time into the DB permanently,
+      // showing e.g. an Arabic title even when later viewed in English.
+      body: JSON.stringify({ titleText: "New Agreement", sharingScopeCode: "INTERNAL", directionCode: "PROVIDER" }),
     });
     const data = await r.json();
     setCreating(false);
