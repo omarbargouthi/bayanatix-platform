@@ -231,6 +231,9 @@ export async function getEntityById(entityId: number): Promise<
       e.entity_name_text as "entityName",
       e.display_name_text as "displayName",
       e.entity_category_code as "category",
+      e.suggested_category_code as "suggestedCategory",
+      e.category_confidence_code as "categoryConfidence",
+      coalesce(e.category_is_confirmed, false) as "categoryIsConfirmed",
       e.description_text as "description",
       e.source_description_text as "sourceDescription",
       coalesce(e.is_view_indicator, false) as "isView",
@@ -453,12 +456,17 @@ export async function updateEntity(
     SELECT description_text, display_name_text, entity_category_code
     FROM bayanat.data_entities WHERE entity_id = ${entityId}
   `;
+  // Setting the type by hand here counts as reviewing it — stop the crawler-suggested
+  // value from silently overwriting a steward's explicit choice on the next crawl.
   await sql`
     UPDATE bayanat.data_entities
     SET
       description_text     = ${patch.description  || null},
       display_name_text    = ${patch.displayName   || null},
-      entity_category_code = ${patch.category}
+      entity_category_code = ${patch.category},
+      category_is_confirmed = true,
+      category_confirmed_by = ${userId},
+      category_confirmed_at = NOW()
     WHERE entity_id = ${entityId}
   `;
   if (old) {
@@ -466,6 +474,32 @@ export async function updateEntity(
       { field: "description_text",     oldVal: old.description_text,     newVal: patch.description  || null },
       { field: "display_name_text",    oldVal: old.display_name_text,    newVal: patch.displayName  || null },
       { field: "entity_category_code", oldVal: old.entity_category_code, newVal: patch.category },
+    ]);
+  }
+}
+
+// Steward accepts (or overrides) the crawler-suggested table type without touching
+// description/display name — used by the "Accept" / "Change" actions on the
+// suggestion badge, distinct from the full edit panel's updateEntity() above.
+export async function confirmEntityCategory(
+  entityId: number,
+  userId: string,
+  category: string | null,
+): Promise<void> {
+  const [old] = await sql<{ entity_category_code: string | null }[]>`
+    SELECT entity_category_code FROM bayanat.data_entities WHERE entity_id = ${entityId}
+  `;
+  await sql`
+    UPDATE bayanat.data_entities SET
+      entity_category_code  = ${category},
+      category_is_confirmed = true,
+      category_confirmed_by = ${userId},
+      category_confirmed_at = NOW()
+    WHERE entity_id = ${entityId}
+  `;
+  if (old) {
+    await logUpdate("DATA_ENTITIES", entityId, userId, [
+      { field: "entity_category_code", oldVal: old.entity_category_code, newVal: category },
     ]);
   }
 }

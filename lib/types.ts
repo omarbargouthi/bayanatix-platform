@@ -51,6 +51,11 @@ export type DataEntity = {
   entityName: string;
   displayName: string | null;
   category: string | null;
+  // Crawler-suggested table type — set on every crawl, but only ever drives
+  // `category` until a steward confirms or overrides it (categoryIsConfirmed).
+  suggestedCategory?: string | null;
+  categoryConfidence?: "HIGH" | "MEDIUM" | "LOW" | null;
+  categoryIsConfirmed?: boolean;
   description: string | null;
   sourceDescription: string | null;
   isView: boolean;

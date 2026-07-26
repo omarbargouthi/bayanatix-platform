@@ -464,8 +464,17 @@ export type I18nStrings = {
     typeTransactional:string;
     typeMaster:       string;
     typeReference:    string;
+    typeSetup:        string;
     typeSystem:       string;
     typeNone:         string;
+    // Table type suggestion (crawler-suggested, pending steward review)
+    suggestedTypePrefix: string;   // "Suggested:" — prepended to the type label
+    suggestedTypeTitle:  string;   // tooltip explaining where the suggestion came from
+    acceptSuggestion:    string;
+    changeSuggestion:    string;
+    confidenceHigh:      string;
+    confidenceMedium:    string;
+    confidenceLow:       string;
     // Cert filter
     certAllStatus:    string;
     certGold:         string;

@@ -9,6 +9,7 @@ const ENTITY_TYPE_OPTIONS_KEYS = [
   { value: "TRANSACTIONAL", labelKey: "typeTransactional" as const },
   { value: "MASTER",        labelKey: "typeMaster" as const },
   { value: "REFERENCE",     labelKey: "typeReference" as const },
+  { value: "SETUP",         labelKey: "typeSetup" as const },
   { value: "SYSTEM",        labelKey: "typeSystem" as const },
 ];
 

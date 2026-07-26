@@ -22,15 +22,9 @@ import { getStakeholders } from "@/lib/queries/stakeholders";
 import { getGovernanceRoleLabels } from "@/lib/queries/governance-config";
 import { GovernancePanel } from "@/components/catalog/GovernancePanel";
 import { MindMapTab } from "@/components/catalog/MindMapTab";
+import { TableTypeBadge } from "@/components/catalog/TableTypeBadge";
 
 export const dynamic = "force-dynamic";
-
-const ENTITY_TYPE_LABEL: Record<string, string> = {
-  TRANSACTIONAL: "Transactional",
-  MASTER:        "Master",
-  REFERENCE:     "Lookup / Reference",
-  SYSTEM:        "System / Setup",
-};
 
 const VALID_TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Relationships", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof VALID_TABS[number];
@@ -96,11 +90,13 @@ export default async function TablePage({
             <IconTable className="w-6 h-6 text-brand-purple" />
             {entity.entityName}
             <CertTag code={entity.certCode} />
-            {entity.category && (
-              <Tag variant="purple">
-                {ENTITY_TYPE_LABEL[entity.category] ?? entity.category}
-              </Tag>
-            )}
+            <TableTypeBadge
+              entityId={entity.entityId}
+              category={entity.category}
+              categoryConfidence={entity.categoryConfidence}
+              categoryIsConfirmed={entity.categoryIsConfirmed}
+              canEdit={canEdit}
+            />
             <Tag>{entity.isView ? "View" : "Table"} · {fmtNumber(entity.rowCount as number | null)} rows</Tag>
           </h1>
           <TablePageActions

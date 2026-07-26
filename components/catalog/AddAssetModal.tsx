@@ -20,10 +20,11 @@ const KINDS: { kind: AssetKind; label: string; desc: string; icon: string }[] = 
 const SOURCE_TYPES = ["POSTGRESQL","MYSQL","MSSQL","ORACLE","SNOWFLAKE","BIGQUERY","SAP","DATABRICKS","CSV","EXCEL","OTHER"];
 const TABLE_TYPES  = [
   { value:"",              label:"— None —" },
-  { value:"TRANSACTIONAL", label:"Transactional" },
+  { value:"TRANSACTIONAL", label:"Transaction" },
   { value:"MASTER",        label:"Master" },
   { value:"REFERENCE",     label:"Lookup / Reference" },
-  { value:"SYSTEM",        label:"System / Setup" },
+  { value:"SETUP",         label:"Setup" },
+  { value:"SYSTEM",        label:"System" },
 ];
 const CLASS_CODES = [
   { value:"",            label:"— None —" },
