@@ -1,0 +1,71 @@
+# Bundled self-hosted LLM services (spec §4). Ports match the two placeholder
+# profiles already seeded in the app's database (db/067_llm_provider_config.sql):
+#   "Bayanatix Local — Qwen2.5-32B"            -> http://localhost:8000/v1
+#   "Bayanatix Local — Qwen2.5-7B (fallback)"  -> http://localhost:8001/v1
+# Both profiles start DISABLED — once one of these is actually reachable, enable it
+# in /admin/ai-providers (Test Connection first), then optionally Set Default or
+# route DESCRIBE/REPHRASE/DQ_SEMANTIC to it under Capability Routing.
+#
+# NOT tested against real GPU hardware — start with `docker compose up bayanatix-llm-32b`
+# and watch logs; first start pulls ~20-60GB of model weights unless HF_HUB_OFFLINE
+# is set with a pre-populated volume (see the commented block below).
+
+services:
+  bayanatix-llm-32b:
+    build:
+      context: .
+      args:
+        MODEL_NAME: "Qwen/Qwen2.5-32B-Instruct-AWQ"
+        QUANTIZATION: "awq"
+        MAX_MODEL_LEN: "8192"
+        GPU_MEMORY_UTILIZATION: "0.90"
+    image: bayanatix-llm:32b
+    container_name: bayanatix-llm-32b
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_NAME=Qwen/Qwen2.5-32B-Instruct-AWQ
+      # - HF_HUB_OFFLINE=1  # uncomment for air-gapped installs with a pre-populated volume
+    volumes:
+      - hf-cache-32b:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Single 48GB-class GPU (L40S/A6000) or one A100/H100. Recommended default tier.
+    restart: unless-stopped
+
+  bayanatix-llm-7b:
+    build:
+      context: .
+      args:
+        MODEL_NAME: "Qwen/Qwen2.5-7B-Instruct"
+        QUANTIZATION: ""
+        MAX_MODEL_LEN: "8192"
+        GPU_MEMORY_UTILIZATION: "0.85"
+    image: bayanatix-llm:7b
+    container_name: bayanatix-llm-7b
+    ports:
+      - "8001:8000"
+    environment:
+      - MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
+    volumes:
+      - hf-cache-7b:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Reduced-hardware fallback tier — small GPU or CPU-only installs (drop the
+    # `deploy.resources` block entirely for CPU-only; expect much higher latency).
+    restart: unless-stopped
+    profiles: ["fallback"]  # not started by default `docker compose up`; opt in explicitly
+
+volumes:
+  hf-cache-32b:
+  hf-cache-7b:
