@@ -266,6 +266,9 @@ export async function getEntityById(entityId: number): Promise<
       a.null_percentage as "nullPercentage",
       coalesce(a.is_encrypted, false) as "isEncrypted",
       a.attribute_class_code as "columnType",
+      a.suggested_class_code as "suggestedColumnType",
+      a.suggestion_confidence as "columnTypeConfidence",
+      a.suggestion_status_code as "columnTypeStatus",
       bg.retention_category_id  as "retentionCategoryId",
       dc.name                   as "retentionCategoryName",
       bg_cls.term_name_text        as "classTermName",
@@ -537,14 +540,21 @@ export async function updateAttribute(
     SELECT description_text, friendly_name_text, is_encrypted, attribute_class_code, glossary_term_text
     FROM bayanat.data_attributes WHERE attribute_id = ${attributeId}
   `;
+  // Picking a Column Type from this dropdown is a steward decision too — mark it
+  // reviewed (mirrors the dedicated accept/override endpoints in
+  // lib/queries/classification.ts) so a later classification run's non-destructive
+  // write rules leave it alone instead of silently reconsidering it on the next crawl.
   await sql`
     UPDATE bayanat.data_attributes
     SET
       description_text     = ${patch.description  || null},
       friendly_name_text   = ${patch.friendlyName || null},
-      is_encrypted         = ${patch.isEncrypted},
+      is_encrypted          = ${patch.isEncrypted},
       attribute_class_code = ${patch.columnType},
-      glossary_term_text   = ${patch.glossaryTerm || null}
+      glossary_term_text   = ${patch.glossaryTerm || null},
+      suggestion_status_code  = CASE WHEN ${patch.columnType} IS NOT NULL THEN 'OVERRIDDEN' ELSE suggestion_status_code END,
+      classified_by_user_id   = CASE WHEN ${patch.columnType} IS NOT NULL THEN ${userId} ELSE classified_by_user_id END,
+      classified_at_timestamp = CASE WHEN ${patch.columnType} IS NOT NULL THEN NOW() ELSE classified_at_timestamp END
     WHERE attribute_id = ${attributeId}
   `;
   if (old) {

@@ -115,6 +115,10 @@ export type DataAttribute = {
   nullPercentage?: number | null;
   isEncrypted: boolean;
   columnType: string | null;
+  // Column Asset-Type Suggestion engine — see lib/column-classifier.ts
+  suggestedColumnType?:  string | null;
+  columnTypeConfidence?: number | null;
+  columnTypeStatus?:     string | null; // NONE | PENDING | ACCEPTED | OVERRIDDEN | STALE
   retentionCategoryId?:    number | null;
   retentionCategoryName?:  string | null;
   // From the linked CLASSIFICATION business term

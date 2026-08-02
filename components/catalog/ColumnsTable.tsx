@@ -8,6 +8,7 @@ import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
 import { MindMapTab } from "./MindMapTab";
+import { ColumnTypeBadge } from "./ColumnTypeBadge";
 import { useLang } from "@/lib/lang-context";
 
 // ── Column chooser definitions ──────────────────────────────────────────────
@@ -197,7 +198,7 @@ function EnrichmentTermsCell({ attributeId }: { attributeId: number }) {
 
 type TagRow = { tagId: number; tagName: string; colorHex: string };
 
-function ColumnDetail({ attr, onEdit }: { attr: DataAttribute; onEdit: () => void }) {
+function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: () => void; canEdit: boolean }) {
   const [tags,            setTags]            = useState<TagRow[]  | null>(null);
   const [enrichment,      setEnrichment]      = useState<TermRow[] | null>(null);
   const [showRelationships, setShowRelationships] = useState(false);
@@ -233,7 +234,13 @@ function ColumnDetail({ attr, onEdit }: { attr: DataAttribute; onEdit: () => voi
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">Column Type</div>
           <div className="text-sm text-ink">
-            {attr.columnType ? COLUMN_TYPE_LABEL[attr.columnType] ?? attr.columnType : <span className="text-muted">—</span>}
+            <ColumnTypeBadge
+              attributeId={attr.attributeId} physicalName={attr.physicalName}
+              currentType={attr.columnType} suggestedType={attr.suggestedColumnType}
+              confidence={attr.columnTypeConfidence} status={attr.columnTypeStatus}
+              canEdit={canEdit}
+            />
+            {!attr.columnType && !attr.suggestedColumnType && <span className="text-muted">—</span>}
           </div>
         </div>
         <div>
@@ -562,6 +569,14 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                           <span className="font-semibold text-brand-deep truncate">{a.physicalName}</span>
                           {a.isEncrypted && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">🔒 Enc</span>}
                           {a.columnType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>}
+                          {!a.columnType && a.suggestedColumnType && (
+                            <span
+                              className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-dashed border-amber-400 bg-amber-50 text-amber-700 shrink-0"
+                              title={t.catalog.suggestedColumnTypeTitle}
+                            >
+                              {t.catalog.suggestedTypePrefix} {a.suggestedColumnType === "BUSINESS" ? t.catalog.columnTypeBusiness : t.catalog.columnTypeTechnical}
+                            </span>
+                          )}
                           {a.classTermIsPii && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 shrink-0">PII</span>}
                           {isCde(a) && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 shrink-0">CDE</span>}
                         </div>
@@ -623,9 +638,13 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                   case "coltype":
                     return (
                       <div key="coltype" className="min-w-0">
-                        {a.columnType
-                          ? <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>
-                          : <span className="text-muted">—</span>}
+                        <ColumnTypeBadge
+                          attributeId={a.attributeId} physicalName={a.physicalName}
+                          currentType={a.columnType} suggestedType={a.suggestedColumnType}
+                          confidence={a.columnTypeConfidence} status={a.columnTypeStatus}
+                          canEdit={canEdit}
+                        />
+                        {!a.columnType && !a.suggestedColumnType && <span className="text-muted">—</span>}
                       </div>
                     );
                   case "encrypted":
@@ -688,7 +707,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
 
             {/* Expanded detail */}
             {expandedId === a.attributeId && (
-              <ColumnDetail attr={a} onEdit={() => { setExpandedId(null); setEditing(a); }} />
+              <ColumnDetail attr={a} onEdit={() => { setExpandedId(null); setEditing(a); }} canEdit={canEdit} />
             )}
           </div>
         ))}

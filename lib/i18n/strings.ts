@@ -475,6 +475,14 @@ export type I18nStrings = {
     confidenceHigh:      string;
     confidenceMedium:    string;
     confidenceLow:       string;
+    // Column Asset-Type suggestion (Business/Technical, distinct from table type above)
+    suggestedColumnTypeTitle: string;
+    overrideReasonLabel:      string;
+    overrideReasonPlaceholder: string;
+    overrideConfirmBtn:       string;
+    addPatternExceptionLabel: string;
+    columnTypeBusiness:       string;
+    columnTypeTechnical:      string;
     // Cert filter
     certAllStatus:    string;
     certGold:         string;

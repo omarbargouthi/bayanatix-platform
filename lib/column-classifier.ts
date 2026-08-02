@@ -85,8 +85,18 @@ export function classifyColumn(input: ColumnInput, patterns: PatternDictionary):
   let decision: ClassCode;
   let confidence: number;
 
+  // ── R0 (steward-authored exception, checked before every rule) ─────────────────
+  // Written by the "add pattern exception" one-click action on an override (spec §5):
+  // a steward already decided a specific name in this data source is TECHNICAL
+  // despite how it looks structurally (e.g. an ETL artifact named like a natural id).
+  // Never auto-learned — only ever created by an explicit steward action.
+  if (matches(name, "EXCLUDE", patterns)) {
+    rule = "R0"; decision = "TECHNICAL"; confidence = 0.97;
+    hits.push({ rule, detail: "name matches a steward-defined EXCLUDE pattern exception" });
+    signals.name_pattern_group = "EXCLUDE";
+
   // ── R1–R11, evaluated strictly in priority order — first match wins. ──────────
-  if (matches(name, "AUDIT_COLUMN", patterns)) {
+  } else if (matches(name, "AUDIT_COLUMN", patterns)) {
     rule = "R1"; decision = "TECHNICAL"; confidence = 0.98;
     hits.push({ rule, detail: `name matches AUDIT_COLUMN pattern` });
     signals.name_pattern_group = "AUDIT_COLUMN";
