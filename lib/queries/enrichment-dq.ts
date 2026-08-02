@@ -132,6 +132,16 @@ export async function acceptDqRuleSuggestion(
   if (row.status === "DUPLICATE") throw new Error("Cannot accept a suggestion marked as a duplicate of an existing active rule");
   if (row.status !== "PENDING") throw new Error(`Suggestion is already ${row.status}`);
 
+  // Re-check for a duplicate at accept time, not just at suggestion-creation time:
+  // two separate "Suggest Rules" runs (or a run before an earlier suggestion was
+  // accepted) can leave more than one PENDING suggestion for the same dimension +
+  // template on the same asset — without this, accepting each one individually
+  // would create multiple active dq_rules rows for the identical check.
+  if (row.ruleTemplateCode && await isDuplicateRule(row.assetType, row.assetId, row.dimensionCode ?? "", row.ruleTemplateCode)) {
+    await sql`UPDATE bayanat.dq_rule_suggestions SET status_code = 'DUPLICATE' WHERE suggestion_id = ${suggestionId}`;
+    throw new Error("An active rule of this dimension and type already exists for this asset — suggestion marked as duplicate");
+  }
+
   const edited = !!overrides && Object.keys(overrides).length > 0;
   const ruleTemplateCode = row.ruleTemplateCode === "CUSTOM_SQL" ? null : row.ruleTemplateCode;
 
@@ -183,8 +193,14 @@ export async function bulkAcceptDqSuggestions(suggestionIds: number[], userId: s
   for (const r of rows) {
     if (r.status === "DUPLICATE") { skippedDuplicate.push(r.suggestionId); continue; }
     if (r.status !== "PENDING") continue;
-    await acceptDqRuleSuggestion(r.suggestionId, userId);
-    accepted.push(r.suggestionId);
+    try {
+      await acceptDqRuleSuggestion(r.suggestionId, userId);
+      accepted.push(r.suggestionId);
+    } catch {
+      // Most likely the accept-time duplicate re-check (two suggestions for the same
+      // dimension+template in this batch) — don't let one row abort the rest of the batch.
+      skippedDuplicate.push(r.suggestionId);
+    }
   }
   return { accepted, skippedDuplicate };
 }

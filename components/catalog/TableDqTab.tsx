@@ -809,6 +809,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   const [showSuggest, setShowSuggest] = useState(false);
   const [runningAll, setRunningAll] = useState(false);
   const [runningId, setRunningId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [samplesResultId, setSamplesResultId] = useState<number | null>(null);
   const [runErrors, setRunErrors] = useState<Record<number, string>>({});
 
@@ -859,6 +860,20 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
     } catch {
       setRunErrors((prev) => ({ ...prev, [ruleId]: "Failed to connect to run service" }));
     } finally { setRunningId(null); }
+  }
+
+  async function deleteRule(ruleId: number, ruleName: string) {
+    if (!confirm(`Delete the rule "${ruleName}"? This also removes its run history.`)) return;
+    setDeletingId(ruleId);
+    try {
+      const res = await fetch(`/api/dq/rules/${ruleId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? "Failed to delete rule");
+        return;
+      }
+      await load();
+    } finally { setDeletingId(null); }
   }
 
   // Split ERROR rules from threshold-result rules
@@ -1087,6 +1102,16 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                       >
                         {runningId === rule.ruleId ? "…" : c.dqRunBtn}
                       </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => deleteRule(rule.ruleId, rule.ruleName)}
+                          disabled={deletingId === rule.ruleId}
+                          className="btn btn-sm text-[11px] px-2 py-1 text-red-600 border-red-200 hover:bg-red-50"
+                          title="Delete this rule"
+                        >
+                          {deletingId === rule.ruleId ? "…" : "Delete"}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1137,6 +1162,16 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                   >
                     {runningId === rule.ruleId ? "…" : c.dqRetryBtn}
                   </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => deleteRule(rule.ruleId, rule.ruleName)}
+                      disabled={deletingId === rule.ruleId}
+                      className="btn btn-sm text-[11px] px-2 py-1 shrink-0 text-red-600 border-red-200 hover:bg-red-50"
+                      title="Delete this rule"
+                    >
+                      {deletingId === rule.ruleId ? "…" : "Delete"}
+                    </button>
+                  )}
                 </div>
               );
             })}
