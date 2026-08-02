@@ -10,6 +10,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI,
+  IconTable,
 } from "./icons";
 
 type Item = {
@@ -31,6 +32,7 @@ const NAV_DOMAINS_DEF = [
   { href: "/catalog",        key: "catalog"       as const, Icon: IconBook },
   { href: "/quality",        key: "quality"       as const, Icon: IconCheck },
   { href: "/classification", key: "classification"as const, Icon: IconLines },
+  { href: "/column-types",   key: "columnTypes"   as const, Icon: IconTable },
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
   { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },

@@ -67,6 +67,18 @@ const BLANK_LINEAGE_CFG: LineageCfg = {
   lineageScanProcedures: true, lineageScanFunctions: true,
 };
 
+type ClassificationCfg = {
+  auto_classify_columns: boolean;
+  classify_scope: "NEW_ONLY" | "UNCLASSIFIED_ONLY" | "ALL";
+  harvest_fk_constraints: boolean;
+  infer_fk_by_naming: boolean;
+  auto_accept_band: "NONE" | "HIGH";
+};
+const BLANK_CLASSIFICATION_CFG: ClassificationCfg = {
+  auto_classify_columns: true, classify_scope: "NEW_ONLY",
+  harvest_fk_constraints: true, infer_fk_by_naming: true, auto_accept_band: "NONE",
+};
+
 const STATUS_DOT: Record<string, string> = {
   OK:        "bg-green-500",
   FAILED:    "bg-red-500",
@@ -119,6 +131,11 @@ export default function DataSourcesPage() {
   const [lineageSaved, setLineageSaved] = useState(false);
   const [scanning, setScanning]         = useState(false);
   const [scanResult, setScanResult]     = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Column classification (Business/Technical suggestion engine) settings state
+  const [classCfg, setClassCfg]         = useState<ClassificationCfg>({ ...BLANK_CLASSIFICATION_CFG });
+  const [classCfgSaving, setClassCfgSaving] = useState(false);
+  const [classCfgSaved, setClassCfgSaved]   = useState(false);
 
   // Governance default user picker state (per field)
   const [govSearch, setGovSearch]     = useState<Record<string, string>>({});
@@ -175,6 +192,13 @@ export default function DataSourcesPage() {
     setGovSearch(labels);
   }
 
+  async function loadClassificationConfig(id: number) {
+    const r = await fetch(`/api/admin/sources/${id}/classification-settings`);
+    if (!r.ok) return;
+    const cfg = await r.json();
+    setClassCfg({ ...BLANK_CLASSIFICATION_CFG, ...cfg });
+  }
+
   async function loadJobs(id: number) {
     const r = await fetch(`/api/admin/crawl-jobs?connectionId=${id}`);
     if (r.ok) setJobs(await r.json());
@@ -219,6 +243,7 @@ export default function DataSourcesPage() {
   useEffect(() => {
     if (selected?.connectionId) {
       loadCrawlConfig(selected.connectionId);
+      loadClassificationConfig(selected.connectionId);
       loadJobs(selected.connectionId);
       setJobLogs(new Map());
       setExpandedJobId(null);
@@ -364,6 +389,20 @@ export default function DataSourcesPage() {
       setLineageSaved(true);
       setTimeout(() => setLineageSaved(false), 2000);
     } finally { setLineageSaving(false); }
+  }
+
+  async function handleSaveClassificationCfg() {
+    if (!selected) return;
+    setClassCfgSaving(true);
+    try {
+      const r = await fetch(`/api/admin/sources/${selected.connectionId}/classification-settings`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(classCfg),
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.error); return; }
+      setClassCfgSaved(true);
+      setTimeout(() => setClassCfgSaved(false), 2000);
+    } finally { setClassCfgSaving(false); }
   }
 
   async function handleRunLineageScan() {
@@ -717,6 +756,70 @@ export default function DataSourcesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Column Classification */}
+                <div className="bg-white border border-line rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-ink mb-1">Column Classification</h3>
+                  <p className="text-xs text-muted mb-5">
+                    Auto-suggest Business/Technical column types during crawl, based on table category, key role, naming patterns, and FK topology. Suggestions always require steward review unless auto-accept is enabled below.
+                  </p>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <button type="button"
+                        onClick={() => setClassCfg(c => ({ ...c, auto_classify_columns: !c.auto_classify_columns }))}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${classCfg.auto_classify_columns ? "bg-brand-purple" : "bg-gray-300"}`}>
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${classCfg.auto_classify_columns ? "left-5" : "left-0.5"}`} />
+                      </button>
+                      <label className="text-sm text-ink font-medium">Auto-classify Columns on Crawl</label>
+                    </div>
+
+                    {classCfg.auto_classify_columns && (
+                      <div className="pl-13 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-ink mb-1">Classification Scope</label>
+                            <select className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand-purple"
+                              value={classCfg.classify_scope} onChange={e => setClassCfg(c => ({ ...c, classify_scope: e.target.value as ClassificationCfg["classify_scope"] }))}>
+                              <option value="NEW_ONLY">New columns only</option>
+                              <option value="UNCLASSIFIED_ONLY">Unclassified columns</option>
+                              <option value="ALL">Re-evaluate all columns</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-ink mb-1">Auto-accept Band</label>
+                            <select className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand-purple"
+                              value={classCfg.auto_accept_band} onChange={e => setClassCfg(c => ({ ...c, auto_accept_band: e.target.value as ClassificationCfg["auto_accept_band"] }))}>
+                              <option value="NONE">Never auto-accept — always review</option>
+                              <option value="HIGH">Auto-accept HIGH-confidence suggestions</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                            <input type="checkbox" className="w-4 h-4 accent-brand-purple"
+                              checked={classCfg.harvest_fk_constraints}
+                              onChange={e => setClassCfg(c => ({ ...c, harvest_fk_constraints: e.target.checked }))} />
+                            Harvest declared FK constraints
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                            <input type="checkbox" className="w-4 h-4 accent-brand-purple"
+                              checked={classCfg.infer_fk_by_naming}
+                              onChange={e => setClassCfg(c => ({ ...c, infer_fk_by_naming: e.target.checked }))} />
+                            Infer FKs by column naming (fallback)
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <button onClick={handleSaveClassificationCfg} disabled={classCfgSaving} className="btn btn-primary btn-sm">
+                        {classCfgSaving ? "Saving…" : "Save Classification Settings"}
+                      </button>
+                      {classCfgSaved && <span className="text-xs text-green-700 font-semibold">✓ Saved</span>}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Test Connection */}
                 <div className="bg-white border border-line rounded-xl p-6">

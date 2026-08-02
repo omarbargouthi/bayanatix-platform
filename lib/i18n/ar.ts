@@ -11,6 +11,7 @@ export const ar: I18nStrings = {
     lineage:           "مسار البيانات",
     quality:           "جودة البيانات",
     classification:    "التصنيف",
+    columnTypes:       "أنواع الأعمدة",
     privacy:           "خصوصية البيانات",
     sharing:           "مشاركة البيانات",
     openData:          "البيانات المفتوحة",

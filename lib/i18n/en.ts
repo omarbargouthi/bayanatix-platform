@@ -11,6 +11,7 @@ export const en: I18nStrings = {
     lineage:           "Data Lineage",
     quality:           "Data Quality",
     classification:    "Classification",
+    columnTypes:       "Column Types",
     privacy:           "Data Privacy",
     sharing:           "Data Sharing",
     openData:          "Open Data",

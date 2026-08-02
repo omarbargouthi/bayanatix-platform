@@ -102,6 +102,7 @@ export default async function TablePage({
           <TablePageActions
             entityId={entity.entityId}
             entityName={entity.entityName}
+            canEdit={canEdit}
           />
         </div>
 

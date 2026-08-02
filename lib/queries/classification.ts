@@ -7,6 +7,7 @@ export type SuggestionRow = {
   friendlyName: string | null;
   entityId: number;
   entityName: string;
+  schemaId: number;
   schemaName: string;
   suggestedClass: string | null;
   confidence: number | null;
@@ -42,7 +43,7 @@ export async function getSuggestionsQueue(filter: {
   const rows = await sql<SuggestionRow[]>`
     SELECT
       a.attribute_id AS "attributeId", a.physical_name_text AS "physicalName", a.friendly_name_text AS "friendlyName",
-      e.entity_id AS "entityId", e.entity_name_text AS "entityName", s.schema_name_text AS "schemaName",
+      e.entity_id AS "entityId", e.entity_name_text AS "entityName", s.schema_id AS "schemaId", s.schema_name_text AS "schemaName",
       a.suggested_class_code AS "suggestedClass", a.suggestion_confidence AS confidence,
       (${bandExpr()}) AS band,
       a.suggestion_status_code AS status, a.suggestion_rationale_json AS rationale,

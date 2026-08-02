@@ -17,6 +17,7 @@ export type I18nStrings = {
     lineage:          string;
     quality:          string;
     classification:   string;
+    columnTypes:      string;
     privacy:          string;
     sharing:          string;
     openData:         string;
