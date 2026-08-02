@@ -30,7 +30,7 @@ type ColProfile = {
 
 type CrawlColumn = {
   name: string; dataType: string; isNullable: boolean;
-  isPrimaryKey: boolean; defaultValue: string | null;
+  isPrimaryKey: boolean; isForeignKey: boolean; defaultValue: string | null;
   comment?: string | null;
   profile?: ColProfile;
 };
@@ -38,11 +38,20 @@ type CrawlColumn = {
 type CrawlTable  = { name: string; isView: boolean; columns: CrawlColumn[]; comment?: string | null; rowCount?: number; sampleSize?: number };
 type CrawlSchema = { name: string; tables: CrawlTable[] };
 
+// FK topology harvested alongside columns — feeds bayanat.attribute_reference_links,
+// the prerequisite the column-classifier's R3/R5/R6 rules need (see lib/column-classifier.ts).
+export type CrawlFk = {
+  schema: string; table: string; column: string;
+  refSchema: string; refTable: string; refColumn: string;
+  constraintName: string | null;
+};
+
 export type CrawlResult = {
   schemas:      CrawlSchema[];
   schemaCount:  number;
   tableCount:   number;
   columnCount:  number;
+  foreignKeys:  CrawlFk[];
   profilingMode?:  string;
   profilingLimit?: number;
 };
@@ -255,6 +264,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
     `;
 
     const schemas: CrawlSchema[] = [];
+    const foreignKeys: CrawlFk[] = [];
 
     for (const sr of schemaRows) {
       if (!schemaIncluded(sr.n, config)) {
@@ -268,6 +278,32 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
         WHERE table_schema = ${sr.n} ORDER BY table_name
       `;
 
+      // FK harvest for the whole schema in one set-based query, via pg_constraint's
+      // conkey/confkey arrays (unnest zipped by position) rather than the ANSI
+      // information_schema views, which can't reliably pair columns on composite FKs.
+      const fkRows = await pg<{ table: string; column: string; refSchema: string; refTable: string; refColumn: string; constraintName: string }[]>`
+        SELECT
+          cl.relname AS table, a.attname AS column,
+          refns.nspname AS "refSchema", refcl.relname AS "refTable", refa.attname AS "refColumn",
+          con.conname AS "constraintName"
+        FROM pg_constraint con
+        JOIN pg_class cl ON cl.oid = con.conrelid
+        JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+        JOIN pg_class refcl ON refcl.oid = con.confrelid
+        JOIN pg_namespace refns ON refns.oid = refcl.relnamespace
+        JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS cols(attnum, refattnum, ord) ON true
+        JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = cols.attnum
+        JOIN pg_attribute refa ON refa.attrelid = con.confrelid AND refa.attnum = cols.refattnum
+        WHERE con.contype = 'f' AND ns.nspname = ${sr.n}
+      `;
+      const fkColsByTable = new Map<string, Set<string>>();
+      for (const fk of fkRows) {
+        foreignKeys.push({ schema: sr.n, table: fk.table, column: fk.column, refSchema: fk.refSchema, refTable: fk.refTable, refColumn: fk.refColumn, constraintName: fk.constraintName });
+        const set = fkColsByTable.get(fk.table) ?? new Set<string>();
+        set.add(fk.column);
+        fkColsByTable.set(fk.table, set);
+      }
+
       const tables: CrawlTable[] = [];
       for (const tr of tableRows) {
         if (!tableIncluded(tr.t, config)) continue;
@@ -280,6 +316,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
           WHERE i.indisprimary AND ns.nspname = ${sr.n} AND cl.relname = ${tr.t}
         `;
         const pk = new Set(pkRows.map(r => r.c));
+        const fkCols = fkColsByTable.get(tr.t) ?? new Set<string>();
 
         // Table comment + column comments in one query
         const [tCommentRow] = await pg<{ cmt: string | null }[]>`
@@ -306,7 +343,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
 
         const columns: CrawlColumn[] = cols.map(c => ({
           name: c.n, dataType: c.dt,
-          isNullable: c.nl === "YES", isPrimaryKey: pk.has(c.n), defaultValue: c.def,
+          isNullable: c.nl === "YES", isPrimaryKey: pk.has(c.n), isForeignKey: fkCols.has(c.n), defaultValue: c.def,
           comment: colComments.get(c.n) ?? null,
         }));
 
@@ -336,7 +373,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
     }
 
     return {
-      ...summarise(schemas),
+      ...summarise(schemas, foreignKeys),
       profilingMode:  config?.profilingMode,
       profilingLimit: config?.profilingLimit,
     };
@@ -366,6 +403,7 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
        ORDER BY schema_name`,
     );
     const schemas: CrawlSchema[] = [];
+    const foreignKeys: CrawlFk[] = [];
     for (const dbRow of dbRows as Record<string, string>[]) {
       const sname = dbRow.schema_name || dbRow.SCHEMA_NAME;
       if (!schemaIncluded(sname, config)) continue;
@@ -375,12 +413,37 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
       const [tRows] = await conn.query(
         `SELECT table_name, table_type, table_comment FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name`, [sname],
       );
+
+      // KEY_COLUMN_USAGE already pairs each FK column with its referenced column
+      // (no composite-FK ambiguity, unlike Postgres' generic ANSI views).
+      const [fkRows] = await conn.query(
+        `SELECT table_name, column_name, referenced_table_schema, referenced_table_name, referenced_column_name, constraint_name
+         FROM information_schema.key_column_usage
+         WHERE table_schema = ? AND referenced_table_name IS NOT NULL`, [sname],
+      );
+      const fkColsByTable = new Map<string, Set<string>>();
+      for (const fk of fkRows as Record<string, string>[]) {
+        const table = fk.table_name || fk.TABLE_NAME;
+        const column = fk.column_name || fk.COLUMN_NAME;
+        foreignKeys.push({
+          schema: sname, table, column,
+          refSchema: fk.referenced_table_schema || fk.REFERENCED_TABLE_SCHEMA,
+          refTable:  fk.referenced_table_name   || fk.REFERENCED_TABLE_NAME,
+          refColumn: fk.referenced_column_name  || fk.REFERENCED_COLUMN_NAME,
+          constraintName: fk.constraint_name    || fk.CONSTRAINT_NAME,
+        });
+        const set = fkColsByTable.get(table) ?? new Set<string>();
+        set.add(column);
+        fkColsByTable.set(table, set);
+      }
+
       const tables: CrawlTable[] = [];
       for (const tRow of tRows as Record<string, string>[]) {
         const tname = tRow.table_name || tRow.TABLE_NAME;
         if (!tableIncluded(tname, config)) continue;
         const ttype = tRow.table_type || tRow.TABLE_TYPE;
         const tcomment = tRow.table_comment || tRow.TABLE_COMMENT || null;
+        const fkCols = fkColsByTable.get(tname) ?? new Set<string>();
         const [cRows] = await conn.query(
           `SELECT column_name, data_type, is_nullable, column_default, column_key, column_comment
            FROM information_schema.columns
@@ -394,6 +457,7 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
             dataType:     c.data_type      || c.DATA_TYPE,
             isNullable:   (c.is_nullable   || c.IS_NULLABLE) === "YES",
             isPrimaryKey: (c.column_key    || c.COLUMN_KEY)  === "PRI",
+            isForeignKey: fkCols.has(c.column_name || c.COLUMN_NAME),
             defaultValue: c.column_default || c.COLUMN_DEFAULT || null,
             comment:      c.column_comment || c.COLUMN_COMMENT || null,
           })),
@@ -402,7 +466,7 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
       if (tables.length > 0) schemas.push({ name: sname, tables });
       await logger.info(`  → ${tables.length} tables/views in ${sname}`);
     }
-    return summarise(schemas);
+    return summarise(schemas, foreignKeys);
   } finally { await conn.end(); }
 }
 
@@ -425,6 +489,7 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
       "db_ddladmin","db_backupoperator","db_datareader","db_datawriter","db_denydatareader","db_denydatawriter"]);
     const sr = await pool.request().query(`SELECT name AS schema_name FROM sys.schemas ORDER BY name`);
     const schemas: CrawlSchema[] = [];
+    const foreignKeys: CrawlFk[] = [];
 
     for (const row of sr.recordset) {
       const sname: string = row.schema_name;
@@ -438,6 +503,33 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
         SELECT v.name,'VIEW' FROM sys.views v JOIN sys.schemas s ON v.schema_id=s.schema_id WHERE s.name=@s
         ORDER BY table_name`);
 
+      // sys.foreign_key_columns already pairs each FK column with its referenced
+      // column (parent_column_id <-> referenced_column_id), same dialect family
+      // (sys.* catalog views) as the rest of this function's queries.
+      const fkr = await pool.request().input("s", mssql.VarChar, sname).query(`
+        SELECT t1.name AS table_name, c1.name AS column_name,
+               s2.name AS ref_schema, t2.name AS ref_table, c2.name AS ref_column, fk.name AS constraint_name
+        FROM sys.foreign_keys fk
+        JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+        JOIN sys.tables t1 ON t1.object_id = fkc.parent_object_id
+        JOIN sys.schemas s1 ON s1.schema_id = t1.schema_id
+        JOIN sys.columns c1 ON c1.object_id = fkc.parent_object_id AND c1.column_id = fkc.parent_column_id
+        JOIN sys.tables t2 ON t2.object_id = fkc.referenced_object_id
+        JOIN sys.schemas s2 ON s2.schema_id = t2.schema_id
+        JOIN sys.columns c2 ON c2.object_id = fkc.referenced_object_id AND c2.column_id = fkc.referenced_column_id
+        WHERE s1.name = @s`);
+      const fkColsByTable = new Map<string, Set<string>>();
+      for (const fk of fkr.recordset as Record<string, string>[]) {
+        foreignKeys.push({
+          schema: sname, table: fk.table_name, column: fk.column_name,
+          refSchema: fk.ref_schema, refTable: fk.ref_table, refColumn: fk.ref_column,
+          constraintName: fk.constraint_name,
+        });
+        const set = fkColsByTable.get(fk.table_name) ?? new Set<string>();
+        set.add(fk.column_name);
+        fkColsByTable.set(fk.table_name, set);
+      }
+
       const tables: CrawlTable[] = [];
       for (const trow of tr.recordset) {
         if (!tableIncluded(trow.table_name, config)) continue;
@@ -448,6 +540,7 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
           JOIN sys.tables tb ON tb.object_id=i.object_id JOIN sys.schemas sc ON sc.schema_id=tb.schema_id
           WHERE i.is_primary_key=1 AND sc.name=@s AND tb.name=@t`);
         const pk = new Set(pkr.recordset.map((r: Record<string,string>) => r.cn));
+        const fkCols = fkColsByTable.get(trow.table_name) ?? new Set<string>();
         const cr = await pool.request().input("s",mssql.VarChar,sname).input("t",mssql.VarChar,trow.table_name).query(`
           SELECT c.name AS cn, tp.name AS dt, c.is_nullable AS nl,
             CAST(ep.value AS NVARCHAR(MAX)) AS cmt
@@ -469,7 +562,7 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
           comment: tcmt.recordset[0]?.cmt ?? null,
           columns: cr.recordset.map((c: Record<string, string|boolean|null>) => ({
             name: c.cn as string, dataType: c.dt as string,
-            isNullable: !!c.nl, isPrimaryKey: pk.has(c.cn as string), defaultValue: null,
+            isNullable: !!c.nl, isPrimaryKey: pk.has(c.cn as string), isForeignKey: fkCols.has(c.cn as string), defaultValue: null,
             comment: c.cmt as string | null ?? null,
           })),
         });
@@ -477,7 +570,7 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
       if (tables.length > 0) schemas.push({ name: sname, tables });
       await logger.info(`  → ${tables.length} tables/views in ${sname}`);
     }
-    return summarise(schemas);
+    return summarise(schemas, foreignKeys);
   } finally { await pool.close(); }
 }
 
@@ -623,7 +716,7 @@ async function crawlFile(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
       const inferred = inferColumnsFromRows(headers, dataRows);
       const columns: CrawlColumn[] = inferred.map(c => ({
         name: c.name, dataType: c.dataType, isNullable: c.isNullable,
-        isPrimaryKey: false, defaultValue: null, comment: null,
+        isPrimaryKey: false, isForeignKey: false, defaultValue: null, comment: null,
       }));
 
       let sampleSize: number | undefined;
@@ -670,6 +763,7 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
       [], { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
     const schemaMap = new Map<string, CrawlTable[]>();
+    const foreignKeys: CrawlFk[] = [];
 
     for (const row of (tabRes.rows || []) as Record<string, string>[]) {
       const owner = row.OWNER, tname = row.TABLE_NAME;
@@ -683,6 +777,17 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
         `SELECT cc.column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.constraint_name=c.constraint_name AND cc.owner=c.owner WHERE c.owner=:o AND c.table_name=:t AND c.constraint_type='P'`,
         { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
+      // FK constraint (type 'R') joined to the constraint it references (r_owner/r_constraint_name),
+      // pairing columns by `position` so composite FKs line up correctly.
+      const fkRes = await conn.execute(
+        `SELECT ac.constraint_name, acc.column_name, rac.owner AS ref_owner, rac.table_name AS ref_table, racc.column_name AS ref_column
+         FROM all_constraints ac
+         JOIN all_cons_columns acc ON acc.owner=ac.owner AND acc.constraint_name=ac.constraint_name
+         JOIN all_constraints rac ON rac.owner=ac.r_owner AND rac.constraint_name=ac.r_constraint_name
+         JOIN all_cons_columns racc ON racc.owner=rac.owner AND racc.constraint_name=rac.constraint_name AND racc.position=acc.position
+         WHERE ac.constraint_type='R' AND ac.owner=:o AND ac.table_name=:t`,
+        { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
+      );
       const tCommentRes = await conn.execute(
         `SELECT comments FROM all_tab_comments WHERE owner=:o AND table_name=:t`,
         { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
@@ -692,28 +797,37 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
         { o: owner, t: tname }, { outFormat: oracledb.OUT_FORMAT_OBJECT },
       );
       const pk = new Set((pkRes.rows || []).map((r: Record<string,string>) => r.COLUMN_NAME));
+      const fkCols = new Set<string>();
+      for (const fk of (fkRes.rows || []) as Record<string, string>[]) {
+        fkCols.add(fk.COLUMN_NAME);
+        foreignKeys.push({
+          schema: owner, table: tname, column: fk.COLUMN_NAME,
+          refSchema: fk.REF_OWNER, refTable: fk.REF_TABLE, refColumn: fk.REF_COLUMN,
+          constraintName: fk.CONSTRAINT_NAME,
+        });
+      }
       const colCmts = new Map(((cCommentRes.rows || []) as Record<string,string>[]).map(r => [r.COLUMN_NAME, r.COMMENTS ?? null]));
       schemaMap.get(owner)!.push({
         name: tname, isView: row.TTYPE === "VIEW",
         comment: ((tCommentRes.rows || []) as Record<string,string>[])[0]?.COMMENTS ?? null,
         columns: (colRes.rows || []).map((c: Record<string, string>) => ({
           name: c.COLUMN_NAME, dataType: c.DATA_TYPE,
-          isNullable: c.NULLABLE === "Y", isPrimaryKey: pk.has(c.COLUMN_NAME), defaultValue: null,
+          isNullable: c.NULLABLE === "Y", isPrimaryKey: pk.has(c.COLUMN_NAME), isForeignKey: fkCols.has(c.COLUMN_NAME), defaultValue: null,
           comment: colCmts.get(c.COLUMN_NAME) ?? null,
         })),
       });
     }
     for (const [schema] of schemaMap) await logger.info(`Crawled schema: ${schema}`);
-    return summarise(Array.from(schemaMap.entries()).map(([name, tables]) => ({ name, tables })));
+    return summarise(Array.from(schemaMap.entries()).map(([name, tables]) => ({ name, tables })), foreignKeys);
   } finally { await conn.close(); }
 }
 
 // ── Summarise ─────────────────────────────────────────────────────────────────
 
-function summarise(schemas: CrawlSchema[]): CrawlResult {
+function summarise(schemas: CrawlSchema[], foreignKeys: CrawlFk[] = []): CrawlResult {
   const tableCount  = schemas.reduce((s, sc) => s + sc.tables.length, 0);
   const columnCount = schemas.reduce((s, sc) => s + sc.tables.reduce((t, tb) => t + tb.columns.length, 0), 0);
-  return { schemas, schemaCount: schemas.length, tableCount, columnCount };
+  return { schemas, schemaCount: schemas.length, tableCount, columnCount, foreignKeys };
 }
 
 // ── Test connection ───────────────────────────────────────────────────────────
@@ -805,7 +919,7 @@ async function saveCrawlResults(
   hostAddress: string, databaseName: string | null,
   result: CrawlResult, jobId: number,
   govDefaults: GovernanceDefaults,
-): Promise<void> {
+): Promise<number> {
   const existing = await sql<{ id: number }[]>`
     SELECT data_source_id AS id FROM bayanat.data_sources WHERE connection_id = ${connectionId}
   `;
@@ -935,6 +1049,8 @@ async function saveCrawlResults(
               data_type_text = ${col.dataType},
               is_nullable_indicator = ${col.isNullable},
               is_primary_key_indicator = ${col.isPrimaryKey},
+              is_foreign_key_indicator = ${col.isForeignKey},
+              default_value_text = ${col.defaultValue},
               source_description_text = ${col.comment ?? null}
             WHERE attribute_id = ${attributeId}
           `;
@@ -942,8 +1058,10 @@ async function saveCrawlResults(
           attributeId = (await sql<{ id: number }[]>`
             INSERT INTO bayanat.data_attributes
               (entity_id, physical_name_text, friendly_name_text, data_type_text,
-               is_nullable_indicator, is_primary_key_indicator, source_description_text)
-            VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey}, ${col.comment ?? null})
+               is_nullable_indicator, is_primary_key_indicator, is_foreign_key_indicator,
+               default_value_text, source_description_text)
+            VALUES (${entityId}, ${col.name}, ${col.name}, ${col.dataType}, ${col.isNullable}, ${col.isPrimaryKey},
+                    ${col.isForeignKey}, ${col.defaultValue}, ${col.comment ?? null})
             RETURNING attribute_id AS id
           `)[0].id;
         }
@@ -1003,6 +1121,61 @@ async function saveCrawlResults(
     try { await sql`DELETE FROM bayanat.data_schemas WHERE schema_id = ${row.id}`; }
     catch { /* still has entities that couldn't be removed — left as stale */ }
   }
+
+  return sourceId;
+}
+
+// Resolves harvested FK column-pairs to attribute_ids and upserts them into
+// attribute_reference_links as INTROSPECTED — the prerequisite the column-classifier's
+// R3/R5/R6 rules need. Must run after saveCrawlResults() so both the FK column and the
+// column it references already have attribute_ids (the referenced table may appear
+// later in crawl order than the table with the FK).
+async function persistForeignKeys(sourceId: number, foreignKeys: CrawlFk[]): Promise<void> {
+  if (foreignKeys.length === 0) return;
+
+  const attrRows = await sql<{ id: number; schema: string; table: string; column: string }[]>`
+    SELECT a.attribute_id AS id, s.schema_name_text AS schema, e.entity_name_text AS table, a.physical_name_text AS column
+    FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    WHERE s.data_source_id = ${sourceId}
+  `;
+  const attrIdByKey = new Map<string, number>();
+  for (const r of attrRows) attrIdByKey.set(`${r.schema}.${r.table}.${r.column}`, r.id);
+
+  const touchedLinkIds: number[] = [];
+  for (const fk of foreignKeys) {
+    const fkAttrId  = attrIdByKey.get(`${fk.schema}.${fk.table}.${fk.column}`);
+    const refAttrId = attrIdByKey.get(`${fk.refSchema}.${fk.refTable}.${fk.refColumn}`);
+    if (!fkAttrId || !refAttrId || fkAttrId === refAttrId) continue; // referenced table out of crawl scope, or excluded by config
+    const [row] = await sql<{ id: number }[]>`
+      INSERT INTO bayanat.attribute_reference_links
+        (fk_attribute_id, referenced_attribute_id, constraint_name_text, discovery_method_code, confidence_number)
+      VALUES (${fkAttrId}, ${refAttrId}, ${fk.constraintName}, 'INTROSPECTED', 1.0)
+      ON CONFLICT (fk_attribute_id, referenced_attribute_id) DO UPDATE SET
+        constraint_name_text = EXCLUDED.constraint_name_text,
+        discovery_method_code = 'INTROSPECTED',
+        confidence_number = 1.0,
+        discovered_at_timestamp = NOW()
+      RETURNING link_id AS id
+    `;
+    touchedLinkIds.push(row.id);
+  }
+
+  // Drop INTROSPECTED links for this source no longer reported by this crawl (the FK
+  // constraint was dropped at the source). NAME_INFERRED/MANUAL links are untouched —
+  // this crawl finding no declared constraint doesn't invalidate a fallback/manual one.
+  await sql`
+    DELETE FROM bayanat.attribute_reference_links
+    WHERE discovery_method_code = 'INTROSPECTED'
+      AND fk_attribute_id IN (
+        SELECT a.attribute_id FROM bayanat.data_attributes a
+        JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+        JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+        WHERE s.data_source_id = ${sourceId}
+      )
+      AND link_id != ALL(${touchedLinkIds.length > 0 ? touchedLinkIds : [-1]})
+  `;
 }
 
 // ── Main orchestrator ─────────────────────────────────────────────────────────
@@ -1063,7 +1236,38 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     else throw new Error(`Unsupported DB type: ${cfgRow.dbTypeCode}`);
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);
-    await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId, govDefaults);
+    const sourceId = await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId, govDefaults);
+
+    const [crawlerSettingsRow] = await sql<{ settings: {
+      auto_classify_columns?: boolean; classify_scope?: "NEW_ONLY" | "UNCLASSIFIED_ONLY" | "ALL";
+      harvest_fk_constraints?: boolean; infer_fk_by_naming?: boolean; auto_accept_band?: "NONE" | "HIGH";
+    } }[]>`
+      SELECT crawler_settings_json AS settings FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
+    `;
+    const crawlerSettings = crawlerSettingsRow?.settings ?? {};
+
+    if (crawlerSettings.harvest_fk_constraints !== false && result.foreignKeys.length > 0) {
+      await logger.info(`Harvesting FK topology: ${result.foreignKeys.length} constraint(s) found`);
+      await persistForeignKeys(sourceId, result.foreignKeys);
+    }
+
+    if (crawlerSettings.auto_classify_columns !== false) {
+      try {
+        const { runColumnClassification } = await import("./classification-runner");
+        const summary = await runColumnClassification({
+          scopeType: "DATA_SOURCE", scopeId: sourceId,
+          scopeMode: crawlerSettings.classify_scope ?? "NEW_ONLY",
+          triggeredByUserId: SYSTEM_ACTOR,
+          autoAcceptBand: crawlerSettings.auto_accept_band ?? "NONE",
+          inferFkByNaming: crawlerSettings.infer_fk_by_naming !== false,
+          crawlJobId: logger.jobId,
+        });
+        await logger.info(`Column classification: ${summary.attributesEvaluated} evaluated, ${summary.suggestionsChanged} suggestion(s) changed`);
+      } catch (e) {
+        await logger.warn(`Column classification step failed: ${(e as Error).message}`);
+      }
+    }
+
     await finishJob(logger.jobId, result);
 
     await sql`

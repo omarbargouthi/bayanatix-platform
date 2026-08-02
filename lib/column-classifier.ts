@@ -58,7 +58,7 @@ function matches(name: string, group: PatternGroup, patterns: PatternDictionary)
 
 const SURROGATE_TYPE_HINTS = ["serial", "identity", "uuid"];
 
-function isSurrogateLooking(col: { name: string; dataType: string; defaultValueText: string | null }, patterns: PatternDictionary): boolean {
+export function isSurrogateLooking(col: { name: string; dataType: string; defaultValueText: string | null }, patterns: PatternDictionary): boolean {
   const nameMatch = matches(col.name, "SURROGATE_KEY", patterns);
   const typeMatch = SURROGATE_TYPE_HINTS.some((h) => col.dataType.toLowerCase().includes(h));
   const seqDefault = !!col.defaultValueText && /nextval|identity|autoincrement|auto_increment/i.test(col.defaultValueText);
