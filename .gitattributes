@@ -1,0 +1,4 @@
+# Shell scripts must keep LF line endings — a CRLF shebang breaks execution inside
+# Linux containers (e.g. deploy/llm-self-hosted/health-check.sh), regardless of the
+# checking-out OS's core.autocrlf setting.
+*.sh text eol=lf
