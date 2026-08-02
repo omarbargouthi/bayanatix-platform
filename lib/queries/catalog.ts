@@ -452,8 +452,9 @@ export async function updateEntity(
     description_text:    string | null;
     display_name_text:   string | null;
     entity_category_code: string | null;
+    category_is_confirmed: boolean;
   }[]>`
-    SELECT description_text, display_name_text, entity_category_code
+    SELECT description_text, display_name_text, entity_category_code, coalesce(category_is_confirmed, false) AS category_is_confirmed
     FROM bayanat.data_entities WHERE entity_id = ${entityId}
   `;
   // Setting the type by hand here counts as reviewing it — stop the crawler-suggested
@@ -473,7 +474,11 @@ export async function updateEntity(
     await logUpdate("DATA_ENTITIES", entityId, userId, [
       { field: "description_text",     oldVal: old.description_text,     newVal: patch.description  || null },
       { field: "display_name_text",    oldVal: old.display_name_text,    newVal: patch.displayName  || null },
+      // Not forced here (unlike confirmEntityCategory) — if the steward didn't touch
+      // the type dropdown, only log something when it's a real transition: the type
+      // value itself changed, or this save is what first flips it to confirmed.
       { field: "entity_category_code", oldVal: old.entity_category_code, newVal: patch.category },
+      { field: "category_is_confirmed", oldVal: String(old.category_is_confirmed), newVal: "true" },
     ]);
   }
 }
@@ -486,8 +491,9 @@ export async function confirmEntityCategory(
   userId: string,
   category: string | null,
 ): Promise<void> {
-  const [old] = await sql<{ entity_category_code: string | null }[]>`
-    SELECT entity_category_code FROM bayanat.data_entities WHERE entity_id = ${entityId}
+  const [old] = await sql<{ entity_category_code: string | null; category_is_confirmed: boolean }[]>`
+    SELECT entity_category_code, coalesce(category_is_confirmed, false) AS category_is_confirmed
+    FROM bayanat.data_entities WHERE entity_id = ${entityId}
   `;
   await sql`
     UPDATE bayanat.data_entities SET
@@ -498,8 +504,14 @@ export async function confirmEntityCategory(
     WHERE entity_id = ${entityId}
   `;
   if (old) {
+    // force: true — the steward accepting a suggestion as-is (the common case) leaves
+    // entity_category_code unchanged, since saveCrawlResults() already writes the
+    // suggestion straight into that field while unconfirmed. Without forcing this,
+    // logUpdate's oldVal===newVal filter would silently drop the "Accept" action
+    // entirely, leaving no record that a steward reviewed it.
     await logUpdate("DATA_ENTITIES", entityId, userId, [
-      { field: "entity_category_code", oldVal: old.entity_category_code, newVal: category },
+      { field: "entity_category_code",  oldVal: old.entity_category_code, newVal: category, force: true },
+      { field: "category_is_confirmed", oldVal: String(old.category_is_confirmed), newVal: "true" },
     ]);
   }
 }

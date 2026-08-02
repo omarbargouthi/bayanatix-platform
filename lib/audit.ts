@@ -5,9 +5,13 @@ export async function logUpdate(
   assetType: string,
   assetId: number,
   userId: string,
-  changes: Array<{ field: string; oldVal: string | null; newVal: string | null }>,
+  // `force` records the entry even when oldVal === newVal — needed for actions like
+  // "Accept suggestion" where nothing about the stored value changes but the action
+  // itself (a steward reviewing and confirming it) is still what needs to show up
+  // in the history log.
+  changes: Array<{ field: string; oldVal: string | null; newVal: string | null; force?: boolean }>,
 ): Promise<void> {
-  const diff = changes.filter((c) => c.oldVal !== c.newVal);
+  const diff = changes.filter((c) => c.force || c.oldVal !== c.newVal);
   if (diff.length === 0) return;
 
   try {

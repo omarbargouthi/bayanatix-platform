@@ -1,6 +1,13 @@
 import postgres from "postgres";
 import { sql } from "./db";
 import { applyGovernanceDefaults } from "./queries/stakeholders";
+import { logUpdate } from "./audit";
+
+// Actor id used for audit_logs entries the crawler writes on its own (table-type
+// suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
+// is safe as a plain marker string — same convention lib/dq-engine.ts already uses
+// for automated asset_requests (raised_by_user_id = 'SYSTEM').
+const SYSTEM_ACTOR = "SYSTEM";
 type CrawlConfig = {
   schemaIncludeList:    string[] | null;
   schemaExcludeList:    string[];
@@ -840,8 +847,12 @@ async function saveCrawlResults(
     touchedSchemaIds.push(schemaId);
 
     for (const table of schema.tables) {
-      const [existingEntity] = await sql<{ id: number }[]>`
-        SELECT entity_id AS id FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${table.name}
+      const [existingEntity] = await sql<{
+        id: number; suggestedCategory: string | null; category: string | null; isConfirmed: boolean;
+      }[]>`
+        SELECT entity_id AS id, suggested_category_code AS "suggestedCategory",
+               entity_category_code AS category, coalesce(category_is_confirmed, false) AS "isConfirmed"
+        FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${table.name}
       `;
       const suggestion = classifyTableType(schema.name, table);
       let entityId: number;
@@ -856,6 +867,18 @@ async function saveCrawlResults(
             entity_category_code = CASE WHEN category_is_confirmed THEN entity_category_code ELSE ${suggestion.code} END
           WHERE entity_id = ${entityId}
         `;
+        // Only worth a history entry when the model's opinion actually moved (re-crawls
+        // with no layout change would otherwise write an identical row every time).
+        // Attributed to SYSTEM so it reads distinctly from a steward's own decisions.
+        if (suggestion.code !== existingEntity.suggestedCategory) {
+          const changes: Parameters<typeof logUpdate>[3] = [
+            { field: "suggested_category_code", oldVal: existingEntity.suggestedCategory, newVal: suggestion.code },
+          ];
+          if (!existingEntity.isConfirmed && suggestion.code !== existingEntity.category) {
+            changes.push({ field: "entity_category_code", oldVal: existingEntity.category, newVal: suggestion.code });
+          }
+          await logUpdate("DATA_ENTITIES", entityId, SYSTEM_ACTOR, changes);
+        }
       } else {
         entityId = (await sql<{ id: number }[]>`
           INSERT INTO bayanat.data_entities
@@ -865,6 +888,10 @@ async function saveCrawlResults(
                   ${suggestion.code}, ${suggestion.code}, ${suggestion.confidence}, false)
           RETURNING entity_id AS id
         `)[0].id;
+        await logUpdate("DATA_ENTITIES", entityId, SYSTEM_ACTOR, [
+          { field: "suggested_category_code", oldVal: null, newVal: suggestion.code },
+          { field: "entity_category_code", oldVal: null, newVal: suggestion.code },
+        ]);
       }
       touchedEntityIds.push(entityId);
 

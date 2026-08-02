@@ -35,7 +35,9 @@ const FIELD_LABEL: Record<string, string> = {
   is_encrypted:         "Encrypted",
   attribute_class_code: "Column Type",
   glossary_term_text:   "Business Term",
-  entity_type_code:     "Table Type",
+  entity_category_code: "Table Type",
+  suggested_category_code: "Table Type (Suggested)",
+  category_is_confirmed:   "Table Type Confirmed",
   business_app_name:    "Business App",
 };
 
@@ -48,8 +50,14 @@ function fmt(ts: string) {
 }
 
 function initials(name: string | null, id: string) {
+  if (id === "SYSTEM") return "SY";
   if (!name) return id.slice(0, 2).toUpperCase();
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function actorLabel(name: string | null, id: string) {
+  if (id === "SYSTEM") return "Bayanatix Crawler";
+  return name ?? id;
 }
 
 export function AuditLogClient({ users }: { users: AdminUser[] }) {
@@ -200,7 +208,7 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
                   <span className="w-6 h-6 rounded-full bg-brand-purple/15 text-brand-purple text-[10px] font-bold grid place-items-center shrink-0">
                     {initials(e.userName, e.userId)}
                   </span>
-                  <span className="text-sm text-ink truncate">{e.userName ?? e.userId}</span>
+                  <span className="text-sm text-ink truncate">{actorLabel(e.userName, e.userId)}</span>
                 </div>
 
                 {/* Asset */}

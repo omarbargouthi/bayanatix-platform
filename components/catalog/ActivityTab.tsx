@@ -5,12 +5,23 @@ const FIELD_LABEL: Record<string, string> = {
   description_text:      "Description",
   display_name_text:     "Friendly Name",
   entity_category_code:  "Table Type",
+  suggested_category_code: "Table Type (Suggested)",
+  category_is_confirmed: "Table Type Confirmed",
   friendly_name_text:    "Column Name",
   classification_code:   "Classification",
   glossary_term_text:    "Business Term",
   is_encrypted:          "Encrypted",
   attribute_class_code:  "Column Type",
 };
+
+function actorLabel(userName: string | null, userId: string) {
+  if (userId === "SYSTEM") return "Bayanatix Crawler";
+  return userName ?? userId;
+}
+
+function actionLabel(userId: string) {
+  return userId === "SYSTEM" ? "auto-suggested table type" : "updated metadata";
+}
 
 function fmt(d: string) {
   return new Date(d).toLocaleString("en-GB", {
@@ -20,6 +31,7 @@ function fmt(d: string) {
 }
 
 function initials(name: string | null, userId: string) {
+  if (userId === "SYSTEM") return "SY";
   if (!name) return userId.slice(0, 2).toUpperCase();
   const parts = name.trim().split(" ");
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
@@ -56,8 +68,8 @@ function AuditCard({ entry }: { entry: AuditEntry }) {
       {/* Card */}
       <div className="flex-1 min-w-0 pb-2">
         <div className="flex items-baseline gap-2 mb-1.5">
-          <span className="text-[13px] font-semibold text-ink">{entry.userName ?? entry.userId}</span>
-          <span className="text-[11px] text-muted">updated metadata</span>
+          <span className="text-[13px] font-semibold text-ink">{actorLabel(entry.userName, entry.userId)}</span>
+          <span className="text-[11px] text-muted">{actionLabel(entry.userId)}</span>
           <span className="text-[11px] text-muted ml-auto shrink-0">{fmt(entry.timestamp)}</span>
         </div>
         {entry.changes.length > 0 && (
