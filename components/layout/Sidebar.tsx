@@ -53,6 +53,7 @@ const NAV_ADMIN_DEF = [
   { href: "/admin/sources",             key: "dataSources"          as const, Icon: IconShare },
   { href: "/admin/audit-logs",          key: "auditLogs"            as const, Icon: IconHistory },
   { href: "/admin/configuration",       key: "configuration"        as const, Icon: IconCog },
+  { href: "/admin/ai-providers",        key: "aiProviders"          as const, Icon: IconAI },
   { href: "/admin/maturity-index-setup", key: "maturityIndexSetup"  as const, Icon: IconBook },
 ];
 

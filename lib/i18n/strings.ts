@@ -30,6 +30,7 @@ export type I18nStrings = {
     dataSources:      string;
     auditLogs:        string;
     configuration:       string;
+    aiProviders:         string;
     maturityIndexSetup:  string;
     // Compliance sub-items (kept for backward compat)
     complianceConfig: string;

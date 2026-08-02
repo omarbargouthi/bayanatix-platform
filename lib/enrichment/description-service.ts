@@ -4,6 +4,7 @@
 
 import type { ContextPackage } from "./context";
 import { runSuggestionPrompt, type LlmCallResult } from "./suggestion-service";
+import { applyProfileSampleValuePolicy } from "./provider-router";
 
 export type Lang = "en" | "ar";
 
@@ -63,15 +64,18 @@ function rationaleSignalsFor(ctx: ContextPackage): string[] {
 }
 
 export async function generateDescription(ctx: ContextPackage, lang: Lang = "en"): Promise<GenerateResult> {
+  // Must resolve the profile's sample-value policy BEFORE formatting the prompt —
+  // once sample values are baked into prompt text there's no redacting them (spec §5, AC6).
+  const gatedCtx = await applyProfileSampleValuePolicy(ctx, "DESCRIBE");
   const prompt = [
     `You are a data governance assistant writing a concise, business-friendly description for a data catalog.`,
     `Write ONLY in ${LANG_NAME[lang]}. Base the description strictly on the metadata below — never invent facts, table relationships, or values that are not present in it.`,
     `Keep it to 1-2 sentences. Do not restate the raw column name or data type unless it clarifies meaning. Return ONLY the description text, with no preamble, quotes, or labels.`,
     ``,
-    formatContext(ctx),
+    formatContext(gatedCtx),
   ].join("\n");
 
-  const result = await runSuggestionPrompt(prompt, ctx, 300);
+  const result = await runSuggestionPrompt(prompt, gatedCtx, "DESCRIBE", 300);
   return result.ok ? { ...result, rationaleSignals: rationaleSignalsFor(ctx) } : result;
 }
 
@@ -86,7 +90,10 @@ export async function generateDescriptionsBatch(
   columnContexts: { attributeId: number; ctx: ContextPackage }[],
   lang: Lang = "en",
 ): Promise<{ ok: true; results: Map<number, { text: string }>; modelRef: string; contextHash: string; contextManifest: Record<string, unknown> } | { ok: false; error: string }> {
-  const columnBlocks = columnContexts.map(({ attributeId, ctx }) => `### attribute_id=${attributeId}\n${formatContext(ctx)}`).join("\n\n");
+  const gatedColumnContexts = await Promise.all(
+    columnContexts.map(async ({ attributeId, ctx }) => ({ attributeId, ctx: await applyProfileSampleValuePolicy(ctx, "DESCRIBE") })),
+  );
+  const columnBlocks = gatedColumnContexts.map(({ attributeId, ctx }) => `### attribute_id=${attributeId}\n${formatContext(ctx)}`).join("\n\n");
 
   const prompt = [
     `You are a data governance assistant writing concise, business-friendly descriptions for a data catalog.`,
@@ -98,7 +105,7 @@ export async function generateDescriptionsBatch(
     columnBlocks,
   ].join("\n");
 
-  const result = await runSuggestionPrompt(prompt, tableCtx, 300 * Math.max(1, columnContexts.length));
+  const result = await runSuggestionPrompt(prompt, tableCtx, "DESCRIBE", 300 * Math.max(1, columnContexts.length));
   if (!result.ok) return result;
 
   let parsed: Record<string, string>;
@@ -128,19 +135,20 @@ export type RephraseResult =
   | { ok: false; error: string };
 
 export async function rephraseDescription(ctx: ContextPackage, currentText: string, lang: Lang = "en"): Promise<RephraseResult> {
+  const gatedCtx = await applyProfileSampleValuePolicy(ctx, "REPHRASE");
   const prompt = [
     `You are a data governance assistant. Rewrite the following data catalog description in ${LANG_NAME[lang]} in three different styles, WITHOUT changing its meaning or adding any fact not already present in it.`,
     `Style 1: ${REPHRASE_STYLES[0].instruction}.`,
     `Style 2: ${REPHRASE_STYLES[1].instruction}.`,
     `Style 3: ${REPHRASE_STYLES[2].instruction}.`,
-    `Grounding context (for terminology only — do not add facts beyond this + the current description): ${formatContext(ctx)}`,
+    `Grounding context (for terminology only — do not add facts beyond this + the current description): ${formatContext(gatedCtx)}`,
     ``,
     `Current description: "${currentText}"`,
     ``,
     `Return ONLY a JSON array of exactly 3 strings, no markdown fences, no other text.`,
   ].join("\n");
 
-  const result = await runSuggestionPrompt(prompt, ctx, 600);
+  const result = await runSuggestionPrompt(prompt, gatedCtx, "REPHRASE", 600);
   if (!result.ok) return result;
 
   try {

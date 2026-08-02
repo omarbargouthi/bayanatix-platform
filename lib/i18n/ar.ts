@@ -23,6 +23,7 @@ export const ar: I18nStrings = {
     dataSources:       "مصادر البيانات",
     auditLogs:         "التدقيق والسجلات",
     configuration:      "الإعدادات",
+    aiProviders:        "مزودو الذكاء الاصطناعي",
     maturityIndexSetup: "إعداد مؤشر النضج",
     complianceConfig:   "إعدادات الامتثال",
     indexSetup:        "إعداد الفهرس",

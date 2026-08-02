@@ -23,6 +23,7 @@ export const en: I18nStrings = {
     dataSources:       "Data Sources",
     auditLogs:         "Audit & Logs",
     configuration:      "Configuration",
+    aiProviders:        "AI Providers",
     maturityIndexSetup: "Maturity Index Setup",
     complianceConfig:   "Configuration",
     indexSetup:        "Index Setup",

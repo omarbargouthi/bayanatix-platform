@@ -28,7 +28,7 @@ export async function suggestTier2Rules(ctx: ContextPackage): Promise<{ ok: true
     `Return ONLY a JSON array (max 2 items) of objects: {"rule_name": string, "dimension": one of ${[...VALID_DIMENSIONS].join("|")}, "sql": string, "rationale": string}. No markdown fences, no other text. Return an empty array [] if no confident semantic rule applies.`,
   ].filter(Boolean).join("\n");
 
-  const result = await runSuggestionPrompt(prompt, ctx, 800);
+  const result = await runSuggestionPrompt(prompt, ctx, "DQ_SEMANTIC", 800);
   if (!result.ok) return result;
 
   let ideas: LlmRuleIdea[];
