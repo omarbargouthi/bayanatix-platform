@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { DqRule, DqResult, DqSample } from "@/lib/queries/dq";
 import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
+import { DqRuleSuggestPanel } from "./DqRuleSuggestPanel";
 import { useLang } from "@/lib/lang-context";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
@@ -805,6 +806,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   const [latestResults, setLatestResults] = useState<Record<number, DqResult>>({});
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
   const [runningAll, setRunningAll] = useState(false);
   const [runningId, setRunningId] = useState<number | null>(null);
   const [samplesResultId, setSamplesResultId] = useState<number | null>(null);
@@ -896,6 +898,9 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                 <button onClick={runAll} disabled={runningAll} className="btn btn-sm text-xs">
                   {runningAll ? c.dqRunAllRunning : c.dqRunAll}
                 </button>
+              )}
+              {canEdit && (
+                <button onClick={() => setShowSuggest(true)} className="btn btn-sm text-xs">{t.enrichment.suggestRules}</button>
               )}
               {canEdit && (
                 <button onClick={() => setShowAdd(true)} className="btn btn-primary btn-sm text-xs">{c.dqAddRule}</button>
@@ -1141,6 +1146,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
 
       {/* Modals */}
       {showAdd && <AddRulePanel entityId={entityId} entityName={entityName} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
+      {showSuggest && <DqRuleSuggestPanel entityId={entityId} entityName={entityName} onClose={() => setShowSuggest(false)} onSaved={load} />}
       {samplesResultId != null && <SamplesPanel resultId={samplesResultId} onClose={() => setSamplesResultId(null)} />}
     </div>
   );

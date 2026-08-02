@@ -13,6 +13,9 @@ import {
   IconTable,
 } from "./icons";
 
+// AI Enrichment reuses the existing IconAI (same glyph as the AI Governance nav item) —
+// the two live in different sidebar sections so there's no visual ambiguity.
+
 type Item = {
   href:   string;
   label:  string;
@@ -33,6 +36,7 @@ const NAV_DOMAINS_DEF = [
   { href: "/quality",        key: "quality"       as const, Icon: IconCheck },
   { href: "/classification", key: "classification"as const, Icon: IconLines },
   { href: "/column-types",   key: "columnTypes"   as const, Icon: IconTable },
+  { href: "/enrichment",     key: "enrichment"    as const, Icon: IconAI },
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
   { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },

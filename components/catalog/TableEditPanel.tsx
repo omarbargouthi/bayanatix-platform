@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
+import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
 
 const ENTITY_TYPE_OPTIONS_KEYS = [
   { value: "",              labelKey: "typeNone" as const },
@@ -124,9 +125,12 @@ export function TableEditPanel({ entityId, description, sourceDescription, displ
           )}
         </div>
       ) : (
-        <p className="text-ink-soft text-[14px] leading-relaxed">
-          {description ?? c.noDescYet}
-        </p>
+        <>
+          <p className="text-ink-soft text-[14px] leading-relaxed">
+            {description ?? c.noDescYet}
+          </p>
+          {canEdit && <DescriptionEnrichWidget assetType="DATA_ENTITIES" assetId={entityId} currentText={description} canEdit={canEdit} />}
+        </>
       )}
 
       <div className="mt-3 rounded-md bg-canvas-soft border border-line px-3.5 py-2.5">

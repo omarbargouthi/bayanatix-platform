@@ -18,6 +18,7 @@ export type I18nStrings = {
     quality:          string;
     classification:   string;
     columnTypes:      string;
+    enrichment:       string;
     privacy:          string;
     sharing:          string;
     openData:         string;
@@ -1528,5 +1529,40 @@ export type I18nStrings = {
       tables:  string; views:  string; columns: string;
       schemas: string; sources: string; terms:  string;
     };
+  };
+
+  // ── AI Metadata Enrichment (descriptions + DQ rule suggestions) ──────────────
+  enrichment: {
+    suggest:            string;
+    suggesting:         string;
+    rephrase:           string;
+    rephrasing:         string;
+    regenerate:         string;
+    accept:              string;
+    editThenAccept:      string;
+    discard:              string;
+    aiPendingLabel:       string;   // "AI-suggested — pending steward approval"
+    rationaleLabel:       string;
+    currentLabel:         string;
+    suggestedLabel:       string;
+    variantLabel:         string;   // "Variant {n}"
+    noDescriptionYet:      string;
+    errorPrefix:           string;
+    suggestRules:          string;
+    suggestingRules:       string;
+    ruleDraftsTitle:        string;
+    addDraft:                string;
+    addDraftWithEdits:       string;
+    dismissDraft:            string;
+    evidenceLabel:            string;
+    duplicateLabel:           string;
+    degradedProfileWarning:   string;
+    tier2UnavailableWarning:  string;
+    reviewQueueTitle:         string;
+    reviewQueueSubtitle:      string;
+    tabDescriptions:          string;
+    tabDqRules:                string;
+    bulkAccept:                 string;
+    driftWarning:                string;
   };
 };

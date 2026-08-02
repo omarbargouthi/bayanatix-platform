@@ -9,6 +9,7 @@ import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
 import { MindMapTab } from "./MindMapTab";
 import { ColumnTypeBadge } from "./ColumnTypeBadge";
+import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
 import { useLang } from "@/lib/lang-context";
 
 // ── Column chooser definitions ──────────────────────────────────────────────
@@ -223,6 +224,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
         {(attr.description || attr.sourceDescription)
           ? <p className="text-sm text-ink leading-relaxed">{attr.description ?? attr.sourceDescription}</p>
           : <span className="text-sm text-muted italic">No description</span>}
+        {canEdit && <DescriptionEnrichWidget assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} currentText={attr.description ?? null} canEdit={canEdit} />}
       </div>
 
       {/* Metadata row */}

@@ -5,6 +5,7 @@ import { UiTranslationsSection } from "./UiTranslationsSection";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { LanguageSettingsSection } from "./LanguageSettingsSection";
 import { DataCategoriesConfig } from "./DataCategoriesConfig";
+import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -39,6 +40,7 @@ export default function ConfigurationPage() {
   const [showComplianceConfig, setShowComplianceConfig] = useState(false);
   const [showLanguageSettings, setShowLanguageSettings] = useState(false);
   const [showDataCategories, setShowDataCategories]     = useState(false);
+  const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -75,6 +77,7 @@ export default function ConfigurationPage() {
     setShowComplianceConfig(false);
     setShowLanguageSettings(false);
     setShowDataCategories(false);
+    setShowEnrichmentSettings(false);
     setAdding(false);
   }
 
@@ -155,7 +158,7 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showUiTranslations &&
-    !showComplianceConfig && !showLanguageSettings && !showDataCategories;
+    !showComplianceConfig && !showLanguageSettings && !showDataCategories && !showEnrichmentSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -227,6 +230,18 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Compliance Config</div>
             <div className="text-[10px] text-muted mt-0.5">Levels · Statuses · Domains</div>
           </button>
+
+          {/* ── AI section */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
+            AI
+          </div>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowEnrichmentSettings(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showEnrichmentSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">AI Enrichment</div>
+            <div className="text-[10px] text-muted mt-0.5">Provider · Buffers · Token budget</div>
+          </button>
         </div>
       </aside>
 
@@ -252,6 +267,9 @@ export default function ConfigurationPage() {
 
         {/* ── Compliance Config panel ── */}
         {showComplianceConfig && <ComplianceConfigSection />}
+
+        {/* ── AI Enrichment Settings panel ── */}
+        {showEnrichmentSettings && <EnrichmentSettingsSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (
