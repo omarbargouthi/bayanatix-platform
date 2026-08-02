@@ -55,9 +55,21 @@ check("country_name_en", col("country_name_en", { entity: refReferencedEntity })
 check("country_name_ar", col("country_name_ar", { entity: refReferencedEntity }), "BUSINESS", "R5");
 
 console.log("\n=== Criteria 4: unreferenced lookup ===");
+// NOTE: spec's illustrative table said "unreferenced lookup -> ALL columns TECHNICAL,
+// LOW band". Real usage (regions/segment/party_role_type tables) showed this was wrong
+// for descriptive columns: REFERENCE is itself the "business-nature lookup" category
+// (SETUP/SYSTEM is where genuinely internal lookups live, via R8) — missing inbound-FK
+// evidence just means the topology can't *confirm* usage, it doesn't make a country
+// name technical. R7 now stays BUSINESS for non-key columns regardless of referenced
+// status, just at reduced (sub-HIGH) confidence so a steward still reviews it. Key
+// columns (R6) are unaffected — key-ness is a real technical signal either way.
 const refUnreferencedEntity = { categoryCode: "REFERENCE", pkColumnCount: 1, referencedByMasterOrTransactional: false };
 check("country_id PK (unreferenced)", col("country_id", { isPrimaryKey: true, entity: refUnreferencedEntity }), "TECHNICAL");
-check("country_name_en (unreferenced)", col("country_name_en", { entity: refUnreferencedEntity }), "TECHNICAL", "R7");
+check("country_name_en (unreferenced)", col("country_name_en", { entity: refUnreferencedEntity }), "BUSINESS", "R7");
+// Referenced lookup, non-key column that doesn't match a LOOKUP_VALUE pattern (e.g.
+// "applies_to" on party_role_type) — previously fell all the way to the R11 fallback
+// at BUSINESS/0.40; now correctly lands on R7 at a more confident BUSINESS/0.70.
+check("applies_to (referenced, no pattern match)", col("applies_to", { entity: refReferencedEntity }), "BUSINESS", "R7");
 
 console.log("\n=== Criteria 6: glossary modifier ===");
 const r6 = classifyColumn(col("natl_id", { entity: masterEntity, hasGlossaryMatch: true, glossaryTermName: "National ID" }), G);

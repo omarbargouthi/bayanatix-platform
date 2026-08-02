@@ -128,9 +128,21 @@ export function classifyColumn(input: ColumnInput, patterns: PatternDictionary):
     rule = "R6"; decision = "TECHNICAL"; confidence = 0.93;
     hits.push({ rule, detail: "internal key column on a lookup/reference table" });
 
-  } else if (category === "REFERENCE" && !input.entity.referencedByMasterOrTransactional) {
-    rule = "R7"; decision = "TECHNICAL"; confidence = 0.55;
-    hits.push({ rule, detail: "lookup table has no inbound FK from a Master/Transactional table — forces steward review" });
+  } else if (category === "REFERENCE" && nonKey) {
+    // A REFERENCE table is, by category, a business-nature lookup — the internal/
+    // technical case already has its own category (SETUP/SYSTEM, see R8 below).
+    // No inbound Master/Transactional FK just means the topology can't *confirm*
+    // usage (missing constraints, flat-file source, a name-inference miss) — it
+    // doesn't make a descriptive column technical. Confidence stays below HIGH
+    // either way so a steward still reviews these.
+    rule = "R7"; decision = "BUSINESS";
+    confidence = input.entity.referencedByMasterOrTransactional ? 0.70 : 0.60;
+    hits.push({
+      rule,
+      detail: input.entity.referencedByMasterOrTransactional
+        ? "descriptive column on a referenced lookup table, no specific lookup-value pattern matched — steward review recommended"
+        : "descriptive column on an unreferenced lookup table — lookup nature presumed business; steward review recommended",
+    });
 
   } else if (category === "SETUP" || category === "SYSTEM") {
     rule = "R8"; decision = "TECHNICAL"; confidence = 0.85;
