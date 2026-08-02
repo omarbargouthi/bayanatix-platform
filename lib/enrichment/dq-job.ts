@@ -73,9 +73,10 @@ export async function suggestDqRulesForColumn(attributeId: number, jobId?: numbe
   }, domain);
 
   let tier2Error: string | null = null;
+  let tier2ModelRef: string | null = null;
   if (ctx.assetClass === "BUSINESS") {
     const tier2 = await suggestTier2Rules(ctx);
-    if (tier2.ok) drafts.push(...tier2.drafts);
+    if (tier2.ok) { drafts.push(...tier2.drafts); tier2ModelRef = tier2.modelRef; }
     else tier2Error = tier2.error;
   }
 
@@ -83,7 +84,9 @@ export async function suggestDqRulesForColumn(attributeId: number, jobId?: numbe
   for (const draft of drafts) {
     await createDqRuleSuggestion({
       assetType: "DATA_ATTRIBUTES", assetId: attributeId, draft, jobId,
-      modelRef: draft.provenanceCode === "LLM" ? "ANTHROPIC:tier2" : "DETERMINISTIC:tier1",
+      // Tier 2 records the real provider profile that produced it (spec AC2); Tier 1
+      // is deterministic and was never routed through any LLM provider.
+      modelRef: draft.provenanceCode === "LLM" ? (tier2ModelRef ?? "unknown") : "DETERMINISTIC:tier1",
       contextHash: "n/a", contextManifest: { degradedProfile },
     });
     created++;

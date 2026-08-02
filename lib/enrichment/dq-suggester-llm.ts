@@ -10,7 +10,7 @@ const VALID_DIMENSIONS = new Set(["COMP", "ACCURACY", "CONSISTENCY", "VALIDITY",
 
 type LlmRuleIdea = { rule_name: string; dimension: string; sql: string; rationale: string };
 
-export async function suggestTier2Rules(ctx: ContextPackage): Promise<{ ok: true; drafts: DqRuleDraft[] } | { ok: false; error: string }> {
+export async function suggestTier2Rules(ctx: ContextPackage): Promise<{ ok: true; drafts: DqRuleDraft[]; modelRef: string } | { ok: false; error: string }> {
   const qualifiedTable = ctx.schemaName ? `"${ctx.schemaName}"."${ctx.entityName}"` : `"${ctx.entityName}"`;
   const siblingList = ctx.siblingColumns.map((c) => `${c.name} (${c.dataType})`).join(", ");
 
@@ -57,5 +57,5 @@ export async function suggestTier2Rules(ctx: ContextPackage): Promise<{ ok: true
       evidenceJson: { rationale: idea.rationale, model_ref: result.modelRef },
     }));
 
-  return { ok: true, drafts };
+  return { ok: true, drafts, modelRef: result.modelRef };
 }
