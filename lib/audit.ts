@@ -32,6 +32,36 @@ export async function logUpdate(
   }
 }
 
+/**
+ * Records creation of a brand-new row (e.g. a dq_rules row created by accepting an
+ * AI suggestion) — logUpdate's diff-against-old-value model doesn't fit a row that
+ * didn't exist a moment ago, so every field is logged with oldVal: null.
+ */
+export async function logCreate(
+  assetType: string,
+  assetId: number,
+  userId: string,
+  fields: Array<{ field: string; newVal: string | null }>,
+): Promise<void> {
+  if (fields.length === 0) return;
+  try {
+    const rows = await sql<{ audit_id: number }[]>`
+      INSERT INTO bayanat.audit_logs (action_type_code, asset_type_code, asset_id, user_id)
+      VALUES ('CREATE', ${assetType}, ${assetId}, ${userId})
+      RETURNING audit_id
+    `;
+    const auditId = rows[0].audit_id;
+    for (const f of fields) {
+      await sql`
+        INSERT INTO bayanat.history_logs (audit_id, field_name_text, old_value_text, new_value_text)
+        VALUES (${auditId}, ${f.field}, NULL, ${f.newVal})
+      `;
+    }
+  } catch (err) {
+    console.warn("[audit] logCreate failed:", err);
+  }
+}
+
 export type AuditSearchEntry = AuditEntry & {
   assetType: string;
   assetId:   number;
