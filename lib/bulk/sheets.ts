@@ -97,3 +97,4 @@ export const SHEET_ASSET_TYPE: Record<SheetName, string> = {
 
 export const ROW_CAP_PER_FILE = 50_000;
 export const CLEAR_SENTINEL = "<CLEAR>";
+export const TEMPLATE_SCHEMA_VERSION = 1;

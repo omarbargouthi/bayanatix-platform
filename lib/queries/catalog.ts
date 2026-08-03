@@ -552,9 +552,12 @@ export async function updateAttribute(
       is_encrypted          = ${patch.isEncrypted},
       attribute_class_code = ${patch.columnType},
       glossary_term_text   = ${patch.glossaryTerm || null},
-      suggestion_status_code  = CASE WHEN ${patch.columnType} IS NOT NULL THEN 'OVERRIDDEN' ELSE suggestion_status_code END,
-      classified_by_user_id   = CASE WHEN ${patch.columnType} IS NOT NULL THEN ${userId} ELSE classified_by_user_id END,
-      classified_at_timestamp = CASE WHEN ${patch.columnType} IS NOT NULL THEN NOW() ELSE classified_at_timestamp END
+      -- Explicit ::varchar cast — a bare "$n IS NOT NULL" comparison with a
+      -- null-valued parameter and no other type context confuses Postgres's
+      -- parameter type inference ("could not determine data type of parameter").
+      suggestion_status_code  = CASE WHEN ${patch.columnType}::varchar IS NOT NULL THEN 'OVERRIDDEN' ELSE suggestion_status_code END,
+      classified_by_user_id   = CASE WHEN ${patch.columnType}::varchar IS NOT NULL THEN ${userId} ELSE classified_by_user_id END,
+      classified_at_timestamp = CASE WHEN ${patch.columnType}::varchar IS NOT NULL THEN NOW() ELSE classified_at_timestamp END
     WHERE attribute_id = ${attributeId}
   `;
   if (old) {

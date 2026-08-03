@@ -3,7 +3,7 @@
 // protection, or comments — all required here, hence the new dependency).
 
 import ExcelJS from "exceljs";
-import { getFieldsForSheet, ROW_CAP_PER_FILE, type SheetName, type FieldDef } from "./sheets";
+import { getFieldsForSheet, ROW_CAP_PER_FILE, TEMPLATE_SCHEMA_VERSION, type SheetName, type FieldDef } from "./sheets";
 import { loadEnumValues, loadExistingTagNames, loadExistingTermNames } from "./enum-sources";
 import type { SheetRows } from "./scope-resolver";
 
@@ -39,8 +39,6 @@ export type WorkbookMeta = {
   exportedAt: Date;
   schemaVersion: number;
 };
-
-export const TEMPLATE_SCHEMA_VERSION = 1;
 
 /** Returns one workbook per up-to-ROW_CAP_PER_FILE-row chunk (spec §2.2: "larger
  *  scopes split into numbered files in one zip"). In practice every sheet in this
