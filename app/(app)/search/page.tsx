@@ -9,7 +9,10 @@ export const dynamic = "force-dynamic";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string; types?: string; stakeholders?: string; tags?: string };
+  searchParams: {
+    q?: string; types?: string; tags?: string; owner?: string; classification?: string;
+    status?: string; domain?: string; since?: string; dqDimension?: string; dsaScope?: string;
+  };
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
@@ -26,12 +29,7 @@ export default async function SearchPage({
       />
       <main className="px-8 py-7 pb-14">
         <Suspense fallback={<div className="h-10 w-48 bg-canvas-soft animate-pulse rounded-md" />}>
-          <SearchPageClient
-            initialQ={searchParams.q ?? ""}
-            initialTypes={searchParams.types ?? ""}
-            initialStakeholders={searchParams.stakeholders ?? ""}
-            initialTags={searchParams.tags ?? ""}
-          />
+          <SearchPageClient initialParams={searchParams} />
         </Suspense>
       </main>
     </>

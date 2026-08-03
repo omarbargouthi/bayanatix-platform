@@ -9,9 +9,29 @@ import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useLang } from "@/lib/lang-context";
 import type { SessionUser } from "@/lib/types";
-import type { SearchResult } from "@/app/api/catalog/search/route";
+import type { FullSearchHit, SearchHitType } from "@/lib/search-types";
 import { ALL_TYPES } from "@/lib/search-types";
 import { useState, useEffect, useRef, useCallback } from "react";
+
+const QUICK_TYPE_CHIPS: { key: SearchHitType; label: string }[] = [
+  { key: "TABLE",  label: "Tables" },
+  { key: "VIEW",   label: "Views" },
+  { key: "COLUMN", label: "Columns" },
+  { key: "SCHEMA", label: "Schemas" },
+  { key: "SOURCE", label: "Sources" },
+  { key: "TERM",   label: "Terms" },
+  { key: "TAG",    label: "Tags" },
+  { key: "DQ_RULE", label: "DQ Rules" },
+  { key: "SHARING_AGREEMENT", label: "Agreements" },
+  { key: "OPEN_DATA", label: "Open Data" },
+  { key: "FOI_REQUEST", label: "FOI" },
+];
+
+const TYPE_GROUP_LABELS: Record<SearchHitType, string> = {
+  TABLE: "Tables", VIEW: "Views", COLUMN: "Columns", SCHEMA: "Schemas", SOURCE: "Sources",
+  TERM: "Business Terms", TAG: "Tags", DQ_RULE: "DQ Rules", SHARING_AGREEMENT: "Sharing Agreements",
+  OPEN_DATA: "Open Data", FOI_REQUEST: "FOI Requests", REGISTER_ENTRY: "Register Entries",
+};
 
 export type Crumb = { label: string; href?: string };
 
@@ -50,8 +70,10 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
   // Global search state
   const [searchQuery,   setSearchQuery]   = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<FullSearchHit[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [highlightIdx,  setHighlightIdx]  = useState(-1);
   const [quickTypes,    setQuickTypes]    = useState<Set<string>>(
     new Set(contextTypes && contextTypes.length > 0 ? contextTypes : ALL_TYPES)
   );
@@ -62,21 +84,52 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
     if (q.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
-      const r = await fetch(`/api/catalog/search?q=${encodeURIComponent(q)}`);
-      if (r.ok) setSearchResults(await r.json());
+      const r = await fetch(`/api/search?mode=typeahead&q=${encodeURIComponent(q)}`);
+      if (r.ok) {
+        const data = await r.json();
+        setSearchResults(data.results ?? []);
+      }
     } finally { setSearchLoading(false); }
   }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => runSearch(searchQuery), 250);
+    setHighlightIdx(-1);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchQuery, runSearch]);
 
-  function submitSearch() {
-    if (!searchQuery.trim()) return;
+  // Ctrl+K / `/` focuses the search box from anywhere on the page (FR-1.1),
+  // but never hijacks `/` while the user is typing in some other field.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "/" && !typing) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  function openSearchFocus() {
+    setSearchFocused(true);
+    if (!searchQuery) {
+      fetch("/api/catalog/search/save").then((r) => r.ok ? r.json() : { recent: [] }).then((d) => setRecentSearches(d.recent ?? [])).catch(() => {});
+    }
+  }
+
+  function submitSearch(qOverride?: string) {
+    const q = (qOverride ?? searchQuery).trim();
+    if (!q) return;
     setSearchFocused(false);
-    const params = new URLSearchParams({ q: searchQuery.trim() });
+    fetch("/api/catalog/search/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }) }).catch(() => {});
+    const params = new URLSearchParams({ q });
     if (quickTypes.size < ALL_TYPES.length) params.set("types", [...quickTypes].join(","));
     router.push(`/search?${params.toString()}`);
   }
@@ -86,6 +139,32 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
     if (next.has(type)) { if (next.size > 1) next.delete(type); } else { next.add(type); }
     setQuickTypes(next);
   }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      if (highlightIdx >= 0 && searchResults[highlightIdx]) {
+        const hit = searchResults[highlightIdx];
+        setSearchFocused(false); setSearchQuery("");
+        router.push(hit.href);
+      } else {
+        submitSearch();
+      }
+    } else if (e.key === "ArrowDown" && searchResults.length > 0) {
+      e.preventDefault();
+      setHighlightIdx((i) => (i + 1) % searchResults.length);
+    } else if (e.key === "ArrowUp" && searchResults.length > 0) {
+      e.preventDefault();
+      setHighlightIdx((i) => (i - 1 + searchResults.length) % searchResults.length);
+    } else if (e.key === "Escape") {
+      setSearchFocused(false);
+      searchRef.current?.blur();
+    }
+  }
+
+  const groupedResults = searchResults.reduce<Partial<Record<SearchHitType, FullSearchHit[]>>>((acc, hit) => {
+    (acc[hit.type] ??= []).push(hit);
+    return acc;
+  }, {});
 
   useEffect(() => {
     fetch("/api/notifications/count")
@@ -136,11 +215,11 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
             ref={searchRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
+            onFocus={openSearchFocus}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-            onKeyDown={(e) => { if (e.key === "Enter") submitSearch(); }}
+            onKeyDown={handleSearchKeyDown}
             className="bg-transparent border-0 outline-none text-sm text-ink placeholder:text-muted flex-1 min-w-0"
-            placeholder="Search assets, schemas, tables, columns…"
+            placeholder="Search assets, schemas, tables, columns…  (Ctrl+K)"
           />
           {searchQuery && (
             <button onMouseDown={(e) => e.preventDefault()} onClick={() => { setSearchQuery(""); setSearchResults([]); }} className="text-muted hover:text-ink text-base leading-none">×</button>
@@ -152,14 +231,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-lg z-50 overflow-hidden">
             {/* Quick type filter chips */}
             <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-line-soft bg-canvas-soft">
-              {[
-                { key: "TABLE",  label: "Tables" },
-                { key: "VIEW",   label: "Views" },
-                { key: "COLUMN", label: "Columns" },
-                { key: "SCHEMA", label: "Schemas" },
-                { key: "SOURCE", label: "Sources" },
-                { key: "TERM",   label: "Terms" },
-              ].map(({ key, label }) => (
+              {QUICK_TYPE_CHIPS.map(({ key, label }) => (
                 <button
                   key={key}
                   onMouseDown={(e) => e.preventDefault()}
@@ -175,28 +247,57 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
               ))}
             </div>
 
-            {/* Search results */}
-            {searchQuery.length >= 2 && (
+            {/* Recent searches (shown before typing) */}
+            {searchQuery.length === 0 && recentSearches.length > 0 && (
               <div className="max-h-64 overflow-y-auto">
+                <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-muted uppercase tracking-wide">Recent Searches</div>
+                {recentSearches.map((q, i) => (
+                  <button
+                    key={`${q}-${i}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { setSearchQuery(q); submitSearch(q); }}
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-canvas text-left transition-colors"
+                  >
+                    <IconHistory className="w-3.5 h-3.5 text-muted shrink-0" />
+                    <span className="text-[13px] text-ink-soft truncate">{q}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search results, grouped by type */}
+            {searchQuery.length >= 2 && (
+              <div className="max-h-80 overflow-y-auto">
                 {searchLoading && <div className="px-4 py-3 text-sm text-muted">Searching…</div>}
                 {!searchLoading && searchResults.length === 0 && (
                   <div className="px-4 py-3 text-sm text-muted">No results for "{searchQuery}"</div>
                 )}
-                {searchResults.map((r) => (
-                  <button
-                    key={`${r.type}-${r.id}`}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-canvas text-left border-b border-line-soft last:border-b-0 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-semibold text-ink truncate">{r.name}</span>
-                        <span className="text-[10px] text-muted bg-canvas-soft px-1.5 py-0.5 rounded shrink-0">{r.type}</span>
-                      </div>
-                      {r.meta && <div className="text-[11px] text-muted truncate">{r.meta}</div>}
+                {!searchLoading && (Object.keys(groupedResults) as SearchHitType[]).map((type) => (
+                  <div key={type}>
+                    <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-muted uppercase tracking-wide bg-canvas-soft/50">
+                      {TYPE_GROUP_LABELS[type]}
                     </div>
-                  </button>
+                    {groupedResults[type]!.map((r) => {
+                      const flatIdx = searchResults.indexOf(r);
+                      return (
+                        <button
+                          key={`${r.type}-${r.id}`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-line-soft last:border-b-0 transition-colors ${flatIdx === highlightIdx ? "bg-canvas" : "hover:bg-canvas"}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[13px] font-semibold text-ink truncate">{r.name}</span>
+                            </div>
+                            {(r.path.length > 0 || r.description) && (
+                              <div className="text-[11px] text-muted truncate">{r.path.length > 0 ? r.path.join(" › ") : r.description}</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 ))}
               </div>
             )}
@@ -205,7 +306,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
             {searchQuery.length >= 2 && !searchLoading && (
               <button
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={submitSearch}
+                onClick={() => submitSearch()}
                 className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-brand-purple hover:bg-canvas border-t border-line-soft transition-colors"
               >
                 See all results for "{searchQuery}"
