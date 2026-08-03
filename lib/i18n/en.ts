@@ -13,6 +13,7 @@ export const en: I18nStrings = {
     classification:    "Classification",
     columnTypes:       "Column Types",
     enrichment:        "AI Enrichment",
+    bulkOperations:    "Bulk Operations",
     privacy:           "Data Privacy",
     sharing:           "Data Sharing",
     openData:          "Open Data",

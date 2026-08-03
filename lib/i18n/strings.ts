@@ -19,6 +19,7 @@ export type I18nStrings = {
     classification:   string;
     columnTypes:      string;
     enrichment:       string;
+    bulkOperations:   string;
     privacy:          string;
     sharing:          string;
     openData:         string;

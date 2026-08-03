@@ -13,6 +13,7 @@ export const ar: I18nStrings = {
     classification:    "التصنيف",
     columnTypes:       "أنواع الأعمدة",
     enrichment:        "إثراء الذكاء الاصطناعي",
+    bulkOperations:    "العمليات المجمعة",
     privacy:           "خصوصية البيانات",
     sharing:           "مشاركة البيانات",
     openData:          "البيانات المفتوحة",

@@ -481,6 +481,12 @@ export function SearchPageClient({
 
           {/* ── Results ───────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-3">
+            {!loading && results.length > 0 && (
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[12px] text-muted">{results.length} result{results.length !== 1 ? "s" : ""}</span>
+                <ExportResultsButton results={results} />
+              </div>
+            )}
             {loading && (
               <div className="flex items-center justify-center py-20">
                 <div className="animate-spin w-8 h-8 border-2 border-brand-purple border-t-transparent rounded-full" />
@@ -500,5 +506,44 @@ export function SearchPageClient({
         </div>
       )}
     </div>
+  );
+}
+
+// ── Export results (Bulk Download handoff — spec §2.1) ──────────────────────────
+
+const HIT_TYPE_TO_ASSET_TYPE: Record<string, string | null> = {
+  TABLE: "DATA_ENTITIES", VIEW: "DATA_ENTITIES", COLUMN: "DATA_ATTRIBUTES",
+  SOURCE: "DATA_SOURCES", TERM: "BUSINESS_TERMS", SCHEMA: null, // no Schemas sheet in the bulk template
+};
+
+function ExportResultsButton({ results }: { results: FullSearchHit[] }) {
+  const [busy, setBusy] = useState(false);
+
+  async function exportResults() {
+    const refs = results
+      .map((h) => ({ assetType: HIT_TYPE_TO_ASSET_TYPE[h.type], assetId: h.id }))
+      .filter((r): r is { assetType: string; assetId: number } => r.assetType != null);
+    if (refs.length === 0) {
+      alert("None of the current results are exportable (tables, columns, sources, and business terms only).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/bulk/downloads", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: { type: "SEARCH_RESULTS", refs } }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error ?? "Export failed"); return; }
+      window.location.href = `/api/bulk/jobs/${data.jobId}/file`;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button onClick={exportResults} disabled={busy} className="text-[11px] font-semibold text-brand-purple hover:underline disabled:opacity-50">
+      {busy ? "Preparing…" : "⭳ Export results to Excel"}
+    </button>
   );
 }
