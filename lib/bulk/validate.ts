@@ -154,6 +154,18 @@ async function resolveGlossaryTermByName(name: string): Promise<{ ok: true; valu
 
 // ── Main entry point ─────────────────────────────────────────────────────────────
 
+export function summarizePlans(plans: RowPlan[]): Record<string, number> {
+  const totals: Record<string, number> = { rows: plans.length, updates: 0, creates: 0, skipped: 0, errors: 0, conflicts: 0 };
+  for (const p of plans) {
+    if (p.outcome === "UPDATE") totals.updates++;
+    else if (p.outcome === "CREATE") totals.creates++;
+    else if (p.outcome === "SKIPPED_NOOP") totals.skipped++;
+    else if (p.outcome === "SKIPPED_CONFLICT") totals.conflicts++;
+    else if (p.outcome === "ERROR") totals.errors++;
+  }
+  return totals;
+}
+
 export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOptions): Promise<RowPlan[]> {
   const plans: RowPlan[] = [];
   const canCreateTags = await canEditMetadata(opts.session);
