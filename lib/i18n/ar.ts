@@ -1454,5 +1454,9 @@ export const ar: I18nStrings = {
     tabDqRules:                "قواعد الجودة",
     bulkAccept:                 "قبول جماعي",
     driftWarning:                "تم تغييره منذ الاقتراح — يتطلب مراجعة فردية",
+    langLabel:                   "اللغة",
+    langAuto:                     "🌐 تلقائي (مطابقة الواجهة)",
+    langEnglish:                  "الإنجليزية",
+    langArabic:                   "العربية",
   },
 };

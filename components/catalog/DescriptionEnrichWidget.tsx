@@ -18,10 +18,11 @@ export function DescriptionEnrichWidget({
   canEdit: boolean;
 }) {
   const router = useRouter();
-  const { t } = useLang();
+  const { t, lang: uiLang } = useLang();
   const e = t.enrichment;
 
   type Variant = { suggestionId: number; text: string };
+  type LangPref = "auto" | "en" | "ar";
   const [variants, setVariants] = useState<Variant[] | null>(null);
   const [mode, setMode] = useState<"GENERATE" | "REPHRASE">("GENERATE");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -30,13 +31,21 @@ export function DescriptionEnrichWidget({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [langPref, setLangPref] = useState<LangPref>("auto");
 
   if (!canEdit) return null;
+
+  // "Auto" follows whatever language the app's own language toggle is currently
+  // set to — the description/rephrase backend only speaks English/Arabic, so any
+  // non-English UI language maps to Arabic here.
+  const effectiveLang: "en" | "ar" = langPref === "auto" ? (uiLang === "en" ? "en" : "ar") : langPref;
 
   async function suggest() {
     setBusy(true); setError(null); setOpen(true);
     try {
-      const res = await fetch(`/api/assets/${assetType}/${assetId}/description/suggest`, { method: "POST" });
+      const res = await fetch(`/api/assets/${assetType}/${assetId}/description/suggest`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: effectiveLang }),
+      });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
       setMode("GENERATE");
@@ -52,7 +61,9 @@ export function DescriptionEnrichWidget({
   async function rephrase() {
     setBusy(true); setError(null); setOpen(true);
     try {
-      const res = await fetch(`/api/assets/${assetType}/${assetId}/description/rephrase`, { method: "POST" });
+      const res = await fetch(`/api/assets/${assetType}/${assetId}/description/rephrase`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: effectiveLang }),
+      });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
       const vs: Variant[] = data.variants.map((v: { suggestionId: number; text: string }) => ({ suggestionId: v.suggestionId, text: v.text }));
@@ -117,6 +128,17 @@ export function DescriptionEnrichWidget({
               {busy ? e.rephrasing : e.rephrase}
             </button>
           )}
+          <select
+            value={langPref}
+            onChange={(ev) => setLangPref(ev.target.value as LangPref)}
+            disabled={busy}
+            title={e.langLabel}
+            className="text-[10px] border border-line rounded px-1.5 py-0.5 bg-white text-muted focus:outline-none focus:border-brand-purple"
+          >
+            <option value="auto">{e.langAuto}</option>
+            <option value="en">{e.langEnglish}</option>
+            <option value="ar">{e.langArabic}</option>
+          </select>
         </div>
       )}
 
@@ -126,6 +148,17 @@ export function DescriptionEnrichWidget({
             <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-dashed border-amber-400 bg-amber-50 text-amber-700">
               ✨ {e.aiPendingLabel}
             </span>
+            <select
+              value={langPref}
+              onChange={(ev) => setLangPref(ev.target.value as LangPref)}
+              disabled={busy}
+              title={e.langLabel}
+              className="text-[10px] border border-line rounded px-1.5 py-0.5 bg-white text-muted focus:outline-none focus:border-brand-purple"
+            >
+              <option value="auto">{e.langAuto}</option>
+              <option value="en">{e.langEnglish}</option>
+              <option value="ar">{e.langArabic}</option>
+            </select>
             {variants && variants.length > 1 && (
               <div className="flex items-center gap-1">
                 {variants.map((_, i) => (

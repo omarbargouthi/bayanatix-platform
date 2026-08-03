@@ -1565,5 +1565,9 @@ export type I18nStrings = {
     tabDqRules:                string;
     bulkAccept:                 string;
     driftWarning:                string;
+    langLabel:                   string;
+    langAuto:                     string;
+    langEnglish:                  string;
+    langArabic:                   string;
   };
 };

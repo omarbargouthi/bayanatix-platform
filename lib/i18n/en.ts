@@ -1454,5 +1454,9 @@ export const en: I18nStrings = {
     tabDqRules:                "DQ Rules",
     bulkAccept:                 "Bulk Accept",
     driftWarning:                "Changed since suggested — review individually",
+    langLabel:                   "Language",
+    langAuto:                     "🌐 Auto (match UI)",
+    langEnglish:                  "English",
+    langArabic:                   "Arabic",
   },
 };
