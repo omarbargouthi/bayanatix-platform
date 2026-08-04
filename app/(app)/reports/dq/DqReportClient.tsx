@@ -7,6 +7,7 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DqDrillDownGrid } from "@/components/reports/DqDrillDownGrid";
+import { useLang } from "@/lib/lang-context";
 
 const PAGE_SIZE = 25;
 
@@ -21,6 +22,9 @@ function DqReportContent({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.dq;
 
   const domainId = searchParams.get("domain") ?? "";
   const sourceId = searchParams.get("source") ?? "";
@@ -80,8 +84,8 @@ function DqReportContent({
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-brand-deep">Data Quality Report</h1>
-          <p className="text-xs text-muted mt-0.5">R2 — DQ.MQ Level 4 monitoring evidence</p>
+          <h1 className="text-xl font-bold text-brand-deep">{rt.title}</h1>
+          <p className="text-xs text-muted mt-0.5">{rt.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -90,14 +94,20 @@ function DqReportContent({
               disabled={capturing}
               className="text-sm px-3 py-2 rounded-lg border border-line bg-white hover:bg-canvas disabled:opacity-50"
             >
-              {capturing ? "Capturing…" : "Capture Snapshot"}
+              {capturing ? rc.capturing : rc.captureSnapshot}
             </button>
           )}
           <a
             href={`/api/reports/R2_DQ/export?${exportParams.toString()}`}
             className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet"
           >
-            Export XLSX
+            {rc.exportXlsx}
+          </a>
+          <a
+            href={`/api/reports/R2_DQ/export-pdf?${exportParams.toString()}`}
+            className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5"
+          >
+            {rc.exportPdf}
           </a>
         </div>
       </div>
@@ -117,12 +127,12 @@ function DqReportContent({
           </div>
 
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-2">12-Month Trend</div>
+            <div className="text-sm font-semibold text-ink mb-2">{rc.trend}</div>
             <TrendChart data={data.trend} target={data.kpis[0]?.targetValue ?? null} />
           </div>
 
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-3">Open DQ Issues</div>
+            <div className="text-sm font-semibold text-ink mb-3">{rt.drillTitle}</div>
             <DqDrillDownGrid rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </div>
         </>

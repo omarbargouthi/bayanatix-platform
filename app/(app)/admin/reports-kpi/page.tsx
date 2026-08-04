@@ -15,9 +15,9 @@ type ExportAuditRow = {
 };
 
 const REPORT_LABELS: Record<string, string> = {
-  R1_MCM: "R1 — Data Catalog / Metadata", R2_DQ: "R2 — Data Quality", R3_DC: "R3 — Data Classification",
-  R4_DSI: "R4 — Data Sharing", R5_OD: "R5 — Open Data", R6_FOI: "R6 — FOI",
-  R7_PDP: "R7 — Personal Data Protection", R8_DG_SUMMARY: "R8 — DG Executive Summary", R9_RETENTION: "R9 — Retention",
+  R1_MCM: "Data Catalog / Metadata", R2_DQ: "Data Quality", R3_DC: "Data Classification",
+  R4_DSI: "Data Sharing", R5_OD: "Open Data", R6_FOI: "FOI",
+  R7_PDP: "Personal Data Protection", R8_DG_SUMMARY: "DG Executive Summary", R9_RETENTION: "Retention",
 };
 
 const BLANK_ADD = {

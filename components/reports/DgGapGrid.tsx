@@ -3,11 +3,13 @@
 import Link from "next/link";
 import type { DgGapRow } from "@/lib/queries/reports";
 import { PaginationBar } from "./DqDrillDownGrid";
+import { useLang } from "@/lib/lang-context";
 
 function YesNo({ ok }: { ok: boolean }) {
+  const { t } = useLang();
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-      {ok ? "Yes" : "No"}
+      {ok ? t.reports.common.yes : t.reports.common.no}
     </span>
   );
 }
@@ -21,10 +23,13 @@ export function DgGapGrid({
   pageSize: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.dg;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (rows.length === 0) {
-    return <div className="text-sm text-muted text-center py-10">No governance gaps in scope — every table has an owner, steward, certification, and described columns.</div>;
+    return <div className="text-sm text-muted text-center py-10">{rt.empty}</div>;
   }
 
   return (
@@ -33,13 +38,13 @@ export function DgGapGrid({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted border-b border-line">
-              <th className="py-2 pr-3">Table</th>
-              <th className="py-2 pr-3">Source</th>
-              <th className="py-2 pr-3">Domain</th>
-              <th className="py-2 pr-3">Owner</th>
-              <th className="py-2 pr-3">Steward</th>
-              <th className="py-2 pr-3">Certified</th>
-              <th className="py-2 pr-3">Missing Descriptions</th>
+              <th className="py-2 pr-3">{rc.colTable}</th>
+              <th className="py-2 pr-3">{rc.colSource}</th>
+              <th className="py-2 pr-3">{rc.colDomain}</th>
+              <th className="py-2 pr-3">{rc.colOwner}</th>
+              <th className="py-2 pr-3">{rc.colSteward}</th>
+              <th className="py-2 pr-3">{rc.colCertified}</th>
+              <th className="py-2 pr-3">{rt.colMissingDesc}</th>
             </tr>
           </thead>
           <tbody>

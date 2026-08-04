@@ -4,6 +4,8 @@ import { getDomainScorecard, logReportExport } from "@/lib/queries/reports";
 import { buildReportPdfHtml } from "@/lib/reports/pdf-template";
 import { renderHtmlToPdf } from "@/lib/reports/pdf-render";
 import type { KpiCardData } from "@/lib/queries/reports";
+import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
 
 export async function GET(req: Request, { params }: { params: { glossaryId: string } }) {
   const session = await getSession();
@@ -17,16 +19,19 @@ export async function GET(req: Request, { params }: { params: { glossaryId: stri
   const lang: "en" | "ar" = searchParams.get("lang") === "ar" ? "ar" : "en";
 
   const kpis: KpiCardData[] = scorecard.capabilities.map((c) => ({
-    kpiCode: c.kpiCode, reportCode: c.reportCode, nameEn: `${c.reportLabel} — ${c.kpiName}`, nameAr: null,
+    kpiCode: c.kpiCode, reportCode: c.reportCode,
+    nameEn: `${c.reportLabel} — ${c.kpiName}`,
+    nameAr: c.kpiNameAr ? `${c.reportLabel} — ${c.kpiNameAr}` : null,
     capabilityCode: c.reportCode, metricKey: null, customSql: null, targetValue: c.targetValue, direction: c.direction,
     format: c.format, sortOrder: 0, isActive: true, value: c.value, breakdown: [],
   }));
 
   const dgCapability = scorecard.capabilities.find((c) => c.reportCode === "R8_DG_SUMMARY");
+  const t = lang === "ar" ? ar : en;
 
   const html = buildReportPdfHtml({
     lang,
-    reportLabel: `${scorecard.domain.name} — Domain Scorecard`,
+    reportLabel: `${scorecard.domain.name} — ${t.reports.index.scorecardsTitle}`,
     generatedBy: session.fullName,
     domainName: scorecard.domain.name,
     sourceName: null,
@@ -34,8 +39,8 @@ export async function GET(req: Request, { params }: { params: { glossaryId: stri
     trend: dgCapability?.trend ?? [],
     primaryTarget: dgCapability?.targetValue ?? null,
     drillDownColumns: [
-      { label: "Issue", get: (r) => String(r.label) },
-      { label: "Detail", get: (r) => String(r.detail) },
+      { label: t.reports.domain.topIssues, get: (r) => String(r.label) },
+      { label: t.reports.common.colStatus, get: (r) => String(r.detail) },
     ],
     drillDownRows: scorecard.topIssues,
   });

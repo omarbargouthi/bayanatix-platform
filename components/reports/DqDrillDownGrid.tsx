@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { DqDrillDownRow } from "@/lib/queries/reports";
+import { useLang } from "@/lib/lang-context";
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700",
@@ -24,10 +25,13 @@ export function DqDrillDownGrid({
   pageSize: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.dq;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (rows.length === 0) {
-    return <div className="text-sm text-muted text-center py-10">No open DQ issues in scope — nothing to drill into.</div>;
+    return <div className="text-sm text-muted text-center py-10">{rt.empty}</div>;
   }
 
   return (
@@ -36,14 +40,14 @@ export function DqDrillDownGrid({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted border-b border-line">
-              <th className="py-2 pr-3">Rule</th>
-              <th className="py-2 pr-3">Dimension</th>
-              <th className="py-2 pr-3">Severity</th>
-              <th className="py-2 pr-3">Status</th>
-              <th className="py-2 pr-3">Table</th>
-              <th className="py-2 pr-3">Source</th>
-              <th className="py-2 pr-3">Domain</th>
-              <th className="py-2 pr-3">Age</th>
+              <th className="py-2 pr-3">{rt.colRule}</th>
+              <th className="py-2 pr-3">{rt.colDimension}</th>
+              <th className="py-2 pr-3">{rt.colSeverity}</th>
+              <th className="py-2 pr-3">{rc.colStatus}</th>
+              <th className="py-2 pr-3">{rc.colTable}</th>
+              <th className="py-2 pr-3">{rc.colSource}</th>
+              <th className="py-2 pr-3">{rc.colDomain}</th>
+              <th className="py-2 pr-3">{rt.colAge}</th>
             </tr>
           </thead>
           <tbody>
@@ -80,6 +84,8 @@ export function DqDrillDownGrid({
 }
 
 export function PaginationBar({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
+  const { t } = useLang();
+  const rc = t.reports.common;
   if (totalPages <= 1) return null;
   return (
     <div className="flex items-center justify-end gap-2 mt-3 text-sm">
@@ -88,15 +94,15 @@ export function PaginationBar({ page, totalPages, onPageChange }: { page: number
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
-        Prev
+        {rc.prev}
       </button>
-      <span className="text-muted text-xs">Page {page} of {totalPages}</span>
+      <span className="text-muted text-xs">{rc.page} {page} {rc.of} {totalPages}</span>
       <button
         className="px-2 py-1 rounded border border-line disabled:opacity-40"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
       >
-        Next
+        {rc.next}
       </button>
     </div>
   );

@@ -8,6 +8,7 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DgGapGrid } from "@/components/reports/DgGapGrid";
+import { useLang } from "@/lib/lang-context";
 
 const PAGE_SIZE = 25;
 
@@ -22,6 +23,10 @@ function DgSummaryReportContent({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.dg;
+  const rfoi = t.reports.foi;
 
   const domainId = searchParams.get("domain") ?? "";
   const sourceId = searchParams.get("source") ?? "";
@@ -83,8 +88,8 @@ function DgSummaryReportContent({
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-brand-deep">DG Executive Summary</h1>
-          <p className="text-xs text-muted mt-0.5">R8 — DG.MQ Level 4 monitoring + management reporting</p>
+          <h1 className="text-xl font-bold text-brand-deep">{rt.title}</h1>
+          <p className="text-xs text-muted mt-0.5">{rt.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -93,14 +98,20 @@ function DgSummaryReportContent({
               disabled={capturing}
               className="text-sm px-3 py-2 rounded-lg border border-line bg-white hover:bg-canvas disabled:opacity-50"
             >
-              {capturing ? "Capturing…" : "Capture Snapshot"}
+              {capturing ? rc.capturing : rc.captureSnapshot}
             </button>
           )}
           <a
             href={`/api/reports/R8_DG_SUMMARY/export?${exportParams.toString()}`}
             className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet"
           >
-            Export XLSX
+            {rc.exportXlsx}
+          </a>
+          <a
+            href={`/api/reports/R8_DG_SUMMARY/export-pdf?${exportParams.toString()}`}
+            className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5"
+          >
+            {rc.exportPdf}
           </a>
         </div>
       </div>
@@ -122,8 +133,8 @@ function DgSummaryReportContent({
           {openTasksKpi && openTasksKpi.breakdown.length > 0 && (
             <div className="card-padded">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-semibold text-ink">Open Tasks by Type</div>
-                <Link href="/requests?status=OPEN" className="text-xs text-brand-purple hover:underline">View all in Requests →</Link>
+                <div className="text-sm font-semibold text-ink">{rfoi.openTasksByType}</div>
+                <Link href="/requests?status=OPEN" className="text-xs text-brand-purple hover:underline">{rfoi.viewAllRequests}</Link>
               </div>
               <div className="flex flex-wrap gap-2">
                 {openTasksKpi.breakdown.map((b) => (
@@ -136,12 +147,12 @@ function DgSummaryReportContent({
           )}
 
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-2">12-Month Trend</div>
+            <div className="text-sm font-semibold text-ink mb-2">{rc.trend}</div>
             <TrendChart data={data.trend} target={data.kpis[0]?.targetValue ?? null} />
           </div>
 
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-3">Governance Gaps</div>
+            <div className="text-sm font-semibold text-ink mb-3">{rt.drillTitle}</div>
             <DgGapGrid rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </div>
         </>

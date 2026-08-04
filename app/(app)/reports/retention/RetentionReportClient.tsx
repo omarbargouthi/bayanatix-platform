@@ -7,16 +7,22 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DrillDownGrid, type GridColumn } from "@/components/reports/DrillDownGrid";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 const PAGE_SIZE = 25;
 
-const COLUMNS: GridColumn<RetOverdueRow>[] = [
-  { key: "entityName", label: "Table" },
-  { key: "sourceName", label: "Source" },
-  { key: "categoryName", label: "Category", render: (r) => r.categoryName ?? "—" },
-  { key: "effectiveExpiryDate", label: "Expired On", render: (r) => r.effectiveExpiryDate ?? "—" },
-  { key: "postRetentionAction", label: "Action", render: (r) => r.postRetentionAction ?? "Unscheduled" },
-];
+function buildColumns(t: I18nStrings): GridColumn<RetOverdueRow>[] {
+  const rc = t.reports.common;
+  const rt = t.reports.retention;
+  return [
+    { key: "entityName", label: rc.colTable },
+    { key: "sourceName", label: rc.colSource },
+    { key: "categoryName", label: rc.colCategory, render: (r) => r.categoryName ?? "—" },
+    { key: "effectiveExpiryDate", label: rt.colExpired, render: (r) => r.effectiveExpiryDate ?? "—" },
+    { key: "postRetentionAction", label: rt.colAction, render: (r) => r.postRetentionAction ?? rt.unscheduled },
+  ];
+}
 
 function RetentionReportContent({
   domains, sources, owners, isAdmin, domainLocked,
@@ -29,6 +35,9 @@ function RetentionReportContent({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.retention;
 
   const domainId = searchParams.get("domain") ?? "";
   const sourceId = searchParams.get("source") ?? "";
@@ -88,22 +97,22 @@ function RetentionReportContent({
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-brand-deep">Retention Report</h1>
-          <p className="text-xs text-muted mt-0.5">R9 — retention monitoring KPIs</p>
+          <h1 className="text-xl font-bold text-brand-deep">{rt.title}</h1>
+          <p className="text-xs text-muted mt-0.5">{rt.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <button onClick={captureSnapshot} disabled={capturing} className="text-sm px-3 py-2 rounded-lg border border-line bg-white hover:bg-canvas disabled:opacity-50">
-              {capturing ? "Capturing…" : "Capture Snapshot"}
+              {capturing ? rc.capturing : rc.captureSnapshot}
             </button>
           )}
-          <a href={`/api/reports/R9_RETENTION/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">Export XLSX</a>
-          <a href={`/api/reports/R9_RETENTION/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">Export PDF</a>
+          <a href={`/api/reports/R9_RETENTION/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">{rc.exportXlsx}</a>
+          <a href={`/api/reports/R9_RETENTION/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">{rc.exportPdf}</a>
         </div>
       </div>
 
       <ReportFilterBar domains={domains} sources={sources} owners={owners} domainId={domainId} sourceId={sourceId} ownerId={ownerId} onChange={setParam} domainLocked={domainLocked} />
-      <p className="text-xs text-muted -mt-2">Filters above don&apos;t narrow this report yet — no table has retention linkage populated in this environment.</p>
+      <p className="text-xs text-muted -mt-2">{rt.note}</p>
 
       {loading && !data ? (
         <div className="py-20 text-center text-muted">Loading…</div>
@@ -113,15 +122,15 @@ function RetentionReportContent({
             {data.kpis.map((k) => <KpiCard key={k.kpiCode} kpi={k} />)}
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-2">12-Month Trend</div>
+            <div className="text-sm font-semibold text-ink mb-2">{rc.trend}</div>
             <TrendChart data={data.trend} target={data.kpis[0]?.targetValue ?? null} />
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-3">Overdue Assets</div>
+            <div className="text-sm font-semibold text-ink mb-3">{rt.drillTitle}</div>
             <DrillDownGrid
-              columns={COLUMNS} rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
+              columns={buildColumns(t)} rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
               rowKey={(r) => r.entityId} linkHref={(r) => `/catalog/${r.schemaId}/tables/${r.entityId}`}
-              emptyMessage="No assets past their retention date."
+              emptyMessage={rt.empty}
             />
           </div>
         </>

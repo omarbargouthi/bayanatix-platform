@@ -856,6 +856,7 @@ export type DomainScorecardCapability = {
   reportLabel: string;
   kpiCode: string;
   kpiName: string;
+  kpiNameAr: string | null;
   value: number;
   targetValue: number | null;
   direction: "UP" | "DOWN";
@@ -893,7 +894,7 @@ export async function getDomainScorecard(glossaryId: number): Promise<DomainScor
       ]);
       return {
         reportCode, reportLabel: SCORECARD_REPORT_LABELS[reportCode],
-        kpiCode: primary.kpiCode, kpiName: primary.nameEn, value: result.value,
+        kpiCode: primary.kpiCode, kpiName: primary.nameEn, kpiNameAr: primary.nameAr, value: result.value,
         targetValue: primary.targetValue, direction: primary.direction, format: primary.format, trend,
       };
     }),

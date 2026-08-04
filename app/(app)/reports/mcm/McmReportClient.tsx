@@ -7,17 +7,23 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DrillDownGrid, type GridColumn } from "@/components/reports/DrillDownGrid";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 const PAGE_SIZE = 25;
 
-const COLUMNS: GridColumn<McmGapRow>[] = [
-  { key: "entityName", label: "Table" },
-  { key: "sourceName", label: "Source" },
-  { key: "domainName", label: "Domain" },
-  { key: "hasOwner", label: "Owner", render: (r) => (r.hasOwner ? "Yes" : "No") },
-  { key: "missingDescCount", label: "Missing Descriptions" },
-  { key: "unlinkedColumnCount", label: "Unlinked Columns" },
-];
+function buildColumns(t: I18nStrings): GridColumn<McmGapRow>[] {
+  const rc = t.reports.common;
+  const rt = t.reports.mcm;
+  return [
+    { key: "entityName", label: rc.colTable },
+    { key: "sourceName", label: rc.colSource },
+    { key: "domainName", label: rc.colDomain },
+    { key: "hasOwner", label: rc.colOwner, render: (r) => (r.hasOwner ? rc.yes : rc.no) },
+    { key: "missingDescCount", label: rt.colMissingDesc },
+    { key: "unlinkedColumnCount", label: rt.colUnlinked },
+  ];
+}
 
 function McmReportContent({
   domains, sources, owners, isAdmin, domainLocked,
@@ -30,6 +36,9 @@ function McmReportContent({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.mcm;
 
   const domainId = searchParams.get("domain") ?? "";
   const sourceId = searchParams.get("source") ?? "";
@@ -89,17 +98,17 @@ function McmReportContent({
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-brand-deep">Data Catalog / Metadata Report</h1>
-          <p className="text-xs text-muted mt-0.5">R1 — MCM monitoring KPIs</p>
+          <h1 className="text-xl font-bold text-brand-deep">{rt.title}</h1>
+          <p className="text-xs text-muted mt-0.5">{rt.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <button onClick={captureSnapshot} disabled={capturing} className="text-sm px-3 py-2 rounded-lg border border-line bg-white hover:bg-canvas disabled:opacity-50">
-              {capturing ? "Capturing…" : "Capture Snapshot"}
+              {capturing ? rc.capturing : rc.captureSnapshot}
             </button>
           )}
-          <a href={`/api/reports/R1_MCM/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">Export XLSX</a>
-          <a href={`/api/reports/R1_MCM/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">Export PDF</a>
+          <a href={`/api/reports/R1_MCM/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">{rc.exportXlsx}</a>
+          <a href={`/api/reports/R1_MCM/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">{rc.exportPdf}</a>
         </div>
       </div>
 
@@ -113,15 +122,15 @@ function McmReportContent({
             {data.kpis.map((k) => <KpiCard key={k.kpiCode} kpi={k} />)}
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-2">12-Month Trend</div>
+            <div className="text-sm font-semibold text-ink mb-2">{rc.trend}</div>
             <TrendChart data={data.trend} target={data.kpis[0]?.targetValue ?? null} />
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-3">Catalog Gaps</div>
+            <div className="text-sm font-semibold text-ink mb-3">{rt.drillTitle}</div>
             <DrillDownGrid
-              columns={COLUMNS} rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
+              columns={buildColumns(t)} rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
               rowKey={(r) => r.entityId} linkHref={(r) => `/catalog/${r.schemaId}/tables/${r.entityId}`}
-              emptyMessage="No catalog gaps in scope — every table has an owner and fully described, term-linked columns."
+              emptyMessage={rt.empty}
             />
           </div>
         </>

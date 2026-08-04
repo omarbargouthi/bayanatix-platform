@@ -2,6 +2,7 @@
 
 import { getRagStatus, RAG_CLASSES } from "@/lib/reports/rag";
 import type { KpiCardData } from "@/lib/queries/reports";
+import { useLang } from "@/lib/lang-context";
 
 function formatValue(value: number, format: KpiCardData["format"]): string {
   if (format === "PERCENT") return `${value}%`;
@@ -10,8 +11,11 @@ function formatValue(value: number, format: KpiCardData["format"]): string {
 }
 
 export function KpiCard({ kpi, selected, onSelect }: { kpi: KpiCardData; selected?: boolean; onSelect?: () => void }) {
+  const { t, lang } = useLang();
+  const rc = t.reports.common;
   const rag = getRagStatus(kpi.value, kpi.targetValue, kpi.direction);
   const classes = RAG_CLASSES[rag];
+  const name = lang !== "en" ? (kpi.nameAr ?? kpi.nameEn) : kpi.nameEn;
 
   return (
     <button
@@ -25,10 +29,10 @@ export function KpiCard({ kpi, selected, onSelect }: { kpi: KpiCardData; selecte
           {rag}
         </span>
       </div>
-      <div className="text-[11px] text-muted mt-1 uppercase tracking-wider">{kpi.nameEn}</div>
+      <div className="text-[11px] text-muted mt-1 uppercase tracking-wider">{name}</div>
       {kpi.targetValue != null && (
         <div className="text-xs text-muted mt-1">
-          Target: {formatValue(kpi.targetValue, kpi.format)} ({kpi.direction === "UP" ? "higher is better" : "lower is better"})
+          {rc.target}: {formatValue(kpi.targetValue, kpi.format)} ({kpi.direction === "UP" ? rc.higherBetter : rc.lowerBetter})
         </div>
       )}
     </button>

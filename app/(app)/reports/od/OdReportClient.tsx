@@ -7,16 +7,22 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DrillDownGrid, type GridColumn } from "@/components/reports/DrillDownGrid";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 const PAGE_SIZE = 25;
 
-const COLUMNS: GridColumn<OdDatasetRow>[] = [
-  { key: "datasetName", label: "Dataset" },
-  { key: "statusCode", label: "Status" },
-  { key: "categoryName", label: "Category", render: (r) => r.categoryName ?? "—" },
-  { key: "raisedByName", label: "Raised By", render: (r) => r.raisedByName ?? "—" },
-  { key: "publishDate", label: "Published", render: (r) => r.publishDate ?? "—" },
-];
+function buildColumns(t: I18nStrings): GridColumn<OdDatasetRow>[] {
+  const rc = t.reports.common;
+  const rt = t.reports.od;
+  return [
+    { key: "datasetName", label: rt.colDataset },
+    { key: "statusCode", label: rc.colStatus },
+    { key: "categoryName", label: rc.colCategory, render: (r) => r.categoryName ?? "—" },
+    { key: "raisedByName", label: rt.colRaisedBy, render: (r) => r.raisedByName ?? "—" },
+    { key: "publishDate", label: rt.colPublished, render: (r) => r.publishDate ?? "—" },
+  ];
+}
 
 function OdReportContent({
   domains, sources, owners, isAdmin, domainLocked,
@@ -29,6 +35,9 @@ function OdReportContent({
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useLang();
+  const rc = t.reports.common;
+  const rt = t.reports.od;
 
   const domainId = searchParams.get("domain") ?? "";
   const sourceId = searchParams.get("source") ?? "";
@@ -88,17 +97,17 @@ function OdReportContent({
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-brand-deep">Open Data Report</h1>
-          <p className="text-xs text-muted mt-0.5">R5 — OD monitoring KPIs</p>
+          <h1 className="text-xl font-bold text-brand-deep">{rt.title}</h1>
+          <p className="text-xs text-muted mt-0.5">{rt.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <button onClick={captureSnapshot} disabled={capturing} className="text-sm px-3 py-2 rounded-lg border border-line bg-white hover:bg-canvas disabled:opacity-50">
-              {capturing ? "Capturing…" : "Capture Snapshot"}
+              {capturing ? rc.capturing : rc.captureSnapshot}
             </button>
           )}
-          <a href={`/api/reports/R5_OD/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">Export XLSX</a>
-          <a href={`/api/reports/R5_OD/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">Export PDF</a>
+          <a href={`/api/reports/R5_OD/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">{rc.exportXlsx}</a>
+          <a href={`/api/reports/R5_OD/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">{rc.exportPdf}</a>
         </div>
       </div>
 
@@ -112,15 +121,15 @@ function OdReportContent({
             {data.kpis.map((k) => <KpiCard key={k.kpiCode} kpi={k} />)}
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-2">12-Month Trend</div>
+            <div className="text-sm font-semibold text-ink mb-2">{rc.trend}</div>
             <TrendChart data={data.trend} target={data.kpis[0]?.targetValue ?? null} />
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-3">Datasets</div>
+            <div className="text-sm font-semibold text-ink mb-3">{rt.drillTitle}</div>
             <DrillDownGrid
-              columns={COLUMNS} rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
+              columns={buildColumns(t)} rows={data.drillDown} total={data.total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage}
               rowKey={(r) => r.datasetId} linkHref={(r) => `/open-data/${r.datasetId}`}
-              emptyMessage="No open datasets in scope."
+              emptyMessage={rt.empty}
             />
           </div>
         </>

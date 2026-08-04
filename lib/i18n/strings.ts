@@ -1572,4 +1572,144 @@ export type I18nStrings = {
     langEnglish:                  string;
     langArabic:                   string;
   };
+
+  // ── Reports (KPI engine: index, 9 capability reports, Domain Scorecard) ──────
+  reports: {
+    index: {
+      title:              string;
+      subtitle:           string;
+      scorecardsTitle:    string;
+      scorecardsSubtitle: string;
+      noDomains:          string;
+    };
+    common: {
+      captureSnapshot:     string;
+      capturing:           string;
+      exportXlsx:          string;
+      exportPdf:           string;
+      trend:               string;
+      noTrend:             string;
+      noTrendSub:          string;
+      prev:                string;
+      next:                string;
+      page:                string;   // "Page"
+      of:                  string;   // "of"
+      target:              string;
+      higherBetter:        string;
+      lowerBetter:         string;
+      allDomains:          string;
+      allSources:          string;
+      allOwners:           string;
+      periodCurrentMonth:  string;
+      domainLockedHint:    string;
+      yes:                 string;
+      no:                  string;
+      colTable:            string;
+      colSource:           string;
+      colDomain:           string;
+      colStatus:           string;
+      colOwner:            string;
+      colSteward:          string;
+      colCertified:        string;
+      colCategory:         string;
+    };
+    mcm: {
+      title:          string;
+      subtitle:       string;
+      drillTitle:     string;
+      empty:          string;
+      colMissingDesc: string;
+      colUnlinked:    string;
+    };
+    dq: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colRule:      string;
+      colDimension: string;
+      colSeverity:  string;
+      colAge:       string;
+    };
+    dc: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colColumn:     string;
+      colPii:        string;
+      colSuggested:  string;
+      colConfidence: string;
+    };
+    dsi: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colRef:          string;
+      colTitle:        string;
+      colScope:        string;
+      colCounterparty: string;
+      colExpires:      string;
+    };
+    od: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colDataset:   string;
+      colPublished: string;
+      colRaisedBy:  string;
+    };
+    foi: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colRef:            string;
+      colSubject:        string;
+      colOfficer:        string;
+      colDue:            string;
+      colClosed:         string;
+      unassigned:        string;
+      openTasksByType:   string;
+      viewAllRequests:   string;
+    };
+    pdp: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colColumn:      string;
+      colPiCategory:  string;
+      colClassified:  string;
+    };
+    dg: {
+      title:      string;
+      subtitle:   string;
+      drillTitle: string;
+      empty:      string;
+      colMissingDesc: string;
+    };
+    retention: {
+      title:      string;
+      subtitle:   string;
+      note:       string;
+      drillTitle: string;
+      empty:      string;
+      colExpired:     string;
+      colAction:      string;
+      unscheduled:    string;
+    };
+    domain: {
+      capabilityScores: string;
+      topIssues:        string;
+      noIssues:         string;
+      ownerStewards:    string;
+      domainOwner:      string;
+      unassigned:       string;
+      noStewards:       string;
+      exportBrief:      string;
+    };
+  };
 };
