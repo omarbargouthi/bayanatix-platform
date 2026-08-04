@@ -5,7 +5,7 @@ import type { BusinessDomain, SourceLite, UserLite } from "@/lib/queries/reports
 const SELECT_CLASS = "bg-white border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-purple";
 
 export function ReportFilterBar({
-  domains, sources, owners, domainId, sourceId, ownerId, onChange,
+  domains, sources, owners, domainId, sourceId, ownerId, onChange, domainLocked,
 }: {
   domains: BusinessDomain[];
   sources: SourceLite[];
@@ -14,11 +14,18 @@ export function ReportFilterBar({
   sourceId: string;
   ownerId: string;
   onChange: (key: "domain" | "source" | "owner", value: string) => void;
+  domainLocked?: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-3 items-center">
-      <select className={SELECT_CLASS} value={domainId} onChange={(e) => onChange("domain", e.target.value)}>
-        <option value="">All Business Domains</option>
+      <select
+        className={`${SELECT_CLASS} ${domainLocked ? "opacity-70 cursor-not-allowed" : ""}`}
+        value={domainId}
+        disabled={domainLocked}
+        title={domainLocked ? "Your account is scoped to this business domain" : undefined}
+        onChange={(e) => onChange("domain", e.target.value)}
+      >
+        {!domainLocked && <option value="">All Business Domains</option>}
         {domains.map((d) => (
           <option key={d.glossaryId} value={d.glossaryId}>{d.name}</option>
         ))}

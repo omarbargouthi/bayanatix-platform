@@ -26,6 +26,7 @@ export const ar: I18nStrings = {
     configuration:      "الإعدادات",
     aiProviders:        "مزودو الذكاء الاصطناعي",
     maturityIndexSetup: "إعداد مؤشر النضج",
+    reportsKpi:         "إدارة مؤشرات التقارير",
     complianceConfig:   "إعدادات الامتثال",
     indexSetup:        "إعداد الفهرس",
     support:           "الدعم",

@@ -11,12 +11,13 @@ import { DqDrillDownGrid } from "@/components/reports/DqDrillDownGrid";
 const PAGE_SIZE = 25;
 
 function DqReportContent({
-  domains, sources, owners, isAdmin,
+  domains, sources, owners, isAdmin, domainLocked,
 }: {
   domains: BusinessDomain[];
   sources: SourceLite[];
   owners: UserLite[];
   isAdmin: boolean;
+  domainLocked?: boolean;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -104,7 +105,7 @@ function DqReportContent({
       <ReportFilterBar
         domains={domains} sources={sources} owners={owners}
         domainId={domainId} sourceId={sourceId} ownerId={ownerId}
-        onChange={setParam}
+        onChange={setParam} domainLocked={domainLocked}
       />
 
       {loading && !data ? (
@@ -130,7 +131,7 @@ function DqReportContent({
   );
 }
 
-export function DqReportClient(props: { domains: BusinessDomain[]; sources: SourceLite[]; owners: UserLite[]; isAdmin: boolean }) {
+export function DqReportClient(props: { domains: BusinessDomain[]; sources: SourceLite[]; owners: UserLite[]; isAdmin: boolean; domainLocked?: boolean }) {
   return (
     <Suspense fallback={<div className="py-20 text-center text-muted">Loading…</div>}>
       <DqReportContent {...props} />

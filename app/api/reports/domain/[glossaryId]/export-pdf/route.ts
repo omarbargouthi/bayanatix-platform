@@ -1,0 +1,53 @@
+import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { getDomainScorecard, logReportExport } from "@/lib/queries/reports";
+import { buildReportPdfHtml } from "@/lib/reports/pdf-template";
+import { renderHtmlToPdf } from "@/lib/reports/pdf-render";
+import type { KpiCardData } from "@/lib/queries/reports";
+
+export async function GET(req: Request, { params }: { params: { glossaryId: string } }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const glossaryId = Number(params.glossaryId);
+  const scorecard = await getDomainScorecard(glossaryId);
+  if (!scorecard) return NextResponse.json({ error: "Domain not found" }, { status: 404 });
+
+  const { searchParams } = new URL(req.url);
+  const lang: "en" | "ar" = searchParams.get("lang") === "ar" ? "ar" : "en";
+
+  const kpis: KpiCardData[] = scorecard.capabilities.map((c) => ({
+    kpiCode: c.kpiCode, reportCode: c.reportCode, nameEn: `${c.reportLabel} — ${c.kpiName}`, nameAr: null,
+    capabilityCode: c.reportCode, metricKey: null, customSql: null, targetValue: c.targetValue, direction: c.direction,
+    format: c.format, sortOrder: 0, isActive: true, value: c.value, breakdown: [],
+  }));
+
+  const dgCapability = scorecard.capabilities.find((c) => c.reportCode === "R8_DG_SUMMARY");
+
+  const html = buildReportPdfHtml({
+    lang,
+    reportLabel: `${scorecard.domain.name} — Domain Scorecard`,
+    generatedBy: session.fullName,
+    domainName: scorecard.domain.name,
+    sourceName: null,
+    kpis,
+    trend: dgCapability?.trend ?? [],
+    primaryTarget: dgCapability?.targetValue ?? null,
+    drillDownColumns: [
+      { label: "Issue", get: (r) => String(r.label) },
+      { label: "Detail", get: (r) => String(r.detail) },
+    ],
+    drillDownRows: scorecard.topIssues,
+  });
+
+  const pdf = await renderHtmlToPdf(html);
+  await logReportExport(`DOMAIN_${glossaryId}`, session.userId, {}, "PDF");
+
+  const fileName = `${scorecard.domain.name.replace(/\s+/g, "_")}_Scorecard_${new Date().toISOString().slice(0, 10)}.pdf`;
+  return new Response(pdf, {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+    },
+  });
+}

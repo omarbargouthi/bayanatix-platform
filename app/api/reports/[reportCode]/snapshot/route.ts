@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { captureSnapshot } from "@/lib/queries/reports";
 
-const VALID_REPORT_CODES = ["R2_DQ", "R8_DG_SUMMARY"];
+const VALID_REPORT_CODES = [
+  "R1_MCM", "R2_DQ", "R3_DC", "R4_DSI", "R5_OD", "R6_FOI", "R7_PDP", "R8_DG_SUMMARY", "R9_RETENTION",
+];
 
 export async function POST(_req: Request, { params }: { params: { reportCode: string } }) {
   const session = await getSession();

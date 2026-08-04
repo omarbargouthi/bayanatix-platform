@@ -11,6 +11,7 @@ const PUBLIC_PREFIXES = [
   "/logo.svg",
   "/foi-request",           // public FOI intake form + tracking
   "/api/foi/intake",        // public intake submission
+  "/api/reports/cron/snapshot", // Vercel Cron — no session cookie, authenticates via its own CRON_SECRET bearer check
 ];
 
 function isPublic(pathname: string) {

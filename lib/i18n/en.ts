@@ -26,6 +26,7 @@ export const en: I18nStrings = {
     configuration:      "Configuration",
     aiProviders:        "AI Providers",
     maturityIndexSetup: "Maturity Index Setup",
+    reportsKpi:         "Report KPI Admin",
     complianceConfig:   "Configuration",
     indexSetup:        "Index Setup",
     support:           "Support",

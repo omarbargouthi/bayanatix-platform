@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getDgSummaryReportData } from "@/lib/queries/reports";
+import { applyStewardScope } from "@/lib/reports/access";
 
 const PAGE_SIZE = 25;
 
@@ -14,9 +15,7 @@ export async function GET(req: Request) {
   const ownerId = searchParams.get("owner") ?? undefined;
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
 
-  const data = await getDgSummaryReportData(
-    { domainGlossaryId, sourceId, ownerId },
-    { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE },
-  );
+  const filters = await applyStewardScope(session, { domainGlossaryId, sourceId, ownerId });
+  const data = await getDgSummaryReportData(filters, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
   return NextResponse.json(data);
 }

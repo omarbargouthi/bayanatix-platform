@@ -56,6 +56,7 @@ const NAV_ADMIN_DEF = [
   { href: "/admin/configuration",       key: "configuration"        as const, Icon: IconCog },
   { href: "/admin/ai-providers",        key: "aiProviders"          as const, Icon: IconAI },
   { href: "/admin/maturity-index-setup", key: "maturityIndexSetup"  as const, Icon: IconBook },
+  { href: "/admin/reports-kpi",          key: "reportsKpi"          as const, Icon: IconReports },
 ];
 
 export function Sidebar({ user }: { user: SessionUser }) {
