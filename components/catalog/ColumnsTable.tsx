@@ -10,6 +10,7 @@ import { TermMultiPicker } from "./TermMultiPicker";
 import { MindMapTab } from "./MindMapTab";
 import { ColumnTypeBadge } from "./ColumnTypeBadge";
 import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
+import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
 import { useLang } from "@/lib/lang-context";
 
 // ── Column chooser definitions ──────────────────────────────────────────────
@@ -335,6 +336,9 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
             </div>
           )}
       </div>
+
+      {/* Related custom assets */}
+      <RelatedAssetsPanel assetTypeCode="DATA_ATTRIBUTES" assetId={attr.attributeId} compact />
 
       {/* Action row */}
       <div className="flex items-center justify-between pt-1">

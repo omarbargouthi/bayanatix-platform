@@ -10,7 +10,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI,
-  IconTable, IconBulk,
+  IconTable, IconBulk, IconGlossary, IconDB,
 } from "./icons";
 
 // AI Enrichment reuses the existing IconAI (same glyph as the AI Governance nav item) —
@@ -42,6 +42,7 @@ const NAV_DOMAINS_DEF = [
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
   { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },
   { href: "/foi",            key: "foi"           as const, Icon: IconChat },
+  { href: "/assets",         key: "customAssets"  as const, Icon: IconGlossary },
 ];
 
 const NAV_STANDALONE_DEF = [
@@ -57,6 +58,7 @@ const NAV_ADMIN_DEF = [
   { href: "/admin/ai-providers",        key: "aiProviders"          as const, Icon: IconAI },
   { href: "/admin/maturity-index-setup", key: "maturityIndexSetup"  as const, Icon: IconBook },
   { href: "/admin/reports-kpi",          key: "reportsKpi"          as const, Icon: IconReports },
+  { href: "/admin/custom-assets",        key: "customAssetTypes"    as const, Icon: IconDB },
 ];
 
 export function Sidebar({ user }: { user: SessionUser }) {

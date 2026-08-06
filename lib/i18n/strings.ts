@@ -24,6 +24,7 @@ export type I18nStrings = {
     sharing:          string;
     openData:         string;
     foi:              string;
+    customAssets:     string;
     aiGovernance:     string;
     // Admin section items
     userManagement:   string;
@@ -34,6 +35,7 @@ export type I18nStrings = {
     aiProviders:         string;
     maturityIndexSetup:  string;
     reportsKpi:          string;
+    customAssetTypes:    string;
     // Compliance sub-items (kept for backward compat)
     complianceConfig: string;
     indexSetup:       string;
