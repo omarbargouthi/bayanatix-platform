@@ -24,6 +24,7 @@ import { GovernancePanel } from "@/components/catalog/GovernancePanel";
 import { MindMapTab } from "@/components/catalog/MindMapTab";
 import { TableTypeBadge } from "@/components/catalog/TableTypeBadge";
 import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
+import { SetChatContext } from "@/components/chat/SetChatContext";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,8 @@ export default async function TablePage({
         user={user}
         contextTypes={["COLUMN", "TERM"]}
       />
+
+      <SetChatContext assetType="DATA_ENTITIES" assetId={entity.entityId} assetName={entity.entityName} />
 
       <main className="px-8 py-7 pb-14">
         {/* ── Page header ─────────────────────────────────────────────── */}

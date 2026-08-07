@@ -1,6 +1,7 @@
 "use client";
 import { SidebarProvider, useSidebar } from "@/lib/sidebar-context";
 import { LangProvider, useLang, type Lang } from "@/lib/lang-context";
+import { ChatAssetContextProvider } from "@/lib/chat/chat-context";
 import { Sidebar } from "./Sidebar";
 import { ChatbotBubble } from "@/components/ui/ChatbotBubble";
 import type { SessionUser } from "@/lib/types";
@@ -25,7 +26,9 @@ export function AppShell({ user, children, initialLang }: { user: SessionUser; c
   return (
     <LangProvider initialLang={initialLang}>
       <SidebarProvider>
-        <ShellGrid user={user}>{children}</ShellGrid>
+        <ChatAssetContextProvider>
+          <ShellGrid user={user}>{children}</ShellGrid>
+        </ChatAssetContextProvider>
       </SidebarProvider>
     </LangProvider>
   );

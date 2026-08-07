@@ -1602,4 +1602,21 @@ export const ar: I18nStrings = {
       exportBrief:      "تصدير موجز PDF",
     },
   },
+
+  chat: {
+    headerTitle:        "مساعد بياناتكس",
+    headerSubtitle:     "ذكاء اصطناعي لحوكمة البيانات",
+    placeholder:        "اسأل عن أصول البيانات…",
+    greeting:           "مرحباً! يمكنني مساعدتك في التنقل بين أصول البيانات، وشرح سياسات الحوكمة، أو العثور على الجداول والأعمدة. كيف يمكنني مساعدتك؟",
+    newChat:            "محادثة جديدة",
+    history:            "السجل",
+    send:               "إرسال",
+    unavailable:        "المساعد غير متاح حالياً. يرجى المحاولة مرة أخرى بعد قليل.",
+    sources:            "المصادر",
+    thumbsUp:           "مفيد",
+    thumbsDown:         "غير مفيد",
+    feedbackComment:    "تعليق اختياري…",
+    deleteConversation: "حذف المحادثة",
+    noConversations:    "لا توجد محادثات بعد.",
+  },
 };

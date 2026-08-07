@@ -19,7 +19,7 @@ const BLANK_FORM = {
 };
 
 const HEALTH_DOT: Record<string, string> = { HEALTHY: "bg-green-500", UNHEALTHY: "bg-red-500", UNKNOWN: "bg-gray-300" };
-const CAPABILITY_LABELS: Record<string, string> = { DESCRIBE: "Description Generate", REPHRASE: "Description Rephrase", DQ_SEMANTIC: "DQ Semantic Rules (Tier 2)" };
+const CAPABILITY_LABELS: Record<string, string> = { DESCRIBE: "Description Generate", REPHRASE: "Description Rephrase", DQ_SEMANTIC: "DQ Semantic Rules (Tier 2)", CHAT: "Ask Bayanatix (Chat Assistant)" };
 
 export function AiProvidersClient() {
   const [profiles, setProfiles] = useState<Profile[]>([]);

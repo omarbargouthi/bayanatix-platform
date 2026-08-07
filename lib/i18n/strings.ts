@@ -1714,4 +1714,24 @@ export type I18nStrings = {
       exportBrief:      string;
     };
   };
+
+  // ── AI Chat Assistant ("Ask Bayanatix") ──────────────────────────────────────
+  // UI chrome only — the assistant's own reply language follows the question's
+  // language via a system-prompt instruction, independent of this UI setting.
+  chat: {
+    headerTitle:        string;
+    headerSubtitle:     string;
+    placeholder:        string;
+    greeting:           string;
+    newChat:            string;
+    history:            string;
+    send:               string;
+    unavailable:        string;
+    sources:            string;
+    thumbsUp:           string;
+    thumbsDown:         string;
+    feedbackComment:    string;
+    deleteConversation: string;
+    noConversations:    string;
+  };
 };

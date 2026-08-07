@@ -1602,4 +1602,21 @@ export const en: I18nStrings = {
       exportBrief:      "Export PDF Brief",
     },
   },
+
+  chat: {
+    headerTitle:        "Bayanatix Assistant",
+    headerSubtitle:     "Data Governance AI",
+    placeholder:        "Ask about data assets…",
+    greeting:           "Hello! I can help you navigate data assets, explain governance policies, or find tables and columns. What do you need?",
+    newChat:            "New chat",
+    history:            "History",
+    send:               "Send",
+    unavailable:        "Assistant unavailable. Please try again shortly.",
+    sources:            "Sources",
+    thumbsUp:           "Helpful",
+    thumbsDown:         "Not helpful",
+    feedbackComment:    "Optional comment…",
+    deleteConversation: "Delete conversation",
+    noConversations:    "No conversations yet.",
+  },
 };

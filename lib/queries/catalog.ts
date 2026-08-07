@@ -749,6 +749,67 @@ export async function getClassificationStats(): Promise<ClassificationStats> {
   };
 }
 
+// Scoped sibling to getClassificationStats() — AI Chat Assistant's
+// get_classification_summary tool needs "the finance schema" style scoping the
+// global-only function above can't do. Same shape/logic, with an optional join
+// down to data_entities/data_schemas to filter by schema or source.
+export async function getClassificationStatsScoped(scope?: { schemaId?: number; sourceId?: number }): Promise<ClassificationStats> {
+  if (!scope?.schemaId && !scope?.sourceId) return getClassificationStats();
+
+  const [row] = await sql<{
+    total: number; classified: number; cde: number; pii: number;
+    business: number; technical: number;
+  }[]>`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(abt.glossary_id)::int AS classified,
+      COUNT(CASE WHEN bg.classification_code IN ('CONFIDENTIAL','SECRET','TOP_SECRET') THEN 1 END)::int AS cde,
+      COUNT(CASE WHEN bg.is_pii_indicator = true THEN 1 END)::int AS pii,
+      COUNT(CASE WHEN a.attribute_class_code = 'BUSINESS'  THEN 1 END)::int AS business,
+      COUNT(CASE WHEN a.attribute_class_code = 'TECHNICAL' THEN 1 END)::int AS technical
+    FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES'
+     AND abt.asset_id = a.attribute_id
+     AND abt.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    WHERE (${scope.schemaId ?? null}::int IS NULL OR s.schema_id = ${scope.schemaId ?? null})
+      AND (${scope.sourceId ?? null}::int IS NULL OR s.data_source_id = ${scope.sourceId ?? null})
+  `;
+
+  const piRows = await sql<{ name: string; count: number }[]>`
+    SELECT pct.category_name_text AS name, COUNT(*)::int AS count
+    FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES'
+     AND abt.asset_id = a.attribute_id
+     AND abt.term_role = 'CLASSIFICATION'
+    JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    JOIN bayanat.pi_category_types pct ON pct.category_code = bg.pi_category_code
+    WHERE bg.pi_category_code IS NOT NULL
+      AND (${scope.schemaId ?? null}::int IS NULL OR s.schema_id = ${scope.schemaId ?? null})
+      AND (${scope.sourceId ?? null}::int IS NULL OR s.data_source_id = ${scope.sourceId ?? null})
+    GROUP BY pct.category_name_text
+    ORDER BY COUNT(*) DESC
+    LIMIT 6
+  `;
+
+  return {
+    total:        Number(row?.total        ?? 0),
+    classified:   Number(row?.classified   ?? 0),
+    unclassified: Number(row?.total ?? 0) - Number(row?.classified ?? 0),
+    cde:          Number(row?.cde          ?? 0),
+    pii:          Number(row?.pii          ?? 0),
+    business:     Number(row?.business     ?? 0),
+    technical:    Number(row?.technical    ?? 0),
+    byPiCategory: piRows.map((r) => ({ name: r.name, count: Number(r.count) })),
+  };
+}
+
 // ----- Glossaries (top-level domains) -----
 export async function getGlossaryRoots() {
   return sql<{ glossaryId: number; termName: string; termCount: number }[]>`
