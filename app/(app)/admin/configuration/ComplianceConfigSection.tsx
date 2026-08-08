@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLang } from "@/lib/lang-context";
 import type {
   ComplianceFramework, LevelConfig, ConfigItem, DomainConfig,
 } from "@/lib/queries/gov-compliance";
@@ -25,8 +24,10 @@ function blankLevels(fwId: number): LevelConfig[] {
 }
 
 export function ComplianceConfigSection() {
-  const { secondaryLangDef } = useLang();
-  const secondaryLangCode = secondaryLangDef.code;
+  // The nameAr/descriptionAr columns this feeds are Arabic-specific regardless of
+  // the entity's configured secondary language — not part of the Language
+  // Management overhaul, left as-is.
+  const secondaryLangCode = "ar";
 
   const [frameworks,   setFrameworks]   = useState<ComplianceFramework[]>([]);
   const [fwId,         setFwId]         = useState<number | null>(null);

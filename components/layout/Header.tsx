@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
-import { IconBell, IconSearch, IconLogout, IconMenu, IconGlobe, IconHistory, IconCollaborate } from "./icons";
+import { IconBell, IconSearch, IconLogout, IconMenu, IconHistory, IconCollaborate } from "./icons";
+import { LanguagePicker } from "./LanguagePicker";
 import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
@@ -63,7 +64,7 @@ function HeaderIconBtn({
 export function Header({ crumbs, user, contextTypes, collaborationHref }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[]; collaborationHref?: string }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
-  const { lang, setLang, isRtl, secondaryLangDef } = useLang();
+  const { isRtl } = useLang();
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -323,17 +324,9 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
       {/* Right actions: Language · Notification · History · Collaboration */}
       <div className={`${isRtl ? "mr-auto" : "ml-auto"} flex items-center gap-1`}>
         {/* Language */}
-        <button
-          onClick={() => setLang(lang === "en" ? secondaryLangDef.code : "en")}
-          aria-label="Toggle language"
-          className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 border rounded-md text-xs font-semibold transition-colors select-none
-            ${lang !== "en"
-              ? "border-brand-purple text-brand-purple bg-brand-purple/5"
-              : "border-line text-ink-soft hover:border-brand-purple hover:text-brand-purple"}`}
-        >
-          <IconGlobe className="w-3.5 h-3.5" />
-          {lang === "en" ? secondaryLangDef.nativeName : "English"}
-        </button>
+        <div className="hidden sm:block">
+          <LanguagePicker />
+        </div>
 
         {/* Notification */}
         <HeaderIconBtn label="Notifications" badgeCount={unreadCount} onClick={() => setNotifOpen(true)}>

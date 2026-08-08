@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/foi-request",           // public FOI intake form + tracking
   "/api/foi/intake",        // public intake submission
   "/api/reports/cron/snapshot", // Vercel Cron — no session cookie, authenticates via its own CRON_SECRET bearer check
+  "/api/languages",         // login page's language picker needs this before a session exists
 ];
 
 function isPublic(pathname: string) {

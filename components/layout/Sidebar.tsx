@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useLang } from "@/lib/lang-context";
+import { LanguagePicker } from "./LanguagePicker";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
@@ -63,7 +64,7 @@ const NAV_ADMIN_DEF = [
 
 export function Sidebar({ user }: { user: SessionUser }) {
   const { collapsed } = useSidebar();
-  const { t, lang, setLang, isRtl, secondaryLangDef } = useLang();
+  const { t, isRtl } = useLang();
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
@@ -157,21 +158,14 @@ export function Sidebar({ user }: { user: SessionUser }) {
         <NavLink item={{ href: "/support",  label: t.nav.support,  Icon: IconHelp }} active={isActive("/support")}  collapsed={collapsed} isRtl={isRtl} />
         <NavLink item={{ href: "/settings", label: t.nav.settings, Icon: IconCog  }} active={isActive("/settings")} collapsed={collapsed} isRtl={isRtl} />
 
-        {/* Language toggle */}
-        <button
-          onClick={() => setLang(lang === "en" ? secondaryLangDef.code : "en")}
-          title={lang === "en" ? `Switch to ${secondaryLangDef.displayName}` : "Switch to English"}
-          className={`w-full mt-1 flex items-center gap-2 py-1.5 rounded-md text-sm font-semibold transition-colors
-            ${collapsed ? "justify-center px-2" : "px-3"}
-            ${lang !== "en" ? "bg-brand-purple/10 text-brand-purple" : "text-ink-soft hover:bg-canvas hover:text-brand-deep"}`}
-        >
-          <GlobeIcon />
-          {!collapsed && (
-            <span className="text-[13px]">
-              {lang === "en" ? secondaryLangDef.nativeName : "English"}
-            </span>
-          )}
-        </button>
+        {/* Language picker */}
+        <div className={`w-full mt-1 ${collapsed ? "flex justify-center" : ""}`}>
+          <LanguagePicker
+            collapsed={collapsed}
+            dropUp
+            triggerClassName={`w-full flex items-center gap-2 py-1.5 rounded-md text-sm font-semibold transition-colors ${collapsed ? "justify-center px-2" : "px-3"} text-ink-soft hover:bg-canvas hover:text-brand-deep`}
+          />
+        </div>
 
         <div className={`flex items-center mt-2 pt-3 border-t border-line ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
           <img src="/logo.svg" alt="" className="w-5 h-6 shrink-0" />
@@ -217,13 +211,5 @@ function NavLink({ item, active, collapsed, indent, isRtl }: {
         </span>
       ) : null}
     </Link>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="w-[15px] h-[15px] shrink-0">
-      <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM2.04 4.326c.325 1.329 2.532 2.54 3.717 3.19.48.263.793.434.743.484-.08.08-.162.158-.242.234-.416.396-.787.749-.758 1.266.035.634.618.824 1.214 1.017.577.188 1.168.38 1.286.983.082.417-.075.988-.22 1.52-.215.782-.406 1.48.22 1.48 1.5-.5 3.798-3.186 4-5 .138-1.243-2-2-3.5-2.5-.478-.16-.755.081-.99.284-.172.15-.322.279-.51.216-.445-.148-2.615-2.133-1.626-3.554l.127-.179c.333-.46.728-1.006-.296-1.006-.72.001-1.595.515-2.283 1.57l-.083.131z"/>
-    </svg>
   );
 }

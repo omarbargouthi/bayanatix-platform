@@ -40,6 +40,7 @@ export async function readSession(token: string | undefined): Promise<SessionUse
       email: String(payload.email),
       fullName: String(payload.fullName),
       role: payload.role as SessionUser["role"],
+      preferredLanguageCode: payload.preferredLanguageCode ? String(payload.preferredLanguageCode) : null,
     };
   } catch {
     return null;

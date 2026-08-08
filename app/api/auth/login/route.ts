@@ -27,10 +27,11 @@ export async function POST(req: Request) {
     email: user.email,
     fullName: user.full_name,
     role: user.role,
+    preferredLanguageCode: user.preferred_language_code,
   });
   setSessionCookie(token);
 
   return NextResponse.json({
-    user: { userId: user.user_id, email: user.email, fullName: user.full_name, role: user.role },
+    user: { userId: user.user_id, email: user.email, fullName: user.full_name, role: user.role, preferredLanguageCode: user.preferred_language_code },
   });
 }

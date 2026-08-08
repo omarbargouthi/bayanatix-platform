@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UiTranslationsSection } from "./UiTranslationsSection";
+import Link from "next/link";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
-import { LanguageSettingsSection } from "./LanguageSettingsSection";
 import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
 import { useLang } from "@/lib/lang-context";
@@ -36,9 +35,7 @@ export default function ConfigurationPage() {
 
   const [groups, setGroups]             = useState<GroupEntry[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [showUiTranslations, setShowUiTranslations]   = useState(false);
   const [showComplianceConfig, setShowComplianceConfig] = useState(false);
-  const [showLanguageSettings, setShowLanguageSettings] = useState(false);
   const [showDataCategories, setShowDataCategories]     = useState(false);
   const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
 
@@ -73,9 +70,7 @@ export default function ConfigurationPage() {
   }, [selectedGroup]);
 
   function resetNav() {
-    setShowUiTranslations(false);
     setShowComplianceConfig(false);
-    setShowLanguageSettings(false);
     setShowDataCategories(false);
     setShowEnrichmentSettings(false);
     setAdding(false);
@@ -157,8 +152,7 @@ export default function ConfigurationPage() {
   }
 
   const isNothingSelected =
-    !selectedGroup && !adding && !showUiTranslations &&
-    !showComplianceConfig && !showLanguageSettings && !showDataCategories && !showEnrichmentSettings;
+    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -169,23 +163,14 @@ export default function ConfigurationPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
 
-          {/* ── Language Settings (pinned) */}
-          <button
-            onClick={() => { resetNav(); setSelectedGroup(null); setShowLanguageSettings(true); }}
-            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showLanguageSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          {/* ── Languages & Translations (pinned) — moved to its own dedicated admin page */}
+          <Link
+            href="/admin/languages"
+            className="block w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white"
           >
-            <div className="font-medium text-ink">Language Settings</div>
-            <div className="text-[10px] text-muted mt-0.5">Second language · Direction · Auto-translate</div>
-          </button>
-
-          {/* ── UI Translations (pinned) */}
-          <button
-            onClick={() => { resetNav(); setSelectedGroup(null); setShowUiTranslations(true); }}
-            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showUiTranslations ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
-          >
-            <div className="font-medium text-ink">UI Translations</div>
-            <div className="text-[10px] text-muted mt-0.5">English overrides · Second language labels</div>
-          </button>
+            <div className="font-medium text-ink">Languages &amp; Translations</div>
+            <div className="text-[10px] text-muted mt-0.5">Languages · Categories · Workbench · AI-translate</div>
+          </Link>
 
           {/* ── Lookup Groups header + add */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-line bg-canvas-soft flex items-center justify-between">
@@ -247,23 +232,6 @@ export default function ConfigurationPage() {
 
       {/* ── Main panel ───────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto p-8">
-
-        {/* ── Language Settings panel ── */}
-        {showLanguageSettings && <LanguageSettingsSection />}
-
-        {/* ── UI Translations panel ── */}
-        {showUiTranslations && (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-ink">UI Translations</h2>
-              <p className="text-xs text-muted mt-1">
-                Override any default English string or add Arabic translations for the language toggle.
-                Changes take effect immediately for all users after saving.
-              </p>
-            </div>
-            <UiTranslationsSection />
-          </div>
-        )}
 
         {/* ── Compliance Config panel ── */}
         {showComplianceConfig && <ComplianceConfigSection />}

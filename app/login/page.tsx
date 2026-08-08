@@ -1,4 +1,5 @@
 import LoginForm from "./LoginForm";
+import { LoginLangBar } from "./LoginLangBar";
 
 export const metadata = { title: "Sign in · Bayanatix" };
 
@@ -44,21 +45,23 @@ export default function LoginPage({ searchParams }: { searchParams: { from?: str
       {/* Right: form */}
       <section className="flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-sm">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <img src="/logo.svg" alt="" className="w-8 h-10" />
-            <span className="font-bold tracking-[0.18em] text-brand-deep">BAYANATIX</span>
-          </div>
+          <LoginLangBar>
+            <div className="lg:hidden flex items-center gap-2 mb-8">
+              <img src="/logo.svg" alt="" className="w-8 h-10" />
+              <span className="font-bold tracking-[0.18em] text-brand-deep">BAYANATIX</span>
+            </div>
 
-          <h2 className="text-2xl font-bold text-ink mb-2">Sign in</h2>
-          <p className="text-sm text-ink-soft mb-8">
-            Welcome back. Enter your credentials to continue.
-          </p>
+            <h2 className="text-2xl font-bold text-ink mb-2">Sign in</h2>
+            <p className="text-sm text-ink-soft mb-8">
+              Welcome back. Enter your credentials to continue.
+            </p>
 
-          <LoginForm redirectTo={from} />
+            <LoginForm redirectTo={from} />
 
-          <p className="mt-8 text-xs text-muted text-center">
-            By signing in you agree to the Bayanatix acceptable use policy.
-          </p>
+            <p className="mt-8 text-xs text-muted text-center">
+              By signing in you agree to the Bayanatix acceptable use policy.
+            </p>
+          </LoginLangBar>
         </div>
       </section>
     </main>

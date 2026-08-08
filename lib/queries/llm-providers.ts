@@ -7,7 +7,7 @@ import { encryptSecret, decryptSecret } from "../secrets";
 export type ProviderType = "MANAGED_API" | "CLOUD_REGION" | "SELF_HOSTED";
 export type ApiFlavor = "OPENAI_COMPAT" | "ANTHROPIC" | "BEDROCK" | "VERTEX";
 export type HealthStatus = "UNKNOWN" | "HEALTHY" | "UNHEALTHY";
-export type Capability = "DESCRIBE" | "REPHRASE" | "DQ_SEMANTIC" | "CHAT";
+export type Capability = "DESCRIBE" | "REPHRASE" | "DQ_SEMANTIC" | "CHAT" | "TRANSLATE";
 
 export type ProviderProfile = {
   profileId: number;
@@ -185,7 +185,7 @@ export async function listCapabilityRoutes(): Promise<CapabilityRoute[]> {
     FROM bayanat.llm_capability_routes
   `;
   const byCode = new Map(rows.map((r) => [r.capabilityCode, r]));
-  const ALL: Capability[] = ["DESCRIBE", "REPHRASE", "DQ_SEMANTIC", "CHAT"];
+  const ALL: Capability[] = ["DESCRIBE", "REPHRASE", "DQ_SEMANTIC", "CHAT", "TRANSLATE"];
   return ALL.map((code) => byCode.get(code) ?? { capabilityCode: code, profileId: null, fallbackProfileId: null });
 }
 

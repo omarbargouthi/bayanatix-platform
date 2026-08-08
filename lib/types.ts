@@ -6,6 +6,7 @@ export type SessionUser = {
   email: string;
   fullName: string;
   role: "ADMIN" | "STEWARD" | "OFFICER" | "VIEWER";
+  preferredLanguageCode: string | null;
 };
 
 export type DataSource = {
