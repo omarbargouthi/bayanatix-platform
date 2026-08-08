@@ -505,7 +505,12 @@ export async function listInstancesOfType(typeCode: string): Promise<MatrixAxisI
 // lists (e.g. a relationship allowing both DATA_ENTITIES and DATA_ATTRIBUTES on
 // one side) aren't flattened into one matrix axis — an edge case none of the
 // spec's driving scenarios need.
-export async function getRelationshipMatrix(relTypeId: number): Promise<RelationshipMatrix | null> {
+// `asOf` (defaults to today, matching the graph's default) filters out links whose
+// valid_from_date/valid_to_date don't cover that date — AC-7's "a link with
+// valid_to_date in the past disappears from default graph/matrix views and
+// reappears with 'as of' set to a covered date" applies to the matrix too, not
+// just the graph.
+export async function getRelationshipMatrix(relTypeId: number, asOf?: string): Promise<RelationshipMatrix | null> {
   const relTypes = await getRelationshipTypes(true);
   const relType = relTypes.find((r) => r.relTypeId === relTypeId);
   if (!relType) return null;
@@ -516,10 +521,13 @@ export async function getRelationshipMatrix(relTypeId: number): Promise<Relation
 
   const [rows, cols] = await Promise.all([listInstancesOfType(fromType), listInstancesOfType(toType)]);
 
+  const effectiveAsOf = asOf || new Date().toISOString().slice(0, 10);
   const linkRows = await sql<{ fromAssetId: number; toAssetId: number; attributes: Record<string, unknown> }[]>`
     SELECT from_asset_id AS "fromAssetId", to_asset_id AS "toAssetId", attributes_json AS attributes
     FROM bayanat.custom_asset_links
     WHERE rel_type_id = ${relTypeId} AND from_asset_type_code = ${fromType} AND to_asset_type_code = ${toType}
+      AND (valid_from_date IS NULL OR valid_from_date <= ${effectiveAsOf}::date)
+      AND (valid_to_date IS NULL OR valid_to_date >= ${effectiveAsOf}::date)
   `;
   const cells: Record<string, Record<string, unknown> | null> = {};
   for (const l of linkRows) {

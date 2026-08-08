@@ -3,17 +3,20 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { getRelationshipTypeByCode, getRelationshipMatrix } from "@/lib/queries/custom-assets";
+import { MatrixAsOfFilter } from "@/components/custom-assets/MatrixAsOfFilter";
 
 export const dynamic = "force-dynamic";
 
-export default async function MatrixPage({ params }: { params: { relCode: string } }) {
+export default async function MatrixPage({ params, searchParams }: { params: { relCode: string }; searchParams: { asOf?: string } }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
   const relType = await getRelationshipTypeByCode(params.relCode.toUpperCase());
   if (!relType) notFound();
 
-  const matrix = await getRelationshipMatrix(relType.relTypeId);
+  const today = new Date().toISOString().slice(0, 10);
+  const asOf = searchParams.asOf || today;
+  const matrix = await getRelationshipMatrix(relType.relTypeId, asOf);
   if (!matrix) notFound();
 
   return (
@@ -37,8 +40,17 @@ export default async function MatrixPage({ params }: { params: { relCode: string
               )}
             </p>
           </div>
-          <a href={`/api/custom-assets/matrix/${params.relCode}/export`} className="btn btn-primary text-sm">⭳ Export XLSX</a>
+          <div className="flex items-center gap-3">
+            <MatrixAsOfFilter defaultValue={asOf} />
+            <a href={`/api/custom-assets/matrix/${params.relCode}/export?asOf=${asOf}`} className="btn btn-primary text-sm">⭳ Export XLSX</a>
+          </div>
         </div>
+        {asOf !== today && (
+          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5 -mt-2">
+            Showing links valid as of {asOf} — not today.{" "}
+            <Link href={`/assets/matrix/${params.relCode}`} className="underline font-medium">Reset to today</Link>
+          </p>
+        )}
 
         {matrix.rows.length === 0 || matrix.cols.length === 0 ? (
           <div className="card p-10 text-center text-muted">No instances yet on one or both sides of this relationship.</div>

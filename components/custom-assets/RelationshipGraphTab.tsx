@@ -63,6 +63,18 @@ function AssetCard({ data }: NodeProps) {
 
 const nodeTypes: NodeTypes = { assetCard: AssetCard };
 
+const CORE_TYPE_LABELS: Record<string, string> = {
+  DATA_SOURCES: "Source", DATA_SCHEMAS: "Schema", DATA_ENTITIES: "Table", DATA_ATTRIBUTES: "Column",
+};
+
+function assetTypeLabel(assetType: string): string {
+  if (assetType.startsWith("CUSTOM:")) {
+    const code = assetType.slice("CUSTOM:".length);
+    return code.charAt(0) + code.slice(1).toLowerCase();
+  }
+  return CORE_TYPE_LABELS[assetType] ?? assetType;
+}
+
 function GraphInner({ assetType, assetId, height }: { assetType: string; assetId: number; height: number }) {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -156,6 +168,17 @@ function GraphInner({ assetType, assetId, height }: { assetType: string; assetId
               <button key={rt.code} onClick={() => toggleSet(relTypeFilter, setRelTypeFilter, rt.code)}
                 className={`px-2 py-0.5 rounded-full border ${relTypeFilter.size === 0 || relTypeFilter.has(rt.code) ? "border-brand-purple text-brand-purple bg-brand-purple/5" : "border-line text-muted"}`}>
                 {rt.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {availableAssetTypes.length > 1 && (
+          <div className="flex items-center gap-1.5 text-xs flex-wrap">
+            <span className="text-muted">Asset type</span>
+            {availableAssetTypes.map((at) => (
+              <button key={at} onClick={() => toggleSet(assetTypeFilter, setAssetTypeFilter, at)}
+                className={`px-2 py-0.5 rounded-full border ${assetTypeFilter.size === 0 || assetTypeFilter.has(at) ? "border-brand-purple text-brand-purple bg-brand-purple/5" : "border-line text-muted"}`}>
+                {assetTypeLabel(at)}
               </button>
             ))}
           </div>

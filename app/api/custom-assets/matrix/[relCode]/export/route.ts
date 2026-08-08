@@ -3,14 +3,15 @@ import { getSession } from "@/lib/auth";
 import { getRelationshipTypeByCode, getRelationshipMatrix } from "@/lib/queries/custom-assets";
 import * as XLSX from "xlsx";
 
-export async function GET(_req: Request, { params }: { params: { relCode: string } }) {
+export async function GET(req: Request, { params }: { params: { relCode: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const relType = await getRelationshipTypeByCode(params.relCode.toUpperCase());
   if (!relType) return NextResponse.json({ error: "Unknown relationship type" }, { status: 404 });
 
-  const matrix = await getRelationshipMatrix(relType.relTypeId);
+  const asOf = new URL(req.url).searchParams.get("asOf") || undefined;
+  const matrix = await getRelationshipMatrix(relType.relTypeId, asOf);
   if (!matrix) return NextResponse.json({ error: "Unknown relationship type" }, { status: 404 });
 
   const gridRows = matrix.rows.map((row) => {
