@@ -17,6 +17,7 @@
     "clsx": "2.1.1",
     "dagre": "^0.8.5",
     "exceljs": "^4.4.0",
+    "html-to-image": "^1.11.13",
     "jose": "5.9.6",
     "libpg-query": "^17.7.4",
     "mssql": "^12.5.2",

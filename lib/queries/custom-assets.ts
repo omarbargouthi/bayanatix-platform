@@ -414,7 +414,7 @@ export type ResolvedLink = {
 
 // Resolves a display name + href for a core-or-custom asset reference. Batches by
 // type so N links only cost one query per distinct type touched, not N queries.
-async function resolveAssetNames(refs: { typeCode: string; id: number }[]): Promise<Map<string, { name: string; href: string | null }>> {
+export async function resolveAssetNames(refs: { typeCode: string; id: number }[]): Promise<Map<string, { name: string; href: string | null }>> {
   const out = new Map<string, { name: string; href: string | null }>();
   const byType = new Map<string, number[]>();
   for (const r of refs) {
@@ -455,6 +455,79 @@ async function resolveAssetNames(refs: { typeCode: string; id: number }[]): Prom
     }
   }
   return out;
+}
+
+// ── Matrix view (deferred spec FR-3.4) ──────────────────────────────────────────
+
+export type MatrixAxisItem = { typeCode: string; id: number; name: string; href: string | null };
+export type RelationshipMatrix = {
+  relType: CustomRelationshipType;
+  rows: MatrixAxisItem[];
+  cols: MatrixAxisItem[];
+  cells: Record<string, Record<string, unknown> | null>; // key `${rowId}:${colId}`, null = linked with no attributes
+};
+
+// Lists every instance of a single core-or-custom asset type, for matrix axes.
+// Only used here — getInstances()/resolveAssetNames() cover the id-keyed and
+// single-lookup cases everywhere else in this file; this is "list them all."
+export async function listInstancesOfType(typeCode: string): Promise<MatrixAxisItem[]> {
+  if (typeCode === "DATA_SOURCES") {
+    const rows = await sql<{ id: number; name: string }[]>`SELECT data_source_id AS id, source_name_text AS name FROM bayanat.data_sources ORDER BY source_name_text`;
+    return rows.map((r) => ({ typeCode, id: r.id, name: r.name, href: null }));
+  }
+  if (typeCode === "DATA_SCHEMAS") {
+    const rows = await sql<{ id: number; name: string }[]>`SELECT schema_id AS id, schema_name_text AS name FROM bayanat.data_schemas ORDER BY schema_name_text`;
+    return rows.map((r) => ({ typeCode, id: r.id, name: r.name, href: `/catalog/${r.id}` }));
+  }
+  if (typeCode === "DATA_ENTITIES") {
+    const rows = await sql<{ id: number; name: string; schemaId: number }[]>`SELECT entity_id AS id, entity_name_text AS name, schema_id AS "schemaId" FROM bayanat.data_entities ORDER BY entity_name_text`;
+    return rows.map((r) => ({ typeCode, id: r.id, name: r.name, href: `/catalog/${r.schemaId}/tables/${r.id}` }));
+  }
+  if (typeCode === "DATA_ATTRIBUTES") {
+    const rows = await sql<{ id: number; name: string; entityId: number; schemaId: number }[]>`
+      SELECT a.attribute_id AS id, a.physical_name_text AS name, a.entity_id AS "entityId", e.schema_id AS "schemaId"
+      FROM bayanat.data_attributes a JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+      ORDER BY a.physical_name_text
+    `;
+    return rows.map((r) => ({ typeCode, id: r.id, name: r.name, href: `/catalog/${r.schemaId}/tables/${r.entityId}` }));
+  }
+  if (typeCode.startsWith("CUSTOM:")) {
+    const type = await getCustomAssetTypeByCode(typeCode.slice("CUSTOM:".length));
+    if (!type) return [];
+    const { rows } = await getInstances(type.typeId, { limit: 500 });
+    return rows.map((r) => ({ typeCode, id: r.customAssetId, name: r.assetNameText, href: `/assets/${type.typeCode.toLowerCase()}/${r.customAssetId}` }));
+  }
+  return [];
+}
+
+// Only meaningful for M:N relationship types — a 1:N/N:1 grid degenerates to a
+// list. Uses each side's first allowed endpoint type only; multi-type endpoint
+// lists (e.g. a relationship allowing both DATA_ENTITIES and DATA_ATTRIBUTES on
+// one side) aren't flattened into one matrix axis — an edge case none of the
+// spec's driving scenarios need.
+export async function getRelationshipMatrix(relTypeId: number): Promise<RelationshipMatrix | null> {
+  const relTypes = await getRelationshipTypes(true);
+  const relType = relTypes.find((r) => r.relTypeId === relTypeId);
+  if (!relType) return null;
+
+  const fromType = relType.fromEndpoints[0];
+  const toType = relType.toEndpoints[0];
+  if (!fromType || !toType) return { relType, rows: [], cols: [], cells: {} };
+
+  const [rows, cols] = await Promise.all([listInstancesOfType(fromType), listInstancesOfType(toType)]);
+
+  const linkRows = await sql<{ fromAssetId: number; toAssetId: number; attributes: Record<string, unknown> }[]>`
+    SELECT from_asset_id AS "fromAssetId", to_asset_id AS "toAssetId", attributes_json AS attributes
+    FROM bayanat.custom_asset_links
+    WHERE rel_type_id = ${relTypeId} AND from_asset_type_code = ${fromType} AND to_asset_type_code = ${toType}
+  `;
+  const cells: Record<string, Record<string, unknown> | null> = {};
+  for (const l of linkRows) {
+    const key = `${l.fromAssetId}:${l.toAssetId}`;
+    cells[key] = l.attributes && Object.keys(l.attributes).length > 0 ? l.attributes : null;
+  }
+
+  return { relType, rows, cols, cells };
 }
 
 export async function getLinksForAsset(assetTypeCode: string, assetId: number): Promise<ResolvedLink[]> {

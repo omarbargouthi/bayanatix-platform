@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { RelationshipGraphTab } from "./RelationshipGraphTab";
 
 type ResolvedLink = {
   linkId: number;
@@ -14,6 +15,7 @@ type ResolvedLink = {
 
 export function RelatedAssetsPanel({ assetTypeCode, assetId, compact }: { assetTypeCode: string; assetId: number; compact?: boolean }) {
   const [links, setLinks] = useState<ResolvedLink[] | null>(null);
+  const [showGraph, setShowGraph] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,9 +37,19 @@ export function RelatedAssetsPanel({ assetTypeCode, assetId, compact }: { assetT
 
   return (
     <div className={compact ? "mt-2" : "card p-5 mt-5"}>
-      {compact
-        ? <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">Related Assets</div>
-        : <h3 className="font-bold text-sm mb-3">Related Assets</h3>}
+      <div className="flex items-center justify-between mb-1.5">
+        {compact
+          ? <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Related Assets</div>
+          : <h3 className="font-bold text-sm">Related Assets</h3>}
+        <button onClick={() => setShowGraph((v) => !v)} className="text-[10px] font-semibold text-brand-purple hover:underline">
+          {showGraph ? "Hide graph" : "View graph"}
+        </button>
+      </div>
+      {showGraph && (
+        <div className="mb-3">
+          <RelationshipGraphTab assetType={assetTypeCode} assetId={assetId} height={420} />
+        </div>
+      )}
       <div className="space-y-2">
         {[...grouped.entries()].map(([label, group]) => (
           <div key={label} className="flex items-start gap-2 flex-wrap">

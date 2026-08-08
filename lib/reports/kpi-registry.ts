@@ -902,6 +902,60 @@ const retPurgeQueue: MetricFn = async () => {
   };
 };
 
+// ── PI Access by Role (deferred Custom Asset Framework spec §7/FR-4.3) ────────
+// Walks bayanat.custom_asset_links by stable rel_code, not hardcoded type ids, so
+// this works whether just the "PI Access Map" template (HAS_ACCESS_TO: Role ->
+// Column) is installed, or the fuller "RoPA-lite" chain (PERFORMED_BY + USES_DATA)
+// is layered on top — same CTE shape lib/queries/reports.ts's drill-down query
+// uses, kept in sync manually since KPI values and drill-down rows are computed
+// by different functions per this file's existing convention (e.g. R2/R9 above).
+const PI_ACCESS_CTE = sql`
+  pi_access AS (
+    SELECT l.from_asset_id AS role_id, l.to_asset_id AS attr_id
+    FROM bayanat.custom_asset_links l
+    JOIN bayanat.custom_relationship_types rt ON rt.rel_type_id = l.rel_type_id
+    WHERE rt.rel_code = 'HAS_ACCESS_TO' AND l.to_asset_type_code = 'DATA_ATTRIBUTES'
+    UNION
+    SELECT pb.to_asset_id AS role_id, ud.to_asset_id AS attr_id
+    FROM bayanat.custom_asset_links ud
+    JOIN bayanat.custom_relationship_types udt ON udt.rel_type_id = ud.rel_type_id AND udt.rel_code = 'USES_DATA'
+    JOIN bayanat.custom_asset_links pb ON pb.from_asset_type_code = ud.from_asset_type_code AND pb.from_asset_id = ud.from_asset_id
+    JOIN bayanat.custom_relationship_types pbt ON pbt.rel_type_id = pb.rel_type_id AND pbt.rel_code = 'PERFORMED_BY'
+    WHERE ud.to_asset_type_code = 'DATA_ATTRIBUTES'
+  ),
+  pi_access_scoped AS (
+    SELECT DISTINCT pa.role_id, pa.attr_id, e.entity_id, ds.data_source_id, d.domain_glossary_id
+    FROM pi_access pa
+    JOIN bayanat.data_attributes a ON a.attribute_id = pa.attr_id
+    JOIN bayanat.asset_business_terms abt ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id AND bg.is_pii_indicator = true
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
+    LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = e.entity_id
+  )
+`;
+
+const piAccessLinkCount: MetricFn = async (f) => {
+  const rows = await sql<{ count: number }[]>`
+    WITH ${PI_ACCESS_CTE}
+    SELECT count(*)::int AS count FROM pi_access_scoped
+    WHERE (${f.domainGlossaryId ?? null}::int IS NULL OR domain_glossary_id = ${f.domainGlossaryId ?? null})
+      AND (${f.sourceId ?? null}::int IS NULL OR data_source_id = ${f.sourceId ?? null})
+  `;
+  return { value: rows[0]?.count ?? 0, breakdown: [] };
+};
+
+const piAccessRolesCount: MetricFn = async (f) => {
+  const rows = await sql<{ count: number }[]>`
+    WITH ${PI_ACCESS_CTE}
+    SELECT count(DISTINCT role_id)::int AS count FROM pi_access_scoped
+    WHERE (${f.domainGlossaryId ?? null}::int IS NULL OR domain_glossary_id = ${f.domainGlossaryId ?? null})
+      AND (${f.sourceId ?? null}::int IS NULL OR data_source_id = ${f.sourceId ?? null})
+  `;
+  return { value: rows[0]?.count ?? 0, breakdown: [] };
+};
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const KPI_REGISTRY: Record<string, MetricFn> = {
@@ -944,4 +998,6 @@ export const KPI_REGISTRY: Record<string, MetricFn> = {
   retAssetsPastRetention,
   retLegalHoldsActive,
   retPurgeQueue,
+  piAccessLinkCount,
+  piAccessRolesCount,
 };

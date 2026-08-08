@@ -17,6 +17,7 @@ function buildTiles(t: I18nStrings) {
     { name: r.pdp.title, description: r.pdp.subtitle, href: "/reports/pdp" },
     { name: r.dg.title, description: r.dg.subtitle, href: "/reports/dg-summary" },
     { name: r.retention.title, description: r.retention.subtitle, href: "/reports/retention" },
+    { name: "PI Access by Role", description: "Which roles/activities access which personal-data columns.", href: "/reports/pi-access" },
   ];
 }
 

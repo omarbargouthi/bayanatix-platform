@@ -4,7 +4,7 @@
 // The reader matches columns by HEADER TEXT, not position, so a user reordering
 // columns in Excel doesn't break the round-trip.
 
-export type SheetName = "DataSources" | "Tables" | "Columns" | "BusinessTerms";
+export type SheetName = "DataSources" | "Tables" | "Columns" | "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
 export type FieldKind = "SYSTEM" | "EDITABLE" | "REFERENCE";
 export type FieldType = "TEXT" | "LONGTEXT" | "ENUM" | "BOOLEAN" | "TAGS" | "TERM" | "NUMBER";
 export type EnumSource = "TABLE_CATEGORY" | "COLUMN_TYPE" | "CLASSIFICATION" | "PI_CATEGORY";
@@ -79,12 +79,41 @@ export const BUSINESS_TERMS_FIELDS: FieldDef[] = [
   { key: "example", header: "Example", kind: "EDITABLE", type: "TEXT", maxLength: 500 },
 ];
 
+// Custom asset types have an admin-defined, runtime-variable attribute schema —
+// incompatible with this file's compile-time-fixed FieldDef arrays per sheet. One
+// generic sheet with a catch-all JSON "Attributes" column round-trips any type's
+// values as text rather than generating a column per attribute (scoping decision:
+// less Excel-native per-field editing, but keeps the rest of the Bulk feature's
+// sheet registry — a closed, synchronous, args-free-by-SheetName lookup used by
+// the writer/reader/validator/committer — completely untouched).
+export const CUSTOM_ASSETS_FIELDS: FieldDef[] = [
+  SYS("_ID", "_ID"), SYS("_TYPE", "_TYPE"),
+  REF("typeCode", "Type"),
+  { key: "assetName", header: "Name", kind: "EDITABLE", type: "TEXT", maxLength: 255 },
+  { key: "description", header: "Description", kind: "EDITABLE", type: "LONGTEXT", maxLength: 2000 },
+  { key: "attributesJson", header: "Attributes (JSON)", kind: "EDITABLE", type: "LONGTEXT", maxLength: 4000 },
+];
+
+export const CUSTOM_ASSET_LINKS_FIELDS: FieldDef[] = [
+  SYS("_ID", "_ID"), SYS("_TYPE", "_TYPE"),
+  REF("relCode", "Relationship"),
+  { key: "fromType", header: "From Type", kind: "EDITABLE", type: "TEXT", maxLength: 60 },
+  { key: "fromName", header: "From Name", kind: "EDITABLE", type: "TEXT", maxLength: 255 },
+  { key: "toType", header: "To Type", kind: "EDITABLE", type: "TEXT", maxLength: 60 },
+  { key: "toName", header: "To Name", kind: "EDITABLE", type: "TEXT", maxLength: 255 },
+  { key: "attributesJson", header: "Attributes (JSON)", kind: "EDITABLE", type: "LONGTEXT", maxLength: 2000 },
+  { key: "validFromDate", header: "Valid From", kind: "EDITABLE", type: "TEXT", maxLength: 10 },
+  { key: "validToDate", header: "Valid To", kind: "EDITABLE", type: "TEXT", maxLength: 10 },
+];
+
 export function getFieldsForSheet(sheet: SheetName): FieldDef[] {
   const base =
     sheet === "DataSources" ? DATA_SOURCES_FIELDS :
     sheet === "Tables" ? TABLES_FIELDS :
     sheet === "Columns" ? COLUMNS_FIELDS :
-    BUSINESS_TERMS_FIELDS;
+    sheet === "BusinessTerms" ? BUSINESS_TERMS_FIELDS :
+    sheet === "CustomAssets" ? CUSTOM_ASSETS_FIELDS :
+    CUSTOM_ASSET_LINKS_FIELDS;
   return [...base, ...getExtendedAttributeFields(sheet)];
 }
 
@@ -93,6 +122,8 @@ export const SHEET_ASSET_TYPE: Record<SheetName, string> = {
   Tables: "DATA_ENTITIES",
   Columns: "DATA_ATTRIBUTES",
   BusinessTerms: "BUSINESS_TERMS",
+  CustomAssets: "CUSTOM_ASSETS",
+  CustomAssetLinks: "CUSTOM_ASSET_LINKS",
 };
 
 export const ROW_CAP_PER_FILE = 50_000;

@@ -8,6 +8,10 @@ import { getFieldsForSheet, CLEAR_SENTINEL, SHEET_ASSET_TYPE, type SheetName, ty
 import { loadEnumValues } from "./enum-sources";
 import type { ParsedRow, ParsedWorkbook } from "./workbook-reader";
 import type { SessionUser } from "../types";
+import {
+  getCustomAssetTypeByCode, validateAttributes,
+  getRelationshipTypeByCode, validateLinkEndpoints, listInstancesOfType,
+} from "../queries/custom-assets";
 
 export type FieldChange = { field: string; header: string; oldVal: string | null; newVal: string | null };
 export type RowOutcome = "UPDATE" | "CREATE" | "SKIPPED_NOOP" | "SKIPPED_CONFLICT" | "ERROR";
@@ -122,6 +126,28 @@ async function fetchCurrentTerms(ids: number[]): Promise<Map<number, Record<stri
   }]));
 }
 
+async function fetchCurrentCustomAssets(ids: number[]): Promise<Map<number, { typeId: number; typeCode: string; assetName: string | null; description: string | null; attributesJson: string | null }>> {
+  if (ids.length === 0) return new Map();
+  const rows = await sql<{ id: number; typeId: number; typeCode: string; assetName: string | null; description: string | null; attributesJson: string }[]>`
+    SELECT ca.custom_asset_id AS id, ca.type_id AS "typeId", t.type_code AS "typeCode",
+      ca.asset_name_text AS "assetName", ca.description_text AS description,
+      COALESCE(ca.attributes_json, '{}'::jsonb)::text AS "attributesJson"
+    FROM bayanat.custom_assets ca JOIN bayanat.custom_asset_types t ON t.type_id = ca.type_id
+    WHERE ca.custom_asset_id = ANY(${ids})
+  `;
+  return new Map(rows.map((r) => [r.id, r]));
+}
+
+async function fetchCurrentCustomAssetLinks(ids: number[]): Promise<Map<number, { relTypeId: number; attributesJson: string; validFromDate: string | null; validToDate: string | null }>> {
+  if (ids.length === 0) return new Map();
+  const rows = await sql<{ id: number; relTypeId: number; attributesJson: string; validFromDate: string | null; validToDate: string | null }[]>`
+    SELECT link_id AS id, rel_type_id AS "relTypeId", COALESCE(attributes_json, '{}'::jsonb)::text AS "attributesJson",
+      valid_from_date::text AS "validFromDate", valid_to_date::text AS "validToDate"
+    FROM bayanat.custom_asset_links WHERE link_id = ANY(${ids})
+  `;
+  return new Map(rows.map((r) => [r.id, r]));
+}
+
 function toNum(s: string): number | null {
   const n = Number(s);
   return Number.isFinite(n) && s.trim() !== "" ? n : null;
@@ -194,6 +220,26 @@ export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOpt
     const currentMap = await fetchCurrentTerms(ids);
     for (const row of termRows) {
       plans.push(await validateTermRow(fields, row, currentMap, opts));
+    }
+  }
+
+  const customAssetRows = parsed.sheets.CustomAssets;
+  if (customAssetRows) {
+    const fields = getFieldsForSheet("CustomAssets");
+    const ids = customAssetRows.map((r) => toNum(r.values._ID)).filter((n): n is number => n != null);
+    const currentMap = await fetchCurrentCustomAssets(ids);
+    for (const row of customAssetRows) {
+      plans.push(await validateCustomAssetRow(fields, row, currentMap, opts));
+    }
+  }
+
+  const customAssetLinkRows = parsed.sheets.CustomAssetLinks;
+  if (customAssetLinkRows) {
+    const fields = getFieldsForSheet("CustomAssetLinks");
+    const ids = customAssetLinkRows.map((r) => toNum(r.values._ID)).filter((n): n is number => n != null);
+    const currentMap = await fetchCurrentCustomAssetLinks(ids);
+    for (const row of customAssetLinkRows) {
+      plans.push(await validateCustomAssetLinkRow(fields, row, currentMap, opts));
     }
   }
 
@@ -339,4 +385,187 @@ async function validateTermRow(
     return { sheet: "BusinessTerms", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "SKIPPED_CONFLICT", changes, errors, warnings };
   }
   return { sheet: "BusinessTerms", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "UPDATE", changes, errors, warnings };
+}
+
+function parseJsonAttributes(raw: string, errors: string[], fieldLabel: string): Record<string, unknown> {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    errors.push(`${fieldLabel}: must be a JSON object, e.g. {"KEY":"value"}`);
+    return {};
+  } catch {
+    errors.push(`${fieldLabel}: not valid JSON`);
+    return {};
+  }
+}
+
+// ── Custom Assets (deferred spec FR-4.2) — modeled on validateTermRow: the only
+// other sheet where bulk-create is allowed, for the same reason (pure user data,
+// no "already discovered by a scanner" precondition). Gated on canEditMetadata
+// only, like Business Terms — custom types have no DATA_SOURCE/SCHEMA/TABLE-shaped
+// ancestry to hang canEditAsset's resource-scoped check on.
+async function validateCustomAssetRow(
+  fields: FieldDef[], row: ParsedRow,
+  currentMap: Map<number, { typeId: number; typeCode: string; assetName: string | null; description: string | null; attributesJson: string | null }>,
+  opts: ValidateOptions,
+): Promise<RowPlan> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const idNum = toNum(row.values._ID);
+  const canEdit = await canEditMetadata(opts.session);
+
+  if (idNum == null) {
+    const typeCode = row.values.typeCode?.trim().toUpperCase();
+    const assetName = row.values.assetName?.trim();
+    if (!typeCode) errors.push("Type is required to create a new custom asset");
+    if (!assetName) errors.push("Name is required to create a new custom asset");
+    if (!canEdit) errors.push("You don't have permission to create custom assets");
+
+    const type = typeCode ? await getCustomAssetTypeByCode(typeCode) : null;
+    if (typeCode && !type) errors.push(`Custom asset type "${typeCode}" not found`);
+
+    const attributes = parseJsonAttributes(row.values.attributesJson ?? "", errors, "Attributes (JSON)");
+    if (type) {
+      const attrErrors = await validateAttributes(type.typeId, attributes);
+      for (const e of attrErrors) errors.push(`${e.attrCode}: ${e.message}`);
+    }
+
+    const assetType = type ? `CUSTOM:${type.typeCode}` : "CUSTOM_ASSETS";
+    if (errors.length > 0) return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: null, isCreate: true, outcome: "ERROR", changes: [], errors, warnings };
+
+    return {
+      sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: null, isCreate: true, outcome: "CREATE",
+      changes: [
+        { field: "assetName", header: "Name", oldVal: null, newVal: assetName ?? null },
+        { field: "attributesJson", header: "Attributes (JSON)", oldVal: null, newVal: JSON.stringify(attributes) },
+      ],
+      errors, warnings,
+      createPayload: { typeId: type!.typeId, assetNameText: assetName, descriptionText: row.values.description?.trim() || null, attributes },
+    };
+  }
+
+  const current = currentMap.get(idNum);
+  if (!current) {
+    return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSETS", assetId: idNum, isCreate: false, outcome: "ERROR", changes: [], errors: [`_ID ${idNum}: no matching custom asset found`], warnings };
+  }
+  const assetType = `CUSTOM:${current.typeCode}`;
+  if (!canEdit) {
+    return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "ERROR", changes: [], errors: ["You don't have edit permission on custom assets"], warnings };
+  }
+
+  const changes: FieldChange[] = [];
+  const nameField = fields.find((f) => f.key === "assetName")!;
+  const { newVal: newName, touched: nameTouched } = resolveNewValue(row.values.assetName ?? "", current.assetName, opts.strictMode);
+  if (nameTouched) changes.push({ field: "assetName", header: nameField.header, oldVal: current.assetName, newVal: newName });
+
+  const descField = fields.find((f) => f.key === "description")!;
+  const { newVal: newDesc, touched: descTouched } = resolveNewValue(row.values.description ?? "", current.description, opts.strictMode);
+  if (descTouched) changes.push({ field: "description", header: descField.header, oldVal: current.description, newVal: newDesc });
+
+  let newAttributes: Record<string, unknown> | null = null;
+  const attrRaw = (row.values.attributesJson ?? "").trim();
+  if (attrRaw && attrRaw !== current.attributesJson) {
+    newAttributes = parseJsonAttributes(attrRaw, errors, "Attributes (JSON)");
+    if (errors.length === 0) {
+      const attrErrors = await validateAttributes(current.typeId, newAttributes, idNum);
+      for (const e of attrErrors) errors.push(`${e.attrCode}: ${e.message}`);
+    }
+    if (errors.length === 0) changes.push({ field: "attributesJson", header: "Attributes (JSON)", oldVal: current.attributesJson, newVal: JSON.stringify(newAttributes) });
+  }
+
+  if (errors.length > 0) return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "ERROR", changes, errors, warnings };
+  if (changes.length === 0) return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "SKIPPED_NOOP", changes, errors, warnings };
+  if (await wasModifiedSince(assetType, idNum, opts.exportSnapshotAt)) {
+    return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "SKIPPED_CONFLICT", changes, errors, warnings };
+  }
+  return { sheet: "CustomAssets", rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "UPDATE", changes, errors, warnings };
+}
+
+// ── Custom Asset Links (deferred spec FR-4.2, AC-6) — endpoints resolved by name
+// within their declared type, then validated against the relationship type's
+// allowed endpoint lists exactly like the interactive EndpointPicker flow does.
+async function validateCustomAssetLinkRow(
+  fields: FieldDef[], row: ParsedRow,
+  currentMap: Map<number, { relTypeId: number; attributesJson: string; validFromDate: string | null; validToDate: string | null }>,
+  opts: ValidateOptions,
+): Promise<RowPlan> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const idNum = toNum(row.values._ID);
+  const canEdit = await canEditMetadata(opts.session);
+
+  if (idNum == null) {
+    const relCode = row.values.relCode?.trim().toUpperCase();
+    const fromType = row.values.fromType?.trim().toUpperCase();
+    const fromName = row.values.fromName?.trim();
+    const toType = row.values.toType?.trim().toUpperCase();
+    const toName = row.values.toName?.trim();
+    if (!relCode) errors.push("Relationship is required to create a new link");
+    if (!fromType || !fromName) errors.push("From Type and From Name are required");
+    if (!toType || !toName) errors.push("To Type and To Name are required");
+    if (!canEdit) errors.push("You don't have permission to create links");
+
+    const relType = relCode ? await getRelationshipTypeByCode(relCode) : null;
+    if (relCode && !relType) errors.push(`Relationship type "${relCode}" not found`);
+
+    let fromId: number | null = null;
+    let toId: number | null = null;
+    if (relType && fromType && fromName) {
+      const validation = validateLinkEndpoints(relType, fromType, toType ?? "");
+      if (!validation.ok) errors.push(validation.reason);
+      else {
+        const candidates = await listInstancesOfType(fromType);
+        const match = candidates.find((c) => c.name.toLowerCase() === fromName.toLowerCase());
+        if (!match) errors.push(`From Name "${fromName}" not found among ${fromType} instances`);
+        else fromId = match.id;
+      }
+    }
+    if (relType && toType && toName) {
+      const candidates = await listInstancesOfType(toType);
+      const match = candidates.find((c) => c.name.toLowerCase() === toName.toLowerCase());
+      if (!match) errors.push(`To Name "${toName}" not found among ${toType} instances`);
+      else toId = match.id;
+    }
+
+    const attributes = parseJsonAttributes(row.values.attributesJson ?? "", errors, "Attributes (JSON)");
+    const validFromDate = row.values.validFromDate?.trim() || null;
+    const validToDate = row.values.validToDate?.trim() || null;
+
+    if (errors.length > 0) return { sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: null, isCreate: true, outcome: "ERROR", changes: [], errors, warnings };
+
+    return {
+      sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: null, isCreate: true, outcome: "CREATE",
+      changes: [{ field: "link", header: "Link", oldVal: null, newVal: `${fromName} → ${toName}` }],
+      errors, warnings,
+      createPayload: {
+        relTypeId: relType!.relTypeId, fromAssetTypeCode: fromType, fromAssetId: fromId,
+        toAssetTypeCode: toType, toAssetId: toId, attributes, validFromDate, validToDate,
+      },
+    };
+  }
+
+  const current = currentMap.get(idNum);
+  if (!current) {
+    return { sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: idNum, isCreate: false, outcome: "ERROR", changes: [], errors: [`_ID ${idNum}: no matching link found`], warnings };
+  }
+  if (!canEdit) {
+    return { sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: idNum, isCreate: false, outcome: "ERROR", changes: [], errors: ["You don't have edit permission on links"], warnings };
+  }
+
+  const changes: FieldChange[] = [];
+  const attrRaw = (row.values.attributesJson ?? "").trim();
+  if (attrRaw && attrRaw !== current.attributesJson) {
+    const newAttributes = parseJsonAttributes(attrRaw, errors, "Attributes (JSON)");
+    if (errors.length === 0) changes.push({ field: "attributesJson", header: "Attributes (JSON)", oldVal: current.attributesJson, newVal: JSON.stringify(newAttributes) });
+  }
+  const { newVal: newFrom, touched: fromTouched } = resolveNewValue(row.values.validFromDate ?? "", current.validFromDate, opts.strictMode);
+  if (fromTouched) changes.push({ field: "validFromDate", header: "Valid From", oldVal: current.validFromDate, newVal: newFrom });
+  const { newVal: newTo, touched: toTouched } = resolveNewValue(row.values.validToDate ?? "", current.validToDate, opts.strictMode);
+  if (toTouched) changes.push({ field: "validToDate", header: "Valid To", oldVal: current.validToDate, newVal: newTo });
+
+  if (errors.length > 0) return { sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: idNum, isCreate: false, outcome: "ERROR", changes, errors, warnings };
+  if (changes.length === 0) return { sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: idNum, isCreate: false, outcome: "SKIPPED_NOOP", changes, errors, warnings };
+  return { sheet: "CustomAssetLinks", rowNumber: row.rowNumber, assetType: "CUSTOM_ASSET_LINKS", assetId: idNum, isCreate: false, outcome: "UPDATE", changes, errors, warnings };
 }

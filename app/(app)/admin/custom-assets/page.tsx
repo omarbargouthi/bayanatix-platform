@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   AttributeSchemaEditor, BLANK_FIELD, toApiFields, type EditableField,
 } from "@/components/custom-assets/AttributeSchemaEditor";
@@ -28,8 +29,42 @@ const BLANK_REL_FORM = {
   fromEndpoints: [] as string[], toEndpoints: [] as string[],
 };
 
+type TemplateStatus = { code: string; name: string; description: string; installed: boolean };
+
 export default function CustomAssetsAdminPage() {
-  const [tab, setTab] = useState<"types" | "relTypes">("types");
+  const [tab, setTab] = useState<"types" | "relTypes" | "templates">("types");
+
+  const [templates, setTemplates] = useState<TemplateStatus[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [installingCode, setInstallingCode] = useState<string | null>(null);
+  const [templateMessage, setTemplateMessage] = useState<string | null>(null);
+
+  const loadTemplates = useCallback(async () => {
+    setTemplatesLoading(true);
+    try {
+      const r = await fetch("/api/admin/custom-assets/templates");
+      if (r.ok) setTemplates(await r.json());
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
+  async function installTemplate(code: string) {
+    setInstallingCode(code);
+    setTemplateMessage(null);
+    try {
+      const r = await fetch(`/api/admin/custom-assets/templates/${code.toLowerCase()}/install`, { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) { setTemplateMessage(data.error ?? "Failed to install template"); return; }
+      const parts = [];
+      if (data.createdTypes?.length) parts.push(`${data.createdTypes.length} type(s)`);
+      if (data.createdRelationshipTypes?.length) parts.push(`${data.createdRelationshipTypes.length} relationship type(s)`);
+      setTemplateMessage(parts.length > 0 ? `Installed: ${parts.join(", ")}.` : "Already installed — nothing new to create.");
+      await loadTemplates();
+    } finally {
+      setInstallingCode(null);
+    }
+  }
 
   const [types, setTypes] = useState<CustomAssetType[]>([]);
   const [relTypes, setRelTypes] = useState<CustomRelationshipType[]>([]);
@@ -62,6 +97,7 @@ export default function CustomAssetsAdminPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (tab === "templates" && templates.length === 0) loadTemplates(); }, [tab, templates.length, loadTemplates]);
 
   const allEndpointOptions = [...CORE_ASSET_TYPES, ...types.map((t) => `CUSTOM:${t.typeCode}`)];
 
@@ -215,6 +251,7 @@ export default function CustomAssetsAdminPage() {
       <div className="flex gap-2 border-b border-line">
         <button onClick={() => setTab("types")} className={`px-3 py-2 text-sm font-semibold border-b-2 ${tab === "types" ? "border-brand-purple text-brand-purple" : "border-transparent text-muted"}`}>Types</button>
         <button onClick={() => setTab("relTypes")} className={`px-3 py-2 text-sm font-semibold border-b-2 ${tab === "relTypes" ? "border-brand-purple text-brand-purple" : "border-transparent text-muted"}`}>Relationship Types</button>
+        <button onClick={() => setTab("templates")} className={`px-3 py-2 text-sm font-semibold border-b-2 ${tab === "templates" ? "border-brand-purple text-brand-purple" : "border-transparent text-muted"}`}>Templates</button>
       </div>
 
       {tab === "types" && (
@@ -372,7 +409,10 @@ export default function CustomAssetsAdminPage() {
                         {r.isEnabled ? "Enabled" : "Disabled"}
                       </button>
                     </td>
-                    <td className="py-2 pr-3 text-right">
+                    <td className="py-2 pr-3 text-right whitespace-nowrap">
+                      {r.cardinalityCode === "M:N" && (
+                        <Link href={`/assets/matrix/${r.relCode.toLowerCase()}`} className="text-xs text-brand-purple font-semibold mr-3">View Matrix</Link>
+                      )}
                       <button onClick={() => startEditRel(r)} className="text-xs text-brand-purple font-semibold">Edit</button>
                     </td>
                   </tr>
@@ -381,6 +421,40 @@ export default function CustomAssetsAdminPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {tab === "templates" && (
+        <div className="space-y-4">
+          <p className="text-xs text-muted">
+            One-click starter packs (spec §7) — each installs a custom type and its relationship type(s) via the same
+            admin actions above. Everything they create stays fully editable afterward; installing twice is a safe no-op.
+          </p>
+          {templateMessage && <div className="text-xs bg-brand-purple/5 border border-brand-purple/20 rounded-md px-3 py-2 text-brand-deep">{templateMessage}</div>}
+          {templatesLoading ? (
+            <div className="py-8 text-center text-muted text-sm">Loading…</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {templates.map((tpl) => (
+                <div key={tpl.code} className="card-padded flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold text-sm text-ink">{tpl.name}</div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tpl.installed ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>
+                      {tpl.installed ? "Installed" : "Not installed"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted flex-1">{tpl.description}</p>
+                  <button
+                    onClick={() => installTemplate(tpl.code)}
+                    disabled={installingCode === tpl.code}
+                    className="btn btn-sm text-xs disabled:opacity-50"
+                  >
+                    {installingCode === tpl.code ? "Installing…" : tpl.installed ? "Reinstall (no-op)" : "Install"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

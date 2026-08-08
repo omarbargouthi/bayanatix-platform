@@ -39,6 +39,7 @@ export async function GET(req: Request) {
     sinceDate: searchParams.get("since") ?? undefined,
     dqDimension: searchParams.get("dqDimension") ?? undefined,
     dsaScope: searchParams.get("dsaScope") ?? undefined,
+    customTypeCode: searchParams.get("customTypeCode")?.toUpperCase() ?? undefined,
   };
 
   const result = await runSearch({ q, types, page, limit, facets });

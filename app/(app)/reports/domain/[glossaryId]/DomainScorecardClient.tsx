@@ -35,7 +35,14 @@ export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: Do
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-brand-deep">{scorecard.domain.name}</h1>
+          <h1 className="text-xl font-bold text-brand-deep flex items-center gap-2">
+            {scorecard.domain.name}
+            {scorecard.linkedCustomAssetCount > 0 && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-fuchsia-100 text-fuchsia-700" title="Custom assets (e.g. customers, roles) linked to tables/columns in this domain">
+                🧩 {scorecard.linkedCustomAssetCount} linked custom asset{scorecard.linkedCustomAssetCount !== 1 ? "s" : ""}
+              </span>
+            )}
+          </h1>
           <p className="text-xs text-muted mt-0.5">{t.reports.index.scorecardsSubtitle}</p>
         </div>
         <a

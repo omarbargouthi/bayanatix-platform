@@ -11,6 +11,7 @@ import { sql } from "../db";
 import { logCreate, logUpdate } from "../audit";
 import { updateDataSource, updateEntity, updateAttribute } from "../queries/catalog";
 import { supersedePendingSuggestions } from "../queries/enrichment-descriptions";
+import { createInstance, updateInstance, createLink } from "../queries/custom-assets";
 import type { RowPlan } from "./validate";
 import type { SessionUser } from "../types";
 
@@ -150,6 +151,57 @@ async function applyTermUpdate(plan: RowPlan, userId: string): Promise<void> {
   await logUpdate("BUSINESS_TERMS", plan.assetId!, userId, plan.changes.map((c) => ({ field: c.field, oldVal: c.oldVal, newVal: c.newVal })));
 }
 
+// ── Custom Assets (deferred spec FR-4.2) ────────────────────────────────────────
+
+async function applyCustomAssetCreate(plan: RowPlan, userId: string): Promise<number> {
+  const p = plan.createPayload!;
+  const newId = await createInstance({
+    typeId: p.typeId as number, assetNameText: p.assetNameText as string, nameArText: null,
+    descriptionText: (p.descriptionText as string | null) ?? null, attributes: p.attributes as Record<string, unknown>,
+    createdByUserId: userId,
+  });
+  await logCreate(plan.assetType, newId, userId, [{ field: "asset_name_text", newVal: p.assetNameText as string }]);
+  return newId;
+}
+
+async function applyCustomAssetUpdate(plan: RowPlan, userId: string): Promise<void> {
+  const assetNameText = changeVal(plan, "assetName");
+  const descriptionText = changeVal(plan, "description");
+  const attributesJson = changeVal(plan, "attributesJson");
+  await updateInstance(plan.assetId!, {
+    assetNameText: assetNameText ?? undefined,
+    descriptionText: descriptionText !== undefined ? descriptionText : undefined,
+    attributes: attributesJson !== undefined ? (JSON.parse(attributesJson ?? "{}") as Record<string, unknown>) : undefined,
+  });
+  await logUpdate(plan.assetType, plan.assetId!, userId, plan.changes.map((c) => ({ field: c.field, oldVal: c.oldVal, newVal: c.newVal })));
+}
+
+async function applyCustomAssetLinkCreate(plan: RowPlan, userId: string): Promise<number> {
+  const p = plan.createPayload!;
+  const linkId = await createLink({
+    relTypeId: p.relTypeId as number, fromAssetTypeCode: p.fromAssetTypeCode as string, fromAssetId: p.fromAssetId as number,
+    toAssetTypeCode: p.toAssetTypeCode as string, toAssetId: p.toAssetId as number,
+    attributes: p.attributes as Record<string, unknown>, validFromDate: p.validFromDate as string | null, validToDate: p.validToDate as string | null,
+    createdByUserId: userId,
+  });
+  if (linkId) await logCreate("CUSTOM_ASSET_LINK", linkId, userId, [{ field: "rel_type_id", newVal: String(p.relTypeId) }]);
+  return linkId;
+}
+
+async function applyCustomAssetLinkUpdate(plan: RowPlan, userId: string): Promise<void> {
+  const attributesJson = changeVal(plan, "attributesJson");
+  const validFromDate = changeVal(plan, "validFromDate");
+  const validToDate = changeVal(plan, "validToDate");
+  await sql`
+    UPDATE bayanat.custom_asset_links SET
+      attributes_json = ${attributesJson !== undefined ? sql`${(attributesJson ? JSON.parse(attributesJson) : {}) as any}::jsonb` : sql`attributes_json`},
+      valid_from_date = ${validFromDate !== undefined ? (validFromDate || null) : sql`valid_from_date`},
+      valid_to_date = ${validToDate !== undefined ? (validToDate || null) : sql`valid_to_date`}
+    WHERE link_id = ${plan.assetId}
+  `;
+  await logUpdate("CUSTOM_ASSET_LINK", plan.assetId!, userId, plan.changes.map((c) => ({ field: c.field, oldVal: c.oldVal, newVal: c.newVal })));
+}
+
 export async function commitPlans(jobId: number, plans: RowPlan[], opts: CommitOptions): Promise<CommitTotals> {
   const totals: CommitTotals = { applied: 0, created: 0, skippedNoop: 0, skippedConflict: 0, errors: 0 };
 
@@ -174,7 +226,10 @@ export async function commitPlans(jobId: number, plans: RowPlan[], opts: CommitO
           outcomeCode = "APPLIED"; detail = { changes: plan.changes, conflictOverridden: true }; totals.applied++;
         }
       } else if (plan.outcome === "CREATE") {
-        const newId = await applyTermCreate(plan, opts.session.userId);
+        const newId =
+          plan.sheet === "BusinessTerms" ? await applyTermCreate(plan, opts.session.userId) :
+          plan.sheet === "CustomAssets" ? await applyCustomAssetCreate(plan, opts.session.userId) :
+          await applyCustomAssetLinkCreate(plan, opts.session.userId);
         plan.assetId = newId;
         outcomeCode = "CREATED"; detail = { changes: plan.changes, newId }; totals.created++;
       } else {
@@ -203,4 +258,6 @@ async function applyRow(plan: RowPlan, userId: string): Promise<void> {
   if (plan.sheet === "Tables") return applyTableRow(plan, userId);
   if (plan.sheet === "Columns") return applyColumnRow(plan, userId);
   if (plan.sheet === "BusinessTerms") return applyTermUpdate(plan, userId);
+  if (plan.sheet === "CustomAssets") return applyCustomAssetUpdate(plan, userId);
+  if (plan.sheet === "CustomAssetLinks") return applyCustomAssetLinkUpdate(plan, userId);
 }

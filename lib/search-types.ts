@@ -1,10 +1,10 @@
 export type SearchHitType =
   | "TABLE" | "VIEW" | "COLUMN" | "SCHEMA" | "SOURCE" | "TERM"
-  | "TAG" | "DQ_RULE" | "SHARING_AGREEMENT" | "OPEN_DATA" | "FOI_REQUEST" | "REGISTER_ENTRY";
+  | "TAG" | "DQ_RULE" | "SHARING_AGREEMENT" | "OPEN_DATA" | "FOI_REQUEST" | "REGISTER_ENTRY" | "CUSTOM_ASSET";
 
 export const ALL_TYPES: SearchHitType[] = [
   "TABLE", "VIEW", "COLUMN", "SCHEMA", "SOURCE", "TERM",
-  "TAG", "DQ_RULE", "SHARING_AGREEMENT", "OPEN_DATA", "FOI_REQUEST", "REGISTER_ENTRY",
+  "TAG", "DQ_RULE", "SHARING_AGREEMENT", "OPEN_DATA", "FOI_REQUEST", "REGISTER_ENTRY", "CUSTOM_ASSET",
 ];
 
 // Types with a real query layer + detail page vs. legacy/unused tables
@@ -42,6 +42,8 @@ export type FullSearchHit = {
     dueDate?: string | null;           // FOI_REQUEST
     officerName?: string | null;       // FOI_REQUEST
     registerName?: string;             // REGISTER_ENTRY
+    customTypeCode?: string;           // CUSTOM_ASSET
+    customTypeName?: string;           // CUSTOM_ASSET
   };
 };
 
@@ -56,6 +58,7 @@ export type CommonFacets = {
   // Type-specific facets (only meaningful when a single type is selected)
   dqDimension?: string;
   dsaScope?: string;
+  customTypeCode?: string;
 };
 
 export type SearchResponse = {

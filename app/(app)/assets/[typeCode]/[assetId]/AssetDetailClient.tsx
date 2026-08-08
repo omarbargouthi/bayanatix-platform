@@ -7,6 +7,7 @@ import { EndpointPicker, type EndpointHit } from "@/components/custom-assets/End
 import { TagPicker } from "@/components/catalog/TagPicker";
 import { GovernancePanel, type Stakeholder, type GovernanceRoleLabels } from "@/components/catalog/GovernancePanel";
 import { AssetRequestsDrawer } from "@/components/catalog/AssetRequestsDrawer";
+import { RelationshipGraphTab } from "@/components/custom-assets/RelationshipGraphTab";
 
 type ResolvedLink = {
   linkId: number;
@@ -274,6 +275,11 @@ export function AssetDetailClient({
           </div>
         </div>
       )}
+
+      <div className="card p-5">
+        <h3 className="font-bold text-sm mb-3">Relationship Graph</h3>
+        <RelationshipGraphTab assetType={assetTypeCode} assetId={assetId} />
+      </div>
 
       <div className="card p-5">
         <h3 className="font-bold text-sm mb-3">Tags</h3>

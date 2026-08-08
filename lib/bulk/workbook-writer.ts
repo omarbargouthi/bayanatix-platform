@@ -7,7 +7,7 @@ import { getFieldsForSheet, ROW_CAP_PER_FILE, TEMPLATE_SCHEMA_VERSION, type Shee
 import { loadEnumValues, loadExistingTagNames, loadExistingTermNames } from "./enum-sources";
 import type { SheetRows } from "./scope-resolver";
 
-const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms"];
+const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
 
 const HEADER_FILL: Record<FieldDef["kind"], string> = {
   SYSTEM: "FFD9D9D9",     // grey — locked

@@ -12,6 +12,7 @@ export default async function SearchPage({
   searchParams: {
     q?: string; types?: string; tags?: string; owner?: string; classification?: string;
     status?: string; domain?: string; since?: string; dqDimension?: string; dsaScope?: string;
+    customTypeCode?: string;
   };
 }) {
   const user = await getSession();

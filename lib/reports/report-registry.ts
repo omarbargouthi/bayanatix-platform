@@ -1,7 +1,7 @@
 import type { ReportFilters, Page, KpiCardData, TrendPoint } from "../queries/reports";
 import {
   getMcmReportData, getDqReportData, getDcReportData, getDsiReportData, getOdReportData,
-  getFoiReportData, getPdpReportData, getDgSummaryReportData, getRetReportData,
+  getFoiReportData, getPdpReportData, getDgSummaryReportData, getRetReportData, getPiAccessReportData,
 } from "../queries/reports";
 
 type Row = Record<string, unknown>;
@@ -119,6 +119,18 @@ export const REPORT_REGISTRY: Record<string, ReportDescriptor> = {
       { key: "categoryName", label: "Category", get: (r) => String(r.categoryName ?? "—") },
       { key: "effectiveExpiryDate", label: "Expired On", get: (r) => String(r.effectiveExpiryDate ?? "—") },
       { key: "postRetentionAction", label: "Action", get: (r) => String(r.postRetentionAction ?? "Unscheduled") },
+    ],
+  },
+  PI_ACCESS: {
+    code: "PI_ACCESS", label: "PI Access by Role",
+    fetch: getPiAccessReportData as ReportDescriptor["fetch"],
+    drillDownColumns: [
+      { key: "roleName", label: "Role", get: (r) => String(r.roleName) },
+      { key: "activityName", label: "Activity", get: (r) => String(r.activityName ?? "—") },
+      { key: "columnName", label: "Column", get: (r) => String(r.columnName) },
+      { key: "entityName", label: "Table", get: (r) => String(r.entityName) },
+      { key: "sourceName", label: "Source", get: (r) => String(r.sourceName) },
+      { key: "piCategory", label: "PI Category", get: (r) => String(r.piCategory ?? "—") },
     ],
   },
 };

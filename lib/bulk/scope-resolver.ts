@@ -10,7 +10,9 @@ export type DownloadScope =
   | { type: "SELECTED"; entityIds?: number[]; attributeIds?: number[] }
   | { type: "SEARCH_RESULTS"; refs: { assetType: string; assetId: number }[] }
   | { type: "BUSINESS_TERMS_ALL" }
-  | { type: "BUSINESS_TERMS_DOMAIN"; domainId: number };
+  | { type: "BUSINESS_TERMS_DOMAIN"; domainId: number }
+  | { type: "CUSTOM_ASSETS_BY_TYPE"; typeId: number }
+  | { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE"; relTypeId: number };
 
 export type SheetRows = Partial<Record<SheetName, Record<string, unknown>[]>>;
 
@@ -96,6 +98,50 @@ async function fetchBusinessTermRows(domainId: number | null): Promise<Record<st
   `;
 }
 
+async function fetchCustomAssetRows(typeId: number): Promise<Record<string, unknown>[]> {
+  return sql<Record<string, unknown>[]>`
+    SELECT
+      ca.custom_asset_id AS "_ID", 'CUSTOM_ASSETS' AS "_TYPE",
+      t.type_code AS "typeCode", ca.asset_name_text AS "assetName", ca.description_text AS description,
+      COALESCE(ca.attributes_json, '{}'::jsonb)::text AS "attributesJson"
+    FROM bayanat.custom_assets ca
+    JOIN bayanat.custom_asset_types t ON t.type_id = ca.type_id
+    WHERE ca.type_id = ${typeId}
+    ORDER BY ca.asset_name_text
+  `;
+}
+
+async function fetchCustomAssetLinkRows(relTypeId: number): Promise<Record<string, unknown>[]> {
+  const rows = await sql<{
+    _ID: number; _TYPE: string; fromType: string; fromId: number; toType: string; toId: number;
+    attributesJson: string; validFromDate: string | null; validToDate: string | null;
+  }[]>`
+    SELECT
+      l.link_id AS "_ID", 'CUSTOM_ASSET_LINKS' AS "_TYPE",
+      l.from_asset_type_code AS "fromType", l.from_asset_id AS "fromId",
+      l.to_asset_type_code AS "toType", l.to_asset_id AS "toId",
+      COALESCE(l.attributes_json, '{}'::jsonb)::text AS "attributesJson",
+      l.valid_from_date::text AS "validFromDate", l.valid_to_date::text AS "validToDate"
+    FROM bayanat.custom_asset_links l
+    WHERE l.rel_type_id = ${relTypeId}
+    ORDER BY l.link_id
+  `;
+  if (rows.length === 0) return [];
+
+  const { resolveAssetNames, getRelationshipTypes } = await import("../queries/custom-assets");
+  const relTypes = await getRelationshipTypes(true);
+  const relCode = relTypes.find((r) => r.relTypeId === relTypeId)?.relCode ?? "";
+  const refs = rows.flatMap((r) => [{ typeCode: r.fromType, id: r.fromId }, { typeCode: r.toType, id: r.toId }]);
+  const names = await resolveAssetNames(refs);
+
+  return rows.map((r) => ({
+    _ID: r._ID, _TYPE: r._TYPE, relCode,
+    fromType: r.fromType, fromName: names.get(`${r.fromType}:${r.fromId}`)?.name ?? `#${r.fromId}`,
+    toType: r.toType, toName: names.get(`${r.toType}:${r.toId}`)?.name ?? `#${r.toId}`,
+    attributesJson: r.attributesJson, validFromDate: r.validFromDate ?? "", validToDate: r.validToDate ?? "",
+  }));
+}
+
 async function resolveEntityIdsForSource(dataSourceId: number): Promise<number[]> {
   const rows = await sql<{ id: number }[]>`
     SELECT e.entity_id AS id FROM bayanat.data_entities e
@@ -143,6 +189,10 @@ export async function resolveDownloadScope(scope: DownloadScope): Promise<SheetR
     result.BusinessTerms = await fetchBusinessTermRows(null);
   } else if (scope.type === "BUSINESS_TERMS_DOMAIN") {
     result.BusinessTerms = await fetchBusinessTermRows(scope.domainId);
+  } else if (scope.type === "CUSTOM_ASSETS_BY_TYPE") {
+    result.CustomAssets = await fetchCustomAssetRows(scope.typeId);
+  } else if (scope.type === "CUSTOM_ASSET_LINKS_BY_REL_TYPE") {
+    result.CustomAssetLinks = await fetchCustomAssetLinkRows(scope.relTypeId);
   }
 
   return result;

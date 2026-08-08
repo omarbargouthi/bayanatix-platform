@@ -837,6 +837,80 @@ export async function getRetReportData(filters: ReportFilters, page: Page = { li
   return { kpis, trend, primaryKpiCode, drillDown, total };
 }
 
+// ── PI Access by Role (deferred Custom Asset Framework spec §7/FR-4.3) ────────
+// "PI_ACCESS" isn't one of the original R1-R9 report codes — a standalone report,
+// reachable from the Reports index like the others, not wired into the Domain
+// Scorecard's capability-tile grid (see the getLinkedCustomAssetCount comment
+// above for why that coupling is deliberately avoided).
+
+export type PiAccessRow = {
+  roleId: number; roleName: string;
+  activityId: number | null; activityName: string | null;
+  columnId: number; columnName: string; entityId: number; entityName: string; schemaId: number;
+  sourceId: number; sourceName: string; piCategory: string | null;
+};
+
+async function getPiAccessRows(filters: ReportFilters, page: Page): Promise<{ rows: PiAccessRow[]; total: number }> {
+  const rows = await sql<(PiAccessRow & { totalCount: number })[]>`
+    WITH pi_access AS (
+      SELECT l.from_asset_id AS role_id, NULL::int AS activity_id, l.to_asset_id AS attr_id
+      FROM bayanat.custom_asset_links l
+      JOIN bayanat.custom_relationship_types rt ON rt.rel_type_id = l.rel_type_id
+      WHERE rt.rel_code = 'HAS_ACCESS_TO' AND l.to_asset_type_code = 'DATA_ATTRIBUTES'
+      UNION
+      SELECT pb.to_asset_id AS role_id, ud.from_asset_id AS activity_id, ud.to_asset_id AS attr_id
+      FROM bayanat.custom_asset_links ud
+      JOIN bayanat.custom_relationship_types udt ON udt.rel_type_id = ud.rel_type_id AND udt.rel_code = 'USES_DATA'
+      JOIN bayanat.custom_asset_links pb ON pb.from_asset_type_code = ud.from_asset_type_code AND pb.from_asset_id = ud.from_asset_id
+      JOIN bayanat.custom_relationship_types pbt ON pbt.rel_type_id = pb.rel_type_id AND pbt.rel_code = 'PERFORMED_BY'
+      WHERE ud.to_asset_type_code = 'DATA_ATTRIBUTES'
+    )
+    SELECT
+      pa.role_id AS "roleId", role.asset_name_text AS "roleName",
+      pa.activity_id AS "activityId", activity.asset_name_text AS "activityName",
+      a.attribute_id AS "columnId", a.physical_name_text AS "columnName",
+      e.entity_id AS "entityId", e.entity_name_text AS "entityName", e.schema_id AS "schemaId",
+      ds.data_source_id AS "sourceId", ds.source_name_text AS "sourceName",
+      pct.category_name_text AS "piCategory",
+      count(*) OVER()::int AS "totalCount"
+    FROM pi_access pa
+    JOIN bayanat.custom_assets role ON role.custom_asset_id = pa.role_id
+    LEFT JOIN bayanat.custom_assets activity ON activity.custom_asset_id = pa.activity_id
+    JOIN bayanat.data_attributes a ON a.attribute_id = pa.attr_id
+    JOIN bayanat.asset_business_terms abt ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id AND bg.is_pii_indicator = true
+    LEFT JOIN bayanat.pi_category_types pct ON pct.category_code = bg.pi_category_code
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
+    LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = e.entity_id
+    WHERE (${filters.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${filters.domainGlossaryId ?? null})
+      AND (${filters.sourceId ?? null}::int IS NULL OR ds.data_source_id = ${filters.sourceId ?? null})
+    ORDER BY role.asset_name_text, a.physical_name_text
+    LIMIT ${page.limit} OFFSET ${page.offset}
+  `;
+  const total = rows[0]?.totalCount ?? 0;
+  return { total, rows: rows.map((r) => ({ ...r, totalCount: undefined })) };
+}
+
+export type PiAccessReportData = {
+  kpis: KpiCardData[];
+  trend: TrendPoint[];
+  primaryKpiCode: string | null;
+  drillDown: PiAccessRow[];
+  total: number;
+};
+
+export async function getPiAccessReportData(filters: ReportFilters, page: Page = { limit: 25, offset: 0 }): Promise<PiAccessReportData> {
+  const kpis = await getReportKpiCards("PI_ACCESS", filters);
+  const primaryKpiCode = kpis[0]?.kpiCode ?? null;
+  const [{ rows: drillDown, total }, trend] = await Promise.all([
+    getPiAccessRows(filters, page),
+    primaryKpiCode ? getKpiSnapshotTrend(primaryKpiCode) : Promise.resolve([]),
+  ]);
+  return { kpis, trend, primaryKpiCode, drillDown, total };
+}
+
 // ── Domain Scorecard (§4) ────────────────────────────────────────────────────
 
 const SCORECARD_REPORT_LABELS: Record<string, string> = {
@@ -872,7 +946,38 @@ export type DomainScorecard = {
   topIssues: { label: string; detail: string; href: string }[];
   stewards: DomainStewardRow[];
   ownerName: string | null;
+  linkedCustomAssetCount: number;
 };
+
+// Deferred spec FR-4.3: "link counts appear on Domain Scorecards where linked to
+// business domains." custom_asset_links has no domain column of its own — a link
+// only has a domain if one of its endpoints resolves (directly, or via
+// DATA_ATTRIBUTES -> entity_id) to a DATA_ENTITIES row that v_entity_business_domain
+// already scopes. Links to DATA_SOURCES/DATA_SCHEMAS or between two custom assets
+// have no such path and are correctly excluded, not miscounted as "unassigned."
+async function getLinkedCustomAssetCount(glossaryId: number): Promise<number> {
+  const [row] = await sql<{ count: number }[]>`
+    WITH resolved AS (
+      SELECT
+        CASE WHEN l.from_asset_type_code LIKE 'CUSTOM:%' THEN l.from_asset_type_code || ':' || l.from_asset_id
+             ELSE l.to_asset_type_code || ':' || l.to_asset_id END AS custom_ref,
+        CASE
+          WHEN l.from_asset_type_code = 'DATA_ENTITIES' THEN l.from_asset_id
+          WHEN l.to_asset_type_code = 'DATA_ENTITIES' THEN l.to_asset_id
+          WHEN l.from_asset_type_code = 'DATA_ATTRIBUTES' THEN (SELECT a.entity_id FROM bayanat.data_attributes a WHERE a.attribute_id = l.from_asset_id)
+          WHEN l.to_asset_type_code = 'DATA_ATTRIBUTES' THEN (SELECT a.entity_id FROM bayanat.data_attributes a WHERE a.attribute_id = l.to_asset_id)
+          ELSE NULL
+        END AS resolved_entity_id
+      FROM bayanat.custom_asset_links l
+      WHERE l.from_asset_type_code LIKE 'CUSTOM:%' OR l.to_asset_type_code LIKE 'CUSTOM:%'
+    )
+    SELECT count(DISTINCT r.custom_ref)::int AS count
+    FROM resolved r
+    JOIN bayanat.v_entity_business_domain d ON d.entity_id = r.resolved_entity_id
+    WHERE d.domain_glossary_id = ${glossaryId}
+  `;
+  return row?.count ?? 0;
+}
 
 // Each report's sort_order=1 KPI is treated as that capability's scorecard
 // representative — no separate "is this the headline KPI" column needed.
@@ -900,7 +1005,7 @@ export async function getDomainScorecard(glossaryId: number): Promise<DomainScor
     }),
   );
 
-  const [dq, dg, stewards, ownerRows] = await Promise.all([
+  const [dq, dg, stewards, ownerRows, linkedCustomAssetCount] = await Promise.all([
     getDqReportData({ domainGlossaryId: glossaryId }, { limit: 5, offset: 0 }),
     getDgSummaryReportData({ domainGlossaryId: glossaryId }, { limit: 5, offset: 0 }),
     sql<DomainStewardRow[]>`
@@ -914,6 +1019,7 @@ export async function getDomainScorecard(glossaryId: number): Promise<DomainScor
       LEFT JOIN bayanat.users u ON u.user_id = bg.owner_user_id
       WHERE bg.glossary_id = ${glossaryId}
     `,
+    getLinkedCustomAssetCount(glossaryId),
   ]);
 
   const topIssues = [
@@ -933,5 +1039,6 @@ export async function getDomainScorecard(glossaryId: number): Promise<DomainScor
     topIssues,
     stewards,
     ownerName: ownerRows[0]?.ownerName ?? null,
+    linkedCustomAssetCount,
   };
 }

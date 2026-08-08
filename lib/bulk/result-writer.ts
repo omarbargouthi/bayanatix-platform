@@ -6,7 +6,7 @@ import ExcelJS from "exceljs";
 import { getFieldsForSheet, type SheetName } from "./sheets";
 import type { RowPlan } from "./validate";
 
-const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms"];
+const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
 
 export async function buildResultWorkbook(plans: RowPlan[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();

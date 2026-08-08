@@ -31,6 +31,7 @@ const TYPE_GROUP_LABELS: Record<SearchHitType, string> = {
   TABLE: "Tables", VIEW: "Views", COLUMN: "Columns", SCHEMA: "Schemas", SOURCE: "Sources",
   TERM: "Business Terms", TAG: "Tags", DQ_RULE: "DQ Rules", SHARING_AGREEMENT: "Sharing Agreements",
   OPEN_DATA: "Open Data", FOI_REQUEST: "FOI Requests", REGISTER_ENTRY: "Register Entries",
+  CUSTOM_ASSET: "Custom Assets",
 };
 
 export type Crumb = { label: string; href?: string };

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 
 type SourceOption = { id: number; name: string; dbType: string | null };
 type DomainOption = { glossaryId: number; domainName: string };
+type CustomTypeOption = { typeId: number; typeCode: string; typeNameText: string };
+type CustomRelTypeOption = { relTypeId: number; relCode: string; relNameText: string };
 
 type RowPlan = {
   sheet: string; rowNumber: number; assetType: string; assetId: number | null;
@@ -18,17 +20,23 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   // ── Download panel ──────────────────────────────────────────────────────────
   const [sources, setSources] = useState<SourceOption[]>([]);
   const [domains, setDomains] = useState<DomainOption[]>([]);
-  const [downloadKind, setDownloadKind] = useState<"SOURCE" | "TERMS_ALL" | "TERMS_DOMAIN">("SOURCE");
+  const [customTypes, setCustomTypes] = useState<CustomTypeOption[]>([]);
+  const [customRelTypes, setCustomRelTypes] = useState<CustomRelTypeOption[]>([]);
+  const [downloadKind, setDownloadKind] = useState<"SOURCE" | "TERMS_ALL" | "TERMS_DOMAIN" | "CUSTOM_TYPE" | "CUSTOM_REL_TYPE">("SOURCE");
   const [sourceId, setSourceId] = useState<number | "">("");
   const [includeTables, setIncludeTables] = useState(true);
   const [includeColumns, setIncludeColumns] = useState(true);
   const [domainId, setDomainId] = useState<number | "">("");
+  const [customTypeId, setCustomTypeId] = useState<number | "">("");
+  const [customRelTypeId, setCustomRelTypeId] = useState<number | "">("");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/catalog/browse?type=sources").then((r) => r.json()).then(setSources);
     fetch("/api/glossary/picker").then((r) => r.json()).then((d) => setDomains(d.map((x: { glossaryId: number; domainName: string }) => ({ glossaryId: x.glossaryId, domainName: x.domainName }))));
+    fetch("/api/admin/custom-asset-types").then((r) => r.ok ? r.json() : []).then(setCustomTypes);
+    fetch("/api/admin/custom-relationship-types").then((r) => r.ok ? r.json() : []).then(setCustomRelTypes);
   }, []);
 
   async function download() {
@@ -37,9 +45,13 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       const scope =
         downloadKind === "SOURCE" ? { type: "DATA_SOURCE", dataSourceId: sourceId, includeTables, includeColumns }
         : downloadKind === "TERMS_ALL" ? { type: "BUSINESS_TERMS_ALL" }
-        : { type: "BUSINESS_TERMS_DOMAIN", domainId };
+        : downloadKind === "TERMS_DOMAIN" ? { type: "BUSINESS_TERMS_DOMAIN", domainId }
+        : downloadKind === "CUSTOM_TYPE" ? { type: "CUSTOM_ASSETS_BY_TYPE", typeId: customTypeId }
+        : { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE", relTypeId: customRelTypeId };
       if (downloadKind === "SOURCE" && !sourceId) { setDownloadError("Choose a data source"); return; }
       if (downloadKind === "TERMS_DOMAIN" && !domainId) { setDownloadError("Choose a domain"); return; }
+      if (downloadKind === "CUSTOM_TYPE" && !customTypeId) { setDownloadError("Choose a custom asset type"); return; }
+      if (downloadKind === "CUSTOM_REL_TYPE" && !customRelTypeId) { setDownloadError("Choose a relationship type"); return; }
 
       const res = await fetch("/api/bulk/downloads", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope }),
@@ -134,6 +146,12 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
           <label className="flex items-center gap-1.5 text-sm">
             <input type="radio" checked={downloadKind === "TERMS_DOMAIN"} onChange={() => setDownloadKind("TERMS_DOMAIN")} /> Business Terms — By Domain
           </label>
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="radio" checked={downloadKind === "CUSTOM_TYPE"} onChange={() => setDownloadKind("CUSTOM_TYPE")} /> Custom Assets — By Type
+          </label>
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="radio" checked={downloadKind === "CUSTOM_REL_TYPE"} onChange={() => setDownloadKind("CUSTOM_REL_TYPE")} /> Custom Asset Links — By Relationship
+          </label>
         </div>
 
         {downloadKind === "SOURCE" && (
@@ -155,6 +173,22 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
             <select value={domainId} onChange={(e) => setDomainId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
               <option value="">Select a domain…</option>
               {domains.map((d) => <option key={d.glossaryId} value={d.glossaryId}>{d.domainName}</option>)}
+            </select>
+          </div>
+        )}
+        {downloadKind === "CUSTOM_TYPE" && (
+          <div className="mb-4">
+            <select value={customTypeId} onChange={(e) => setCustomTypeId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
+              <option value="">Select a custom asset type…</option>
+              {customTypes.map((t) => <option key={t.typeId} value={t.typeId}>{t.typeNameText} ({t.typeCode})</option>)}
+            </select>
+          </div>
+        )}
+        {downloadKind === "CUSTOM_REL_TYPE" && (
+          <div className="mb-4">
+            <select value={customRelTypeId} onChange={(e) => setCustomRelTypeId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
+              <option value="">Select a relationship type…</option>
+              {customRelTypes.map((r) => <option key={r.relTypeId} value={r.relTypeId}>{r.relNameText} ({r.relCode})</option>)}
             </select>
           </div>
         )}

@@ -14,7 +14,9 @@ type SavedSearch = { savedSearchId: number; name: string; queryString: string };
 type InitialParams = {
   q?: string; types?: string; tags?: string; owner?: string; classification?: string;
   status?: string; domain?: string; since?: string; dqDimension?: string; dsaScope?: string;
+  customTypeCode?: string;
 };
+type CustomTypeOption = { typeCode: string; typeNameText: string };
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -22,6 +24,7 @@ const TYPE_LABELS: Record<SearchHitType, string> = {
   TABLE: "Table", VIEW: "View", COLUMN: "Column", SCHEMA: "Schema", SOURCE: "Source",
   TERM: "Business Term", TAG: "Tag", DQ_RULE: "DQ Rule", SHARING_AGREEMENT: "Sharing Agreement",
   OPEN_DATA: "Open Data", FOI_REQUEST: "FOI Request", REGISTER_ENTRY: "Register Entry",
+  CUSTOM_ASSET: "Custom Asset",
 };
 
 const TYPE_COLORS: Record<SearchHitType, { bg: string; text: string; dot: string }> = {
@@ -37,11 +40,13 @@ const TYPE_COLORS: Record<SearchHitType, { bg: string; text: string; dot: string
   OPEN_DATA: { bg: "bg-lime-100", text: "text-lime-700", dot: "#84cc16" },
   FOI_REQUEST: { bg: "bg-rose-100", text: "text-rose-700", dot: "#f43f5e" },
   REGISTER_ENTRY: { bg: "bg-slate-100", text: "text-slate-700", dot: "#64748b" },
+  CUSTOM_ASSET: { bg: "bg-fuchsia-100", text: "text-fuchsia-700", dot: "#c026d3" },
 };
 
 const TYPE_ICONS: Record<SearchHitType, string> = {
   TABLE: "🗄️", VIEW: "👁️", COLUMN: "📊", SCHEMA: "🗂️", SOURCE: "🔌", TERM: "📖",
   TAG: "🏷️", DQ_RULE: "✅", SHARING_AGREEMENT: "🤝", OPEN_DATA: "🌐", FOI_REQUEST: "📩", REGISTER_ENTRY: "📋",
+  CUSTOM_ASSET: "🧩",
 };
 
 const CLASSIFICATION_OPTIONS = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET"];
@@ -220,6 +225,8 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
   const [since, setSince] = useState(initialParams.since ?? "");
   const [dqDimension, setDqDimension] = useState(initialParams.dqDimension ?? "");
   const [dsaScope, setDsaScope] = useState(initialParams.dsaScope ?? "");
+  const [customTypeCode, setCustomTypeCode] = useState(initialParams.customTypeCode ?? "");
+  const [customTypeOptions, setCustomTypeOptions] = useState<CustomTypeOption[]>([]);
 
   const [page, setPage] = useState(1);
   const [results, setResults] = useState<FullSearchHit[]>([]);
@@ -236,6 +243,7 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
   useEffect(() => {
     fetch("/api/sharing/dq-dimensions").then((r) => r.ok ? r.json() : []).then(setDqDimensionOptions).catch(() => {});
     fetch("/api/search/saved").then((r) => r.ok ? r.json() : { saved: [] }).then((d) => setSavedSearches(d.saved ?? [])).catch(() => {});
+    fetch("/api/admin/custom-asset-types").then((r) => r.ok ? r.json() : []).then(setCustomTypeOptions).catch(() => {});
   }, []);
 
   // ── Derive tag refinement options from actual results ──────────────────
@@ -266,9 +274,10 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
     if (since) params.set("since", since);
     if (dqDimension) params.set("dqDimension", dqDimension);
     if (dsaScope) params.set("dsaScope", dsaScope);
+    if (customTypeCode) params.set("customTypeCode", customTypeCode);
     if (currentPage > 1) params.set("page", String(currentPage));
     return params;
-  }, [q, activeTypes, selectedTagIds, ownerUser, classification, status, domain, since, dqDimension, dsaScope]);
+  }, [q, activeTypes, selectedTagIds, ownerUser, classification, status, domain, since, dqDimension, dsaScope, customTypeCode]);
 
   const fetchResults = useCallback(async (currentPage: number, append: boolean) => {
     if (q.length < 2) return;
@@ -314,7 +323,7 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
     }
     syncAndFetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTypes, selectedTagIds, ownerUser, classification, status, domain, since, dqDimension, dsaScope]);
+  }, [activeTypes, selectedTagIds, ownerUser, classification, status, domain, since, dqDimension, dsaScope, customTypeCode]);
 
   function toggleType(type: SearchHitType) {
     const next = new Set(activeTypes);
@@ -334,6 +343,7 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
   function clearFilters() {
     setActiveTypes(new Set(ALL_TYPES)); setSelectedTagIds([]); setOwnerUser(null);
     setClassification(""); setStatus(""); setDomain(""); setSince(""); setDqDimension(""); setDsaScope("");
+    setCustomTypeCode("");
   }
 
   async function saveThisSearch() {
@@ -361,7 +371,7 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
   }
 
   const allSelected = activeTypes.size === ALL_TYPES.length;
-  const hasFilters  = !allSelected || selectedTagIds.length > 0 || ownerUser || classification || status || domain || since || dqDimension || dsaScope;
+  const hasFilters  = !allSelected || selectedTagIds.length > 0 || ownerUser || classification || status || domain || since || dqDimension || dsaScope || customTypeCode;
   const canLoadMore = results.length < total;
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -522,6 +532,15 @@ export function SearchPageClient({ initialParams }: { initialParams: InitialPara
                 </select>
               </div>
             )}
+            {singleType === "CUSTOM_ASSET" && customTypeOptions.length > 0 && (
+              <div className="card p-4">
+                <h3 className="text-[11px] uppercase tracking-wider font-bold text-muted mb-2">Custom Type</h3>
+                <select value={customTypeCode} onChange={(e) => setCustomTypeCode(e.target.value)} className="w-full text-[12px] border border-line rounded-md px-2 py-1.5 bg-white">
+                  <option value="">Any type</option>
+                  {customTypeOptions.map((t) => <option key={t.typeCode} value={t.typeCode}>{t.typeNameText}</option>)}
+                </select>
+              </div>
+            )}
             {singleType === "FOI_REQUEST" && (
               <div className="card p-4">
                 <h3 className="text-[11px] uppercase tracking-wider font-bold text-muted mb-2">Request Status</h3>
@@ -620,6 +639,7 @@ const HIT_TYPE_TO_ASSET_TYPE: Record<string, string | null> = {
   TABLE: "DATA_ENTITIES", VIEW: "DATA_ENTITIES", COLUMN: "DATA_ATTRIBUTES",
   SOURCE: "DATA_SOURCES", TERM: "BUSINESS_TERMS", SCHEMA: null, // no Schemas sheet in the bulk template
   TAG: null, DQ_RULE: null, SHARING_AGREEMENT: null, OPEN_DATA: null, FOI_REQUEST: null, REGISTER_ENTRY: null,
+  CUSTOM_ASSET: null, // Bulk's SEARCH_RESULTS scope resolves core-asset refs only; custom assets have their own dedicated bulk sheet (by type/relationship, not by search-result ref)
 };
 
 function ExportResultsButton({ results }: { results: FullSearchHit[] }) {

@@ -10,6 +10,7 @@ import { sql } from "../db";
 import { parseQuery } from "./query-parser";
 import type { FullSearchHit, SearchHitType, CommonFacets, SearchResponse } from "../search-types";
 import { ALL_TYPES } from "../search-types";
+import { getCustomAssetTypes } from "../queries/custom-assets";
 
 export type SearchParams = {
   q: string;
@@ -24,7 +25,7 @@ type TypeResult = { hits: FullSearchHit[]; total: number };
 const PER_TYPE_CAP = 300;
 // Fuzzy (pg_trgm) fallback only covers the types users free-text-search most —
 // scoping decision, not every type needs a fuzzy path for FR-3.3 to be satisfied.
-const FUZZY_ELIGIBLE: SearchHitType[] = ["TABLE", "VIEW", "COLUMN", "TERM", "TAG"];
+const FUZZY_ELIGIBLE: SearchHitType[] = ["TABLE", "VIEW", "COLUMN", "TERM", "TAG", "CUSTOM_ASSET"];
 
 function emptyResult(): TypeResult {
   return { hits: [], total: 0 };
@@ -463,6 +464,85 @@ async function searchRegisterEntries(freeText: string, f: CommonFacets): Promise
   };
 }
 
+// ── CUSTOM_ASSET ──────────────────────────────────────────────────────────────
+// Unlike REGISTER_ENTRY (queryable text only lives inside a JSONB blob), custom
+// assets have real asset_name_text/description_text columns, so this gets honest
+// rank tiers and a "browse all" default order — richer than the REGISTER_ENTRY
+// precedent it's otherwise modeled on. attributes_json is only a same-tier text
+// fallback for attribute-value hits, not the primary match surface.
+async function searchCustomAssets(freeText: string, opNameOnly: string | undefined, f: CommonFacets, fuzzy: boolean): Promise<TypeResult> {
+  const like = freeText ? `%${freeText}%` : null;
+  const prefixLike = freeText ? `${freeText}%` : null;
+  const nameLike = opNameOnly ? `%${opNameOnly}%` : null;
+
+  const rows = await sql<{
+    customAssetId: number; name: string; desc: string | null; typeCode: string; typeName: string;
+    updatedAt: string | null; rankTier: number; total: number;
+  }[]>`
+    SELECT
+      ca.custom_asset_id AS "customAssetId", ca.asset_name_text AS name, ca.description_text AS desc,
+      t.type_code AS "typeCode", t.type_name_text AS "typeName", ca.updated_at::text AS "updatedAt",
+      CASE
+        WHEN ${like}::text IS NULL THEN 3
+        WHEN lower(ca.asset_name_text) = lower(${freeText}) THEN 0
+        WHEN lower(ca.asset_name_text) LIKE lower(${prefixLike}) THEN 1
+        WHEN ca.attributes_json::text ILIKE ${like} THEN 2
+        ELSE 3
+      END AS "rankTier",
+      count(*) OVER()::int AS total
+    FROM bayanat.custom_assets ca
+    JOIN bayanat.custom_asset_types t ON t.type_id = ca.type_id
+    WHERE t.is_enabled_indicator = true
+      ${like ? sql`AND (ca.asset_name_text ILIKE ${like} OR ca.description_text ILIKE ${like} OR ca.attributes_json::text ILIKE ${like}
+        ${fuzzy ? sql`OR similarity(ca.asset_name_text, ${freeText}) > 0.2` : sql``})` : sql``}
+      ${nameLike ? sql`AND ca.asset_name_text ILIKE ${nameLike}` : sql``}
+      ${f.customTypeCode ? sql`AND t.type_code = ${f.customTypeCode}` : sql``}
+      ${f.sinceDate ? sql`AND ca.updated_at >= ${f.sinceDate}::date` : sql``}
+    ORDER BY "rankTier", ca.asset_name_text
+    LIMIT ${PER_TYPE_CAP}
+  `;
+  if (rows.length === 0) return emptyResult();
+
+  const typeCodesPresent = [...new Set(rows.map((r) => `CUSTOM:${r.typeCode}`))];
+  const ids = rows.map((r) => r.customAssetId);
+  const [tagRows, stewardRows] = await Promise.all([
+    sql<{ assetTypeCode: string; assetId: number; tagId: number; tagName: string; colorHex: string | null }[]>`
+      SELECT at2.asset_type_code AS "assetTypeCode", at2.asset_id AS "assetId", tg.tag_id AS "tagId", tg.tag_name AS "tagName", tg.color_hex AS "colorHex"
+      FROM bayanat.asset_tags at2 JOIN bayanat.tags tg ON tg.tag_id = at2.tag_id
+      WHERE at2.asset_type_code = ANY(${typeCodesPresent}) AND at2.asset_id = ANY(${ids})
+    `,
+    sql<{ assetTypeCode: string; assetId: number; userId: string; fullName: string; roleCode: string }[]>`
+      SELECT ast.asset_type_code AS "assetTypeCode", ast.asset_id AS "assetId", ast.user_id AS "userId", u.full_name AS "fullName", ast.role_code AS "roleCode"
+      FROM bayanat.asset_stakeholders ast JOIN bayanat.users u ON u.user_id = ast.user_id
+      WHERE ast.asset_type_code = ANY(${typeCodesPresent}) AND ast.asset_id = ANY(${ids})
+    `,
+  ]);
+  const tagsByAsset = new Map<string, { tagId: number; tagName: string; colorHex: string | null }[]>();
+  for (const t of tagRows) {
+    const key = `${t.assetTypeCode}:${t.assetId}`;
+    tagsByAsset.set(key, [...(tagsByAsset.get(key) ?? []), { tagId: t.tagId, tagName: t.tagName, colorHex: t.colorHex }]);
+  }
+  const stewardsByAsset = new Map<string, { userId: string; fullName: string; roleCode: string }[]>();
+  for (const s of stewardRows) {
+    const key = `${s.assetTypeCode}:${s.assetId}`;
+    stewardsByAsset.set(key, [...(stewardsByAsset.get(key) ?? []), { userId: s.userId, fullName: s.fullName, roleCode: s.roleCode }]);
+  }
+
+  return {
+    total: rows[0].total,
+    hits: rows.map((r) => {
+      const key = `CUSTOM:${r.typeCode}:${r.customAssetId}`;
+      return {
+        type: "CUSTOM_ASSET", id: r.customAssetId, name: r.name, description: r.desc,
+        href: `/assets/${r.typeCode.toLowerCase()}/${r.customAssetId}`, path: [r.typeName],
+        rankTier: r.rankTier, updatedAt: r.updatedAt,
+        tags: tagsByAsset.get(key) ?? [], stewards: stewardsByAsset.get(key) ?? [],
+        meta: { customTypeCode: r.typeCode, customTypeName: r.typeName },
+      };
+    }),
+  };
+}
+
 async function resolveTagOperator(tagName: string): Promise<number[]> {
   const rows = await sql<{ tagId: number }[]>`SELECT tag_id AS "tagId" FROM bayanat.tags WHERE tag_name ILIKE ${tagName}`;
   return rows.map((r) => r.tagId);
@@ -474,10 +554,6 @@ async function runOnce(q: string, types: SearchHitType[], facetsIn: CommonFacets
   const parsed = parseQuery(q);
   const freeText = parsed.freeText;
   const opName = parsed.operators.name;
-  const effectiveTypes = parsed.operators.type && parsed.operators.type.length > 0
-    ? types.filter((t) => parsed.operators.type!.includes(t))
-    : types;
-  const want = (t: SearchHitType) => effectiveTypes.includes(t);
 
   // Field operators (classification:/owner:) override/augment the facet-panel
   // selection for the same field — an explicit query operator wins.
@@ -489,7 +565,25 @@ async function runOnce(q: string, types: SearchHitType[], facetsIn: CommonFacets
   const tagOperatorIds = parsed.operators.tag ? await resolveTagOperator(parsed.operators.tag) : null;
   if (tagOperatorIds) facets.tagIds = [...new Set([...(facets.tagIds ?? []), ...tagOperatorIds])];
 
-  const [tbl, vw, col, sch, src, term, tag, dq, dsa, od, foi, reg] = await Promise.all([
+  // `type:<custom type code>` (e.g. "type:customer") isn't itself a SearchHitType —
+  // custom type codes route through the single CUSTOM_ASSET type scoped by a
+  // customTypeCode facet instead. Resolve any operator value that isn't a real
+  // SearchHitType against enabled custom type codes before filtering effectiveTypes.
+  let requestedTypes = parsed.operators.type ?? null;
+  if (requestedTypes && requestedTypes.some((t) => !(ALL_TYPES as string[]).includes(t))) {
+    const customTypes = await getCustomAssetTypes();
+    const matchedCode = customTypes.find((ct) => requestedTypes!.includes(ct.typeCode))?.typeCode;
+    if (matchedCode) {
+      requestedTypes = [...requestedTypes.filter((t) => (ALL_TYPES as string[]).includes(t)), "CUSTOM_ASSET"];
+      facets.customTypeCode = matchedCode;
+    }
+  }
+  const effectiveTypes = requestedTypes && requestedTypes.length > 0
+    ? types.filter((t) => requestedTypes!.includes(t))
+    : types;
+  const want = (t: SearchHitType) => effectiveTypes.includes(t);
+
+  const [tbl, vw, col, sch, src, term, tag, dq, dsa, od, foi, reg, ca] = await Promise.all([
     want("TABLE") ? searchEntities(false, freeText, opName, facets, fuzzy && FUZZY_ELIGIBLE.includes("TABLE")) : Promise.resolve(emptyResult()),
     want("VIEW") ? searchEntities(true, freeText, opName, facets, fuzzy && FUZZY_ELIGIBLE.includes("TABLE")) : Promise.resolve(emptyResult()),
     want("COLUMN") ? searchColumns(freeText, opName, facets, fuzzy) : Promise.resolve(emptyResult()),
@@ -502,6 +596,7 @@ async function runOnce(q: string, types: SearchHitType[], facetsIn: CommonFacets
     want("OPEN_DATA") ? searchOpenData(freeText, opName, facets) : Promise.resolve(emptyResult()),
     want("FOI_REQUEST") ? searchFoi(freeText, opName, facets) : Promise.resolve(emptyResult()),
     want("REGISTER_ENTRY") ? searchRegisterEntries(freeText, facets) : Promise.resolve(emptyResult()),
+    want("CUSTOM_ASSET") ? searchCustomAssets(freeText, opName, facets, fuzzy && FUZZY_ELIGIBLE.includes("CUSTOM_ASSET")) : Promise.resolve(emptyResult()),
   ]);
 
   const map = new Map<SearchHitType, TypeResult>();
@@ -517,6 +612,7 @@ async function runOnce(q: string, types: SearchHitType[], facetsIn: CommonFacets
   map.set("OPEN_DATA", od);
   map.set("FOI_REQUEST", foi);
   map.set("REGISTER_ENTRY", reg);
+  map.set("CUSTOM_ASSET", ca);
   return map;
 }
 
