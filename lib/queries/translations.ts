@@ -52,6 +52,7 @@ export type WorkbenchRow = {
   keyCode: string;
   categoryCode: string;
   baseText: string;
+  baseLanguageCode: string;
   contextNoteText: string | null;
   translatedText: string | null;
   statusCode: "MISSING" | "AI_TRANSLATED" | "HUMAN_EDITED" | "VERIFIED" | "STALE";
@@ -66,7 +67,7 @@ export async function getWorkbenchRows(params: {
   const { languageCode, categoryCode, status, search } = params;
   const rows = await sql<(Omit<WorkbenchRow, "statusCode"> & { statusCode: string | null })[]>`
     SELECT tk.key_id AS "keyId", tk.key_code AS "keyCode", tk.category_code AS "categoryCode",
-           tk.base_text AS "baseText", tk.context_note_text AS "contextNoteText",
+           tk.base_text AS "baseText", tk.base_language_code AS "baseLanguageCode", tk.context_note_text AS "contextNoteText",
            t.translated_text AS "translatedText", t.status_code AS "statusCode"
     FROM bayanat.translation_keys tk
     LEFT JOIN bayanat.translations t ON t.key_id = tk.key_id AND t.language_code = ${languageCode}

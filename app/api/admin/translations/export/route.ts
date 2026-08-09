@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
   const rows = await getWorkbenchRows({ languageCode, categoryCode });
   const sheetRows = rows.map((r) => ({
-    key_code: r.keyCode, category: r.categoryCode, base_text: r.baseText,
+    key_code: r.keyCode, category: r.categoryCode, base_language: r.baseLanguageCode, base_text: r.baseText,
     context_note: r.contextNoteText ?? "", translated_text: r.translatedText ?? "", status: r.statusCode,
   }));
 

@@ -367,7 +367,7 @@ function CategoriesTab({ onOpenWorkbench }: { onOpenWorkbench: (categoryCode: st
 // ── Workbench tab ────────────────────────────────────────────────────────────────
 
 type WorkbenchRow = {
-  keyId: number; keyCode: string; categoryCode: string; baseText: string; contextNoteText: string | null;
+  keyId: number; keyCode: string; categoryCode: string; baseText: string; baseLanguageCode: string; contextNoteText: string | null;
   translatedText: string | null; statusCode: "MISSING" | "AI_TRANSLATED" | "HUMAN_EDITED" | "VERIFIED" | "STALE";
 };
 
@@ -541,7 +541,7 @@ function WorkbenchTab({ initialCategory, initialLang }: { initialCategory: strin
 
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[28px_1fr_1fr_100px_140px] gap-3 px-4 py-2 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div></div><div>Base (English)</div><div>Translation</div><div>Status</div><div>Actions</div>
+          <div></div><div>Base Text</div><div>Translation</div><div>Status</div><div>Actions</div>
         </div>
         {loading ? (
           <div className="px-4 py-8 text-center text-muted text-sm">Loading…</div>
@@ -552,7 +552,12 @@ function WorkbenchTab({ initialCategory, initialLang }: { initialCategory: strin
             <div key={row.keyId} className="grid grid-cols-[28px_1fr_1fr_100px_140px] gap-3 px-4 py-2.5 items-start border-b border-line-soft last:border-b-0">
               <input type="checkbox" checked={selected.has(row.keyId)} onChange={() => toggleSelect(row.keyId)} className="w-4 h-4 accent-brand-purple mt-1" />
               <div>
-                <div className="text-sm text-ink">{row.baseText}</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-canvas-soft text-muted uppercase shrink-0" title="Base language">
+                    {row.baseLanguageCode}
+                  </span>
+                  <div className="text-sm text-ink" dir="auto">{row.baseText}</div>
+                </div>
                 <div className="text-[10px] text-muted font-mono">{row.keyCode}</div>
               </div>
               <textarea
