@@ -159,7 +159,11 @@ async function upsertKey(counters: Counters, categoryCode: string, keyCode: stri
     }
   }
 
-  const hasSecondary = !!(rawSecondary && String(rawSecondary).trim());
+  // A secondary value that's byte-for-byte identical to the base isn't a real
+  // translation — it's a placeholder duplicate (e.g. req_text duplicating
+  // question_en because req_text can't be null and no Arabic source exists
+  // yet). Treating it as VERIFIED would hide a genuine translation gap.
+  const hasSecondary = !!(rawSecondary && String(rawSecondary).trim() && String(rawSecondary).trim() !== baseText);
   if (hasSecondary) {
     const inserted = await sql`
       INSERT INTO bayanat.translations (key_id, language_code, translated_text, status_code, translated_at, verified_at)

@@ -1,15 +1,18 @@
 import { sql } from "../db";
+import { logUpdate } from "../audit";
 
 export type ComplianceFramework = {
-  frameworkId:      number;
-  name:             string;
-  code:             string;
-  version:          string | null;
-  description:      string | null;
-  reqCount:         number;
-  completeCount:    number;
-  naCount:          number;
-  notCompleteCount: number;
+  frameworkId:         number;
+  name:                string;
+  code:                string;
+  version:             string | null;
+  description:         string | null;
+  regulationGroupCode: string | null;
+  isApplicable:        boolean;
+  reqCount:            number;
+  completeCount:       number;
+  naCount:             number;
+  notCompleteCount:    number;
 };
 
 export type ComplianceRequirement = {
@@ -112,11 +115,13 @@ const FIELD_LABELS: Record<string, string> = {
 
 // ── Frameworks ───────────────────────────────────────────────────────────────
 
-export async function listFrameworks(): Promise<ComplianceFramework[]> {
+/** includeInactive=false restricts to frameworks the admin has marked applicable to this organization. */
+export async function listFrameworks(includeInactive = true): Promise<ComplianceFramework[]> {
   return sql<ComplianceFramework[]>`
     SELECT
       f.framework_id   AS "frameworkId",
       f.name, f.code, f.version, f.description,
+      f.regulation_group_code AS "regulationGroupCode", f.is_applicable_indicator AS "isApplicable",
       COUNT(r.req_id)::int AS "reqCount",
       COUNT(CASE WHEN a.submission_status = 'COMPLETE'                        THEN 1 END)::int AS "completeCount",
       COUNT(CASE WHEN a.submission_status = 'NA'                              THEN 1 END)::int AS "naCount",
@@ -124,6 +129,7 @@ export async function listFrameworks(): Promise<ComplianceFramework[]> {
     FROM bayanat.gov_compliance_frameworks f
     LEFT JOIN bayanat.gov_compliance_requirements  r ON r.framework_id = f.framework_id
     LEFT JOIN bayanat.gov_compliance_assessments   a ON a.req_id       = r.req_id
+    ${includeInactive ? sql`` : sql`WHERE f.is_applicable_indicator = true`}
     GROUP BY f.framework_id
     ORDER BY f.name
   `;
@@ -143,6 +149,13 @@ export async function createFramework(
     RETURNING framework_id AS id
   `;
   return rows[0].id;
+}
+
+export async function updateFrameworkApplicability(frameworkId: number, isApplicable: boolean, userId: string): Promise<void> {
+  await sql`UPDATE bayanat.gov_compliance_frameworks SET is_applicable_indicator = ${isApplicable} WHERE framework_id = ${frameworkId}`;
+  await logUpdate("GOV_COMPLIANCE_FRAMEWORKS", frameworkId, userId, [
+    { field: "is_applicable_indicator", oldVal: null, newVal: String(isApplicable), force: true },
+  ]);
 }
 
 // ── Requirements ─────────────────────────────────────────────────────────────

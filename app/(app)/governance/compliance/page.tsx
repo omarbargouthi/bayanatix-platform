@@ -22,7 +22,7 @@ export default async function CompliancePage({
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const frameworks      = await listFrameworks();
+  const frameworks      = await listFrameworks(false); // only regulations the admin has marked applicable
   const fwId            = searchParams.fw ? Number(searchParams.fw) : (frameworks[0]?.frameworkId ?? null);
   const activeFramework = frameworks.find((f) => f.frameworkId === fwId) ?? frameworks[0] ?? null;
 

@@ -73,6 +73,7 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
   const [filterDomain, setFilterDomain] = useState("");
   const [editing,     setEditing]     = useState<ComplianceRequirement | null>(null);
   const [saving,      setSaving]      = useState(false);
+  const [applicabilityOverrides, setApplicabilityOverrides] = useState<Record<number, boolean>>({});
 
   // collapse state — keyed by domainCode / "domainCode::standard"
   const [collapsedDomains,    setCollapsedDomains]    = useState<Set<string>>(new Set());
@@ -251,6 +252,18 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
     setEditing(null);
   }
 
+  const selectedFw = frameworks.find((f) => f.frameworkId === fwId);
+  const isApplicable = applicabilityOverrides[fwId] ?? selectedFw?.isApplicable ?? true;
+
+  async function toggleApplicable() {
+    const next = !isApplicable;
+    setApplicabilityOverrides((prev) => ({ ...prev, [fwId]: next }));
+    await fetch(`/api/governance/compliance/${fwId}/applicability`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isApplicable: next }),
+    });
+  }
+
   const totalVisible = grouped.reduce((s, dom) =>
     s + dom.standards.reduce((s2, std) =>
       s2 + std.levels.reduce((s3, lv) => s3 + lv.questions.length, 0), 0), 0);
@@ -266,16 +279,24 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
               <option key={f.frameworkId} value={f.frameworkId}>{f.name}</option>
             ))}
           </select>
+          <label className="flex items-center gap-1.5 text-xs text-ink-soft cursor-pointer select-none">
+            <input type="checkbox" checked={isApplicable} onChange={toggleApplicable} className="w-3.5 h-3.5 accent-brand-purple" />
+            Applicable to organization
+          </label>
         </div>
       )}
       {frameworks.length === 1 && (
-        <div className="mb-6">
+        <div className="mb-6 flex items-center gap-3">
           <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-purple/10 text-brand-purple text-sm font-semibold">
             {frameworks[0].name}
             {frameworks[0].version && (
               <span className="text-brand-purple/60 font-normal">· {frameworks[0].version}</span>
             )}
           </span>
+          <label className="flex items-center gap-1.5 text-xs text-ink-soft cursor-pointer select-none">
+            <input type="checkbox" checked={isApplicable} onChange={toggleApplicable} className="w-3.5 h-3.5 accent-brand-purple" />
+            Applicable to organization
+          </label>
         </div>
       )}
 
