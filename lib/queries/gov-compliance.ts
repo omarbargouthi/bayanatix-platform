@@ -47,6 +47,7 @@ export type ComplianceRequirement = {
   submissionStatus:      string;
   evidentAdminOverride:  string | null;
   domainOwnerOverride:   string | null;
+  supportingEvidenceOverride: string | null;
   managementNotes:       string | null;
   comments:              string | null;
   evidenceName:          string | null;
@@ -197,6 +198,7 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       COALESCE(a.submission_status, 'NOT_COMPLETE') AS "submissionStatus",
       a.evident_admin_override  AS "evidentAdminOverride",
       a.domain_owner_override   AS "domainOwnerOverride",
+      a.supporting_evidence_override AS "supportingEvidenceOverride",
       a.management_notes        AS "managementNotes",
       a.comments,
       a.evidence_name           AS "evidenceName",
@@ -292,6 +294,7 @@ export async function upsertAssessment(reqId: number, fields: {
   submissionStatus?: string;
   evidentAdminOverride?: string | null;
   domainOwnerOverride?: string | null;
+  supportingEvidenceOverride?: string | null;
   managementNotes?: string | null;
   comments?: string | null;
   assessedBy: string;
@@ -301,22 +304,24 @@ export async function upsertAssessment(reqId: number, fields: {
     submission_status: string;
     evident_admin_override: string | null;
     domain_owner_override: string | null;
+    supporting_evidence_override: string | null;
     management_notes: string | null;
     comments: string | null;
   }[]>`
-    SELECT submission_status, evident_admin_override, domain_owner_override, management_notes, comments
+    SELECT submission_status, evident_admin_override, domain_owner_override, supporting_evidence_override, management_notes, comments
     FROM bayanat.gov_compliance_assessments WHERE req_id = ${reqId}
   `;
   const prev = existing[0] ?? null;
 
   await sql`
     INSERT INTO bayanat.gov_compliance_assessments
-      (req_id, submission_status, evident_admin_override, domain_owner_override, management_notes, comments, assessed_by, assessed_at)
+      (req_id, submission_status, evident_admin_override, domain_owner_override, supporting_evidence_override, management_notes, comments, assessed_by, assessed_at)
     VALUES (
       ${reqId},
       ${fields.submissionStatus ?? 'NOT_COMPLETE'},
       ${fields.evidentAdminOverride ?? null},
       ${fields.domainOwnerOverride  ?? null},
+      ${fields.supportingEvidenceOverride ?? null},
       ${fields.managementNotes      ?? null},
       ${fields.comments             ?? null},
       ${fields.assessedBy},
@@ -326,6 +331,7 @@ export async function upsertAssessment(reqId: number, fields: {
       submission_status      = COALESCE(EXCLUDED.submission_status, gov_compliance_assessments.submission_status),
       evident_admin_override = EXCLUDED.evident_admin_override,
       domain_owner_override  = EXCLUDED.domain_owner_override,
+      supporting_evidence_override = EXCLUDED.supporting_evidence_override,
       management_notes       = EXCLUDED.management_notes,
       comments               = EXCLUDED.comments,
       assessed_by            = EXCLUDED.assessed_by,
@@ -342,6 +348,7 @@ export async function upsertAssessment(reqId: number, fields: {
     { field: "submissionStatus",      old: prev?.submission_status      ?? null, nw: fields.submissionStatus      ?? null },
     { field: "evidentAdminOverride",  old: prev?.evident_admin_override  ?? null, nw: fields.evidentAdminOverride  ?? null },
     { field: "domainOwnerOverride",   old: prev?.domain_owner_override   ?? null, nw: fields.domainOwnerOverride   ?? null },
+    { field: "supportingEvidenceOverride", old: prev?.supporting_evidence_override ?? null, nw: fields.supportingEvidenceOverride ?? null },
     { field: "managementNotes",       old: prev?.management_notes        ?? null, nw: fields.managementNotes       ?? null },
     { field: "comments",              old: prev?.comments                ?? null, nw: fields.comments              ?? null },
   ];

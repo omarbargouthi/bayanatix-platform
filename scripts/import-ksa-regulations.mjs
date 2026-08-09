@@ -5,11 +5,17 @@
  * status/score/comments/evidence from the source assessment is imported;
  * every organization using Bayanatix does its own real assessment.
  *
- * English is base (question_en/supporting_evidence_en/admission_criteria_en/
- * management_sector_en); req_text (NOT NULL) duplicates question_en since
- * there's no Arabic source yet — lib/i18n-admin/translatable-fields.ts's
- * sync guard skips seeding a "translation" when it's identical to the base,
- * so these show up as real Arabic coverage gaps, not false VERIFIED rows.
+ * English is base (question_en/admission_criteria_en/management_sector_en);
+ * req_text (NOT NULL) duplicates question_en since there's no Arabic source
+ * yet — lib/i18n-admin/translatable-fields.ts's sync guard skips seeding a
+ * "translation" when it's identical to the base, so these show up as real
+ * Arabic coverage gaps, not false VERIFIED rows.
+ *
+ * supporting_evidence/supporting_evidence_en are NOT imported — the source
+ * sheet's "Supporting Evidence" column is Zain KSA's own assessment
+ * narrative, not generic requirement guidance. Supporting evidence is an
+ * assessment-level field the assessing user fills in themselves
+ * (gov_compliance_assessments.supporting_evidence_override).
  *
  * domain/standard/maturity_level have no _en counterpart (native-only
  * fields) — populated directly in English since that's the only language
@@ -75,22 +81,29 @@ async function seedConfigItems(fwId) {
   `;
 }
 
-async function insertRequirement(fwId, { reqCode, domain, standard, question, supportingEvidence, admissionCriteria, managementSector, domainOwner, evidentAdministrator, sortOrder }) {
+async function insertRequirement(fwId, { reqCode, domain, standard, question, admissionCriteria, managementSector, domainOwner, evidentAdministrator, sortOrder }) {
   const questionEn = question.trim();
   if (!questionEn) return false;
   await sql`
     INSERT INTO bayanat.gov_compliance_requirements
       (framework_id, req_code, standard, standard_code, req_text, domain, domain_code,
        maturity_level, compliance_or_maturity, sort_order, domain_owner, evident_administrator,
-       question_en, supporting_evidence_en, admission_criteria_en, management_sector_en)
+       question_en, admission_criteria_en, management_sector_en)
     VALUES (
       ${fwId}, ${reqCode}, ${standard || null}, ${standard || null}, ${questionEn}, ${domain || null}, ${domain || null},
       '0', 'امتثال', ${sortOrder}, ${domainOwner?.trim() || null}, ${evidentAdministrator?.trim() || null},
-      ${questionEn}, ${supportingEvidence?.trim() || null}, ${admissionCriteria?.trim() || null}, ${managementSector?.trim() || null}
+      ${questionEn}, ${admissionCriteria?.trim() || null}, ${managementSector?.trim() || null}
     )
   `;
   return true;
 }
+
+// Supporting Evidence is deliberately NOT imported from the source sheet's
+// "Supporting Evidence" column — that column is Zain KSA's own assessment
+// narrative (what evidence THEY found), not generic requirement guidance.
+// Importing it would have violated the "definitions only" decision and
+// shown up as fixed, unchangeable text instead of something the assessing
+// user fills in themselves (gov_compliance_assessments.supporting_evidence_override).
 
 // ── PDPL ─────────────────────────────────────────────────────────────────
 async function importPdpl(fwId) {
@@ -99,7 +112,7 @@ async function importPdpl(fwId) {
   for (const r of rows) {
     const ok = await insertRequirement(fwId, {
       reqCode: `PDPL-${r[0]}`, domain: r[1], standard: r[11],
-      question: r[2], supportingEvidence: r[6], sortOrder: n,
+      question: r[2], sortOrder: n,
     });
     if (ok) n++;
   }
@@ -113,7 +126,7 @@ async function importDcc(fwId) {
   for (const r of rows) {
     const ok = await insertRequirement(fwId, {
       reqCode: `DCC-${r[0]}`, domain: r[1], standard: r[2],
-      question: r[3], supportingEvidence: r[7], admissionCriteria: r[8], domainOwner: r[9], sortOrder: n,
+      question: r[3], admissionCriteria: r[8], domainOwner: r[9], sortOrder: n,
     });
     if (ok) n++;
   }
@@ -127,7 +140,7 @@ async function importCst(fwId) {
   for (const r of cstRows) {
     const ok = await insertRequirement(fwId, {
       reqCode: `CST-${n + 1}`, domain: r[1], standard: r[2],
-      question: r[3], supportingEvidence: r[7], sortOrder: n,
+      question: r[3], sortOrder: n,
     });
     if (ok) n++;
   }
@@ -135,7 +148,7 @@ async function importCst(fwId) {
   for (const r of citcRows) {
     const ok = await insertRequirement(fwId, {
       reqCode: `CST-${n + 1}`, domain: r[1], standard: r[11],
-      question: r[2], supportingEvidence: r[6], sortOrder: n,
+      question: r[2], sortOrder: n,
     });
     if (ok) n++;
   }

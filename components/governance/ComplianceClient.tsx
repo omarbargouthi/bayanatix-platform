@@ -389,6 +389,7 @@ export function ComplianceClient({
         submissionStatus:     merged.submissionStatus,
         evidentAdminOverride: merged.evidentAdminOverride,
         domainOwnerOverride:  merged.domainOwnerOverride,
+        supportingEvidenceOverride: merged.supportingEvidenceOverride,
         managementNotes:      merged.managementNotes,
         comments:             merged.comments,
       }),
@@ -824,7 +825,7 @@ export function ComplianceClient({
                                     <td className="px-3 py-3">
                                       <div className="text-[12px] text-ink leading-snug"
                                         dir={isRtl ? "rtl" : undefined}>
-                                        {disp(req.supportingEvidenceEn, req.supportingEvidence)
+                                        {req.supportingEvidenceOverride || disp(req.supportingEvidenceEn, req.supportingEvidence)
                                           || <span className="text-muted italic">—</span>}
                                       </div>
                                     </td>
@@ -984,20 +985,25 @@ function EvidenceExpanded({
   }
 
   const mgmtImported = d(req.managementSectorEn, req.managementSector);
+  const evidenceImported = d(req.supportingEvidenceEn, req.supportingEvidence);
   const [mgmt,     setMgmt]     = useState(req.managementNotes ?? mgmtImported);
+  const [evidence, setEvidence] = useState(req.supportingEvidenceOverride ?? evidenceImported);
   const [comments, setComments] = useState(req.comments ?? "");
   const [saving,   setSaving]   = useState(false);
 
   useEffect(() => { setMgmt(req.managementNotes ?? d(req.managementSectorEn, req.managementSector)); },
     [req.managementNotes, req.managementSectorEn, req.managementSector, isRtl]); // eslint-disable-line
+  useEffect(() => { setEvidence(req.supportingEvidenceOverride ?? d(req.supportingEvidenceEn, req.supportingEvidence)); },
+    [req.supportingEvidenceOverride, req.supportingEvidenceEn, req.supportingEvidence, isRtl]); // eslint-disable-line
   useEffect(() => { setComments(req.comments ?? ""); }, [req.comments]);
 
   const isDirty = mgmt   !== (req.managementNotes ?? d(req.managementSectorEn, req.managementSector)) ||
+                  evidence !== (req.supportingEvidenceOverride ?? d(req.supportingEvidenceEn, req.supportingEvidence)) ||
                   comments !== (req.comments ?? "");
 
   async function saveAll() {
     setSaving(true);
-    await onPatch({ managementNotes: mgmt || null, comments: comments || null });
+    await onPatch({ managementNotes: mgmt || null, supportingEvidenceOverride: evidence || null, comments: comments || null });
     setSaving(false);
   }
 
@@ -1039,6 +1045,22 @@ function EvidenceExpanded({
             <div className="text-ink">{req.operationalExcellence}</div>
           </div>
         )}
+      </div>
+
+      {/* Supporting Evidence — the assessing user's own text, not fixed admin guidance */}
+      <div>
+        <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">
+          {ca.colEvidence}
+        </label>
+        {evidenceImported && !req.supportingEvidenceOverride && (
+          <div className={`text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5 ${isRtl ? "text-right" : ""}`}
+            dir={isRtl ? "rtl" : undefined}>
+            <span className="text-muted/70">{evidenceImported}</span>
+            <span className="ml-2 text-[10px] text-muted italic">(imported)</span>
+          </div>
+        )}
+        <textarea value={evidence} onChange={(e) => setEvidence(e.target.value)} rows={2}
+          className="field text-[12px] w-full" placeholder="Describe or reference the supporting evidence…" />
       </div>
 
       {/* Management & Supporting Sector */}
