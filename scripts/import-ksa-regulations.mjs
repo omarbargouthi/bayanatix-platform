@@ -53,10 +53,13 @@ async function seedSingleLevel(fwId) {
 }
 
 async function seedConfigItems(fwId) {
+  // Simplified compliance-status scoring (not NDI's Complete/Not Completed/N-A
+  // model) — matches how these regulations are actually assessed against.
   const status = [
-    { code: "COMPLETE", label: "Complete", labelAr: "مكتمل", color: "#10B981", sort: 1 },
-    { code: "NOT_COMPLETE", label: "Not Completed", labelAr: "غير مكتمل", color: "#F59E0B", sort: 2 },
-    { code: "NA", label: "N/A", labelAr: "لا ينطبق", color: "#6B7280", sort: 3 },
+    { code: "COMPLIANCE", label: "Compliance", labelAr: "امتثال", color: "#10B981", sort: 1 },
+    { code: "PARTIAL_COMPLIANCE", label: "Partial Compliance", labelAr: "امتثال جزئي", color: "#F59E0B", sort: 2 },
+    { code: "NON_COMPLIANCE", label: "Non Compliance", labelAr: "عدم الامتثال", color: "#EF4444", sort: 3 },
+    { code: "NA", label: "N/A", labelAr: "لا ينطبق", color: "#6B7280", sort: 4 },
   ];
   for (const s of status) {
     await sql`
@@ -72,17 +75,17 @@ async function seedConfigItems(fwId) {
   `;
 }
 
-async function insertRequirement(fwId, { reqCode, domain, standard, question, supportingEvidence, admissionCriteria, managementSector, sortOrder }) {
+async function insertRequirement(fwId, { reqCode, domain, standard, question, supportingEvidence, admissionCriteria, managementSector, domainOwner, evidentAdministrator, sortOrder }) {
   const questionEn = question.trim();
   if (!questionEn) return false;
   await sql`
     INSERT INTO bayanat.gov_compliance_requirements
       (framework_id, req_code, standard, standard_code, req_text, domain, domain_code,
-       maturity_level, compliance_or_maturity, sort_order,
+       maturity_level, compliance_or_maturity, sort_order, domain_owner, evident_administrator,
        question_en, supporting_evidence_en, admission_criteria_en, management_sector_en)
     VALUES (
       ${fwId}, ${reqCode}, ${standard || null}, ${standard || null}, ${questionEn}, ${domain || null}, ${domain || null},
-      '0', 'امتثال', ${sortOrder},
+      '0', 'امتثال', ${sortOrder}, ${domainOwner?.trim() || null}, ${evidentAdministrator?.trim() || null},
       ${questionEn}, ${supportingEvidence?.trim() || null}, ${admissionCriteria?.trim() || null}, ${managementSector?.trim() || null}
     )
   `;
@@ -110,7 +113,7 @@ async function importDcc(fwId) {
   for (const r of rows) {
     const ok = await insertRequirement(fwId, {
       reqCode: `DCC-${r[0]}`, domain: r[1], standard: r[2],
-      question: r[3], supportingEvidence: r[7], admissionCriteria: r[8], managementSector: r[9], sortOrder: n,
+      question: r[3], supportingEvidence: r[7], admissionCriteria: r[8], domainOwner: r[9], sortOrder: n,
     });
     if (ok) n++;
   }

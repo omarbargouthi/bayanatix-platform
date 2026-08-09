@@ -31,6 +31,13 @@ type CollabThread = {
 const DEFAULT_LEVEL_COLORS = ["#D84848","#E88030","#2D4AA0","#3D7EC8","#1E8C76","#5CA85C"];
 const DEFAULT_LEVEL_NAMES  = ["No Capability","Build","Definition","Activation","Managed","Innovation"];
 
+// "Complete" for progress-stat purposes: NDI's own COMPLETE code, or the
+// simplified Compliance/Partial/Non/N-A model's COMPLIANCE code (full
+// compliance) — Partial/Non-Compliance count as not-yet-complete, same as
+// NDI's NOT_COMPLETE.
+const COMPLETE_STATUSES = new Set(["COMPLETE", "COMPLIANCE"]);
+function isCompleteStatus(status: string): boolean { return COMPLETE_STATUSES.has(status); }
+
 // Fallback English names keyed by NDI domain code (used when domainEn is null in DB)
 const DOMAIN_EN_BY_CODE: Record<string, string> = {
   DG:  "Data Governance",
@@ -205,7 +212,7 @@ export function ComplianceClient({
 
   const overallStats = useMemo(() => {
     const total    = reqs.length;
-    const complete = reqs.filter((r) => r.submissionStatus === "COMPLETE").length;
+    const complete = reqs.filter((r) => isCompleteStatus(r.submissionStatus)).length;
     const na       = reqs.filter((r) => r.submissionStatus === "NA").length;
     const notDone  = total - complete - na;
     const pct      = Math.round(((complete + na) / Math.max(total, 1)) * 100);
@@ -229,13 +236,13 @@ export function ComplianceClient({
 
   function domainStats(domain: string) {
     const d = reqs.filter((r) => (r.domain ?? "Other") === domain);
-    const c = d.filter((r) => r.submissionStatus === "COMPLETE").length;
+    const c = d.filter((r) => isCompleteStatus(r.submissionStatus)).length;
     const na = d.filter((r) => r.submissionStatus === "NA").length;
     return { total: d.length, complete: c, na, pct: Math.round(((c+na)/Math.max(d.length,1))*100) };
   }
   function standardStats(domain: string, std: string) {
     const d = reqs.filter((r) => (r.domain ?? "Other") === domain && deriveStandard(r) === std);
-    const c = d.filter((r) => r.submissionStatus === "COMPLETE").length;
+    const c = d.filter((r) => isCompleteStatus(r.submissionStatus)).length;
     const na = d.filter((r) => r.submissionStatus === "NA").length;
     return { total: d.length, complete: c, na, pct: Math.round(((c+na)/Math.max(d.length,1))*100) };
   }
@@ -249,7 +256,7 @@ export function ComplianceClient({
       if (ln === 0) return lvl === 0;
       return lvl >= 1 && lvl <= ln;
     });
-    const c = d.filter((r) => r.submissionStatus === "COMPLETE").length;
+    const c = d.filter((r) => isCompleteStatus(r.submissionStatus)).length;
     const na = d.filter((r) => r.submissionStatus === "NA").length;
     return { total: d.length, complete: c, na, pct: Math.round(((c+na)/Math.max(d.length,1))*100) };
   }
@@ -737,10 +744,10 @@ export function ComplianceClient({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3 text-[12px] flex-wrap">
                       <span className="text-emerald-600 font-semibold">
-                        {questionsForView.filter((r) => r.submissionStatus === "COMPLETE").length} {ca.statComplete}
+                        {questionsForView.filter((r) => isCompleteStatus(r.submissionStatus)).length} {ca.statComplete}
                       </span>
                       <span className="text-amber-600 font-semibold">
-                        {questionsForView.filter((r) => r.submissionStatus === "NOT_COMPLETE").length} {ca.statNotCompleted}
+                        {questionsForView.filter((r) => !isCompleteStatus(r.submissionStatus) && r.submissionStatus !== "NA").length} {ca.statNotCompleted}
                       </span>
                       <span className="text-gray-500">
                         {questionsForView.filter((r) => r.submissionStatus === "NA").length} N/A

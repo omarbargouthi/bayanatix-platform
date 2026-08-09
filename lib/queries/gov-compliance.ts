@@ -123,9 +123,13 @@ export async function listFrameworks(includeInactive = true): Promise<Compliance
       f.name, f.code, f.version, f.description,
       f.regulation_group_code AS "regulationGroupCode", f.is_applicable_indicator AS "isApplicable",
       COUNT(r.req_id)::int AS "reqCount",
-      COUNT(CASE WHEN a.submission_status = 'COMPLETE'                        THEN 1 END)::int AS "completeCount",
-      COUNT(CASE WHEN a.submission_status = 'NA'                              THEN 1 END)::int AS "naCount",
-      COUNT(CASE WHEN a.submission_status = 'NOT_COMPLETE' OR a.assessment_id IS NULL THEN 1 END)::int AS "notCompleteCount"
+      -- COMPLETE/COMPLIANCE, NOT_COMPLETE/PARTIAL_COMPLIANCE/NON_COMPLIANCE: NDI's
+      -- Complete/Not-Completed/N-A codes and the simplified Compliance/Partial/Non/N-A
+      -- codes used by PDPL/DCC/CST both bucket into the same 3 summary counts.
+      COUNT(CASE WHEN a.submission_status IN ('COMPLETE', 'COMPLIANCE')                     THEN 1 END)::int AS "completeCount",
+      COUNT(CASE WHEN a.submission_status = 'NA'                                            THEN 1 END)::int AS "naCount",
+      COUNT(CASE WHEN a.submission_status IN ('NOT_COMPLETE', 'PARTIAL_COMPLIANCE', 'NON_COMPLIANCE')
+                 OR a.assessment_id IS NULL                                                 THEN 1 END)::int AS "notCompleteCount"
     FROM bayanat.gov_compliance_frameworks f
     LEFT JOIN bayanat.gov_compliance_requirements  r ON r.framework_id = f.framework_id
     LEFT JOIN bayanat.gov_compliance_assessments   a ON a.req_id       = r.req_id
