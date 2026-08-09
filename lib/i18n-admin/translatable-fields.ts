@@ -129,7 +129,11 @@ export async function syncListValueKeys(): Promise<SyncResult> {
         let baseText = String(row[`text_${i}`] ?? "").trim();
         if (!baseText) {
           if (cfg.missingBaseTextPlaceholder && hasSecondary) {
-            baseText = cfg.missingBaseTextPlaceholder;
+            // A secondary value that's itself just "N/A" means the field is genuinely
+            // not applicable for this row, not merely untranslated — mirror it as-is
+            // rather than implying a translation gap exists.
+            const secondaryTrimmed = String(rawSecondary).trim();
+            baseText = secondaryTrimmed.toUpperCase() === "N/A" ? "N/A" : cfg.missingBaseTextPlaceholder;
           } else {
             continue; // nothing in either language for this field — nothing to track
           }
