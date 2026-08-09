@@ -288,14 +288,16 @@ function CategoriesTab({ onOpenWorkbench }: { onOpenWorkbench: (categoryCode: st
     try {
       const r = await fetch("/api/admin/translations/sync", { method: "POST" });
       const d = await r.json();
-      setSyncMsg(`Synced list values: ${d.keysCreated} new, ${d.keysUpdatedStale} marked stale, ${d.arSeeded} Arabic values pre-filled.`);
+      setSyncMsg(`Synced list values: ${d.keysCreated} new, ${d.keysUpdatedStale} marked stale, ${d.secondarySeeded} existing translations pre-filled.`);
       await load();
     } finally { setSyncing(false); }
   }
 
   if (loading) return <div className="text-sm text-muted">Loading…</div>;
 
-  const targetLangs = languages.filter((l) => l.languageCode !== "en");
+  // No "!== en" filter: a category's base language is no longer always English (e.g.
+  // compliance requirements are Arabic-base), so English can be a real target column.
+  const targetLangs = languages;
   const byCategory = new Map<string, { categoryNameText: string; domainCode: string; totalKeys: number; cells: Map<string, CoverageRow> }>();
   for (const row of coverage) {
     if (!byCategory.has(row.categoryCode)) byCategory.set(row.categoryCode, { categoryNameText: row.categoryNameText, domainCode: row.domainCode, totalKeys: row.totalKeys, cells: new Map() });
@@ -331,7 +333,13 @@ function CategoriesTab({ onOpenWorkbench }: { onOpenWorkbench: (categoryCode: st
                 <td className="px-4 py-2.5 text-right text-xs text-muted">{cat.totalKeys}</td>
                 {targetLangs.map((l) => {
                   const cell = cat.cells.get(l.languageCode);
-                  const pct = cell?.coveredPct ?? 0;
+                  // No cell at all means this language is this category's own base
+                  // language (e.g. Arabic for compliance requirements, English for
+                  // everything else) — not a real coverage gap, just not applicable.
+                  if (!cell) {
+                    return <td key={l.languageCode} className="px-4 py-2.5 text-right text-muted text-xs">—</td>;
+                  }
+                  const pct = cell.coveredPct;
                   return (
                     <td key={l.languageCode} className="px-4 py-2.5 text-right">
                       <button
@@ -340,7 +348,7 @@ function CategoriesTab({ onOpenWorkbench }: { onOpenWorkbench: (categoryCode: st
                       >
                         {pct}%
                       </button>
-                      {cell && cell.stale > 0 && <div className="text-[10px] text-red-600">{cell.stale} stale</div>}
+                      {cell.stale > 0 && <div className="text-[10px] text-red-600">{cell.stale} stale</div>}
                     </td>
                   );
                 })}
@@ -492,7 +500,8 @@ function WorkbenchTab({ initialCategory, initialLang }: { initialCategory: strin
     await load();
   }
 
-  const targetLangs = languages.filter((l) => l.languageCode !== "en");
+  // No "!== en" filter — English can be a real target language for non-English-base content.
+  const targetLangs = languages;
 
   return (
     <div className="space-y-4">
@@ -602,7 +611,8 @@ function ImportExportTab() {
     } finally { setImporting(false); }
   }
 
-  const targetLangs = languages.filter((l) => l.languageCode !== "en");
+  // No "!== en" filter — English can be a real target language for non-English-base content.
+  const targetLangs = languages;
 
   return (
     <div className="space-y-6 max-w-2xl">

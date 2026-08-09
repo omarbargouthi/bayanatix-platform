@@ -28,17 +28,25 @@ export async function getLanguages(includeDisabled = true): Promise<Language[]> 
   `;
   if (rows.length === 0) return [];
 
+  // Grouped by the cross-joined l2.language_code (always non-null), not t.language_code
+  // (null whenever no translation row exists) — grouping by the latter would collapse
+  // every "no translation yet" row across every language into one indistinguishable
+  // NULL bucket and silently drop it from the denominator, inflating percentages.
+  // Each key's own base language is excluded — it doesn't need a translation into
+  // itself (matters once base_language_code varies, e.g. Arabic-native compliance
+  // content needing English coverage instead of the other way around).
   const coverage = await sql<{ languageCode: string; pct: number }[]>`
-    SELECT t.language_code AS "languageCode",
+    SELECT l2.language_code AS "languageCode",
            round(100.0 * count(*) FILTER (WHERE t.status_code IN ('AI_TRANSLATED','HUMAN_EDITED','VERIFIED')) / NULLIF(count(*), 0), 1) AS pct
     FROM bayanat.translation_keys tk
     CROSS JOIN bayanat.languages l2
     LEFT JOIN bayanat.translations t ON t.key_id = tk.key_id AND t.language_code = l2.language_code
-    WHERE tk.is_active_indicator = true
-    GROUP BY t.language_code
+    WHERE tk.is_active_indicator = true AND l2.language_code <> tk.base_language_code
+    GROUP BY l2.language_code
   `;
   const byCode = new Map(coverage.map((c) => [c.languageCode, Number(c.pct)]));
-  return rows.map((r) => ({ ...r, coveragePct: r.languageCode === "en" ? 100 : (byCode.get(r.languageCode) ?? 0) }));
+  // No applicable keys for this language (e.g. nothing needs translating into it yet) = trivially fully covered.
+  return rows.map((r) => ({ ...r, coveragePct: byCode.get(r.languageCode) ?? 100 }));
 }
 
 export async function getLanguageByCode(code: string): Promise<Language | null> {

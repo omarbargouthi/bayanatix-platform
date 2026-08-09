@@ -9,20 +9,23 @@ import { resolveProviderForCapability } from "../enrichment/provider-router";
 import { callProfile } from "../enrichment/llm-adapters";
 import { logUsage, getTokensUsedToday } from "../queries/llm-providers";
 
-type KeyRow = { keyId: number; keyCode: string; baseText: string; contextNoteText: string | null; existingStatus: string | null };
+type KeyRow = {
+  keyId: number; keyCode: string; baseText: string; contextNoteText: string | null;
+  existingStatus: string | null; baseLanguageCode: string;
+};
 
 async function loadRows(keyIds: number[], languageCode: string): Promise<KeyRow[]> {
   return sql<KeyRow[]>`
     SELECT tk.key_id AS "keyId", tk.key_code AS "keyCode", tk.base_text AS "baseText", tk.context_note_text AS "contextNoteText",
-           t.status_code AS "existingStatus"
+           tk.base_language_code AS "baseLanguageCode", t.status_code AS "existingStatus"
     FROM bayanat.translation_keys tk
     LEFT JOIN bayanat.translations t ON t.key_id = tk.key_id AND t.language_code = ${languageCode}
     WHERE tk.key_id IN ${sql(keyIds)}
   `;
 }
 
-function buildPrompt(baseText: string, contextNote: string | null, languageName: string, protectedTerms: string[]): string {
-  const parts = [`Translate the following English text to ${languageName} accurately, keeping the same tone and register.`];
+function buildPrompt(baseText: string, contextNote: string | null, baseLanguageName: string, targetLanguageName: string, protectedTerms: string[]): string {
+  const parts = [`Translate the following ${baseLanguageName} text to ${targetLanguageName} accurately, keeping the same tone and register.`];
   if (protectedTerms.length > 0) parts.push(`Do not translate these terms — keep them exactly as written: ${protectedTerms.join(", ")}.`);
   if (contextNote) parts.push(`Context for this string: ${contextNote}.`);
   parts.push("Return only the translation with no extra commentary, quotes, or explanation.");
@@ -41,10 +44,12 @@ export type TranslateBatchResult = { translated: number; skipped: number; failed
 export async function translateBatch(keyIds: number[], languageCode: string): Promise<TranslateBatchResult> {
   if (keyIds.length === 0) return { translated: 0, skipped: 0, failed: [] };
 
-  const [lang] = await sql<{ languageNameText: string }[]>`
-    SELECT language_name_text AS "languageNameText" FROM bayanat.languages WHERE language_code = ${languageCode}
+  const languages = await sql<{ languageCode: string; languageNameText: string }[]>`
+    SELECT language_code AS "languageCode", language_name_text AS "languageNameText" FROM bayanat.languages
   `;
-  if (!lang) return { translated: 0, skipped: 0, failed: keyIds.map((keyId) => ({ keyId, keyCode: "", error: `Unknown language code "${languageCode}"` })) };
+  const langNameByCode = new Map(languages.map((l) => [l.languageCode, l.languageNameText]));
+  const targetLanguageName = langNameByCode.get(languageCode);
+  if (!targetLanguageName) return { translated: 0, skipped: 0, failed: keyIds.map((keyId) => ({ keyId, keyCode: "", error: `Unknown language code "${languageCode}"` })) };
 
   const protectedTerms = (await sql<{ termText: string }[]>`SELECT term_text AS "termText" FROM bayanat.translation_protected_terms`).map((r) => r.termText);
 
@@ -71,9 +76,17 @@ export async function translateBatch(keyIds: number[], languageCode: string): Pr
       skipped++;
       continue;
     }
-    const prompt = buildPrompt(row.baseText, row.contextNoteText, lang.languageNameText, protectedTerms);
+    if (row.baseLanguageCode === languageCode) {
+      // Asking to translate a key into the same language its base_text is already
+      // written in (e.g. an Arabic-base compliance key targeted at 'ar') — nothing
+      // to do, not an error.
+      skipped++;
+      continue;
+    }
+    const baseLanguageName = langNameByCode.get(row.baseLanguageCode) ?? row.baseLanguageCode;
+    const prompt = buildPrompt(row.baseText, row.contextNoteText, baseLanguageName, targetLanguageName, protectedTerms);
     try {
-      const { text, inputTokens, outputTokens } = await callProfile(profile, apiKey, prompt, 500);
+      const { text, inputTokens, outputTokens } = await callProfile(profile, apiKey, prompt, 1200);
       await logUsage(profile.profileId, "TRANSLATE", inputTokens, outputTokens, !!text);
       if (!text) throw new Error("LLM returned an empty response");
       await sql`
@@ -101,6 +114,7 @@ export async function translateCategory(categoryCode: string, languageCode: stri
     FROM bayanat.translation_keys tk
     LEFT JOIN bayanat.translations t ON t.key_id = tk.key_id AND t.language_code = ${languageCode}
     WHERE tk.category_code = ${categoryCode} AND tk.is_active_indicator = true
+      AND tk.base_language_code <> ${languageCode}
       AND (t.status_code IS NULL OR t.status_code NOT IN ('HUMAN_EDITED', 'VERIFIED'))
   `;
   return translateBatch(rows.map((r) => r.keyId), languageCode);

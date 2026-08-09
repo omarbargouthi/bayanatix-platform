@@ -37,7 +37,7 @@ export async function getCategoryCoverage(): Promise<CategoryCoverageRow[]> {
     CROSS JOIN bayanat.languages l
     LEFT JOIN bayanat.translation_keys tk ON tk.category_code = tc.category_code AND tk.is_active_indicator = true
     LEFT JOIN bayanat.translations t ON t.key_id = tk.key_id AND t.language_code = l.language_code
-    WHERE l.language_code <> 'en'
+    WHERE tk.key_id IS NULL OR l.language_code <> tk.base_language_code
     GROUP BY tc.category_code, tc.category_name_text, tc.domain_code, l.language_code
     ORDER BY tc.domain_code, tc.category_code, l.language_code
   `;
