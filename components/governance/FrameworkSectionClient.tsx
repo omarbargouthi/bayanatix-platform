@@ -12,12 +12,12 @@ type Props = {
 
 type DocForm = {
   title: string; description: string; statusCode: string;
-  versionText: string; effectiveDate: string; expiryDate: string; ownerUserId: string;
+  versionText: string; effectiveDate: string; expiryDate: string; ownerUserId: string; sourceUrl: string;
 };
 
 const EMPTY_FORM: DocForm = {
   title: "", description: "", statusCode: "DRAFT",
-  versionText: "", effectiveDate: "", expiryDate: "", ownerUserId: "",
+  versionText: "", effectiveDate: "", expiryDate: "", ownerUserId: "", sourceUrl: "",
 };
 
 type SectionKey = "policy" | "process" | "strategy" | "roadmap" | "standard" | "training" | "regulatory";
@@ -59,6 +59,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
       effectiveDate: doc.effectiveDate?.slice(0, 10) ?? "",
       expiryDate: doc.expiryDate?.slice(0, 10) ?? "",
       ownerUserId: doc.ownerUserId ?? "",
+      sourceUrl: doc.sourceUrl ?? "",
     });
     setEditDoc(doc); setShowModal(true); setError("");
   }
@@ -72,7 +73,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
         title: form.title, description: form.description || null,
         statusCode: form.statusCode, versionText: form.versionText || null,
         effectiveDate: form.effectiveDate || null, expiryDate: form.expiryDate || null,
-        ownerUserId: form.ownerUserId || null,
+        ownerUserId: form.ownerUserId || null, sourceUrl: form.sourceUrl || null,
       };
       if (editDoc) {
         await fetch(`/api/governance/framework/${editDoc.docId}`, {
@@ -139,10 +140,18 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                 <>
                   <tr key={doc.docId} className="border-b border-line-soft hover:bg-canvas transition-colors">
                     <td className="px-4 py-3">
-                      <button onClick={() => setExpandedId(expandedId === doc.docId ? null : doc.docId)}
-                        className="font-semibold text-ink hover:text-brand-purple text-left">
-                        {doc.title}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setExpandedId(expandedId === doc.docId ? null : doc.docId)}
+                          className="font-semibold text-ink hover:text-brand-purple text-left">
+                          {doc.title}
+                        </button>
+                        {doc.sourceUrl && (
+                          <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" title={doc.sourceUrl}
+                            onClick={(e) => e.stopPropagation()} className="text-muted hover:text-brand-purple shrink-0">
+                            🔗
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[doc.statusCode] ?? "bg-gray-100 text-gray-600"}`}>
@@ -166,9 +175,17 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                       </div>
                     </td>
                   </tr>
-                  {expandedId === doc.docId && doc.description && (
+                  {expandedId === doc.docId && (doc.description || doc.sourceUrl) && (
                     <tr key={`${doc.docId}-exp`} className="bg-canvas-soft border-b border-line-soft">
-                      <td colSpan={7} className="px-6 py-3 text-sm text-ink-soft">{doc.description}</td>
+                      <td colSpan={7} className="px-6 py-3 text-sm text-ink-soft space-y-1.5">
+                        {doc.description && <p>{doc.description}</p>}
+                        {doc.sourceUrl && (
+                          <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-brand-purple hover:underline text-[12px] break-all inline-block">
+                            🔗 {doc.sourceUrl}
+                          </a>
+                        )}
+                      </td>
                     </tr>
                   )}
                 </>
@@ -213,6 +230,9 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
               </div>
               <Field label={fw.formOwner}>
                 <input value={form.ownerUserId} onChange={(e) => setForm((p) => ({ ...p, ownerUserId: e.target.value }))} className="field" placeholder="e.g. john.smith" />
+              </Field>
+              <Field label={fw.formSourceUrl}>
+                <input type="url" value={form.sourceUrl} onChange={(e) => setForm((p) => ({ ...p, sourceUrl: e.target.value }))} className="field" placeholder="https://..." />
               </Field>
             </div>
             <div className="flex justify-end gap-2 mt-5">

@@ -274,6 +274,7 @@ export const en: I18nStrings = {
       formEffective:  "Effective Date",
       formExpiry:     "Expiry Date",
       formOwner:      "Owner (User ID)",
+      formSourceUrl:  "Source URL (official regulation artifact)",
       statusDraft:    "Draft",
       statusReview:   "Under Review",
       statusApproved: "Approved",

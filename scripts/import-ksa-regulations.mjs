@@ -37,8 +37,8 @@ async function upsertFramework(name, code, description) {
   await sql`DELETE FROM bayanat.gov_compliance_requirements WHERE framework_id IN (SELECT framework_id FROM bayanat.gov_compliance_frameworks WHERE code = ${code})`;
   await sql`DELETE FROM bayanat.gov_compliance_frameworks WHERE code = ${code}`;
   const [fw] = await sql`
-    INSERT INTO bayanat.gov_compliance_frameworks (name, code, version, description, regulation_group_code, is_applicable_indicator)
-    VALUES (${name}, ${code}, '1.0', ${description}, 'KSA_REGULATIONS', true)
+    INSERT INTO bayanat.gov_compliance_frameworks (name, code, version, description, regulation_group_code, is_applicable_indicator, assessment_mode)
+    VALUES (${name}, ${code}, '1.0', ${description}, 'KSA_REGULATIONS', true, 'COMPLIANCE_ONLY')
     RETURNING framework_id
   `;
   return fw.framework_id;

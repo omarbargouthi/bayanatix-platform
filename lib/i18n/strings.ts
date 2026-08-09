@@ -291,6 +291,7 @@ export type I18nStrings = {
       formEffective:  string;
       formExpiry:     string;
       formOwner:      string;
+      formSourceUrl:  string;
       statusDraft:    string;
       statusReview:   string;
       statusApproved: string;

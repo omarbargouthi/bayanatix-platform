@@ -11,6 +11,7 @@ export type GovDoc = {
   expiryDate:    string | null;
   ownerUserId:   string | null;
   ownerName:     string | null;
+  sourceUrl:     string | null;
   createdAt:     string;
   updatedAt:     string;
   createdBy:     string | null;
@@ -40,6 +41,7 @@ export async function listGovDocs(sectionCode?: string): Promise<GovDoc[]> {
       d.expiry_date::text    AS "expiryDate",
       d.owner_user_id   AS "ownerUserId",
       u.full_name       AS "ownerName",
+      d.source_url      AS "sourceUrl",
       d.created_at::text AS "createdAt",
       d.updated_at::text AS "updatedAt",
       d.created_by      AS "createdBy",
@@ -66,6 +68,7 @@ export async function getGovDoc(docId: number): Promise<GovDoc | null> {
       d.expiry_date::text    AS "expiryDate",
       d.owner_user_id   AS "ownerUserId",
       u.full_name       AS "ownerName",
+      d.source_url      AS "sourceUrl",
       d.created_at::text AS "createdAt",
       d.updated_at::text AS "updatedAt",
       d.created_by      AS "createdBy",
@@ -82,16 +85,16 @@ export async function getGovDoc(docId: number): Promise<GovDoc | null> {
 export async function createGovDoc(data: {
   sectionCode: string; title: string; description?: string;
   statusCode?: string; versionText?: string; effectiveDate?: string;
-  expiryDate?: string; ownerUserId?: string; createdBy: string;
+  expiryDate?: string; ownerUserId?: string; sourceUrl?: string; createdBy: string;
 }): Promise<number> {
   const rows = await sql<{ docId: number }[]>`
     INSERT INTO bayanat.gov_framework_docs
-      (section_code, title, description, status_code, version_text, effective_date, expiry_date, owner_user_id, created_by)
+      (section_code, title, description, status_code, version_text, effective_date, expiry_date, owner_user_id, source_url, created_by)
     VALUES (
       ${data.sectionCode}, ${data.title}, ${data.description ?? null},
       ${data.statusCode ?? 'DRAFT'}, ${data.versionText ?? null},
       ${data.effectiveDate ?? null}, ${data.expiryDate ?? null},
-      ${data.ownerUserId ?? null}, ${data.createdBy}
+      ${data.ownerUserId ?? null}, ${data.sourceUrl ?? null}, ${data.createdBy}
     )
     RETURNING doc_id AS "docId"
   `;
@@ -101,7 +104,7 @@ export async function createGovDoc(data: {
 export async function updateGovDoc(docId: number, data: {
   title?: string; description?: string; statusCode?: string;
   versionText?: string; effectiveDate?: string; expiryDate?: string;
-  ownerUserId?: string;
+  ownerUserId?: string; sourceUrl?: string;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.gov_framework_docs SET
@@ -112,6 +115,7 @@ export async function updateGovDoc(docId: number, data: {
       effective_date = COALESCE(${data.effectiveDate ?? null}::date, effective_date),
       expiry_date    = COALESCE(${data.expiryDate ?? null}::date, expiry_date),
       owner_user_id  = COALESCE(${data.ownerUserId ?? null}, owner_user_id),
+      source_url     = ${data.sourceUrl !== undefined ? data.sourceUrl : sql`source_url`},
       updated_at     = NOW()
     WHERE doc_id = ${docId}
   `;

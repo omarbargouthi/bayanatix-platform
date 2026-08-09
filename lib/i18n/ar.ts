@@ -274,6 +274,7 @@ export const ar: I18nStrings = {
       formEffective:  "تاريخ النفاذ",
       formExpiry:     "تاريخ الانتهاء",
       formOwner:      "المالك (معرف المستخدم)",
+      formSourceUrl:  "رابط المصدر (وثيقة اللائحة الرسمية)",
       statusDraft:    "مسودة",
       statusReview:   "قيد المراجعة",
       statusApproved: "معتمد",

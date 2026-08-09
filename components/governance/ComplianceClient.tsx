@@ -121,6 +121,9 @@ export function ComplianceClient({
   const pendingTrans = useRef(new Set<string>());
   const importRef = useRef<HTMLInputElement>(null);
   const fwId = activeFramework?.frameworkId;
+  // PDPL/DCC/CST etc. — a straight compliance checklist, no per-requirement
+  // maturity tier — skip the level-picker step (Step 3) entirely.
+  const isComplianceOnly = activeFramework?.assessmentMode === "COMPLIANCE_ONLY";
 
   const lvlColor = (n: number) => levelCfg.find((c) => c.levelNum === n)?.colorHex ?? DEFAULT_LEVEL_COLORS[n] ?? "#888";
   const lvlName  = (n: number) => {
@@ -263,7 +266,7 @@ export function ComplianceClient({
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   function selectDomain(d: string)   { setSelDomain(d); setSelStandard(null); setSelLevel(null); setExpanded(null); }
-  function selectStandard(s: string) { setSelStandard(s); setSelLevel(null); setExpanded(null); }
+  function selectStandard(s: string) { setSelStandard(s); setSelLevel(isComplianceOnly ? 0 : null); setExpanded(null); }
   function resetAll()                { setSelDomain(null); setSelStandard(null); setSelLevel(null); setExpanded(null); }
   function backToStandards()         { setSelStandard(null); setSelLevel(null); setExpanded(null); }
   function backToLevels()            { setSelLevel(null); setExpanded(null); }
@@ -544,12 +547,16 @@ export function ComplianceClient({
                   </button>
                   {selStandard && (<>
                     <span className="text-muted/50">›</span>
-                    <button onClick={backToLevels}
-                      className={`font-medium ${selLevel !== null ? "text-brand-purple hover:underline" : "text-ink"}`}>
-                      {selStandard}
-                    </button>
+                    {isComplianceOnly ? (
+                      <span className="font-bold text-ink">{selStandard}</span>
+                    ) : (
+                      <button onClick={backToLevels}
+                        className={`font-medium ${selLevel !== null ? "text-brand-purple hover:underline" : "text-ink"}`}>
+                        {selStandard}
+                      </button>
+                    )}
                   </>)}
-                  {selLevel !== null && (<>
+                  {!isComplianceOnly && selLevel !== null && (<>
                     <span className="text-muted/50">›</span>
                     <span className="font-bold px-2 py-0.5 rounded text-white text-[12px]"
                       style={{ backgroundColor: lvlColor(selLevel) }}>
@@ -646,8 +653,8 @@ export function ComplianceClient({
                 </section>
               )}
 
-              {/* Step 3 — Level picker */}
-              {selDomain && selStandard && selLevel === null && (
+              {/* Step 3 — Level picker (maturity-scale frameworks only) */}
+              {!isComplianceOnly && selDomain && selStandard && selLevel === null && (
                 <section>
                   <StepHeader n={3} label={ca.selectMaturity} />
                   {selectedQuestion && (
@@ -724,11 +731,13 @@ export function ComplianceClient({
                     <div className="mb-4 p-4 bg-canvas-soft rounded-xl border border-line">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[11px] font-mono font-bold text-muted">{selStandard}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-white"
-                          style={{ backgroundColor: lvlColor(selLevel) }}>
-                          Level {selLevel} · {lvlName(selLevel)}
-                        </span>
-                        {selLevel > 0 && (
+                        {!isComplianceOnly && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold text-white"
+                            style={{ backgroundColor: lvlColor(selLevel) }}>
+                            Level {selLevel} · {lvlName(selLevel)}
+                          </span>
+                        )}
+                        {!isComplianceOnly && selLevel > 0 && (
                           <span className="text-[10px] text-muted italic">
                             (showing levels 1–{selLevel}, {questionsForView.length} items total)
                           </span>
@@ -754,9 +763,11 @@ export function ComplianceClient({
                       </span>
                       <span className="text-muted">· {questionsForView.length} {ca.statItems}</span>
                     </div>
-                    <button onClick={backToLevels} className="text-[11px] text-brand-purple hover:underline font-medium">
-                      {ca.changeLevel}
-                    </button>
+                    {!isComplianceOnly && (
+                      <button onClick={backToLevels} className="text-[11px] text-brand-purple hover:underline font-medium">
+                        {ca.changeLevel}
+                      </button>
+                    )}
                   </div>
 
                   {questionsForView.length === 0 ? (

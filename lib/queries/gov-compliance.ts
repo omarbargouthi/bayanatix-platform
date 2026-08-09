@@ -9,6 +9,7 @@ export type ComplianceFramework = {
   description:         string | null;
   regulationGroupCode: string | null;
   isApplicable:        boolean;
+  assessmentMode:      "MATURITY" | "COMPLIANCE_ONLY";
   reqCount:            number;
   completeCount:       number;
   naCount:             number;
@@ -122,6 +123,7 @@ export async function listFrameworks(includeInactive = true): Promise<Compliance
       f.framework_id   AS "frameworkId",
       f.name, f.code, f.version, f.description,
       f.regulation_group_code AS "regulationGroupCode", f.is_applicable_indicator AS "isApplicable",
+      f.assessment_mode AS "assessmentMode",
       COUNT(r.req_id)::int AS "reqCount",
       -- COMPLETE/COMPLIANCE, NOT_COMPLETE/PARTIAL_COMPLIANCE/NON_COMPLIANCE: NDI's
       -- Complete/Not-Completed/N-A codes and the simplified Compliance/Partial/Non/N-A
