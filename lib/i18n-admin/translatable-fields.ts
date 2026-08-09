@@ -5,11 +5,16 @@
 // tags/roles/etc. automatically show up as MISSING (AC-5) the next time it runs.
 // Adding another table later is a config entry, not new code.
 //
-// Most entries are English-base + an optional Arabic sidecar column (app_lookups,
-// classification_types, stakeholder_roles, the compliance lookup tables). One entry
-// (gov_compliance_requirements) runs the other direction — Arabic-native imported
-// regulatory text with an optional English sidecar — hence the per-entry
-// baseLanguageCode/secondaryLanguageCode instead of a hardcoded 'ar'.
+// Every entry is English-base + an Arabic (or other) secondary column — English is
+// always the reference language, by design, so a new language added later always
+// has something authoritative to translate from. gov_compliance_requirements is the
+// one case where the English sidecar column isn't always filled in yet (imported
+// Arabic-native regulatory text); missingBaseTextPlaceholder covers that: when
+// English is empty but Arabic content exists, the key is still created (so the
+// existing, real Arabic stays visible and tracked as VERIFIED) with a literal
+// placeholder base_text instead of silently skipping the row. An admin fills in the
+// real English via Maturity Index Setup as normal; re-running the sync then picks it
+// up and replaces the placeholder.
 //
 // This is a one-way, read-from-source sync (same as the original 3 entries): it
 // populates translation_keys/translations for coverage tracking, AI-translate, and
@@ -39,6 +44,11 @@ export type TranslatableFieldConfig = {
   baseLanguageCode?: string; // default 'en'
   secondaryLanguageCode?: string; // default 'ar'
   whereSql?: string; // optional raw WHERE fragment, e.g. "is_active = true"
+  // When the base-language column is empty but the secondary column has content,
+  // use this literal string as base_text instead of skipping the row entirely —
+  // keeps the existing secondary-language content visible/tracked while flagging
+  // the base as not yet filled in.
+  missingBaseTextPlaceholder?: string;
   fields: FieldMapping[];
 };
 
@@ -81,13 +91,13 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
   },
   {
     categoryCode: "COMPLIANCE_REQUIREMENTS", table: "bayanat.gov_compliance_requirements", idExpr: "req_id::text",
-    keyPrefix: "compliance.req", baseLanguageCode: "ar", secondaryLanguageCode: "en",
+    keyPrefix: "compliance.req", missingBaseTextPlaceholder: "Not provided",
     fields: [
-      { keySuffix: "question", textColumn: "req_text", secondaryColumn: "question_en" },
-      { keySuffix: "supporting_evidence", textColumn: "supporting_evidence", secondaryColumn: "supporting_evidence_en" },
-      { keySuffix: "admission_criteria", textColumn: "admission_criteria", secondaryColumn: "admission_criteria_en" },
-      { keySuffix: "management_sector", textColumn: "management_sector", secondaryColumn: "management_sector_en" },
-      { keySuffix: "directory_type", textColumn: "directory_type", secondaryColumn: "directory_type_en" },
+      { keySuffix: "question", textColumn: "question_en", secondaryColumn: "req_text" },
+      { keySuffix: "supporting_evidence", textColumn: "supporting_evidence_en", secondaryColumn: "supporting_evidence" },
+      { keySuffix: "admission_criteria", textColumn: "admission_criteria_en", secondaryColumn: "admission_criteria" },
+      { keySuffix: "management_sector", textColumn: "management_sector_en", secondaryColumn: "management_sector" },
+      { keySuffix: "directory_type", textColumn: "directory_type_en", secondaryColumn: "directory_type" },
     ],
   },
 ];
@@ -113,8 +123,17 @@ export async function syncListValueKeys(): Promise<SyncResult> {
 
     for (const row of rows) {
       for (const [i, field] of cfg.fields.entries()) {
-        const baseText = String(row[`text_${i}`] ?? "").trim();
-        if (!baseText) continue;
+        const rawSecondary = row[`secondary_${i}`];
+        const hasSecondary = !!(rawSecondary && String(rawSecondary).trim());
+
+        let baseText = String(row[`text_${i}`] ?? "").trim();
+        if (!baseText) {
+          if (cfg.missingBaseTextPlaceholder && hasSecondary) {
+            baseText = cfg.missingBaseTextPlaceholder;
+          } else {
+            continue; // nothing in either language for this field — nothing to track
+          }
+        }
         const keyCode = field.keySuffix ? `${cfg.keyPrefix}.${row.id}.${field.keySuffix}` : `${cfg.keyPrefix}.${row.id}`;
 
         const [existing] = await sql<{ keyId: number; baseText: string }[]>`
@@ -138,11 +157,10 @@ export async function syncListValueKeys(): Promise<SyncResult> {
           }
         }
 
-        const secondaryValue = row[`secondary_${i}`];
-        if (secondaryValue && String(secondaryValue).trim()) {
+        if (hasSecondary) {
           const inserted = await sql`
             INSERT INTO bayanat.translations (key_id, language_code, translated_text, status_code, translated_at, verified_at)
-            VALUES (${keyId}, ${secondaryLang}, ${String(secondaryValue).trim()}, 'VERIFIED', now(), now())
+            VALUES (${keyId}, ${secondaryLang}, ${String(rawSecondary).trim()}, 'VERIFIED', now(), now())
             ON CONFLICT (key_id, language_code) DO NOTHING
             RETURNING translation_id
           `;
