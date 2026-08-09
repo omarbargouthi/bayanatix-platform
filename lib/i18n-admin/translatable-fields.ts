@@ -12,9 +12,10 @@
 // Arabic-native regulatory text); missingBaseTextPlaceholder covers that: when
 // English is empty but Arabic content exists, the key is still created (so the
 // existing, real Arabic stays visible and tracked as VERIFIED) with a literal
-// placeholder base_text instead of silently skipping the row. An admin fills in the
-// real English via Maturity Index Setup as normal; re-running the sync then picks it
-// up and replaces the placeholder.
+// placeholder base_text instead of silently skipping the row — "N/A" if the Arabic
+// itself is just "N/A" (genuinely not applicable, not merely untranslated), else a
+// generic placeholder. An admin fills in the real English via Maturity Index Setup
+// as normal; re-running the sync then picks it up and replaces the placeholder.
 //
 // This is a one-way, read-from-source sync (same as the original 3 entries): it
 // populates translation_keys/translations for coverage tracking, AI-translate, and
@@ -90,6 +91,10 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
     fields: [{ keySuffix: "", textColumn: "label", secondaryColumn: "label_ar" }],
   },
   {
+    // directory_type is deliberately NOT in this entry's fields — it's a small,
+    // heavily-repeated set of values (24 distinct English values across 476 rows),
+    // not per-requirement free text, so it's tracked once via DISTINCT_VALUE_LOOKUPS
+    // below instead of duplicating a translation key per requirement.
     categoryCode: "COMPLIANCE_REQUIREMENTS", table: "bayanat.gov_compliance_requirements", idExpr: "req_id::text",
     keyPrefix: "compliance.req", missingBaseTextPlaceholder: "Not provided",
     fields: [
@@ -97,15 +102,77 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
       { keySuffix: "supporting_evidence", textColumn: "supporting_evidence_en", secondaryColumn: "supporting_evidence" },
       { keySuffix: "admission_criteria", textColumn: "admission_criteria_en", secondaryColumn: "admission_criteria" },
       { keySuffix: "management_sector", textColumn: "management_sector_en", secondaryColumn: "management_sector" },
-      { keySuffix: "directory_type", textColumn: "directory_type_en", secondaryColumn: "directory_type" },
     ],
   },
 ];
 
+// Small, heavily-repeated value sets embedded as free text in a larger table (no
+// dedicated lookup table exists) — synced once per DISTINCT value instead of once
+// per source row, so e.g. "Report" gets one translation_key covering all 224
+// requirements that use it, not 224 duplicate keys.
+export type DistinctValueLookupConfig = {
+  categoryCode: string;
+  table: string;
+  textColumn: string; // base-language (English) column
+  secondaryColumn?: string; // matching secondary-language column
+  keyPrefix: string; // key_code = `${keyPrefix}.{slug of the English value}`
+  baseLanguageCode?: string; // default 'en'
+  secondaryLanguageCode?: string; // default 'ar'
+  whereSql?: string;
+};
+
+export const DISTINCT_VALUE_LOOKUPS: DistinctValueLookupConfig[] = [
+  {
+    categoryCode: "LIST_COMPLIANCE_DIRECTORY_TYPES", table: "bayanat.gov_compliance_requirements",
+    textColumn: "directory_type_en", secondaryColumn: "directory_type", keyPrefix: "list.compliance_directory_types",
+  },
+];
+
+function slugify(text: string): string {
+  return text.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
 export type SyncResult = { keysCreated: number; keysUpdatedStale: number; secondarySeeded: number };
 
+type Counters = { keysCreated: number; keysUpdatedStale: number; secondarySeeded: number };
+
+/** Shared upsert: one translation_keys row + an optional pre-filled VERIFIED secondary-language translation. */
+async function upsertKey(counters: Counters, categoryCode: string, keyCode: string, baseText: string, baseLang: string, secondaryLang: string, rawSecondary: unknown): Promise<void> {
+  const [existing] = await sql<{ keyId: number; baseText: string }[]>`
+    SELECT key_id AS "keyId", base_text AS "baseText" FROM bayanat.translation_keys WHERE key_code = ${keyCode}
+  `;
+  let keyId: number;
+  if (!existing) {
+    const [inserted] = await sql<{ keyId: number }[]>`
+      INSERT INTO bayanat.translation_keys (category_code, key_code, base_text, base_language_code)
+      VALUES (${categoryCode}, ${keyCode}, ${baseText}, ${baseLang})
+      RETURNING key_id AS "keyId"
+    `;
+    keyId = inserted.keyId;
+    counters.keysCreated++;
+  } else {
+    keyId = existing.keyId;
+    if (existing.baseText !== baseText) {
+      await sql`UPDATE bayanat.translation_keys SET base_text = ${baseText} WHERE key_id = ${keyId}`;
+      await sql`UPDATE bayanat.translations SET status_code = 'STALE' WHERE key_id = ${keyId} AND status_code <> 'MISSING'`;
+      counters.keysUpdatedStale++;
+    }
+  }
+
+  const hasSecondary = !!(rawSecondary && String(rawSecondary).trim());
+  if (hasSecondary) {
+    const inserted = await sql`
+      INSERT INTO bayanat.translations (key_id, language_code, translated_text, status_code, translated_at, verified_at)
+      VALUES (${keyId}, ${secondaryLang}, ${String(rawSecondary).trim()}, 'VERIFIED', now(), now())
+      ON CONFLICT (key_id, language_code) DO NOTHING
+      RETURNING translation_id
+    `;
+    if (inserted.length > 0) counters.secondarySeeded++;
+  }
+}
+
 export async function syncListValueKeys(): Promise<SyncResult> {
-  let keysCreated = 0, keysUpdatedStale = 0, secondarySeeded = 0;
+  const counters: Counters = { keysCreated: 0, keysUpdatedStale: 0, secondarySeeded: 0 };
 
   for (const cfg of TRANSLATABLE_FIELDS) {
     const baseLang = cfg.baseLanguageCode ?? "en";
@@ -139,40 +206,30 @@ export async function syncListValueKeys(): Promise<SyncResult> {
           }
         }
         const keyCode = field.keySuffix ? `${cfg.keyPrefix}.${row.id}.${field.keySuffix}` : `${cfg.keyPrefix}.${row.id}`;
-
-        const [existing] = await sql<{ keyId: number; baseText: string }[]>`
-          SELECT key_id AS "keyId", base_text AS "baseText" FROM bayanat.translation_keys WHERE key_code = ${keyCode}
-        `;
-        let keyId: number;
-        if (!existing) {
-          const [inserted] = await sql<{ keyId: number }[]>`
-            INSERT INTO bayanat.translation_keys (category_code, key_code, base_text, base_language_code)
-            VALUES (${cfg.categoryCode}, ${keyCode}, ${baseText}, ${baseLang})
-            RETURNING key_id AS "keyId"
-          `;
-          keyId = inserted.keyId;
-          keysCreated++;
-        } else {
-          keyId = existing.keyId;
-          if (existing.baseText !== baseText) {
-            await sql`UPDATE bayanat.translation_keys SET base_text = ${baseText} WHERE key_id = ${keyId}`;
-            await sql`UPDATE bayanat.translations SET status_code = 'STALE' WHERE key_id = ${keyId} AND status_code <> 'MISSING'`;
-            keysUpdatedStale++;
-          }
-        }
-
-        if (hasSecondary) {
-          const inserted = await sql`
-            INSERT INTO bayanat.translations (key_id, language_code, translated_text, status_code, translated_at, verified_at)
-            VALUES (${keyId}, ${secondaryLang}, ${String(rawSecondary).trim()}, 'VERIFIED', now(), now())
-            ON CONFLICT (key_id, language_code) DO NOTHING
-            RETURNING translation_id
-          `;
-          if (inserted.length > 0) secondarySeeded++;
-        }
+        await upsertKey(counters, cfg.categoryCode, keyCode, baseText, baseLang, secondaryLang, rawSecondary);
       }
     }
   }
 
-  return { keysCreated, keysUpdatedStale, secondarySeeded };
+  for (const cfg of DISTINCT_VALUE_LOOKUPS) {
+    const baseLang = cfg.baseLanguageCode ?? "en";
+    const secondaryLang = cfg.secondaryLanguageCode ?? "ar";
+
+    const query = `
+      SELECT ${cfg.textColumn} AS text_value, ${cfg.secondaryColumn ? `MAX(${cfg.secondaryColumn})` : "NULL"} AS secondary_value
+      FROM ${cfg.table}
+      WHERE ${cfg.textColumn} IS NOT NULL AND btrim(${cfg.textColumn}) <> ''
+        ${cfg.whereSql ? `AND ${cfg.whereSql}` : ""}
+      GROUP BY ${cfg.textColumn}
+    `;
+    const rows = (await sql.unsafe(query)) as { text_value: string; secondary_value: string | null }[];
+
+    for (const row of rows) {
+      const baseText = row.text_value.trim();
+      const keyCode = `${cfg.keyPrefix}.${slugify(baseText)}`;
+      await upsertKey(counters, cfg.categoryCode, keyCode, baseText, baseLang, secondaryLang, row.secondary_value);
+    }
+  }
+
+  return counters;
 }
