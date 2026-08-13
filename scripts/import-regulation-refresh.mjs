@@ -54,9 +54,9 @@ async function upsertFramework({ name, code, description, groupCode, assessmentM
 
 async function seedComplianceOnlyLevel(fwId) {
   await sql`
-    INSERT INTO bayanat.gov_compliance_level_config (framework_id, level_num, name, color_hex, description)
-    VALUES (${fwId}, 0, 'Requirement', '#2D4AA0', 'Every requirement in this framework — assessed individually, not against a maturity scale.')
-    ON CONFLICT (framework_id, level_num) DO NOTHING
+    INSERT INTO bayanat.gov_compliance_level_config (framework_id, level_num, name, color_hex, description, name_ar)
+    VALUES (${fwId}, 0, 'Requirement', '#2D4AA0', 'Every requirement in this framework — assessed individually, not against a maturity scale.', 'متطلب')
+    ON CONFLICT (framework_id, level_num) DO UPDATE SET name_ar = EXCLUDED.name_ar
   `;
 }
 
@@ -183,13 +183,17 @@ async function upsertTranslationKey(categoryCode, keyCode, baseText, secondaryLa
   return keyId;
 }
 
-async function registerRequirementTranslations(reqId, r, contextNote) {
+async function registerRequirementTranslations(reqId, r, contextNote, { includeStandardKey = true } = {}) {
   const keyIds = [];
   const fields = [
     ["question", r.questionEn, r.requirementAr],
     ["admission_criteria", r.admissionCriteriaEn, r.admissionCriteriaAr],
     ["supporting_evidence", r.supportingEvidenceEn, r.supportingEvidenceAr],
-    ["standard", r.standardEn, r.standardAr],
+    // NDI's "standard" is a bare technical code (e.g. "DSI.MQ.2") that's the
+    // same string in both languages, not real bilingual prose like DCC/PDPL's
+    // — tracking it as a translation key just creates permanent MISSING debt
+    // for something that will never have a meaningful Arabic translation.
+    ...(includeStandardKey ? [["standard", r.standardEn, r.standardAr]] : []),
   ];
   for (const [suffix, en, ar] of fields) {
     const baseText = trim(en);
@@ -207,6 +211,17 @@ async function registerDomainTranslation(fwId, domainCode, nameEn, nameAr) {
 
 const AI_TRANSLATED_CONTEXT_NOTE =
   "Base English text was AI-translated from the authoritative Arabic source — recommend a human review pass.";
+
+// Deleting a requirement row doesn't cascade to its translation_keys (they're
+// keyed by req_id embedded in a text key_code, no real FK) — clean those up
+// explicitly so deleted requirements don't leave permanent MISSING-Arabic
+// debt sitting in the Language Management coverage denominator forever.
+async function deleteOrphanedTranslationKeys(reqIds) {
+  if (reqIds.length === 0) return;
+  const suffixes = ["question", "admission_criteria", "supporting_evidence", "management_sector", "standard"];
+  const keyCodes = reqIds.flatMap((id) => suffixes.map((s) => `compliance.req.${id}.${s}`));
+  await sql`DELETE FROM bayanat.translation_keys WHERE key_code = ANY(${keyCodes})`;
+}
 
 // ── Full replace (PDPL, DCC): old and new req_code schemes only coincidentally
 // overlap (both happen to number sequentially from 1, but from unrelated
@@ -230,6 +245,7 @@ async function reportAndDeleteAll(fwId, frameworkCode) {
 
   if (DRY_RUN) { console.log("      DRY_RUN=1 — not deleting."); return; }
   await sql`DELETE FROM bayanat.gov_compliance_requirements WHERE req_id = ANY(${reqIds})`;
+  await deleteOrphanedTranslationKeys(reqIds);
   console.log("      Cleared.");
 }
 
@@ -256,6 +272,7 @@ async function reportAndDeleteMissing(fwId, frameworkCode, seenCodes) {
     return;
   }
   await sql`DELETE FROM bayanat.gov_compliance_requirements WHERE req_id = ANY(${reqIds})`;
+  await deleteOrphanedTranslationKeys(reqIds);
   console.log("      Deleted.");
 }
 
@@ -342,7 +359,7 @@ async function importNdiRefresh() {
     await registerRequirementTranslations(reqId, {
       questionEn: requirementEn, requirementAr, admissionCriteriaEn: admEn, admissionCriteriaAr: admAr,
       standardEn, standardAr, supportingEvidenceEn: evEn, supportingEvidenceAr: evAr,
-    }, note);
+    }, note, { includeStandardKey: false });
 
     const domainKey = (domainEn || "").trim();
     if (domainKey && !domainSeen.has(domainKey)) domainSeen.set(domainKey, { domainAr, sortOrder: domainSeen.size });
