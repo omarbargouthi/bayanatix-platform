@@ -22,6 +22,7 @@ export type ComplianceRequirement = {
   reqCode:               string;
   standard:              string | null;
   standardCode:          string | null;
+  standardAr:            string | null;
   domain:                string | null;
   domainCode:            string | null;
   question:              string;
@@ -175,6 +176,7 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       r.req_code                AS "reqCode",
       r.standard,
       r.standard_code           AS "standardCode",
+      r.standard_ar             AS "standardAr",
       r.domain,
       r.domain_code             AS "domainCode",
       r.req_text                AS "question",

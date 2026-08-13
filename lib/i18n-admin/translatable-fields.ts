@@ -102,6 +102,10 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
       { keySuffix: "supporting_evidence", textColumn: "supporting_evidence_en", secondaryColumn: "supporting_evidence" },
       { keySuffix: "admission_criteria", textColumn: "admission_criteria_en", secondaryColumn: "admission_criteria" },
       { keySuffix: "management_sector", textColumn: "management_sector_en", secondaryColumn: "management_sector" },
+      // standard has no _en sidecar column — it's always held English directly
+      // (matching every existing import script), with standard_ar added as the
+      // new bilingual-tracked secondary for the regulation-frameworks refresh.
+      { keySuffix: "standard", textColumn: "standard", secondaryColumn: "standard_ar" },
     ],
   },
 ];
