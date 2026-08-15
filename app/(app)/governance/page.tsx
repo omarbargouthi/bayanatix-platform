@@ -15,7 +15,7 @@ export default async function GovernancePage() {
   const [sectionCounts, registers, frameworks] = await Promise.all([
     getSectionCounts(),
     listRegisters(),
-    listFrameworks(),
+    listFrameworks(false), // only regulations the admin has marked applicable — matches /governance/compliance
   ]);
 
   return (
