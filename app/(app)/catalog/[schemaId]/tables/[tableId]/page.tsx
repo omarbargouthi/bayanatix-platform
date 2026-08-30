@@ -76,6 +76,7 @@ export default async function TablePage({
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
           { label: "Data Catalog", href: "/catalog" },
+          ...(entity.source ? [{ label: entity.source.sourceName, href: "/catalog" }] : []),
           ...(entity.schema
             ? [{ label: entity.schema.schemaName, href: `/catalog/${entity.schema.schemaId}` }]
             : []),
