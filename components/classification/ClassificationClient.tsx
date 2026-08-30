@@ -57,21 +57,32 @@ function InlineClassPicker({
   };
 
   return (
-    <div ref={ref} className="relative inline-block">
-      <button
-        onClick={openPicker}
-        className="flex items-center gap-1.5 text-[12px] text-brand-purple hover:underline focus:outline-none"
-      >
-        {current ? (
-          <span className="flex items-center gap-1">
-            <ClassificationTag code={current.code} />
-            <span className="font-medium truncate max-w-[120px]">{current.name}</span>
-          </span>
-        ) : (
-          <span className="text-muted italic">{t.classification.assignPlaceholder}</span>
+    <div ref={ref} className="relative">
+      <div className="flex items-start gap-1">
+        <button
+          onClick={openPicker}
+          className="flex items-start gap-1.5 text-[12px] text-brand-purple hover:underline focus:outline-none min-w-0 flex-1 text-left"
+        >
+          {current ? (
+            <span className="flex items-start gap-1 flex-wrap min-w-0">
+              <ClassificationTag code={current.code} />
+              <span className="font-medium break-words whitespace-normal">{current.name}</span>
+            </span>
+          ) : (
+            <span className="text-muted italic">{t.classification.assignPlaceholder}</span>
+          )}
+          <svg className="w-3 h-3 text-muted shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        {current && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            title={t.classification.removeClassification}
+            className="shrink-0 mt-0.5 p-0.5 rounded-full text-muted hover:text-red-600 hover:bg-red-50 focus:outline-none"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         )}
-        <svg className="w-3 h-3 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
+      </div>
 
       {open && (
         <div className="absolute z-50 left-0 top-full mt-1 w-64 bg-white border border-line rounded-xl shadow-xl overflow-hidden">
@@ -544,7 +555,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                 </div>
 
                 {/* Classification Term (inline picker) */}
-                <div className="min-w-0 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
                   {canEdit ? (
                     <InlineClassPicker
                       current={row.classTermId ? { id: row.classTermId, name: row.classTermName!, code: row.classTermClassCode } : null}
@@ -553,7 +564,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                     />
                   ) : (
                     row.classTermName
-                      ? <span className="block truncate text-[12px] font-medium text-brand-deep" title={row.classTermName}>{row.classTermName}</span>
+                      ? <span className="block break-words whitespace-normal text-[12px] font-medium text-brand-deep">{row.classTermName}</span>
                       : <span className="text-muted text-[12px]">—</span>
                   )}
                 </div>
