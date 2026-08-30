@@ -544,7 +544,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                 </div>
 
                 {/* Classification Term (inline picker) */}
-                <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+                <div className="min-w-0 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                   {canEdit ? (
                     <InlineClassPicker
                       current={row.classTermId ? { id: row.classTermId, name: row.classTermName!, code: row.classTermClassCode } : null}
@@ -553,7 +553,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
                     />
                   ) : (
                     row.classTermName
-                      ? <span className="text-[12px] font-medium text-brand-deep">{row.classTermName}</span>
+                      ? <span className="block truncate text-[12px] font-medium text-brand-deep" title={row.classTermName}>{row.classTermName}</span>
                       : <span className="text-muted text-[12px]">—</span>
                   )}
                 </div>
