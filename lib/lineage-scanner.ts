@@ -2,7 +2,7 @@ import postgres from "postgres";
 import { createHash } from "node:crypto";
 import { parse as pgParse } from "libpg-query";
 import { sql } from "./db";
-import type { LineageLayerCode } from "./queries/lineage";
+import { ensureSchema, ensureEntity, ensureAttribute } from "./lineage/catalog-upsert";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -384,61 +384,9 @@ export async function extractLineageFromDefinitionAsync(
 }
 
 // ── Catalog resolution (idempotent, non-destructive) ────────────────────────
-
-async function ensureSchema(dataSourceId: number, schemaName: string): Promise<number> {
-  const [existing] = await sql<{ id: number }[]>`
-    SELECT schema_id AS id FROM bayanat.data_schemas WHERE data_source_id = ${dataSourceId} AND schema_name_text = ${schemaName}
-  `;
-  if (existing) return existing.id;
-  const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.data_schemas (data_source_id, schema_name_text) VALUES (${dataSourceId}, ${schemaName})
-    RETURNING schema_id AS id
-  `;
-  return row.id;
-}
-
-// Layer classification heuristic per requirements §6.5: name-prefix conventions
-// for RAW/STAGING, is_view_indicator for VIEW, else TABLE. SOURCE/DASHBOARD are
-// reserved for future connectors and aren't inferred here.
-function classifyLayer(tableName: string, isView: boolean): LineageLayerCode {
-  if (isView) return "VIEW";
-  const n = tableName.toLowerCase();
-  if (n.startsWith("raw_") || n.endsWith("_raw")) return "RAW";
-  if (n.startsWith("stg_") || n.endsWith("_stg")) return "STAGING";
-  return "TABLE";
-}
-
-async function ensureEntity(schemaId: number, tableName: string, isView: boolean): Promise<number> {
-  const [existing] = await sql<{ id: number }[]>`
-    SELECT entity_id AS id FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${tableName}
-  `;
-  if (existing) {
-    await sql`
-      UPDATE bayanat.data_entities SET layer_code = ${classifyLayer(tableName, isView)}
-      WHERE entity_id = ${existing.id} AND layer_code IS NULL
-    `;
-    return existing.id;
-  }
-  const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.data_entities (schema_id, entity_name_text, display_name_text, is_view_indicator, layer_code)
-    VALUES (${schemaId}, ${tableName}, ${tableName}, ${isView}, ${classifyLayer(tableName, isView)})
-    RETURNING entity_id AS id
-  `;
-  return row.id;
-}
-
-async function ensureAttribute(entityId: number, columnName: string, dataType: string | null): Promise<number> {
-  const [existing] = await sql<{ id: number }[]>`
-    SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${entityId} AND physical_name_text = ${columnName}
-  `;
-  if (existing) return existing.id;
-  const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.data_attributes (entity_id, physical_name_text, friendly_name_text, data_type_text)
-    VALUES (${entityId}, ${columnName}, ${columnName}, ${dataType ?? "unknown"})
-    RETURNING attribute_id AS id
-  `;
-  return row.id;
-}
+// ensureSchema/ensureEntity/ensureAttribute now live in ./lineage/catalog-upsert
+// (extracted so the v2 SSIS/Power BI connectors reuse the exact same upsert
+// pattern instead of duplicating it) — imported above.
 
 // ── Scan orchestrator ────────────────────────────────────────────────────────
 
