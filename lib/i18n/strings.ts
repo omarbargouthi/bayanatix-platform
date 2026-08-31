@@ -1091,6 +1091,8 @@ export type I18nStrings = {
 
   // ── Data Lineage graph ──────────────────────────────────────────────────────
   lineage: {
+    pageTitle:          string;
+    pageDesc:           string;
     searchPlaceholder: string;
     tableLevel:         string;
     columnLevel:         string;
@@ -1102,13 +1104,23 @@ export type I18nStrings = {
     currentAsset:        string;
     loadingColumns:      string;
     layers: {
-      source:    string;
-      raw:       string;
-      staging:   string;
-      table:     string;
-      view:      string;
-      dashboard: string;
+      source:        string;
+      raw:           string;
+      staging:       string;
+      table:         string;
+      view:          string;
+      lakehouse:     string;
+      semanticModel: string;
+      report:        string;
     };
+    engines: {
+      oracle:   string;
+      mssql:    string;
+      postgres: string;
+      powerbi:  string;
+      fabric:   string;
+    };
+    groupBySystem: string;
     detail: {
       quality:    string;
       owner:      string;

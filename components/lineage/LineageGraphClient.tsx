@@ -8,7 +8,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
-import { LineageNodeCard, layerLabels, LAYER_DOT, type LineageNodeData } from "./LineageNode";
+import { LineageNodeCard, layerLabels, LAYER_DOT, EngineGlyph, engineLabels, type LineageNodeData } from "./LineageNode";
 import { ImpactReportPanel } from "./ImpactReportPanel";
 import { useLang } from "@/lib/lang-context";
 
@@ -17,7 +17,7 @@ type Scope = "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
 
 type GraphNode = {
   entityId: number; entityName: string; layerCode: string | null; schemaName: string | null;
-  sourceName: string | null; ownerName: string | null; qualityStatus: string; dqTagCount: number;
+  sourceName: string | null; sourceTypeCode: string | null; ownerName: string | null; qualityStatus: string; dqTagCount: number;
   columnCount: number; rowCountEstimate: number | null; isCurrent: boolean; hasUpstreamIssue: boolean;
   columns: { attributeId: number; name: string }[];
 };
@@ -36,7 +36,7 @@ type Graph = {
   counts: { upstreamTotal: number; downstreamTotal: number };
 };
 
-type SearchResult = { assetType: AssetType; assetId: number; name: string; entityName: string | null; schemaName: string | null };
+type SearchResult = { assetType: AssetType; assetId: number; name: string; entityName: string | null; schemaName: string | null; attributeClassCode: string | null };
 
 const NODE_W = 210, NODE_H = 92;
 
@@ -53,7 +53,26 @@ function layoutNodes(nodes: Node[], edges: Edge[]): Node[] {
   });
 }
 
-const LEGEND_ITEMS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "DASHBOARD"];
+// Swimlanes (FR-12.2): re-band the already-computed dagre Y positions by each
+// node's source system, keeping dagre's X (topological rank) untouched — the
+// left-to-right data-flow order is what dagre gets right; grouping by system is
+// a pure Y-axis re-bucketing on top of it, not a different layout algorithm.
+const BAND_HEIGHT = 170;
+function applySwimlanes(laidOutNodes: Node[], systemOf: Map<string, string>): Node[] {
+  const order: string[] = [];
+  for (const n of laidOutNodes) {
+    const sys = systemOf.get(n.id) ?? "—";
+    if (!order.includes(sys)) order.push(sys);
+  }
+  const bandIndex = new Map(order.map((sys, i) => [sys, i]));
+  return laidOutNodes.map((n) => {
+    const sys = systemOf.get(n.id) ?? "—";
+    const band = bandIndex.get(sys) ?? 0;
+    return { ...n, position: { x: n.position.x, y: band * BAND_HEIGHT + (n.position.y % (BAND_HEIGHT - NODE_H - 20)) } };
+  });
+}
+
+const LEGEND_ITEMS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"];
 
 function LineageGraphInner({
   initialAssetType, initialAssetId, canManage, preserveParams = {},
@@ -91,6 +110,12 @@ function LineageGraphInner({
   const [searchOpen, setSearchOpen] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // FR-12.2: user-toggleable; effectively a no-op (single band) when the graph
+  // only spans one system, which is how "default ON when >1 source" falls out
+  // naturally without needing separate default-tracking state.
+  const [groupBySystem, setGroupBySystem] = useState(true);
+  const systemCount = useMemo(() => new Set((graph?.nodes ?? []).map((n) => n.sourceTypeCode ?? n.sourceName ?? "—")).size, [graph]);
+
   // ── Fetch graph on focus/scope/depth change ─────────────────────────────
   useEffect(() => {
     if (!focus) return;
@@ -120,7 +145,7 @@ function LineageGraphInner({
       type: "lineageNode",
       position: { x: 0, y: 0 },
       data: {
-        entityId: n.entityId, entityName: n.entityName, layerCode: n.layerCode,
+        entityId: n.entityId, entityName: n.entityName, layerCode: n.layerCode, sourceTypeCode: n.sourceTypeCode,
         qualityStatus: n.qualityStatus, hasUpstreamIssue: n.hasUpstreamIssue, isCurrent: n.isCurrent,
         columnCount: n.columnCount, columns: n.columns, scope, onSelectColumn: refocusToColumn, t: t.lineage,
       } satisfies LineageNodeData,
@@ -134,9 +159,14 @@ function LineageGraphInner({
       style: { stroke: e.isConfirmed ? "#6058A0" : "#94a3b8", strokeWidth: 1.75, strokeDasharray: e.provenanceCode === "SCANNED" && !e.isConfirmed ? "5 3" : undefined },
       markerEnd: { type: MarkerType.ArrowClosed, color: e.isConfirmed ? "#6058A0" : "#94a3b8", width: 16, height: 16 },
     }));
-    setNodes(layoutNodes(rfNodes, rfEdges));
+    let laidOut = layoutNodes(rfNodes, rfEdges);
+    if (groupBySystem) {
+      const systemOf = new Map(graph.nodes.map((n) => [String(n.entityId), n.sourceTypeCode ?? n.sourceName ?? "—"]));
+      laidOut = applySwimlanes(laidOut, systemOf);
+    }
+    setNodes(laidOut);
     setEdges(rfEdges);
-  }, [graph, scope, refocusToColumn, setNodes, setEdges, t.lineage]);
+  }, [graph, scope, groupBySystem, refocusToColumn, setNodes, setEdges, t.lineage]);
 
   // ── Search typeahead ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -209,7 +239,10 @@ function LineageGraphInner({
             <div className="absolute top-full mt-1 w-full bg-white border border-line rounded-lg shadow-lg max-h-64 overflow-y-auto z-10">
               {searchResults.map((r) => (
                 <button key={`${r.assetType}-${r.assetId}`} onClick={() => selectSearchResult(r)} className="w-full text-left px-3 py-2 hover:bg-canvas-soft text-sm border-b border-line-soft last:border-0">
-                  <span className="font-medium text-ink">{r.entityName ? `${r.entityName}.${r.name}` : r.name}</span>
+                  <span className="font-medium text-ink">
+                    {r.entityName ? (r.attributeClassCode === "MEASURE" ? `${r.entityName}[${r.name}]` : `${r.entityName}.${r.name}`) : r.name}
+                    {r.attributeClassCode === "MEASURE" && <span className="text-amber-600 font-bold ml-1" title="DAX measure">ƒx</span>}
+                  </span>
                   {r.schemaName && <span className="text-xs text-muted ml-2">{r.schemaName}</span>}
                 </button>
               ))}
@@ -237,7 +270,10 @@ function LineageGraphInner({
             <div className="absolute top-full mt-1 w-72 bg-white border border-line rounded-lg shadow-lg max-h-72 overflow-y-auto z-20">
               {searchResults.map((r) => (
                 <button key={`${r.assetType}-${r.assetId}`} onMouseDown={() => selectSearchResult(r)} className="w-full text-left px-3 py-2 hover:bg-canvas-soft text-sm border-b border-line-soft last:border-0">
-                  <span className="font-medium text-ink">{r.entityName ? `${r.entityName}.${r.name}` : r.name}</span>
+                  <span className="font-medium text-ink">
+                    {r.entityName ? (r.attributeClassCode === "MEASURE" ? `${r.entityName}[${r.name}]` : `${r.entityName}.${r.name}`) : r.name}
+                    {r.attributeClassCode === "MEASURE" && <span className="text-amber-600 font-bold ml-1" title="DAX measure">ƒx</span>}
+                  </span>
                   {r.schemaName && <span className="text-xs text-muted ml-2">{r.schemaName}</span>}
                 </button>
               ))}
@@ -258,6 +294,15 @@ function LineageGraphInner({
           <span>{t.lineage.downstreamLabel.replace("{n}", String(downDepth))}</span>
           <button onClick={() => setDownDepth((d) => Math.min(5, d + 1))} className="w-5 h-5 flex items-center justify-center hover:bg-canvas-soft rounded">+</button>
         </div>
+
+        {systemCount > 1 && (
+          <button
+            onClick={() => setGroupBySystem((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${groupBySystem ? "bg-brand-purple text-white border-brand-purple" : "bg-white text-ink-soft border-line hover:bg-canvas-soft"}`}
+          >
+            {t.lineage.groupBySystem}
+          </button>
+        )}
 
         <div className="flex items-center gap-3 ml-auto text-[11px] text-muted">
           {LEGEND_ITEMS.map((code) => (
@@ -305,6 +350,7 @@ function LineageGraphInner({
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${layerLabels(t.lineage)[selectedNode.layerCode ?? ""] ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
                 {layerLabels(t.lineage)[selectedNode.layerCode ?? ""] ?? selectedNode.layerCode ?? "—"}
               </span>
+              <EngineGlyph engineCode={selectedNode.sourceTypeCode} label={engineLabels(t.lineage)[selectedNode.sourceTypeCode ?? ""]} />
             </div>
             <div>
               <div className="text-sm font-bold text-brand-purple">{selectedNode.entityName}</div>

@@ -994,6 +994,8 @@ export const en: I18nStrings = {
   },
 
   lineage: {
+    pageTitle:          "Data Lineage",
+    pageDesc:           "Trace how data flows across every connected system.",
     searchPlaceholder: "Find asset in graph",
     tableLevel:         "Table-level",
     columnLevel:         "Column-level",
@@ -1005,13 +1007,23 @@ export const en: I18nStrings = {
     currentAsset:        "CURRENT ASSET",
     loadingColumns:      "Loading…",
     layers: {
-      source:    "Source",
-      raw:       "Raw",
-      staging:   "Staging",
-      table:     "Table",
-      view:      "View",
-      dashboard: "Dashboard",
+      source:        "Source",
+      raw:           "Raw",
+      staging:       "Staging",
+      table:         "Table",
+      view:          "View",
+      lakehouse:     "Lakehouse",
+      semanticModel: "Semantic model",
+      report:        "Report",
     },
+    engines: {
+      oracle:   "Oracle",
+      mssql:    "SQL Server",
+      postgres: "Postgres",
+      powerbi:  "Power BI",
+      fabric:   "Fabric",
+    },
+    groupBySystem: "Group by system",
     detail: {
       quality:    "Quality",
       owner:      "Owner",

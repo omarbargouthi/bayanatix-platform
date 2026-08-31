@@ -5,7 +5,7 @@ import { sql } from "../db";
 export type LineageScopeCode = "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
 export type LineageAssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
 export type LineageQualityStatus = "CRITICAL" | "WARNING" | "GOOD" | "UNKNOWN";
-export type LineageLayerCode = "SOURCE" | "RAW" | "STAGING" | "TABLE" | "VIEW" | "DASHBOARD";
+export type LineageLayerCode = "SOURCE" | "RAW" | "STAGING" | "TABLE" | "VIEW" | "LAKEHOUSE" | "SEMANTIC_MODEL" | "REPORT";
 
 export type ImpactAssetRow = {
   depth:                    number;
@@ -239,6 +239,7 @@ export type LineageGraphNode = {
   layerCode:         LineageLayerCode | null;
   schemaName:        string | null;
   sourceName:        string | null;
+  sourceTypeCode:    string | null;
   ownerName:         string | null;
   qualityStatus:     LineageQualityStatus;
   dqTagCount:        number;
@@ -277,7 +278,7 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
   if (entityIds.length === 0) return new Map();
   const rows = await sql<{
     entityId: number; entityName: string; layerCode: LineageLayerCode | null;
-    schemaName: string | null; sourceName: string | null; ownerName: string | null;
+    schemaName: string | null; sourceName: string | null; sourceTypeCode: string | null; ownerName: string | null;
     qualityStatus: LineageQualityStatus; dqTagCount: number; columnCount: number; rowCountEstimate: number | null;
   }[]>`
     SELECT
@@ -286,6 +287,7 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
       e.layer_code                              AS "layerCode",
       s.schema_name_text                        AS "schemaName",
       src.source_name_text                      AS "sourceName",
+      src.source_type_code                      AS "sourceTypeCode",
       owner.full_name                           AS "ownerName",
       COALESCE(qual.status, 'UNKNOWN')          AS "qualityStatus",
       (SELECT COUNT(*)::int FROM bayanat.asset_tags at WHERE at.asset_type_code = 'DATA_ENTITIES' AND at.asset_id = e.entity_id) AS "dqTagCount",
@@ -324,7 +326,7 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
     Number(r.entityId),
     {
       entityId: Number(r.entityId), entityName: r.entityName, layerCode: r.layerCode,
-      schemaName: r.schemaName, sourceName: r.sourceName, ownerName: r.ownerName,
+      schemaName: r.schemaName, sourceName: r.sourceName, sourceTypeCode: r.sourceTypeCode, ownerName: r.ownerName,
       qualityStatus: r.qualityStatus, dqTagCount: Number(r.dqTagCount), columnCount: Number(r.columnCount),
       rowCountEstimate: r.rowCountEstimate != null ? Number(r.rowCountEstimate) : null,
       isCurrent: Number(r.entityId) === currentEntityId, hasUpstreamIssue: false, columns: [],
@@ -497,7 +499,7 @@ function markUpstreamIssues(
 
 // ── Search (typeahead for the graph) ────────────────────────────────────────
 
-export type LineageSearchResult = { assetType: LineageAssetType; assetId: number; name: string; entityName: string | null; schemaName: string | null };
+export type LineageSearchResult = { assetType: LineageAssetType; assetId: number; name: string; entityName: string | null; schemaName: string | null; attributeClassCode: string | null };
 
 export async function searchLineageAssets(q: string): Promise<LineageSearchResult[]> {
   const like = `%${q}%`;
@@ -509,8 +511,8 @@ export async function searchLineageAssets(q: string): Promise<LineageSearchResul
       WHERE e.entity_name_text ILIKE ${like}
       ORDER BY e.entity_name_text LIMIT 10
     `,
-    sql<{ assetId: number; name: string; entityName: string; schemaName: string | null }[]>`
-      SELECT a.attribute_id AS "assetId", a.physical_name_text AS name, e.entity_name_text AS "entityName", s.schema_name_text AS "schemaName"
+    sql<{ assetId: number; name: string; entityName: string; schemaName: string | null; attributeClassCode: string | null }[]>`
+      SELECT a.attribute_id AS "assetId", a.physical_name_text AS name, e.entity_name_text AS "entityName", s.schema_name_text AS "schemaName", a.attribute_class_code AS "attributeClassCode"
       FROM bayanat.data_attributes a
       JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
       LEFT JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
@@ -519,7 +521,7 @@ export async function searchLineageAssets(q: string): Promise<LineageSearchResul
     `,
   ]);
   return [
-    ...entities.map((e) => ({ assetType: "DATA_ENTITIES" as const, assetId: Number(e.assetId), name: e.name, entityName: null, schemaName: e.schemaName })),
-    ...attrs.map((a) => ({ assetType: "DATA_ATTRIBUTES" as const, assetId: Number(a.assetId), name: a.name, entityName: a.entityName, schemaName: a.schemaName })),
+    ...entities.map((e) => ({ assetType: "DATA_ENTITIES" as const, assetId: Number(e.assetId), name: e.name, entityName: null, schemaName: e.schemaName, attributeClassCode: null })),
+    ...attrs.map((a) => ({ assetType: "DATA_ATTRIBUTES" as const, assetId: Number(a.assetId), name: a.name, entityName: a.entityName, schemaName: a.schemaName, attributeClassCode: a.attributeClassCode })),
   ];
 }

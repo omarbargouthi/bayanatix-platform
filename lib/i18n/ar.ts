@@ -994,6 +994,8 @@ export const ar: I18nStrings = {
   },
 
   lineage: {
+    pageTitle:          "مسار البيانات",
+    pageDesc:           "تتبّع كيفية تدفق البيانات عبر كل نظام متصل.",
     searchPlaceholder: "ابحث عن أصل في المخطط",
     tableLevel:         "مستوى الجدول",
     columnLevel:         "مستوى العمود",
@@ -1005,13 +1007,23 @@ export const ar: I18nStrings = {
     currentAsset:        "الأصل الحالي",
     loadingColumns:      "جارٍ التحميل…",
     layers: {
-      source:    "المصدر",
-      raw:       "خام",
-      staging:   "تجهيز",
-      table:     "جدول",
-      view:      "عرض",
-      dashboard: "لوحة معلومات",
+      source:        "المصدر",
+      raw:           "خام",
+      staging:       "تجهيز",
+      table:         "جدول",
+      view:          "عرض",
+      lakehouse:     "بحيرة بيانات",
+      semanticModel: "نموذج دلالي",
+      report:        "تقرير",
     },
+    engines: {
+      oracle:   "أوراكل",
+      mssql:    "SQL Server",
+      postgres: "بوستجرس",
+      powerbi:  "Power BI",
+      fabric:   "Fabric",
+    },
+    groupBySystem: "التجميع حسب النظام",
     detail: {
       quality:    "الجودة",
       owner:      "المالك",

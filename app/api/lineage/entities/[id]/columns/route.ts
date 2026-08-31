@@ -11,10 +11,11 @@ export async function GET(_req: Request, { params }: Ctx) {
   const entityId = Number(params.id);
   if (!Number.isFinite(entityId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  const rows = await sql<{ attributeId: number; name: string; qualityStatus: string }[]>`
+  const rows = await sql<{ attributeId: number; name: string; qualityStatus: string; attributeClassCode: string | null }[]>`
     SELECT
       a.attribute_id AS "attributeId",
       a.physical_name_text AS name,
+      a.attribute_class_code AS "attributeClassCode",
       CASE
         WHEN EXISTS (SELECT 1 FROM bayanat.dq_rules r WHERE r.asset_type_code = 'DATA_ATTRIBUTES' AND r.asset_id = a.attribute_id AND r.is_active_indicator = true AND r.severity_level_code = 'CRITICAL' AND r.last_status_code = 'FAILED')
           THEN 'CRITICAL'
