@@ -1537,6 +1537,55 @@ export type I18nStrings = {
     };
   };
 
+  // ── Homepage (personalized widget board) ──────────────────────────────────
+  homepage: {
+    pageTitle:        string;
+    pageDesc:         string;
+    customize:        string;
+    doneCustomizing:  string;
+    addWidget:        string;
+    addWidgetTitle:   string;
+    removeWidget:     string;
+    noWidgets:        string;
+    noWidgetsHint:    string;
+    allAdded:         string;
+    widgetTitles: {
+      needsAction:    string;
+      myRequests:     string;
+      stewardDomains: string;
+      quickLinks:     string;
+      savedSearches:  string;
+      recentAssets:   string;
+    };
+    needsAction: {
+      empty: string;
+    };
+    myRequests: {
+      openCount:  string; // supports {n}
+      raisedByMe: string;
+      onMyAsset:  string;
+      empty:      string;
+      viewAll:    string;
+    };
+    stewardDomains: {
+      openRequests: string; // supports {n}
+      empty:        string;
+    };
+    quickLinks: {
+      catalog:        string;
+      classification: string;
+      reports:        string;
+      requests:       string;
+      admin:          string;
+    };
+    savedSearches: {
+      empty: string;
+    };
+    recentAssets: {
+      empty: string;
+    };
+  };
+
   // ── AI Metadata Enrichment (descriptions + DQ rule suggestions) ──────────────
   enrichment: {
     suggest:            string;

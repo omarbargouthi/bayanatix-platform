@@ -1427,6 +1427,54 @@ export const ar: I18nStrings = {
     },
   },
 
+  homepage: {
+    pageTitle:       "الصفحة الرئيسية",
+    pageDesc:        "عرضك الشخصي — اختر الأدوات التي تهمك.",
+    customize:       "تخصيص",
+    doneCustomizing: "تم",
+    addWidget:       "+ إضافة أداة",
+    addWidgetTitle:  "إضافة أداة",
+    removeWidget:    "إزالة الأداة",
+    noWidgets:       "لا توجد أدوات بعد",
+    noWidgetsHint:   "انقر على \"إضافة أداة\" لبناء صفحتك الرئيسية.",
+    allAdded:        "جميع الأدوات مضافة بالفعل إلى صفحتك الرئيسية.",
+    widgetTitles: {
+      needsAction:    "يتطلب إجرائي",
+      myRequests:     "طلباتي",
+      stewardDomains: "نطاقاتي",
+      quickLinks:     "روابط سريعة",
+      savedSearches:  "عمليات البحث المحفوظة",
+      recentAssets:   "الأصول الأخيرة",
+    },
+    needsAction: {
+      empty: "أنت على اطلاع كامل — لا يوجد ما يتطلب إجراءك.",
+    },
+    myRequests: {
+      openCount:  "{n} مفتوح",
+      raisedByMe: "قدمته أنا",
+      onMyAsset:  "على أحد أصولي",
+      empty:      "لا توجد طلبات مفتوحة.",
+      viewAll:    "عرض جميع الطلبات",
+    },
+    stewardDomains: {
+      openRequests: "{n} طلب(ات) مفتوحة",
+      empty:        "أنت لست أميناً على أي نطاقات حالياً.",
+    },
+    quickLinks: {
+      catalog:        "كتالوج البيانات",
+      classification: "التصنيف",
+      reports:        "التقارير",
+      requests:       "الطلبات",
+      admin:          "الإدارة",
+    },
+    savedSearches: {
+      empty: "لا توجد عمليات بحث محفوظة بعد.",
+    },
+    recentAssets: {
+      empty: "لا توجد أصول تمت زيارتها مؤخراً.",
+    },
+  },
+
   enrichment: {
     suggest:            "✨ اقتراح",
     suggesting:         "جارٍ الاقتراح…",

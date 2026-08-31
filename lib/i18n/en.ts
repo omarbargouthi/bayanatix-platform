@@ -1427,6 +1427,54 @@ export const en: I18nStrings = {
     },
   },
 
+  homepage: {
+    pageTitle:       "Homepage",
+    pageDesc:        "Your personal view — pick the widgets that matter to you.",
+    customize:       "Customize",
+    doneCustomizing: "Done",
+    addWidget:       "+ Add Widget",
+    addWidgetTitle:  "Add a widget",
+    removeWidget:    "Remove widget",
+    noWidgets:       "No widgets yet",
+    noWidgetsHint:   "Click \"Add Widget\" to build your homepage.",
+    allAdded:        "All widgets are already on your homepage.",
+    widgetTitles: {
+      needsAction:    "Needs My Action",
+      myRequests:     "My Requests",
+      stewardDomains: "My Domains",
+      quickLinks:     "Quick Links",
+      savedSearches:  "Saved Searches",
+      recentAssets:   "Recent Assets",
+    },
+    needsAction: {
+      empty: "You're all caught up — nothing needs your action.",
+    },
+    myRequests: {
+      openCount:  "{n} open",
+      raisedByMe: "Raised by me",
+      onMyAsset:  "On my asset",
+      empty:      "No open requests.",
+      viewAll:    "View all requests",
+    },
+    stewardDomains: {
+      openRequests: "{n} open request(s)",
+      empty:        "You aren't stewarding any domains yet.",
+    },
+    quickLinks: {
+      catalog:        "Data Catalog",
+      classification: "Classification",
+      reports:        "Reports",
+      requests:       "Requests",
+      admin:          "Admin",
+    },
+    savedSearches: {
+      empty: "No saved searches yet.",
+    },
+    recentAssets: {
+      empty: "No recently visited assets yet.",
+    },
+  },
+
   enrichment: {
     suggest:            "✨ Suggest",
     suggesting:         "Suggesting…",
