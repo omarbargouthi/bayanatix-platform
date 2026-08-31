@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import { LineageGraphClient } from "@/components/lineage/LineageGraphClient";
 
@@ -15,9 +16,16 @@ export function LineagePageClient({
   const { t } = useLang();
   return (
     <main className="px-8 py-7 pb-14">
-      <div className="mb-5">
-        <h1 className="text-2xl font-extrabold text-brand-deep">{t.lineage.pageTitle}</h1>
-        <p className="text-sm text-muted mt-1">{t.lineage.pageDesc}</p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold text-brand-deep">{t.lineage.pageTitle}</h1>
+          <p className="text-sm text-muted mt-1">{t.lineage.pageDesc}</p>
+        </div>
+        {canManage && (
+          <Link href="/lineage/stitching" className="btn btn-sm shrink-0">
+            Stitching Review
+          </Link>
+        )}
       </div>
       <div className="w-full rounded-xl overflow-hidden border border-line" style={{ height: "calc(100vh - 220px)" }}>
         <LineageGraphClient
