@@ -183,7 +183,7 @@ export async function getSchemaById(schemaId: number): Promise<
       s.asset_id as "entityId",
       s.user_id  as "userId",
       u.full_name as "fullName",
-      upper(left(coalesce(u.full_name, u.user_id), 1) || coalesce(split_part(u.full_name,' ',2),'')) as "initials",
+      upper(left(coalesce(u.full_name, s.user_id), 1) || coalesce(split_part(u.full_name,' ',2),'')) as "initials",
       s.role_code as "role"
     from bayanat.asset_stakeholders s
     left join bayanat.users u on u.user_id = s.user_id

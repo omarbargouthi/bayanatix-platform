@@ -24,7 +24,8 @@ export function Avatar({
   seed?: string;
   className?: string;
 }) {
-  const grad = colorFor(seed ?? initials);
+  const safeInitials = initials?.trim() || "?";
+  const grad = colorFor(seed ?? safeInitials);
   return (
     <span
       className={cn(
@@ -35,7 +36,7 @@ export function Avatar({
       style={{ width: size, height: size, fontSize: size * 0.42 }}
       aria-hidden
     >
-      {initials.slice(0, 2)}
+      {safeInitials.slice(0, 2)}
     </span>
   );
 }
