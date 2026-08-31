@@ -57,19 +57,31 @@ function layoutNodes(nodes: Node[], edges: Edge[]): Node[] {
 // node's source system, keeping dagre's X (topological rank) untouched — the
 // left-to-right data-flow order is what dagre gets right; grouping by system is
 // a pure Y-axis re-bucketing on top of it, not a different layout algorithm.
-const BAND_HEIGHT = 170;
 function applySwimlanes(laidOutNodes: Node[], systemOf: Map<string, string>): Node[] {
   const order: string[] = [];
   for (const n of laidOutNodes) {
     const sys = systemOf.get(n.id) ?? "—";
     if (!order.includes(sys)) order.push(sys);
   }
-  const bandIndex = new Map(order.map((sys, i) => [sys, i]));
-  return laidOutNodes.map((n) => {
-    const sys = systemOf.get(n.id) ?? "—";
-    const band = bandIndex.get(sys) ?? 0;
-    return { ...n, position: { x: n.position.x, y: band * BAND_HEIGHT + (n.position.y % (BAND_HEIGHT - NODE_H - 20)) } };
-  });
+  const byBand = new Map<string, Node[]>(order.map((sys) => [sys, []]));
+  for (const n of laidOutNodes) byBand.get(systemOf.get(n.id) ?? order[0])!.push(n);
+
+  // Re-space each band's own nodes evenly by their original dagre Y order (which
+  // is itself already collision-free) rather than reusing the raw Y value —
+  // modulo-ing the original Y independently per node loses that relative
+  // ordering and can stack multiple same-rank nodes from one system on top of
+  // each other. Band height is sized to whatever that system actually needs.
+  const spacing = NODE_H + 24;
+  const bandGap = 40;
+  let yOffset = 0;
+  const positioned: Node[] = [];
+  for (const sys of order) {
+    const bandNodes = [...byBand.get(sys)!].sort((a, b) => a.position.y - b.position.y);
+    bandNodes.forEach((n, i) => positioned.push({ ...n, position: { x: n.position.x, y: yOffset + i * spacing } }));
+    yOffset += bandNodes.length * spacing + bandGap;
+  }
+  const byId = new Map(positioned.map((n) => [n.id, n]));
+  return laidOutNodes.map((n) => byId.get(n.id)!);
 }
 
 const LEGEND_ITEMS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"];
