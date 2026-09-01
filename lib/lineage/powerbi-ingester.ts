@@ -9,11 +9,11 @@ import { resolveStitch, type ExternalRef, type Confidence } from "./stitching";
 
 // ── scanResult shape (trimmed to the fields this ingester consumes) ─────────
 
-type SrColumn = { name: string; dataType?: string };
+export type SrColumn = { name: string; dataType?: string };
 type SrMeasure = { name: string; expression: string; description?: string };
-type SrTableSource = { expression?: string; lakehouseItemId?: string; tableName?: string };
-type SrTable = { name: string; columns: SrColumn[]; measures?: SrMeasure[]; source?: SrTableSource[] };
-type SrDataset = { id: string; name: string; targetStorageMode?: string; tables: SrTable[] };
+export type SrTableSource = { expression?: string; lakehouseItemId?: string; tableName?: string };
+export type SrTable = { name: string; columns: SrColumn[]; measures?: SrMeasure[]; source?: SrTableSource[] };
+export type SrDataset = { id: string; name: string; targetStorageMode?: string; tables: SrTable[] };
 type SrReport = { id: string; name: string; datasetId: string };
 type SrDataflowQuery = { queryName: string; expression: string; destination?: { type: string; itemId: string; tableName: string } };
 type SrDataflow = { objectId: string; name: string; generation?: number; description?: string; queries?: SrDataflowQuery[] };

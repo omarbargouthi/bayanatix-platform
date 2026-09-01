@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import { LineageGraphClient } from "@/components/lineage/LineageGraphClient";
+import { PbixUploadButton } from "@/components/lineage/PbixUploadButton";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
 
@@ -22,9 +23,12 @@ export function LineagePageClient({
           <p className="text-sm text-muted mt-1">{t.lineage.pageDesc}</p>
         </div>
         {canManage && (
-          <Link href="/lineage/stitching" className="btn btn-sm shrink-0">
-            Stitching Review
-          </Link>
+          <div className="flex items-start gap-2 shrink-0">
+            <PbixUploadButton />
+            <Link href="/lineage/stitching" className="btn btn-sm shrink-0">
+              Stitching Review
+            </Link>
+          </div>
         )}
       </div>
       <div className="w-full rounded-xl overflow-hidden border border-line" style={{ height: "calc(100vh - 220px)" }}>
