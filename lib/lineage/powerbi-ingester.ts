@@ -38,14 +38,16 @@ function parseM(expr: string): MSource {
   const pg = expr.match(/PostgreSQL\.Database\("([^"]+)"\s*,\s*"([^"]+)"\)/);
   const mssql = expr.match(/Sql\.Database\("([^"]+)"\s*,\s*"([^"]+)"\)/);
   const ora = expr.match(/Oracle\.Database\("([^"]+)"(?:\s*,\s*"([^"]+)")?\)/);
-  let engine: string | null = null, host: string | null = null, database: string | null = null;
+  const csv = expr.match(/Csv\.Document\s*\(\s*File\.Contents\s*\(\s*"([^"]+)"\s*\)/);
+  let engine: string | null = null, host: string | null = null, database: string | null = null, csvTable: string | null = null;
   if (pg) { engine = "POSTGRES"; host = pg[1]; database = pg[2]; }
   else if (mssql) { engine = "MSSQL"; host = mssql[1]; database = mssql[2]; }
   else if (ora) { engine = "ORACLE"; host = ora[1]; database = ora[2] ?? null; }
+  else if (csv) { engine = "CSV"; host = csv[1]; csvTable = csv[1].split(/[\\/]/).pop() ?? csv[1]; }
 
   const nav = expr.match(/\{\[Schema="([^"]+)"\s*,\s*Item="([^"]+)"\]\}/) ?? expr.match(/\{\[Item="([^"]+)"\]\}/);
   const schema = nav && nav.length === 3 ? nav[1] : null;
-  const table = nav ? nav[nav.length - 1] : null;
+  const table = csvTable ?? (nav ? nav[nav.length - 1] : null);
 
   const renameMap = new Map<string, string>();
   for (const m of expr.matchAll(/\{"([^"]+)"\s*,\s*"([^"]+)"\}/g)) renameMap.set(m[1], m[2]);

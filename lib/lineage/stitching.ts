@@ -106,7 +106,11 @@ async function findAlias(engine: string, host: string | null, database: string |
 }
 
 async function enqueueStitch(ref: ExternalRef, scanRunId: number | null): Promise<{ placeholderEntityId: number; stitchId: number }> {
-  const placeholderSourceName = `${ref.engine} — ${ref.host ?? "unknown host"}${ref.database ? `/${ref.database}` : ""}`;
+  // data_sources.source_name_text is varchar(100) — a CSV/file "host" (a full
+  // path, unlike a short DB hostname) can easily overflow it. Full fidelity
+  // stays in the entity's description text below, which is unbounded.
+  const rawSourceName = `${ref.engine} — ${ref.host ?? "unknown host"}${ref.database ? `/${ref.database}` : ""}`;
+  const placeholderSourceName = rawSourceName.length > 100 ? `${rawSourceName.slice(0, 97)}...` : rawSourceName;
   const dataSourceId = await ensureDataSource(placeholderSourceName, ref.engine, ref.host, ref.database, { placeholder: true });
   const schemaId = await ensureSchema(dataSourceId, ref.schema ?? "(unknown)");
   const placeholderEntityId = await ensureEntity(schemaId, ref.object, false, {

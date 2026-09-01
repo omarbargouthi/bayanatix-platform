@@ -1,0 +1,7 @@
+# Optional — powers the higher-fidelity .pbix upload path (lib/lineage/pbixray-bridge.ts).
+# Install with: python -m pip install -r scripts/requirements-pbixray.txt
+# If Python or this package aren't available at runtime, .pbix uploads
+# automatically fall back to a Node-only path (Power Query M source only, no
+# DAX measures / full column list) — this is optional infrastructure, not a
+# hard dependency of the app.
+pbixray

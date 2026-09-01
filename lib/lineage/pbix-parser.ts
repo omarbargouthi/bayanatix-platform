@@ -8,6 +8,7 @@
 // lineage from the M definitions, not measure-level DAX lineage.
 import { unzipSync } from "fflate";
 import { ingestPowerBiScanResult, type ScanResult, type SrTable } from "./powerbi-ingester";
+import { extractViaPbixray } from "./pbixray-bridge";
 
 // ── DataMashup binary stream (MS-QDEFF) ──────────────────────────────────────
 // Layout: uint32le version, then four length-prefixed byte sections in order:
@@ -128,6 +129,20 @@ export function extractLikelyColumnNames(expr: string): string[] {
   return [...names];
 }
 
+// Fallback path: only Power Query (M) definitions from the DataMashup stream —
+// no measures, and only the columns the M code happens to name explicitly.
+function tablesFromDataMashup(pbixBuf: Buffer): { tables: SrTable[]; warnings: string[] } {
+  const packageParts = readPackageParts(new Uint8Array(pbixBuf));
+  const section1 = readSection1M(packageParts);
+  const { queries, warnings } = parseSection1M(section1);
+  const tables: SrTable[] = queries.map((q) => ({
+    name: q.name,
+    columns: extractLikelyColumnNames(q.expression).map((name) => ({ name })),
+    source: [{ expression: q.expression }],
+  }));
+  return { tables, warnings };
+}
+
 // ── Main entry ────────────────────────────────────────────────────────────────
 
 export async function ingestPbixFile(
@@ -136,17 +151,31 @@ export async function ingestPbixFile(
   triggeredByUserId: string,
   connectionId: number,
 ): Promise<{ scanRunId: number; edgesCreated: number; warnings: string[] }> {
-  const packageParts = readPackageParts(new Uint8Array(pbixBuf));
-  const section1 = readSection1M(packageParts);
-  const { queries, warnings: parseWarnings } = parseSection1M(section1);
+  const warnings: string[] = [];
+  let tables: SrTable[];
+
+  const pbixrayTables = await extractViaPbixray(pbixBuf);
+  if (pbixrayTables && pbixrayTables.length > 0) {
+    tables = pbixrayTables.map((t) => ({
+      name: t.name,
+      columns: t.columns.map((c) => ({ name: c.name, dataType: c.dataType })),
+      measures: t.measures.map((m) => ({ name: m.name, expression: m.expression })),
+      source: t.mExpression ? [{ expression: t.mExpression }] : undefined,
+    }));
+    warnings.push("Read from the .pbix's compiled data model (via pbixray) — full column list and DAX measures included.");
+  } else {
+    warnings.push("pbixray extraction unavailable (Python/pbixray not found, or the file couldn't be read that way) — falling back to Power Query (M) definitions only. DAX measures and the full column list aren't available from this fallback path.");
+    try {
+      const fallback = tablesFromDataMashup(pbixBuf);
+      tables = fallback.tables;
+      warnings.push(...fallback.warnings);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(`Could not read this .pbix: pbixray extraction was unavailable, and the DataMashup fallback failed too (${reason}).`);
+    }
+  }
 
   const datasetName = fileName.replace(/\.pbix$/i, "");
-  const tables: SrTable[] = queries.map((q) => ({
-    name: q.name,
-    columns: extractLikelyColumnNames(q.expression).map((name) => ({ name })),
-    source: [{ expression: q.expression }],
-  }));
-
   const scanResult: ScanResult = {
     workspaces: [
       {
@@ -161,10 +190,6 @@ export async function ingestPbixFile(
   return {
     scanRunId: result.scanRunId,
     edgesCreated: result.edgesCreated,
-    warnings: [
-      ...parseWarnings,
-      "Parsed from the .pbix's Power Query (M) definitions only — DAX measures and the compiled data model aren't readable from a .pbix file, so measure-level lineage isn't available from this upload path.",
-      ...result.warnings,
-    ],
+    warnings: [...warnings, ...result.warnings],
   };
 }
