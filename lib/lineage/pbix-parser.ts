@@ -150,7 +150,7 @@ export async function ingestPbixFile(
   fileName: string,
   triggeredByUserId: string,
   connectionId: number,
-): Promise<{ scanRunId: number; edgesCreated: number; warnings: string[] }> {
+): Promise<{ scanRunId: number; edgesCreated: number; tablesIngested: number; columnsIngested: number; warnings: string[] }> {
   const warnings: string[] = [];
   let tables: SrTable[];
 
@@ -190,6 +190,8 @@ export async function ingestPbixFile(
   return {
     scanRunId: result.scanRunId,
     edgesCreated: result.edgesCreated,
+    tablesIngested: tables.length,
+    columnsIngested: tables.reduce((sum, t) => sum + t.columns.length, 0),
     warnings: [...warnings, ...result.warnings],
   };
 }

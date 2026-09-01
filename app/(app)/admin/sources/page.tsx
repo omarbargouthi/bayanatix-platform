@@ -40,15 +40,16 @@ const DB_TYPES = [
   { value: "ORACLE",   label: "Oracle DB",  port: 1521 },
   { value: "CSV",      label: "CSV File(s)",          port: 0 },
   { value: "EXCEL",    label: "Excel Workbook(s)",    port: 0 },
+  { value: "PBIX_FOLDER", label: "Power BI Desktop Folder (.pbix)", port: 0 },
 ];
 
 const DB_ICON: Record<string, string> = {
-  POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶", CSV: "📄", EXCEL: "📊",
+  POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶", CSV: "📄", EXCEL: "📊", PBIX_FOLDER: "📊",
 };
 
-// CSV/EXCEL are flat-file sources: no network host/port/credentials, just a
-// file or directory path (stored in hostAddress — repurposed for this case).
-const FILE_TYPES = ["CSV", "EXCEL"];
+// CSV/EXCEL/PBIX_FOLDER are flat-file sources: no network host/port/credentials,
+// just a file or directory path (stored in hostAddress — repurposed for this case).
+const FILE_TYPES = ["CSV", "EXCEL", "PBIX_FOLDER"];
 const isFileType = (dbTypeCode: string) => FILE_TYPES.includes(dbTypeCode);
 
 // Database types the crawler can actually connect to (ORACLE has no working driver yet).
@@ -506,10 +507,12 @@ export default function DataSourcesPage() {
 
                 {isFileType(form.dbTypeCode) ? (
                   <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-ink mb-1">File or Directory Path *</label>
-                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.hostAddress} onChange={e => setForm(f => ({ ...f, hostAddress: e.target.value }))} placeholder={form.dbTypeCode === "CSV" ? "C:\\data\\sales.csv or C:\\data\\csv-exports" : "C:\\data\\report.xlsx or C:\\data\\workbooks"} />
+                    <label className="block text-xs font-semibold text-ink mb-1">{form.dbTypeCode === "PBIX_FOLDER" ? "Directory Path *" : "File or Directory Path *"}</label>
+                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.hostAddress} onChange={e => setForm(f => ({ ...f, hostAddress: e.target.value }))} placeholder={form.dbTypeCode === "CSV" ? "C:\\data\\sales.csv or C:\\data\\csv-exports" : form.dbTypeCode === "PBIX_FOLDER" ? "C:\\data\\powerbi-exports" : "C:\\data\\report.xlsx or C:\\data\\workbooks"} />
                     <p className="text-[11px] text-muted mt-1">
-                      A single file is crawled as one table{form.dbTypeCode === "EXCEL" ? " per sheet" : ""}. A directory is crawled as one schema — every {form.dbTypeCode === "CSV" ? ".csv file" : ".xlsx/.xls workbook"} inside becomes its own table{form.dbTypeCode === "EXCEL" ? "(s)" : ""}. Server-side path — must be reachable by the app process.
+                      {form.dbTypeCode === "PBIX_FOLDER"
+                        ? "A directory only (not a single file) — every .pbix file inside is scanned for lineage (Power Query source + DAX measures where readable). Files are re-scanned only when their modified time changes. Server-side path — must be reachable by the app process."
+                        : <>A single file is crawled as one table{form.dbTypeCode === "EXCEL" ? " per sheet" : ""}. A directory is crawled as one schema — every {form.dbTypeCode === "CSV" ? ".csv file" : ".xlsx/.xls workbook"} inside becomes its own table{form.dbTypeCode === "EXCEL" ? "(s)" : ""}. Server-side path — must be reachable by the app process.</>}
                     </p>
                   </div>
                 ) : (

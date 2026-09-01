@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getConnection, updateCrawlStatus } from "@/lib/queries/sources";
 import { crawlDataSource } from "@/lib/crawler";
+import { scanPbixFolder } from "@/lib/lineage/pbix-folder-scan";
 
 type Params = { params: { id: string } };
 
@@ -15,8 +16,13 @@ export async function POST(_: Request, { params }: Params) {
 
   await updateCrawlStatus(connectionId, "CRAWLING");
 
-  // Fire-and-forget — runs in Node.js background
-  void crawlDataSource(connectionId).catch(async (err: unknown) => {
+  // Fire-and-forget — runs in Node.js background. PBIX_FOLDER has its own
+  // scanner (lineage-specific ingestion, not the generic catalog crawler) but
+  // reuses the exact same status/job-log plumbing so the UI needs no changes.
+  const task = conn.dbTypeCode === "PBIX_FOLDER"
+    ? scanPbixFolder(connectionId, session.userId, { force: true })
+    : crawlDataSource(connectionId);
+  void task.catch(async (err: unknown) => {
     await updateCrawlStatus(connectionId, "FAILED", (err as Error).message);
   });
 
