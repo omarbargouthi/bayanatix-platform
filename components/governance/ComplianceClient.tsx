@@ -60,6 +60,7 @@ const WORKFLOW_META: Record<string, { label: string; color: string; bg: string }
   SUBMITTED: { label: "Submitted", color: "#D97706", bg: "#FEF3C7" },
   CONFIRMED: { label: "Confirmed", color: "#2563EB", bg: "#DBEAFE" },
   ENDORSED:  { label: "Endorsed",  color: "#059669", bg: "#D1FAE5" },
+  REJECTED:  { label: "Rejected",  color: "#DC2626", bg: "#FEE2E2" },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -405,18 +406,23 @@ export function ComplianceClient({
     setReqs((p) => p.map((r) => r.reqId === req.reqId ? { ...r, evidenceName: file.name } : r));
   }
 
-  async function advanceWorkflow(req: ComplianceRequirement, action: "submit"|"confirm"|"endorse") {
+  async function advanceWorkflow(req: ComplianceRequirement, action: "submit"|"confirm"|"endorse"|"reject") {
     if (!fwId) return;
     const res = await fetch(`/api/governance/compliance/${fwId}/workflow/${req.reqId}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
     });
-    if (!res.ok) { toast("Workflow action failed"); return; }
-    const next: Record<string, string> = { submit: "SUBMITTED", confirm: "CONFIRMED", endorse: "ENDORSED" };
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast(data.error ?? "Workflow action failed");
+      return;
+    }
+    const next: Record<string, string> = { submit: "SUBMITTED", confirm: "CONFIRMED", endorse: "ENDORSED", reject: "REJECTED" };
     const labels: Record<string, string> = {
       submit:  "Evidence submitted for review. Reviewers have been notified.",
       confirm: "Evidence confirmed. Endorsers have been notified.",
       endorse: "Evidence endorsed. All parties notified.",
+      reject:  "Evidence rejected. The submitter can resubmit.",
     };
     setReqs((p) => p.map((r) => r.reqId === req.reqId ? { ...r, workflowStatus: next[action] } : r));
     toast(labels[action]);
@@ -958,7 +964,7 @@ function WorkflowBadge({ status }: { status: string }) {
   const { t } = useLang();
   const ca = t.governance.ca;
   const WF_LABELS: Record<string, string> = {
-    DRAFT: ca.wfDraft, SUBMITTED: ca.wfSubmitted, CONFIRMED: ca.wfConfirmed, ENDORSED: ca.wfEndorsed,
+    DRAFT: ca.wfDraft, SUBMITTED: ca.wfSubmitted, CONFIRMED: ca.wfConfirmed, ENDORSED: ca.wfEndorsed, REJECTED: ca.wfRejected,
   };
   const meta = WORKFLOW_META[status] ?? WORKFLOW_META.DRAFT;
   return (
@@ -975,7 +981,7 @@ function EvidenceExpanded({
 }: {
   req: ComplianceRequirement; fwId: number; role: string;
   onPatch: (u: Partial<ComplianceRequirement>) => void;
-  onWorkflow: (action: "submit"|"confirm"|"endorse") => void;
+  onWorkflow: (action: "submit"|"confirm"|"endorse"|"reject") => void;
   translations: Record<string, string>;
 }) {
   const { isRtl, t } = useLang();
@@ -1008,9 +1014,10 @@ function EvidenceExpanded({
   }
 
   const status = req.workflowStatus ?? "DRAFT";
-  const canSubmit  = status === "DRAFT"     && role !== "VIEWER";
+  const canSubmit  = (status === "DRAFT" || status === "REJECTED") && role !== "VIEWER";
   const canConfirm = status === "SUBMITTED" && (role === "ADMIN" || role === "STEWARD");
   const canEndorse = status === "CONFIRMED" && role === "ADMIN";
+  const canReject  = (status === "SUBMITTED" && (role === "ADMIN" || role === "STEWARD")) || (status === "CONFIRMED" && role === "ADMIN");
 
   const admissionCriteria = d(req.admissionCriteriaEn, req.admissionCriteria);
   const directoryType     = d(req.directoryTypeEn,     req.directoryType);
@@ -1126,6 +1133,12 @@ function EvidenceExpanded({
             <button onClick={() => onWorkflow("endorse")}
               className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600">
               {ca.endorseAction} ✓✓
+            </button>
+          )}
+          {canReject && (
+            <button onClick={() => { if (confirm(ca.rejectAction + "?")) onWorkflow("reject"); }}
+              className="btn btn-sm bg-red-600 hover:bg-red-700 text-white border-red-600">
+              {ca.rejectAction} ✕
             </button>
           )}
           {status === "ENDORSED" && (

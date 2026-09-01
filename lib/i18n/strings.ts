@@ -359,6 +359,8 @@ export type I18nStrings = {
       wfSubmitted:      string;
       wfConfirmed:      string;
       wfEndorsed:       string;
+      wfRejected:       string;
+      rejectAction:     string;
       // collab panel
       discussions:      string;
       startDiscussion:  string;

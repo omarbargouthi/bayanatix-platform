@@ -8,7 +8,7 @@
  *
  * Safety model: every requirement upsert goes through
  * ON CONFLICT (framework_id, req_code) DO UPDATE, which preserves req_id and
- * therefore compliance_workflow/gov_compliance_assessments/gov_compliance_history
+ * therefore compliance_workflow_deprecated/gov_compliance_assessments/gov_compliance_history
  * (all FK req_id ON DELETE CASCADE). DCC and PDPL end up as full replacements
  * anyway because their old and new req_code schemes don't overlap (DCC's
  * changed from flat DCC-N to hierarchical; PDPL's old/new numbering is
@@ -235,11 +235,11 @@ async function reportAndDeleteAll(fwId, frameworkCode) {
   if (existing.length === 0) { console.log(`  [${frameworkCode}] no existing rows to clear`); return; }
   const reqIds = existing.map((r) => r.req_id);
   const [{ assessedCount }] = await sql`SELECT count(*)::int AS "assessedCount" FROM bayanat.gov_compliance_assessments WHERE req_id = ANY(${reqIds})`;
-  const [{ workflowCount }] = await sql`SELECT count(*)::int AS "workflowCount" FROM bayanat.compliance_workflow WHERE req_id = ANY(${reqIds})`;
+  const [{ workflowCount }] = await sql`SELECT count(*)::int AS "workflowCount" FROM bayanat.compliance_workflow_deprecated WHERE req_id = ANY(${reqIds})`;
 
   console.log(`\n  ⚠️  [${frameworkCode}] full replace: clearing all ${existing.length} existing requirement(s) before inserting the refreshed set`);
   console.log(`      (old/new req_code numbering only coincidentally overlaps — upserting by code would silently corrupt, not preserve, this data)`);
-  console.log(`      ${assessedCount} have a gov_compliance_assessments row, ${workflowCount} have a compliance_workflow row (both cascade-delete with them).`);
+  console.log(`      ${assessedCount} have a gov_compliance_assessments row, ${workflowCount} have a compliance_workflow_deprecated row (both cascade-delete with them).`);
   for (const r of existing.slice(0, 10)) console.log(`      - req_id=${r.req_id}  req_code=${r.req_code}`);
   if (existing.length > 10) console.log(`      ... and ${existing.length - 10} more`);
 
@@ -260,10 +260,10 @@ async function reportAndDeleteMissing(fwId, frameworkCode, seenCodes) {
   }
   const reqIds = toDelete.map((r) => r.req_id);
   const [{ assessedCount }] = await sql`SELECT count(*)::int AS "assessedCount" FROM bayanat.gov_compliance_assessments WHERE req_id = ANY(${reqIds})`;
-  const [{ workflowCount }] = await sql`SELECT count(*)::int AS "workflowCount" FROM bayanat.compliance_workflow WHERE req_id = ANY(${reqIds})`;
+  const [{ workflowCount }] = await sql`SELECT count(*)::int AS "workflowCount" FROM bayanat.compliance_workflow_deprecated WHERE req_id = ANY(${reqIds})`;
 
   console.log(`\n  \u26a0\ufe0f  [${frameworkCode}] ${toDelete.length} requirement(s) not present in the new source — will be deleted:`);
-  console.log(`      ${assessedCount} have a gov_compliance_assessments row, ${workflowCount} have a compliance_workflow row (both cascade-delete with them).`);
+  console.log(`      ${assessedCount} have a gov_compliance_assessments row, ${workflowCount} have a compliance_workflow_deprecated row (both cascade-delete with them).`);
   for (const r of toDelete.slice(0, 20)) console.log(`      - req_id=${r.req_id}  req_code=${r.req_code}`);
   if (toDelete.length > 20) console.log(`      ... and ${toDelete.length - 20} more`);
 
@@ -460,10 +460,10 @@ async function main() {
   for (const c of counts) console.log(`  ${c.code}: ${c.n} requirements`);
 
   const protectedWorkflow = await sql`
-    SELECT r.req_id, r.req_code, w.status FROM bayanat.compliance_workflow w
+    SELECT r.req_id, r.req_code, w.status FROM bayanat.compliance_workflow_deprecated w
     JOIN bayanat.gov_compliance_requirements r USING (req_id) ORDER BY r.req_code
   `;
-  console.log(`\n  NDI compliance_workflow rows after import (expect 5, same req_ids as before):`);
+  console.log(`\n  NDI compliance_workflow_deprecated rows after import (expect 5, same req_ids as before):`);
   for (const w of protectedWorkflow) console.log(`    req_id=${w.req_id} req_code=${w.req_code} status=${w.status}`);
 
   await sql.end();

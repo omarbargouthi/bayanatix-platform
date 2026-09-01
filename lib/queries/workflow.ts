@@ -16,7 +16,7 @@ export type WorkflowDefinition = {
   workflowId:    number;
   workflowName:  string;
   description:   string | null;
-  isActive:      boolean;
+  statusCode:    "Draft" | "Active" | "Deactive";
   createdAt:     string;
   stages:        WorkflowStage[];
   assignedTypes: string[];
@@ -124,7 +124,7 @@ export async function listWorkflows(): Promise<WorkflowDefinition[]> {
     SELECT workflow_id        AS "workflowId",
            workflow_name_text AS "workflowName",
            description_text   AS "description",
-           is_active          AS "isActive",
+           status_code        AS "statusCode",
            created_at::text   AS "createdAt"
     FROM bayanat.workflow_definitions ORDER BY workflow_id
   `;

@@ -4,12 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import type { WorkflowDefinition } from "@/lib/queries/workflow";
 
 const ALL_TYPES = [
-  { code: "FIX_DATA_ISSUE",    label: "Fix Data Issue" },
-  { code: "UPDATE_DEFINITION", label: "Update Definition" },
-  { code: "CERTIFY_ASSET",     label: "Certify Asset" },
-  { code: "GRANT_ACCESS",      label: "Grant Access" },
-  { code: "REMOVE_ACCESS",     label: "Remove Access" },
-  { code: "OTHER",             label: "Other" },
+  { code: "FIX_DATA_ISSUE",       label: "Fix Data Issue" },
+  { code: "UPDATE_DEFINITION",    label: "Update Definition" },
+  { code: "CERTIFY_ASSET",        label: "Certify Asset" },
+  { code: "GRANT_ACCESS",         label: "Grant Access" },
+  { code: "REMOVE_ACCESS",        label: "Remove Access" },
+  { code: "OTHER",                label: "Other" },
+  { code: "CLASSIFY_ASSET",       label: "Classify Asset" },
+  { code: "COMPLIANCE_REVIEW",    label: "Compliance Review" },
+  { code: "PUBLISH_OPEN_DATA",    label: "Publish Open Data" },
+  { code: "PUBLISH_OPEN_DATA_PI", label: "Publish Open Data (PI)" },
 ];
 
 const ROLE_OPTIONS = [
@@ -31,12 +35,22 @@ const ROLE_COLOR: Record<string, string> = {
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  FIX_DATA_ISSUE:    "bg-red-50 text-red-700 border-red-200",
-  UPDATE_DEFINITION: "bg-blue-50 text-blue-700 border-blue-200",
-  CERTIFY_ASSET:     "bg-amber-50 text-amber-700 border-amber-200",
-  GRANT_ACCESS:      "bg-emerald-50 text-emerald-700 border-emerald-200",
-  REMOVE_ACCESS:     "bg-orange-50 text-orange-700 border-orange-200",
-  OTHER:             "bg-gray-50 text-gray-600 border-gray-200",
+  FIX_DATA_ISSUE:       "bg-red-50 text-red-700 border-red-200",
+  UPDATE_DEFINITION:    "bg-blue-50 text-blue-700 border-blue-200",
+  CERTIFY_ASSET:        "bg-amber-50 text-amber-700 border-amber-200",
+  GRANT_ACCESS:         "bg-emerald-50 text-emerald-700 border-emerald-200",
+  REMOVE_ACCESS:        "bg-orange-50 text-orange-700 border-orange-200",
+  OTHER:                "bg-gray-50 text-gray-600 border-gray-200",
+  CLASSIFY_ASSET:       "bg-indigo-50 text-indigo-700 border-indigo-200",
+  COMPLIANCE_REVIEW:    "bg-teal-50 text-teal-700 border-teal-200",
+  PUBLISH_OPEN_DATA:    "bg-cyan-50 text-cyan-700 border-cyan-200",
+  PUBLISH_OPEN_DATA_PI: "bg-pink-50 text-pink-700 border-pink-200",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  Draft:    "bg-amber-100 text-amber-700",
+  Active:   "bg-emerald-100 text-emerald-700",
+  Deactive: "bg-gray-200 text-gray-600",
 };
 
 export default function WorkflowsAdminPage() {
@@ -69,11 +83,22 @@ export default function WorkflowsAdminPage() {
   useEffect(() => { load(); }, [load]);
 
   async function assignType(code: string, wfId: number | null) {
-    await fetch("/api/admin/workflows/assign", {
+    const res = await fetch("/api/admin/workflows/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ requestTypeCode: code, workflowId: wfId }),
     });
+    if (!res.ok) { const { error } = await res.json().catch(() => ({})); alert(error ?? "Assign failed"); return; }
+    load();
+  }
+
+  async function setStatus(wfId: number, statusCode: string) {
+    const res = await fetch(`/api/admin/workflows/${wfId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ statusCode }),
+    });
+    if (!res.ok) { const { error } = await res.json().catch(() => ({})); alert(error ?? "Status change failed"); return; }
     load();
   }
 
@@ -187,7 +212,10 @@ export default function WorkflowsAdminPage() {
             >
               <div className="flex items-center justify-between mb-0.5">
                 <span className="text-[13px] font-semibold text-brand-deep">{wf.workflowName}</span>
-                <span className="text-[10px] text-muted">{wf.stages.length} stages</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${STATUS_COLOR[wf.statusCode] ?? ""}`}>{wf.statusCode}</span>
+                  <span className="text-[10px] text-muted">{wf.stages.length} stages</span>
+                </div>
               </div>
               <div className="flex flex-wrap gap-1">
                 {wf.assignedTypes.map((t) => (
@@ -219,17 +247,37 @@ export default function WorkflowsAdminPage() {
                 <h1 className="text-xl font-extrabold text-brand-deep">{selected.workflowName}</h1>
                 {selected.description && <p className="text-sm text-muted mt-1">{selected.description}</p>}
               </div>
-              <button
-                onClick={() => deleteWorkflow(selected.workflowId)}
-                className="text-[12px] text-red-500 hover:underline shrink-0 ml-4"
-              >
-                Delete workflow
-              </button>
+              <div className="flex items-center gap-3 shrink-0 ml-4">
+                <select
+                  value={selected.statusCode}
+                  onChange={(e) => setStatus(selected.workflowId, e.target.value)}
+                  className={`text-[11px] font-bold rounded-full px-2.5 py-1 border-0 ${STATUS_COLOR[selected.statusCode] ?? ""}`}
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Active">Active</option>
+                  <option value="Deactive">Deactive</option>
+                </select>
+                <button
+                  onClick={() => deleteWorkflow(selected.workflowId)}
+                  className="text-[12px] text-red-500 hover:underline"
+                >
+                  Delete workflow
+                </button>
+              </div>
             </div>
+
+            {selected.statusCode === "Deactive" && (
+              <div className="mb-6 text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                ⚠ This workflow is <strong>Deactive</strong> — requests routed here are approved immediately with no review, no stage history, and no reviewer notifications.
+              </div>
+            )}
 
             {/* Request type assignments */}
             <div className="card p-5 mb-6">
               <h3 className="text-[11px] uppercase tracking-wider text-muted font-bold mb-3">Assigned Request Types</h3>
+              {selected.statusCode === "Draft" && (
+                <p className="text-[11px] text-muted italic mb-3">Activate this workflow before assigning it to a request type.</p>
+              )}
               <div className="space-y-2">
                 {ALL_TYPES.map((t) => {
                   const assigned = typeToWf[t.code];
@@ -243,7 +291,8 @@ export default function WorkflowsAdminPage() {
                         )}
                         <button
                           onClick={() => assignType(t.code, isThisWf ? null : selected.workflowId)}
-                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors ${
+                          disabled={selected.statusCode === "Draft" && !isThisWf}
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                             isThisWf
                               ? "bg-brand-purple text-white"
                               : "bg-canvas border border-line text-muted hover:border-brand-purple hover:text-brand-purple"

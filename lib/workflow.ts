@@ -51,11 +51,11 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       }
       if (hierUsers.size > 0) return [...hierUsers];
 
-      // Fallback: OFFICER then ADMIN
+      // Fallback: STEWARD, then OFFICER, then ADMIN
       const fb = await sql<{ userId: string }[]>`
         SELECT user_id AS "userId" FROM bayanat.users
-        WHERE role IN ('OFFICER', 'ADMIN') AND is_active = true
-        ORDER BY CASE role WHEN 'OFFICER' THEN 1 ELSE 2 END
+        WHERE role IN ('STEWARD', 'OFFICER', 'ADMIN') AND is_active = true
+        ORDER BY CASE role WHEN 'STEWARD' THEN 1 WHEN 'OFFICER' THEN 2 ELSE 3 END
         LIMIT 5
       `;
       return fb.map((r) => r.userId);
@@ -156,10 +156,24 @@ const STAGE_SELECT = sql`
 `;
 
 export async function startWorkflow(requestId: number, requestTypeCode: string, requestTitle: string): Promise<void> {
-  const [mapping] = await sql<{ workflowId: number }[]>`
-    SELECT workflow_id AS "workflowId" FROM bayanat.request_type_workflows WHERE request_type_code = ${requestTypeCode}
+  const [mapping] = await sql<{ workflowId: number; statusCode: string }[]>`
+    SELECT rtw.workflow_id AS "workflowId", wd.status_code AS "statusCode"
+    FROM bayanat.request_type_workflows rtw
+    JOIN bayanat.workflow_definitions wd ON wd.workflow_id = rtw.workflow_id
+    WHERE rtw.request_type_code = ${requestTypeCode}
   `;
   if (!mapping) return;
+
+  if (mapping.statusCode === "Deactive") {
+    // Bypass: no workflow_instances/workflow_stage_history row, no notifications —
+    // the request is approved immediately, as if it had cleared every stage.
+    await sql`UPDATE bayanat.asset_requests SET status_code = 'RESOLVED', updated_at = NOW() WHERE request_id = ${requestId}`;
+    await applyApprovalOutcome(requestId, requestTypeCode, true);
+    return;
+  }
+  // "Draft" workflows can't be assigned to a request type (enforced in
+  // app/api/admin/workflows/assign/route.ts), so this path should be unreachable —
+  // fall through and treat as Active defensively rather than silently no-op.
 
   const [first] = await sql<StageRow[]>`
     SELECT ${STAGE_SELECT} FROM bayanat.workflow_stages
@@ -177,23 +191,41 @@ export async function startWorkflow(requestId: number, requestTypeCode: string, 
   await enterStage(inst.instanceId, first, requestId, requestTitle);
 }
 
-// When a workflow completes, some request types need their target asset's own
-// status updated — the workflow engine only tracks asset_requests/workflow_instances
-// and has no generic way to know what "approved" means for an arbitrary asset type.
-async function finalizeTargetAsset(requestId: number, requestTypeCode: string, approved: boolean): Promise<void> {
-  if (requestTypeCode !== "PUBLISH_OPEN_DATA" && requestTypeCode !== "PUBLISH_OPEN_DATA_PI") return;
-
-  const [target] = await sql<{ assetId: number }[]>`
-    SELECT asset_id AS "assetId" FROM bayanat.asset_request_targets
-    WHERE request_id = ${requestId} AND asset_type_code = 'OPEN_DATASET' LIMIT 1
-  `;
-  if (!target) return;
-
-  await sql`
-    UPDATE bayanat.open_datasets
-    SET status_code = ${approved ? "APPROVED" : "REJECTED"}, updated_at = NOW()
-    WHERE dataset_id = ${target.assetId}
-  `;
+// When a workflow completes (or is bypassed via a Deactive definition), some
+// request types need their target asset's own status updated — the workflow
+// engine only tracks asset_requests/workflow_instances and has no generic way
+// to know what "approved" means for an arbitrary asset type. Extend this
+// switch when a new request type needs a side effect on approval/rejection.
+async function applyApprovalOutcome(requestId: number, requestTypeCode: string, approved: boolean): Promise<void> {
+  switch (requestTypeCode) {
+    case "PUBLISH_OPEN_DATA":
+    case "PUBLISH_OPEN_DATA_PI": {
+      const [target] = await sql<{ assetId: number }[]>`
+        SELECT asset_id AS "assetId" FROM bayanat.asset_request_targets
+        WHERE request_id = ${requestId} AND asset_type_code = 'OPEN_DATASET' LIMIT 1
+      `;
+      if (!target) return;
+      await sql`
+        UPDATE bayanat.open_datasets
+        SET status_code = ${approved ? "APPROVED" : "REJECTED"}, updated_at = NOW()
+        WHERE dataset_id = ${target.assetId}
+      `;
+      return;
+    }
+    case "CLASSIFY_ASSET":
+      // No-op: the classification term is applied eagerly at request-creation
+      // time (see app/api/classification/assign, app/api/open-data/datasets/[id]/reclassify),
+      // not on approval. The workflow is purely an audit/sign-off trail here.
+      return;
+    case "COMPLIANCE_REVIEW":
+      // No-op: compliance workflow status is derived on read from
+      // asset_requests.status_code + workflow_stage_history (see
+      // getComplianceWorkflowStatus in lib/queries/gov-compliance.ts) —
+      // nothing extra to persist.
+      return;
+    default:
+      return; // FIX_DATA_ISSUE, UPDATE_DEFINITION, CERTIFY_ASSET, GRANT_ACCESS, REMOVE_ACCESS, OTHER
+  }
 }
 
 export async function advanceWorkflow(
@@ -231,7 +263,7 @@ export async function advanceWorkflow(
   if (inst.isFinal || outcome === "REJECTED") {
     await sql`UPDATE bayanat.workflow_instances SET status_code='COMPLETED', completed_at=NOW(), current_stage_id=NULL WHERE instance_id=${inst.instanceId}`;
     await sql`UPDATE bayanat.asset_requests SET status_code=${finalStatus}, updated_at=NOW() WHERE request_id=${requestId}`;
-    await finalizeTargetAsset(requestId, inst.requestTypeCode, finalStatus === "RESOLVED");
+    await applyApprovalOutcome(requestId, inst.requestTypeCode, finalStatus === "RESOLVED");
     return { done: true };
   }
 
@@ -244,7 +276,7 @@ export async function advanceWorkflow(
   if (!next) {
     await sql`UPDATE bayanat.workflow_instances SET status_code='COMPLETED', completed_at=NOW(), current_stage_id=NULL WHERE instance_id=${inst.instanceId}`;
     await sql`UPDATE bayanat.asset_requests SET status_code='RESOLVED', updated_at=NOW() WHERE request_id=${requestId}`;
-    await finalizeTargetAsset(requestId, inst.requestTypeCode, true);
+    await applyApprovalOutcome(requestId, inst.requestTypeCode, true);
     return { done: true };
   }
 

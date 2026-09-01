@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const [row] = await sql<{ stageId: number }[]>`
     INSERT INTO bayanat.workflow_stages
-      (workflow_id, stage_order, stage_name, description, assignee_role, assignee_user_id, sla_hours, is_final)
+      (workflow_id, stage_order, stage_name_text, description_text, required_role_code, assignee_user_id, sla_days_count, is_final)
     VALUES (${Number(params.id)}, ${nextOrder}, ${stageName.trim()},
             ${description?.trim() || null}, ${assigneeRole},
             ${assigneeUserId?.trim() || null}, ${slaHours ?? null}, ${isFinal ?? false})

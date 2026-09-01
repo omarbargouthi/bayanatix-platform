@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { logUpdate } from "../audit";
+import { startWorkflow } from "../workflow";
 
 export type ComplianceFramework = {
   frameworkId:         number;
@@ -168,8 +169,55 @@ export async function updateFrameworkApplicability(frameworkId: number, isApplic
 
 // ── Requirements ─────────────────────────────────────────────────────────────
 
+// Derives a compliance requirement's review status from the standard workflow
+// engine (asset_requests + workflow_stage_history), given the set of
+// review_request_id values pulled from gov_compliance_requirements. Batched
+// (not per-row) to avoid N+1 — mirrors the fetch-then-merge-in-JS pattern
+// lib/queries/workflow.ts's listWorkflows() already uses.
+type ReviewStatusRow = {
+  requestId: number; requestStatus: string;
+  confirmedAt: string | null; endorsedAt: string | null; endorsedByName: string | null;
+};
+
+async function fetchReviewStatuses(requestIds: number[]): Promise<Map<number, ReviewStatusRow>> {
+  if (requestIds.length === 0) return new Map();
+  const rows = await sql<ReviewStatusRow[]>`
+    SELECT
+      ar.request_id AS "requestId",
+      ar.status_code AS "requestStatus",
+      confirm.completed_at::text AS "confirmedAt",
+      endorse.completed_at::text AS "endorsedAt",
+      endorse_user.full_name AS "endorsedByName"
+    FROM bayanat.asset_requests ar
+    LEFT JOIN bayanat.workflow_instances wi ON wi.request_id = ar.request_id
+    LEFT JOIN LATERAL (
+      SELECT h.completed_at FROM bayanat.workflow_stage_history h
+      JOIN bayanat.workflow_stages s ON s.stage_id = h.stage_id
+      WHERE h.instance_id = wi.instance_id AND s.stage_order = 1
+      LIMIT 1
+    ) confirm ON true
+    LEFT JOIN LATERAL (
+      SELECT h.completed_at, h.completed_by_user_id FROM bayanat.workflow_stage_history h
+      JOIN bayanat.workflow_stages s ON s.stage_id = h.stage_id
+      WHERE h.instance_id = wi.instance_id AND s.stage_order = 2
+      LIMIT 1
+    ) endorse ON true
+    LEFT JOIN bayanat.users endorse_user ON endorse_user.user_id = endorse.completed_by_user_id
+    WHERE ar.request_id = ANY(${requestIds})
+  `;
+  return new Map(rows.map((r) => [r.requestId, r]));
+}
+
+function deriveWorkflowStatus(row: ReviewStatusRow | undefined): string {
+  if (!row) return "DRAFT";
+  if (row.requestStatus === "CLOSED") return "REJECTED";
+  if (row.requestStatus === "RESOLVED") return "ENDORSED";
+  if (row.confirmedAt) return "CONFIRMED";
+  return "SUBMITTED";
+}
+
 export async function listRequirements(frameworkId: number): Promise<ComplianceRequirement[]> {
-  return sql<ComplianceRequirement[]>`
+  const rows = await sql<(ComplianceRequirement & { reviewRequestId: number | null })[]>`
     SELECT
       r.req_id                  AS "reqId",
       r.framework_id            AS "frameworkId",
@@ -206,15 +254,25 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       a.evidence_name           AS "evidenceName",
       a.assessed_by             AS "assessedBy",
       a.assessed_at::text       AS "assessedAt",
-      w.status                  AS "workflowStatus",
-      w.endorsed_by             AS "endorsedBy",
-      w.endorsed_at::text       AS "endorsedAt"
+      r.review_request_id       AS "reviewRequestId"
     FROM bayanat.gov_compliance_requirements r
     LEFT JOIN bayanat.gov_compliance_assessments a ON a.req_id = r.req_id
-    LEFT JOIN bayanat.compliance_workflow         w ON w.req_id = r.req_id
     WHERE r.framework_id = ${frameworkId}
     ORDER BY r.sort_order, r.req_code
   `;
+
+  const reviewIds = rows.map((r) => r.reviewRequestId).filter((id): id is number => id != null);
+  const statuses = await fetchReviewStatuses(reviewIds);
+
+  return rows.map(({ reviewRequestId, ...r }) => {
+    const status = reviewRequestId != null ? statuses.get(reviewRequestId) : undefined;
+    return {
+      ...r,
+      workflowStatus: deriveWorkflowStatus(status),
+      endorsedBy: status?.endorsedByName ?? null,
+      endorsedAt: status?.endorsedAt ?? null,
+    };
+  });
 }
 
 export async function importRequirements(
@@ -426,7 +484,8 @@ export async function clearStandardAssessments(frameworkId: number, standardCode
     )
   `;
   await sql`
-    DELETE FROM bayanat.compliance_workflow
+    UPDATE bayanat.gov_compliance_requirements
+    SET review_request_id = NULL
     WHERE req_id IN (
       SELECT req_id FROM bayanat.gov_compliance_requirements
       WHERE framework_id = ${frameworkId} AND standard = ${standardCode}
@@ -451,7 +510,8 @@ export async function clearAssessmentsAboveLevel(
     )
   `;
   await sql`
-    DELETE FROM bayanat.compliance_workflow
+    UPDATE bayanat.gov_compliance_requirements
+    SET review_request_id = NULL
     WHERE req_id IN (
       SELECT req_id FROM bayanat.gov_compliance_requirements
       WHERE framework_id = ${frameworkId}
@@ -464,76 +524,82 @@ export async function clearAssessmentsAboveLevel(
 
 // ── Workflow ──────────────────────────────────────────────────────────────────
 
-export async function getWorkflow(reqId: number) {
-  const rows = await sql<{
-    workflowId: number; status: string;
-    submittedBy: string | null; submittedAt: string | null;
-    confirmedBy: string | null; confirmedAt: string | null;
-    endorsedBy: string | null; endorsedAt: string | null;
-  }[]>`
-    SELECT
-      workflow_id   AS "workflowId",
-      status,
-      submitted_by  AS "submittedBy",
-      submitted_at::text AS "submittedAt",
-      confirmed_by  AS "confirmedBy",
-      confirmed_at::text AS "confirmedAt",
-      endorsed_by   AS "endorsedBy",
-      endorsed_at::text  AS "endorsedAt"
-    FROM bayanat.compliance_workflow WHERE req_id = ${reqId}
+export type ComplianceWorkflowStatus = {
+  requestId: number;
+  status: "DRAFT" | "SUBMITTED" | "CONFIRMED" | "ENDORSED" | "REJECTED";
+  currentStageOrder: number | null;
+  endorsedBy: string | null;
+  endorsedAt: string | null;
+};
+
+// Reads compliance review status straight off the standard workflow engine
+// (asset_requests + workflow_instances + workflow_stage_history) via the
+// requirement's review_request_id — see 087_compliance_review_workflow.sql.
+export async function getComplianceWorkflowStatus(reqId: number): Promise<ComplianceWorkflowStatus | null> {
+  const [req] = await sql<{ reviewRequestId: number | null }[]>`
+    SELECT review_request_id AS "reviewRequestId" FROM bayanat.gov_compliance_requirements WHERE req_id = ${reqId}
   `;
-  return rows[0] ?? null;
+  if (!req?.reviewRequestId) return null; // DRAFT — never submitted
+
+  const [row] = await sql<{
+    requestStatus: string; currentStageOrder: number | null;
+  }[]>`
+    SELECT ar.status_code AS "requestStatus", ws.stage_order AS "currentStageOrder"
+    FROM bayanat.asset_requests ar
+    LEFT JOIN bayanat.workflow_instances wi ON wi.request_id = ar.request_id AND wi.status_code = 'ACTIVE'
+    LEFT JOIN bayanat.workflow_stages ws ON ws.stage_id = wi.current_stage_id
+    WHERE ar.request_id = ${req.reviewRequestId}
+  `;
+  if (!row) return null;
+
+  const statuses = await fetchReviewStatuses([req.reviewRequestId]);
+  const s = statuses.get(req.reviewRequestId);
+
+  return {
+    requestId: req.reviewRequestId,
+    status: deriveWorkflowStatus(s) as ComplianceWorkflowStatus["status"],
+    currentStageOrder: row.currentStageOrder,
+    endorsedBy: s?.endorsedByName ?? null,
+    endorsedAt: s?.endorsedAt ?? null,
+  };
 }
 
-export async function advanceWorkflow(
-  reqId: number,
-  frameworkId: number,
-  action: "submit" | "confirm" | "endorse",
-  byUser: string
-): Promise<void> {
-  const existing = await sql`SELECT workflow_id FROM bayanat.compliance_workflow WHERE req_id = ${reqId}`;
-
-  if (existing.length === 0) {
-    await sql`
-      INSERT INTO bayanat.compliance_workflow (req_id, framework_id, status, updated_at)
-      VALUES (${reqId}, ${frameworkId}, 'DRAFT', NOW())
+// Submits a requirement for review — creates a real asset_requests row
+// (request_type_code='COMPLIANCE_REVIEW') and starts it through the standard
+// workflow engine (startWorkflow handles a Deactive "Compliance Review"
+// workflow's bypass automatically, no separate logic needed here).
+export async function submitComplianceReview(reqId: number, byUserId: string): Promise<{ requestId: number }> {
+  const [existing] = await sql<{ reviewRequestId: number | null }[]>`
+    SELECT review_request_id AS "reviewRequestId" FROM bayanat.gov_compliance_requirements WHERE req_id = ${reqId}
+  `;
+  if (existing?.reviewRequestId) {
+    const [ar] = await sql<{ statusCode: string }[]>`
+      SELECT status_code AS "statusCode" FROM bayanat.asset_requests WHERE request_id = ${existing.reviewRequestId}
     `;
+    if (ar && ar.statusCode !== "CLOSED") {
+      throw new Error("Already submitted — cannot resubmit an active or resolved review");
+    }
   }
 
-  if (action === "submit") {
-    await sql`
-      UPDATE bayanat.compliance_workflow
-      SET status = 'SUBMITTED', submitted_by = ${byUser}, submitted_at = NOW(), updated_at = NOW()
-      WHERE req_id = ${reqId} AND status = 'DRAFT'
-    `;
-    await sql`
-      INSERT INTO bayanat.gov_compliance_history
-        (req_id, framework_id, field_name, old_value, new_value, changed_by)
-      VALUES (${reqId}, ${frameworkId}, 'workflowStatus', 'DRAFT', 'SUBMITTED', ${byUser})
-    `;
-  } else if (action === "confirm") {
-    await sql`
-      UPDATE bayanat.compliance_workflow
-      SET status = 'CONFIRMED', confirmed_by = ${byUser}, confirmed_at = NOW(), updated_at = NOW()
-      WHERE req_id = ${reqId} AND status = 'SUBMITTED'
-    `;
-    await sql`
-      INSERT INTO bayanat.gov_compliance_history
-        (req_id, framework_id, field_name, old_value, new_value, changed_by)
-      VALUES (${reqId}, ${frameworkId}, 'workflowStatus', 'SUBMITTED', 'CONFIRMED', ${byUser})
-    `;
-  } else if (action === "endorse") {
-    await sql`
-      UPDATE bayanat.compliance_workflow
-      SET status = 'ENDORSED', endorsed_by = ${byUser}, endorsed_at = NOW(), updated_at = NOW()
-      WHERE req_id = ${reqId} AND status = 'CONFIRMED'
-    `;
-    await sql`
-      INSERT INTO bayanat.gov_compliance_history
-        (req_id, framework_id, field_name, old_value, new_value, changed_by)
-      VALUES (${reqId}, ${frameworkId}, 'workflowStatus', 'CONFIRMED', 'ENDORSED', ${byUser})
-    `;
-  }
+  const [reqRow] = await sql<{ reqCode: string; domain: string | null }[]>`
+    SELECT req_code AS "reqCode", domain FROM bayanat.gov_compliance_requirements WHERE req_id = ${reqId}
+  `;
+  if (!reqRow) throw new Error("Requirement not found");
+  const title = `Compliance review: ${reqRow.reqCode}${reqRow.domain ? ` (${reqRow.domain})` : ""}`;
+
+  const [created] = await sql<{ requestId: number }[]>`
+    INSERT INTO bayanat.asset_requests (request_type_code, title, priority_code, raised_by_user_id)
+    VALUES ('COMPLIANCE_REVIEW', ${title}, 'MEDIUM', ${byUserId})
+    RETURNING request_id AS "requestId"
+  `;
+  await sql`
+    INSERT INTO bayanat.asset_request_targets (request_id, asset_type_code, asset_id, asset_name)
+    VALUES (${created.requestId}, 'COMPLIANCE_REQUIREMENT', ${reqId}, ${reqRow.reqCode})
+  `;
+  await sql`UPDATE bayanat.gov_compliance_requirements SET review_request_id = ${created.requestId} WHERE req_id = ${reqId}`;
+
+  await startWorkflow(created.requestId, "COMPLIANCE_REVIEW", title);
+  return { requestId: created.requestId };
 }
 
 // ── History ──────────────────────────────────────────────────────────────────

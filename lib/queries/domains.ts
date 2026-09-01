@@ -32,10 +32,26 @@ export async function getDomains(): Promise<GovernanceDomain[]> {
     compliance_raw AS (
       SELECT r.domain_code,
              a.submission_status,
-             w.status AS wf_status
+             -- Workflow status derived from the standard engine (asset_requests +
+             -- workflow_stage_history) via review_request_id — mirrors
+             -- deriveWorkflowStatus() in lib/queries/gov-compliance.ts.
+             CASE
+               WHEN ar.status_code = 'RESOLVED' THEN 'ENDORSED'
+               WHEN ar.status_code = 'CLOSED'   THEN 'REJECTED'
+               WHEN confirm.completed_at IS NOT NULL THEN 'CONFIRMED'
+               WHEN r.review_request_id IS NOT NULL   THEN 'SUBMITTED'
+               ELSE 'DRAFT'
+             END AS wf_status
       FROM   bayanat.gov_compliance_requirements r
       LEFT   JOIN bayanat.gov_compliance_assessments a ON a.req_id = r.req_id
-      LEFT   JOIN bayanat.compliance_workflow        w ON w.req_id = r.req_id
+      LEFT   JOIN bayanat.asset_requests ar ON ar.request_id = r.review_request_id
+      LEFT   JOIN bayanat.workflow_instances wi ON wi.request_id = ar.request_id
+      LEFT   JOIN LATERAL (
+        SELECT h.completed_at FROM bayanat.workflow_stage_history h
+        JOIN bayanat.workflow_stages s ON s.stage_id = h.stage_id
+        WHERE h.instance_id = wi.instance_id AND s.stage_order = 1
+        LIMIT 1
+      ) confirm ON true
       WHERE  r.compliance_or_maturity = 'امتثال'
         AND  r.framework_id = 1
     ),
@@ -115,10 +131,24 @@ export async function getComplianceSummary(): Promise<ComplianceSummary> {
         ON   lc.framework_id = 1 AND da.avg_level BETWEEN lc.range_from AND lc.range_to
     ),
     compliance_raw AS (
-      SELECT a.submission_status, w.status AS wf_status
+      SELECT a.submission_status,
+             CASE
+               WHEN ar.status_code = 'RESOLVED' THEN 'ENDORSED'
+               WHEN ar.status_code = 'CLOSED'   THEN 'REJECTED'
+               WHEN confirm.completed_at IS NOT NULL THEN 'CONFIRMED'
+               WHEN r.review_request_id IS NOT NULL   THEN 'SUBMITTED'
+               ELSE 'DRAFT'
+             END AS wf_status
       FROM   bayanat.gov_compliance_requirements r
       LEFT   JOIN bayanat.gov_compliance_assessments a ON a.req_id = r.req_id
-      LEFT   JOIN bayanat.compliance_workflow        w ON w.req_id = r.req_id
+      LEFT   JOIN bayanat.asset_requests ar ON ar.request_id = r.review_request_id
+      LEFT   JOIN bayanat.workflow_instances wi ON wi.request_id = ar.request_id
+      LEFT   JOIN LATERAL (
+        SELECT h.completed_at FROM bayanat.workflow_stage_history h
+        JOIN bayanat.workflow_stages s ON s.stage_id = h.stage_id
+        WHERE h.instance_id = wi.instance_id AND s.stage_order = 1
+        LIMIT 1
+      ) confirm ON true
       WHERE  r.compliance_or_maturity = 'امتثال'
         AND  r.framework_id = 1
     ),

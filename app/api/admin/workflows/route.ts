@@ -19,8 +19,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "workflowName is required" }, { status: 400 });
 
   const [row] = await sql<{ workflowId: number }[]>`
-    INSERT INTO bayanat.workflow_definitions (workflow_name, description)
-    VALUES (${workflowName.trim()}, ${description?.trim() || null})
+    INSERT INTO bayanat.workflow_definitions (workflow_name_text, description_text, status_code)
+    VALUES (${workflowName.trim()}, ${description?.trim() || null}, 'Draft')
     RETURNING workflow_id AS "workflowId"
   `;
   return NextResponse.json({ ok: true, workflowId: row.workflowId });
