@@ -6,8 +6,14 @@ export type WorkflowStage = {
   stageOrder:     number;
   stageName:      string;
   description:    string | null;
-  assigneeRole:   string;
+  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER";
+  assigneeRoleId: number | null;
+  assigneeTeamId: number | null;
   assigneeUserId: string | null;
+  // Resolved display name for whatever assigneeType points at — a role name,
+  // team name, user's full name, or "Requester". Computed server-side so
+  // every page that lists stages doesn't need its own role/team/user lookup.
+  assigneeLabel:  string;
   slaValue:       number | null;
   isFinal:        boolean;
 };
@@ -59,10 +65,25 @@ const STAGE_COLS = `
   ws.stage_order       AS "stageOrder",
   ws.stage_name_text   AS "stageName",
   ws.description_text  AS "description",
-  ws.required_role_code AS "assigneeRole",
+  ws.assignee_type     AS "assigneeType",
+  ws.assignee_role_id  AS "assigneeRoleId",
+  ws.assignee_team_id  AS "assigneeTeamId",
   ws.assignee_user_id  AS "assigneeUserId",
+  CASE ws.assignee_type
+    WHEN 'ROLE'      THEN role_r.role_name
+    WHEN 'TEAM'       THEN team_t.team_name
+    WHEN 'USER'       THEN user_u.full_name
+    WHEN 'REQUESTER'  THEN 'Requester'
+  END                  AS "assigneeLabel",
   ws.sla_days_count    AS "slaValue",
   ws.is_final          AS "isFinal"
+`;
+
+// Joined alongside STAGE_COLS wherever it's selected, to resolve assigneeLabel.
+const STAGE_JOINS = `
+  LEFT JOIN bayanat.roles role_r ON role_r.role_id = ws.assignee_role_id
+  LEFT JOIN bayanat.teams team_t ON team_t.team_id = ws.assignee_team_id
+  LEFT JOIN bayanat.users user_u ON user_u.user_id = ws.assignee_user_id
 `;
 
 export async function getWorkflowForRequest(requestId: number): Promise<WorkflowInstance | null> {
@@ -91,6 +112,7 @@ export async function getWorkflowForRequest(requestId: number): Promise<Workflow
   const stages = await sql<WorkflowStage[]>`
     SELECT ${sql.unsafe(STAGE_COLS)}
     FROM bayanat.workflow_stages ws
+    ${sql.unsafe(STAGE_JOINS)}
     WHERE ws.workflow_id = ${inst.workflowId}
     ORDER BY ws.stage_order
   `;
@@ -134,6 +156,7 @@ export async function listWorkflows(): Promise<WorkflowDefinition[]> {
   const stages = await sql<WorkflowStage[]>`
     SELECT ${sql.unsafe(STAGE_COLS)}
     FROM bayanat.workflow_stages ws
+    ${sql.unsafe(STAGE_JOINS)}
     WHERE ws.workflow_id IN ${sql(ids)}
     ORDER BY ws.workflow_id, ws.stage_order
   `;

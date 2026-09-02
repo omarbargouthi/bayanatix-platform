@@ -7,7 +7,46 @@ import type {
   DataAttribute,
   CatalogStats,
   Steward,
+  SourceOption,
+  SchemaOption,
+  TableOption,
 } from "../types";
+
+// ----- Resource picker (Source → Schema → Table) for scoping role assignments -----
+export async function getResourcePickerOptions(): Promise<{
+  sources: SourceOption[]; schemas: SchemaOption[]; tables: TableOption[];
+}> {
+  const rows = await sql<{
+    sourceId: number; sourceName: string;
+    schemaId: number; schemaName: string;
+    entityId: number | null; entityName: string | null;
+  }[]>`
+    SELECT
+      src.data_source_id AS "sourceId", src.source_name_text AS "sourceName",
+      sch.schema_id       AS "schemaId", sch.schema_name_text AS "schemaName",
+      e.entity_id         AS "entityId", e.entity_name_text   AS "entityName"
+    FROM bayanat.data_sources src
+    JOIN bayanat.data_schemas sch ON sch.data_source_id = src.data_source_id
+    LEFT JOIN bayanat.data_entities e ON e.schema_id = sch.schema_id
+    ORDER BY src.source_name_text, sch.schema_name_text, e.entity_name_text
+  `;
+
+  const sourcesMap = new Map<number, SourceOption>();
+  const schemasMap = new Map<number, SchemaOption>();
+  const tables: TableOption[] = [];
+  for (const r of rows) {
+    if (!sourcesMap.has(r.sourceId)) {
+      sourcesMap.set(r.sourceId, { id: String(r.sourceId), name: r.sourceName });
+    }
+    if (!schemasMap.has(r.schemaId)) {
+      schemasMap.set(r.schemaId, { id: String(r.schemaId), name: r.schemaName, sourceId: String(r.sourceId), sourceName: r.sourceName });
+    }
+    if (r.entityId != null) {
+      tables.push({ id: String(r.entityId), name: r.entityName!, schemaId: String(r.schemaId), schemaName: r.schemaName, sourceId: String(r.sourceId), sourceName: r.sourceName });
+    }
+  }
+  return { sources: [...sourcesMap.values()], schemas: [...schemasMap.values()], tables };
+}
 
 // ----- Top-level catalog stats -----
 export async function getCatalogStats(): Promise<CatalogStats> {

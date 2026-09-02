@@ -229,6 +229,14 @@ export type Team = {
   createdAt:   string;
 };
 
+// Resource-picker options for scoping a role assignment (or, in principle, any
+// other source/schema/table-scoped feature) — each level carries its parent's
+// id/name so a UI can show "Source / Schema / Table" instead of an ambiguous
+// flat list of same-named schemas or tables from different sources.
+export type SourceOption = { id: string; name: string };
+export type SchemaOption = { id: string; name: string; sourceId: string; sourceName: string };
+export type TableOption  = { id: string; name: string; schemaId: string; schemaName: string; sourceId: string; sourceName: string };
+
 export type RoleAssignment = {
   assignmentId:  number;
   roleId:        number;

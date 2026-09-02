@@ -1,15 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Role } from "@/lib/types";
-
-type Resource = { id: string; name: string };
+import type { Role, SourceOption, SchemaOption, TableOption } from "@/lib/types";
 
 type Props = {
   roles:       Role[];
-  sources:     Resource[];
-  schemas:     Resource[];
-  tables:      Resource[];
+  sources:     SourceOption[];
+  schemas:     SchemaOption[];
+  tables:      TableOption[];
   userId?:     string;
   teamId?:     number;
   onDone:      () => void;
@@ -24,18 +22,32 @@ const RESOURCE_TYPES = [
 ];
 
 export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamId, onDone, onClose }: Props) {
-  const [roleId,       setRoleId]       = useState<string>("");
-  const [resType,      setResType]      = useState<string>("GLOBAL");
-  const [resId,        setResId]        = useState<string>("");
-  const [saving,       setSaving]       = useState(false);
-  const [err,          setErr]          = useState("");
+  const [roleId,         setRoleId]         = useState<string>("");
+  const [resType,        setResType]        = useState<string>("GLOBAL");
+  // Scope-narrowing selections — Schema/Table scope needs Source (and Schema,
+  // for Table) picked first so the final list can't mix same-named schemas or
+  // tables from different sources without any indication of which is which.
+  const [filterSourceId, setFilterSourceId] = useState<string>("");
+  const [filterSchemaId, setFilterSchemaId] = useState<string>("");
+  const [resId,          setResId]          = useState<string>("");
+  const [saving,         setSaving]         = useState(false);
+  const [err,            setErr]            = useState("");
 
-  const resourceList: Resource[] =
-    resType === "DATA_SOURCE" ? sources :
-    resType === "SCHEMA"      ? schemas :
-    resType === "TABLE"       ? tables  : [];
+  function changeResType(v: string) {
+    setResType(v);
+    setFilterSourceId("");
+    setFilterSchemaId("");
+    setResId("");
+  }
 
-  const resName = resourceList.find((r) => r.id === resId)?.name ?? "Global";
+  const schemasInSource = schemas.filter((s) => s.sourceId === filterSourceId);
+  const tablesInSchema  = tables.filter((t) => t.schemaId === filterSchemaId);
+
+  const resName =
+    resType === "DATA_SOURCE" ? sources.find((r) => r.id === resId)?.name ?? "" :
+    resType === "SCHEMA"      ? (() => { const s = schemas.find((r) => r.id === resId); return s ? `${s.sourceName} / ${s.name}` : ""; })() :
+    resType === "TABLE"       ? (() => { const t = tables.find((r) => r.id === resId);  return t ? `${t.sourceName} / ${t.schemaName} / ${t.name}` : ""; })() :
+    "Global";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,6 +71,8 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
     onDone();
   }
 
+  const selectClass = "w-full border border-line rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30 focus:border-brand-purple disabled:opacity-40 disabled:cursor-not-allowed";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-xl shadow-2xl w-[480px] border border-line">
@@ -75,7 +89,7 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
             <select
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
-              className="w-full border border-line rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30 focus:border-brand-purple"
+              className={selectClass}
             >
               <option value="">— select role —</option>
               {roles.map((r) => (
@@ -88,8 +102,8 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
             <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Scope *</label>
             <select
               value={resType}
-              onChange={(e) => { setResType(e.target.value); setResId(""); }}
-              className="w-full border border-line rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30 focus:border-brand-purple"
+              onChange={(e) => changeResType(e.target.value)}
+              className={selectClass}
             >
               {RESOURCE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -97,22 +111,69 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
             </select>
           </div>
 
-          {resType !== "GLOBAL" && (
+          {resType === "DATA_SOURCE" && (
             <div>
-              <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">
-                {resType === "DATA_SOURCE" ? "Data Source" : resType === "SCHEMA" ? "Schema" : "Table"} *
-              </label>
-              <select
-                value={resId}
-                onChange={(e) => setResId(e.target.value)}
-                className="w-full border border-line rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30 focus:border-brand-purple"
-              >
+              <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Data Source *</label>
+              <select value={resId} onChange={(e) => setResId(e.target.value)} className={selectClass}>
                 <option value="">— select —</option>
-                {resourceList.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
+                {sources.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
+          )}
+
+          {/* Schema/Table scope: Source picked first so the schema/table list below
+              it is never an ambiguous flat list of same-named items from different
+              sources — each step narrows the next. */}
+          {(resType === "SCHEMA" || resType === "TABLE") && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Data Source *</label>
+              <select
+                value={filterSourceId}
+                onChange={(e) => { setFilterSourceId(e.target.value); setFilterSchemaId(""); setResId(""); }}
+                className={selectClass}
+              >
+                <option value="">— select source —</option>
+                {sources.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {resType === "SCHEMA" && filterSourceId && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Schema *</label>
+              <select value={resId} onChange={(e) => setResId(e.target.value)} className={selectClass}>
+                <option value="">— select schema —</option>
+                {schemasInSource.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {resType === "TABLE" && filterSourceId && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Schema *</label>
+              <select
+                value={filterSchemaId}
+                onChange={(e) => { setFilterSchemaId(e.target.value); setResId(""); }}
+                className={selectClass}
+              >
+                <option value="">— select schema —</option>
+                {schemasInSource.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {resType === "TABLE" && filterSchemaId && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Table *</label>
+              <select value={resId} onChange={(e) => setResId(e.target.value)} className={selectClass}>
+                <option value="">— select table —</option>
+                {tablesInSchema.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {resId && resType !== "GLOBAL" && resType !== "DATA_SOURCE" && (
+            <p className="text-[11px] text-muted">Scope: <span className="font-semibold text-ink-soft">{resName}</span></p>
           )}
 
           {/* Preview effective privileges */}

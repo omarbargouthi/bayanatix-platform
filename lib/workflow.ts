@@ -4,15 +4,17 @@ type StageRow = {
   stageId:        number;
   stageName:      string;
   stageOrder:     number;
-  assigneeRole:   string;
+  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER";
+  assigneeRoleId: number | null;
+  assigneeTeamId: number | null;
   assigneeUserId: string | null;
   slaValue:       number | null;
   isFinal:        boolean;
 };
 
 async function resolveAssignees(stage: StageRow, requestId: number): Promise<string[]> {
-  switch (stage.assigneeRole) {
-    case "SPECIFIC_USER":
+  switch (stage.assigneeType) {
+    case "USER":
       return stage.assigneeUserId ? [stage.assigneeUserId] : [];
 
     case "REQUESTER": {
@@ -22,89 +24,31 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
       return rows[0] ? [rows[0].userId] : [];
     }
 
-    case "STEWARD": {
-      // 1. Direct assignments on request targets
-      const direct = await sql<{ userId: string }[]>`
-        SELECT DISTINCT s.user_id AS "userId"
-        FROM bayanat.asset_stakeholders s
-        JOIN bayanat.asset_request_targets art
-          ON art.asset_type_code = s.asset_type_code AND art.asset_id = s.asset_id
-        WHERE art.request_id = ${requestId}
-          AND s.role_code IN ('BIZ_STEWARD', 'TECH_STEWARD')
-      `;
-      if (direct.length > 0) return direct.map((r) => r.userId);
-
-      // 2. Hierarchy resolution for DATA_ATTRIBUTES targets
-      const colTargets = await sql<{ assetId: number }[]>`
-        SELECT art.asset_id AS "assetId" FROM bayanat.asset_request_targets art
-        WHERE art.request_id = ${requestId} AND art.asset_type_code = 'DATA_ATTRIBUTES'
-      `;
-      const hierUsers = new Set<string>();
-      for (const t of colTargets) {
-        for (const role of ["BIZ_STEWARD", "TECH_STEWARD"]) {
-          const rows = await sql<{ userId: string }[]>`
-            SELECT user_id AS "userId" FROM bayanat.fn_resolve_effective_stakeholder(${t.assetId}, ${role})
-            WHERE user_id IS NOT NULL
-          `;
-          rows.forEach((r) => hierUsers.add(r.userId));
-        }
-      }
-      if (hierUsers.size > 0) return [...hierUsers];
-
-      // Fallback: STEWARD, then OFFICER, then ADMIN
-      const fb = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users
-        WHERE role IN ('STEWARD', 'OFFICER', 'ADMIN') AND is_active = true
-        ORDER BY CASE role WHEN 'STEWARD' THEN 1 WHEN 'OFFICER' THEN 2 ELSE 3 END
-        LIMIT 5
-      `;
-      return fb.map((r) => r.userId);
-    }
-
-    case "OWNER": {
-      // 1. Direct owner assignments on request targets (covers DATA_SOURCES, DATA_ENTITIES, etc.)
-      const direct = await sql<{ userId: string }[]>`
-        SELECT DISTINCT s.user_id AS "userId"
-        FROM bayanat.asset_stakeholders s
-        JOIN bayanat.asset_request_targets art
-          ON art.asset_type_code = s.asset_type_code AND art.asset_id = s.asset_id
-        WHERE art.request_id = ${requestId} AND s.role_code = 'OWNER'
-      `;
-      if (direct.length > 0) return direct.map((r) => r.userId);
-
-      // 2. Hierarchy resolution for DATA_ATTRIBUTES targets (column → table → schema → source)
-      const colTargets = await sql<{ assetId: number }[]>`
-        SELECT art.asset_id AS "assetId" FROM bayanat.asset_request_targets art
-        WHERE art.request_id = ${requestId} AND art.asset_type_code = 'DATA_ATTRIBUTES'
-      `;
-      const hierUsers = new Set<string>();
-      for (const t of colTargets) {
-        const rows = await sql<{ userId: string }[]>`
-          SELECT user_id AS "userId" FROM bayanat.fn_resolve_effective_stakeholder(${t.assetId}, 'OWNER')
-          WHERE user_id IS NOT NULL
-        `;
-        rows.forEach((r) => hierUsers.add(r.userId));
-      }
-      if (hierUsers.size > 0) return [...hierUsers];
-
-      // Fallback: ADMIN (ownership responsibility when no owner assigned)
-      const fb = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users
-        WHERE role = 'ADMIN' AND is_active = true LIMIT 5
-      `;
-      return fb.map((r) => r.userId);
-    }
-
-    case "OFFICER": {
+    case "TEAM": {
+      if (!stage.assigneeTeamId) return [];
       const rows = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'OFFICER' AND is_active = true LIMIT 5
+        SELECT user_id AS "userId" FROM bayanat.team_members WHERE team_id = ${stage.assigneeTeamId}
       `;
       return rows.map((r) => r.userId);
     }
 
-    case "ADMIN": {
+    case "ROLE": {
+      if (!stage.assigneeRoleId) return [];
+      // Whoever holds this role globally (see bayanat.role_assignments) —
+      // either directly, or as a member of a team the role was assigned to.
+      // Resource-scoped (schema/table) role assignments don't apply here:
+      // a workflow stage isn't tied to a specific asset.
       const rows = await sql<{ userId: string }[]>`
-        SELECT user_id AS "userId" FROM bayanat.users WHERE role = 'ADMIN' AND is_active = true LIMIT 5
+        SELECT DISTINCT user_id AS "userId" FROM (
+          SELECT ra.user_id
+          FROM bayanat.role_assignments ra
+          WHERE ra.role_id = ${stage.assigneeRoleId} AND ra.resource_type = 'GLOBAL' AND ra.user_id IS NOT NULL
+          UNION
+          SELECT tm.user_id
+          FROM bayanat.role_assignments ra
+          JOIN bayanat.team_members tm ON tm.team_id = ra.team_id
+          WHERE ra.role_id = ${stage.assigneeRoleId} AND ra.resource_type = 'GLOBAL' AND ra.team_id IS NOT NULL
+        ) x
       `;
       return rows.map((r) => r.userId);
     }
@@ -146,13 +90,15 @@ async function enterStage(instanceId: number, stage: StageRow, requestId: number
 }
 
 const STAGE_SELECT = sql`
-  stage_id         AS "stageId",
-  stage_name_text  AS "stageName",
-  stage_order      AS "stageOrder",
-  required_role_code AS "assigneeRole",
-  assignee_user_id AS "assigneeUserId",
-  sla_days_count   AS "slaValue",
-  is_final         AS "isFinal"
+  stage_id          AS "stageId",
+  stage_name_text   AS "stageName",
+  stage_order       AS "stageOrder",
+  assignee_type     AS "assigneeType",
+  assignee_role_id  AS "assigneeRoleId",
+  assignee_team_id  AS "assigneeTeamId",
+  assignee_user_id  AS "assigneeUserId",
+  sla_days_count    AS "slaValue",
+  is_final          AS "isFinal"
 `;
 
 export async function startWorkflow(requestId: number, requestTypeCode: string, requestTitle: string): Promise<void> {

@@ -3,10 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { AdminUser, Role, RoleAssignment } from "@/lib/types";
+import type { AdminUser, Role, RoleAssignment, SourceOption, SchemaOption, TableOption } from "@/lib/types";
 import { AssignRoleModal } from "@/components/admin/AssignRoleModal";
-
-type Resource = { id: string; name: string };
 
 const PRIV_PILL = (on: boolean, label: string, color: string) =>
   on ? <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${color}`}>{label}</span> : null;
@@ -24,9 +22,9 @@ export function UserDetailClient({
   user:        AdminUser;
   assignments: RoleAssignment[];
   roles:       Role[];
-  sources:     Resource[];
-  schemas:     Resource[];
-  tables:      Resource[];
+  sources:     SourceOption[];
+  schemas:     SchemaOption[];
+  tables:      TableOption[];
 }) {
   const router = useRouter();
   const [showAssign,  setShowAssign]  = useState(false);

@@ -25,14 +25,6 @@ const STATUS_COLOR: Record<string, string> = {
   RESOLVED:    "text-emerald-700 bg-emerald-50",
   CLOSED:      "text-gray-500 bg-gray-50",
 };
-const ROLE_LABEL: Record<string, string> = {
-  STEWARD:       "Data Steward",
-  OWNER:         "Asset Owner",
-  OFFICER:       "Data Officer",
-  ADMIN:         "Administrator",
-  REQUESTER:     "Request Raiser",
-  SPECIFIC_USER: "Specific User",
-};
 const OUTCOME_STYLE: Record<string, string> = {
   APPROVED:  "text-emerald-700 bg-emerald-50 border-emerald-200",
   REJECTED:  "text-red-600 bg-red-50 border-red-200",
@@ -303,7 +295,7 @@ export default function RequestDetailPage() {
                         <div className={`text-[12px] font-semibold ${current ? "text-brand-purple" : done ? "text-muted line-through" : "text-ink"}`}>
                           {s.stageName}
                         </div>
-                        <div className="text-[10px] text-muted">{ROLE_LABEL[s.assigneeRole] ?? s.assigneeRole}</div>
+                        <div className="text-[10px] text-muted">{s.assigneeLabel ?? s.assigneeType}</div>
                         {s.slaValue && !done && (
                           <div className="text-[10px] text-muted">SLA: {s.slaValue}d</div>
                         )}

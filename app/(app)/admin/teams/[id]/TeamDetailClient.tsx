@@ -3,11 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Team, TeamMember, RoleAssignment, Role, AdminUser } from "@/lib/types";
+import type { Team, TeamMember, RoleAssignment, Role, AdminUser, SourceOption, SchemaOption, TableOption } from "@/lib/types";
 import { AssignRoleModal } from "@/components/admin/AssignRoleModal";
 import { TeamForm } from "@/components/admin/TeamForm";
-
-type Resource = { id: string; name: string };
 
 const SCOPE_BADGE: Record<string, string> = {
   GLOBAL:      "bg-purple-50 text-purple-700 border-purple-200",
@@ -31,9 +29,9 @@ export function TeamDetailClient({
   assignments: RoleAssignment[];
   roles:       Role[];
   nonMembers:  AdminUser[];
-  sources:     Resource[];
-  schemas:     Resource[];
-  tables:      Resource[];
+  sources:     SourceOption[];
+  schemas:     SchemaOption[];
+  tables:      TableOption[];
 }) {
   const router = useRouter();
   const [showAssign,  setShowAssign]  = useState(false);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { WorkflowDefinition } from "@/lib/queries/workflow";
+import type { Role, Team, AdminUser } from "@/lib/types";
 
 const ALL_TYPES = [
   { code: "FIX_DATA_ISSUE",       label: "Fix Data Issue" },
@@ -16,22 +17,18 @@ const ALL_TYPES = [
   { code: "PUBLISH_OPEN_DATA_PI", label: "Publish Open Data (PI)" },
 ];
 
-const ROLE_OPTIONS = [
-  { value: "STEWARD",       label: "Data Steward" },
-  { value: "OWNER",         label: "Asset Owner" },
-  { value: "OFFICER",       label: "Data Officer" },
-  { value: "ADMIN",         label: "Administrator" },
-  { value: "REQUESTER",     label: "Request Raiser" },
-  { value: "SPECIFIC_USER", label: "Specific User" },
+const ASSIGNEE_TYPE_OPTIONS = [
+  { value: "ROLE",      label: "A Role" },
+  { value: "TEAM",      label: "A Team" },
+  { value: "USER",      label: "A Specific User" },
+  { value: "REQUESTER", label: "Whoever Raised the Request" },
 ];
 
-const ROLE_COLOR: Record<string, string> = {
-  STEWARD:       "bg-blue-50 text-blue-700",
-  OWNER:         "bg-purple-50 text-purple-700",
-  OFFICER:       "bg-amber-50 text-amber-700",
-  ADMIN:         "bg-red-50 text-red-700",
-  REQUESTER:     "bg-emerald-50 text-emerald-700",
-  SPECIFIC_USER: "bg-gray-50 text-gray-600",
+const ASSIGNEE_TYPE_COLOR: Record<string, string> = {
+  ROLE:      "bg-blue-50 text-blue-700",
+  TEAM:      "bg-purple-50 text-purple-700",
+  USER:      "bg-gray-50 text-gray-600",
+  REQUESTER: "bg-emerald-50 text-emerald-700",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -58,8 +55,17 @@ export default function WorkflowsAdminPage() {
   const [selected,  setSelected]  = useState<WorkflowDefinition | null>(null);
   const [loading,   setLoading]   = useState(true);
 
+  // Assignee pickers — real Roles/Teams/Users from User Management
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+
   // Stage form
-  const [newStage, setNewStage] = useState({ stageName: "", description: "", assigneeRole: "STEWARD", assigneeUserId: "", slaHours: "", isFinal: false });
+  const [newStage, setNewStage] = useState({
+    stageName: "", description: "",
+    assigneeType: "ROLE", assigneeRoleId: "", assigneeTeamId: "", assigneeUserId: "",
+    slaHours: "", isFinal: false,
+  });
   const [addingStage, setAddingStage] = useState(false);
   const [showStageForm, setShowStageForm] = useState(false);
 
@@ -81,6 +87,12 @@ export default function WorkflowsAdminPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    fetch("/api/admin/roles").then((r) => r.ok ? r.json() : []).then(setRoles);
+    fetch("/api/admin/teams").then((r) => r.ok ? r.json() : []).then(setTeams);
+    fetch("/api/admin/users").then((r) => r.ok ? r.json() : []).then(setUsers);
+  }, []);
 
   async function assignType(code: string, wfId: number | null) {
     const res = await fetch("/api/admin/workflows/assign", {
@@ -104,6 +116,9 @@ export default function WorkflowsAdminPage() {
 
   async function addStage() {
     if (!selected || !newStage.stageName.trim()) return;
+    if (newStage.assigneeType === "ROLE" && !newStage.assigneeRoleId) return;
+    if (newStage.assigneeType === "TEAM" && !newStage.assigneeTeamId) return;
+    if (newStage.assigneeType === "USER" && !newStage.assigneeUserId) return;
     setAddingStage(true);
     await fetch(`/api/admin/workflows/${selected.workflowId}/stages`, {
       method: "POST",
@@ -111,13 +126,15 @@ export default function WorkflowsAdminPage() {
       body: JSON.stringify({
         stageName:      newStage.stageName.trim(),
         description:    newStage.description.trim() || null,
-        assigneeRole:   newStage.assigneeRole,
-        assigneeUserId: newStage.assigneeUserId.trim() || null,
+        assigneeType:   newStage.assigneeType,
+        assigneeRoleId: newStage.assigneeRoleId ? Number(newStage.assigneeRoleId) : null,
+        assigneeTeamId: newStage.assigneeTeamId ? Number(newStage.assigneeTeamId) : null,
+        assigneeUserId: newStage.assigneeUserId || null,
         slaHours:       newStage.slaHours ? Number(newStage.slaHours) : null,
         isFinal:        newStage.isFinal,
       }),
     });
-    setNewStage({ stageName: "", description: "", assigneeRole: "STEWARD", assigneeUserId: "", slaHours: "", isFinal: false });
+    setNewStage({ stageName: "", description: "", assigneeType: "ROLE", assigneeRoleId: "", assigneeTeamId: "", assigneeUserId: "", slaHours: "", isFinal: false });
     setShowStageForm(false);
     setAddingStage(false);
     load();
@@ -334,8 +351,8 @@ export default function WorkflowsAdminPage() {
                       {s.isFinal && <span className="text-[9px] font-bold text-white bg-brand-purple px-1.5 py-0.5 rounded-full">FINAL</span>}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ROLE_COLOR[s.assigneeRole] ?? ""}`}>
-                        {ROLE_OPTIONS.find((r) => r.value === s.assigneeRole)?.label ?? s.assigneeRole}
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ASSIGNEE_TYPE_COLOR[s.assigneeType] ?? ""}`}>
+                        {s.assigneeLabel ?? s.assigneeType}
                       </span>
                       {s.slaValue && <span className="text-[10px] text-muted">SLA: {s.slaValue}d</span>}
                       {s.description && <span className="text-[10px] text-muted">{s.description}</span>}
@@ -376,13 +393,13 @@ export default function WorkflowsAdminPage() {
                       className="col-span-2 text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
                     />
                     <div>
-                      <label className="text-[10px] text-muted block mb-1">Assignee Role</label>
+                      <label className="text-[10px] text-muted block mb-1">Assign To</label>
                       <select
-                        value={newStage.assigneeRole}
-                        onChange={(e) => setNewStage((p) => ({ ...p, assigneeRole: e.target.value }))}
+                        value={newStage.assigneeType}
+                        onChange={(e) => setNewStage((p) => ({ ...p, assigneeType: e.target.value, assigneeRoleId: "", assigneeTeamId: "", assigneeUserId: "" }))}
                         className="w-full text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
                       >
-                        {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        {ASSIGNEE_TYPE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                     <div>
@@ -395,13 +412,44 @@ export default function WorkflowsAdminPage() {
                         className="w-full text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
                       />
                     </div>
-                    {newStage.assigneeRole === "SPECIFIC_USER" && (
-                      <input
-                        value={newStage.assigneeUserId}
-                        onChange={(e) => setNewStage((p) => ({ ...p, assigneeUserId: e.target.value }))}
-                        placeholder="User ID"
-                        className="col-span-2 text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
-                      />
+                    {newStage.assigneeType === "ROLE" && (
+                      <div className="col-span-2">
+                        <label className="text-[10px] text-muted block mb-1">Role *</label>
+                        <select
+                          value={newStage.assigneeRoleId}
+                          onChange={(e) => setNewStage((p) => ({ ...p, assigneeRoleId: e.target.value }))}
+                          className="w-full text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
+                        >
+                          <option value="">— select role —</option>
+                          {roles.map((r) => <option key={r.roleId} value={r.roleId}>{r.roleName}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {newStage.assigneeType === "TEAM" && (
+                      <div className="col-span-2">
+                        <label className="text-[10px] text-muted block mb-1">Team *</label>
+                        <select
+                          value={newStage.assigneeTeamId}
+                          onChange={(e) => setNewStage((p) => ({ ...p, assigneeTeamId: e.target.value }))}
+                          className="w-full text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
+                        >
+                          <option value="">— select team —</option>
+                          {teams.map((t) => <option key={t.teamId} value={t.teamId}>{t.teamName}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {newStage.assigneeType === "USER" && (
+                      <div className="col-span-2">
+                        <label className="text-[10px] text-muted block mb-1">User *</label>
+                        <select
+                          value={newStage.assigneeUserId}
+                          onChange={(e) => setNewStage((p) => ({ ...p, assigneeUserId: e.target.value }))}
+                          className="w-full text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:border-brand-purple"
+                        >
+                          <option value="">— select user —</option>
+                          {users.map((u) => <option key={u.userId} value={u.userId}>{u.fullName}</option>)}
+                        </select>
+                      </div>
                     )}
                   </div>
                   <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
