@@ -10,14 +10,21 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MarkerType,
   useNodesState,
   useEdgesState,
+  useInternalNode,
+  BaseEdge,
+  getBezierPath,
   Handle,
   Position,
   type Node,
   type Edge,
+  type EdgeTypes,
+  type EdgeProps,
   type NodeTypes,
   type NodeProps,
+  type InternalNode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -189,6 +196,75 @@ const nodeTypes: NodeTypes = {
   itemNode:   ItemNode,
 };
 
+// ── Floating edges ─────────────────────────────────────────────────────────────
+// This is a radial layout (center → group → item spokes at arbitrary angles),
+// unlike the Lineage graph's strict left-to-right dagre flow — so edges can't
+// use fixed Left/Right handles the way Lineage's smoothstep edges do; a group
+// sitting to the left of center would still draw from center's Right handle,
+// looping the long way around and crossing other spokes. Instead each edge's
+// endpoints are computed as the actual intersection of the line between the
+// two node centers with each node's own box, so every line takes the direct
+// path — the standard "floating edge" recipe for non-tree-shaped graphs.
+
+function getNodeIntersection(intersectionNode: InternalNode, targetNode: InternalNode) {
+  const { width, height } = intersectionNode.measured;
+  const intersectionPos = intersectionNode.internals.positionAbsolute;
+  const targetPos = targetNode.internals.positionAbsolute;
+
+  const w = (width ?? 0) / 2;
+  const h = (height ?? 0) / 2;
+  const x2 = intersectionPos.x + w;
+  const y2 = intersectionPos.y + h;
+  const x1 = targetPos.x + (targetNode.measured.width ?? 0) / 2;
+  const y1 = targetPos.y + (targetNode.measured.height ?? 0) / 2;
+
+  const xx1 = (x1 - x2) / (2 * w) - (y1 - y2) / (2 * h);
+  const yy1 = (x1 - x2) / (2 * w) + (y1 - y2) / (2 * h);
+  const a = 1 / (Math.abs(xx1) + Math.abs(yy1) || 1);
+  const xx3 = a * xx1;
+  const yy3 = a * yy1;
+
+  return { x: w * (xx3 + yy3) + x2, y: h * (-xx3 + yy3) + y2 };
+}
+
+function getEdgePosition(node: InternalNode, point: { x: number; y: number }) {
+  const pos = node.internals.positionAbsolute;
+  const nx = Math.round(pos.x);
+  const ny = Math.round(pos.y);
+  const px = Math.round(point.x);
+  const py = Math.round(point.y);
+  const w = node.measured.width ?? 0;
+  const h = node.measured.height ?? 0;
+
+  if (px <= nx + 1) return Position.Left;
+  if (px >= nx + w - 1) return Position.Right;
+  if (py <= ny + 1) return Position.Top;
+  if (py >= ny + h - 1) return Position.Bottom;
+  return Position.Top;
+}
+
+function FloatingEdge({ id, source, target, style, markerEnd }: EdgeProps) {
+  const sourceNode = useInternalNode(source);
+  const targetNode = useInternalNode(target);
+  if (!sourceNode || !targetNode) return null;
+
+  const sourceIntersection = getNodeIntersection(sourceNode, targetNode);
+  const targetIntersection = getNodeIntersection(targetNode, sourceNode);
+
+  const [edgePath] = getBezierPath({
+    sourceX: sourceIntersection.x,
+    sourceY: sourceIntersection.y,
+    sourcePosition: getEdgePosition(sourceNode, sourceIntersection),
+    targetX: targetIntersection.x,
+    targetY: targetIntersection.y,
+    targetPosition: getEdgePosition(targetNode, targetIntersection),
+  });
+
+  return <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />;
+}
+
+const edgeTypes: EdgeTypes = { floating: FloatingEdge };
+
 // ── Layout helpers ─────────────────────────────────────────────────────────────
 
 function degToRad(deg: number) {
@@ -250,8 +326,9 @@ function buildNodesAndEdges(
       id: `edge-center-${group.id}`,
       source: "center",
       target: groupNodeId,
-      type: "smoothstep",
+      type: "floating",
       style: { stroke: group.color, strokeWidth: 1.75 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: group.color, width: 14, height: 14 },
     });
 
     if (isExpanded && group.items.length > 0) {
@@ -289,8 +366,9 @@ function buildNodesAndEdges(
           id: `edge-${groupNodeId}-${itemNodeId}`,
           source: groupNodeId,
           target: itemNodeId,
-          type: "straight",
-          style: { stroke: group.color, strokeWidth: 1, opacity: 0.6 },
+          type: "floating",
+          style: { stroke: group.color, strokeWidth: 1.25, opacity: 0.65 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: group.color, width: 10, height: 10 },
         });
       });
     }
@@ -466,6 +544,7 @@ function MindMapInner({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodeOrigin={[0.5, 0.5]}
           fitView
           fitViewOptions={{ padding: 0.2 }}
