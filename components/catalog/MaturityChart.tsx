@@ -24,7 +24,7 @@ function smoothPath(pts: [number, number][]): string {
   return parts.join(" ");
 }
 
-type Tooltip = { x: number; y: number; ndi: number; naii: number; label: string } | null;
+type Tooltip = { x: number; y: number; score: number; label: string } | null;
 
 export function MaturityChart({ data, noDataLabel = "No trend data available" }: { data: TrendPoint[]; noDataLabel?: string }) {
   const [tooltip, setTooltip] = useState<Tooltip>(null);
@@ -39,8 +39,7 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
   const toX = (i: number, total: number) =>
     PAD.l + (total <= 1 ? cW / 2 : (i / (total - 1)) * cW);
 
-  const ndiPts:  [number, number][] = data.map((d, i) => [toX(i, data.length), toY(Number(d.ndiScore))]);
-  const naiiPts: [number, number][] = data.map((d, i) => [toX(i, data.length), toY(Number(d.naiiScore))]);
+  const pts: [number, number][] = data.map((d, i) => [toX(i, data.length), toY(Number(d.maturityScore))]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (data.length === 0) return;
@@ -58,9 +57,8 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
     const cx = toX(closest, data.length);
     setTooltip({
       x: cx,
-      y: toY(Number(pt.ndiScore)),
-      ndi: Number(pt.ndiScore),
-      naii: Number(pt.naiiScore),
+      y: toY(Number(pt.maturityScore)),
+      score: Number(pt.maturityScore),
       label: MONTHS[(pt.month ?? 1) - 1],
     });
   }, [data]);
@@ -73,11 +71,10 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
     );
   }
 
-  const ndiPath  = smoothPath(ndiPts);
-  const naiiPath = smoothPath(naiiPts);
+  const path = smoothPath(pts);
 
   // Tooltip position clamped inside chart
-  const TIP_W = 90, TIP_H = 42;
+  const TIP_W = 74, TIP_H = 30;
   const tipX = tooltip ? Math.min(Math.max(tooltip.x - TIP_W / 2, PAD.l), W - PAD.r - TIP_W) : 0;
   const tipY = tooltip ? Math.max(tooltip.y - TIP_H - 10, PAD.t) : 0;
 
@@ -99,19 +96,9 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
         </g>
       ))}
 
-      {/* NAII smooth curve */}
+      {/* NDI overall maturity smooth curve */}
       <path
-        d={naiiPath}
-        fill="none"
-        stroke="#81B4E1"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray="5 3"
-      />
-      {/* NDI smooth curve (drawn on top) */}
-      <path
-        d={ndiPath}
+        d={path}
         fill="none"
         stroke="#6058A0"
         strokeWidth="2.4"
@@ -121,21 +108,17 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
 
       {/* Dots */}
       {data.map((d, i) => (
-        <g key={d.month}>
-          <circle cx={ndiPts[i][0]}  cy={ndiPts[i][1]}  r="3" fill="#6058A0" />
-          <circle cx={naiiPts[i][0]} cy={naiiPts[i][1]} r="3" fill="#81B4E1" />
-        </g>
+        <circle key={d.month} cx={pts[i][0]} cy={pts[i][1]} r="3" fill="#6058A0" />
       ))}
 
-      {/* Highlighted dots for hovered point */}
+      {/* Highlighted dot for hovered point */}
       {tooltip && (() => {
         const idx = data.findIndex((d) => MONTHS[(d.month ?? 1) - 1] === tooltip.label);
         if (idx < 0) return null;
         return (
           <g>
-            <circle cx={ndiPts[idx][0]}  cy={ndiPts[idx][1]}  r="5" fill="#6058A0" stroke="white" strokeWidth="1.5" />
-            <circle cx={naiiPts[idx][0]} cy={naiiPts[idx][1]} r="5" fill="#81B4E1" stroke="white" strokeWidth="1.5" />
-            <line x1={ndiPts[idx][0]} y1={PAD.t} x2={ndiPts[idx][0]} y2={H - PAD.b} stroke="#c0c4e0" strokeWidth="1" strokeDasharray="3 2" />
+            <circle cx={pts[idx][0]} cy={pts[idx][1]} r="5" fill="#6058A0" stroke="white" strokeWidth="1.5" />
+            <line x1={pts[idx][0]} y1={PAD.t} x2={pts[idx][0]} y2={H - PAD.b} stroke="#c0c4e0" strokeWidth="1" strokeDasharray="3 2" />
           </g>
         );
       })()}
@@ -147,11 +130,7 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
           <text x={tipX + TIP_W / 2} y={tipY + 11} textAnchor="middle" fontSize="8.5" fill="#8089b3" fontWeight="600">{tooltip.label}</text>
           <circle cx={tipX + 10} cy={tipY + 22} r="3" fill="#6058A0" />
           <text x={tipX + 16} y={tipY + 25.5} fontSize="9" fill="#50568a">
-            NDI <tspan fontWeight="700">{tooltip.ndi.toFixed(1)}</tspan>
-          </text>
-          <circle cx={tipX + 10} cy={tipY + 34} r="3" fill="#81B4E1" />
-          <text x={tipX + 16} y={tipY + 37.5} fontSize="9" fill="#50568a">
-            NAII <tspan fontWeight="700">{tooltip.naii.toFixed(1)}</tspan>
+            NDI <tspan fontWeight="700">{tooltip.score.toFixed(2)}</tspan>
           </text>
         </g>
       )}
@@ -172,10 +151,7 @@ export function MaturityChart({ data, noDataLabel = "No trend data available" }:
 
       {/* Legend */}
       <rect x={PAD.l} y={4} width={9} height={9} rx="2" fill="#6058A0" />
-      <text x={PAD.l + 13} y={12} fontSize="9" fill="#50568a" fontWeight="500">NDI</text>
-      <line x1={PAD.l + 38} y1={8} x2={PAD.l + 52} y2={8} stroke="#81B4E1" strokeWidth="2.5" strokeDasharray="4 2" />
-      <circle cx={PAD.l + 45} cy={8} r="3" fill="#81B4E1" />
-      <text x={PAD.l + 57} y={12} fontSize="9" fill="#50568a" fontWeight="500">NAII</text>
+      <text x={PAD.l + 13} y={12} fontSize="9" fill="#50568a" fontWeight="500">NDI Overall Maturity</text>
     </svg>
   );
 }

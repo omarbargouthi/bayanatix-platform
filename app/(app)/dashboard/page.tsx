@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     getDomains(),
     getComplianceSummary(),
     getComplianceSnapshot(),
-    getMaturityTrends(2025),
+    getMaturityTrends(new Date().getFullYear()),
     getRecentAssets(user.userId, 10),
     getRecentSearches(user.userId, 5),
   ]);

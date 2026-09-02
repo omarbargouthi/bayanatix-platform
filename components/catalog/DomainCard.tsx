@@ -73,8 +73,10 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
               Not included in overall maturity &amp; compliance score
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <Stars value={d.maturityLevel} />
-              <span className="text-[11px] font-bold text-amber-700">{d.level}</span>
+              <Stars value={d.maturityScore} color={d.levelColor} />
+              <span className="text-[11px] font-bold text-amber-700">
+                {d.maturityScore.toFixed(2)} — {d.level}
+              </span>
             </div>
           </div>
         </Link>
@@ -125,9 +127,12 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted mb-1.5">{labels?.maturity ?? "Maturity"}</div>
-            <Stars value={d.maturityLevel} />
-            <div className="mt-1">
-              <span className="text-[11px] font-bold text-brand-purple">{d.level}</span>
+            <Stars value={d.maturityScore} color={d.levelColor} />
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-[11px] font-bold" style={{ color: d.levelColor }}>
+                {d.maturityScore.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-muted">/ 5 · {d.level}</span>
             </div>
           </div>
         </div>
@@ -136,18 +141,38 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
   );
 }
 
-function Stars({ value }: { value: number }) {
+const STAR_POINTS = "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26";
+
+function Stars({ value, color = "#6058A0" }: { value: number; color?: string }) {
   return (
-    <div className="flex items-center gap-0.5 text-brand-purple">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} viewBox="0 0 24 24" width="12" height="12"
-          fill={i <= value ? "currentColor" : "none"}
-          stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
-          className={i <= value ? "opacity-100" : "opacity-20"}
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
-        </svg>
-      ))}
+    <div className="flex items-center gap-0.5" style={{ color }}>
+      {[1, 2, 3, 4, 5].map((i) => {
+        // Fraction of this star that should be filled (0, partial, or 1) —
+        // lets a 3.5 average render as three full stars and one half star.
+        const fillFraction = Math.max(0, Math.min(1, value - (i - 1)));
+        const clipId = `star-clip-${i}-${Math.round(value * 100)}`;
+        return (
+          <svg key={i} viewBox="0 0 24 24" width="12" height="12">
+            <defs>
+              <clipPath id={clipId}>
+                <rect x="0" y="0" width={24 * fillFraction} height="24" />
+              </clipPath>
+            </defs>
+            <polygon
+              points={STAR_POINTS}
+              fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
+              className="opacity-25"
+            />
+            {fillFraction > 0 && (
+              <polygon
+                points={STAR_POINTS}
+                fill="currentColor" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
+                clipPath={`url(#${clipId})`}
+              />
+            )}
+          </svg>
+        );
+      })}
     </div>
   );
 }

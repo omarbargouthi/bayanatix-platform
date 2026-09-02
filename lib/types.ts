@@ -146,7 +146,9 @@ export type GovernanceDomain = {
   descriptionAr?: string | null;
   compliancePct: number;
   maturityLevel: number;
+  maturityScore: number;
   level:         string;
+  levelColor:    string;
   alertCount:    number;
   sortOrder:     number;
   weight?:       number;
@@ -156,6 +158,7 @@ export type GovernanceDomain = {
 export type ComplianceSummary = {
   overallPct: number;
   overallMaturityPct: number;
+  overallMaturityScore: number;
   specsTracked: number;
   domainsActive: number;
   controlsPassing: number;
@@ -177,9 +180,8 @@ export type ComplianceSnapshot = {
 };
 
 export type TrendPoint = {
-  month:     number;
-  ndiScore:  number;
-  naiiScore: number;
+  month:         number;
+  maturityScore: number;
 };
 
 export type RecentAsset = {

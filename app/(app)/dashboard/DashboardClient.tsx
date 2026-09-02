@@ -84,16 +84,13 @@ export function DashboardClient({
               <h3 className="text-base font-bold">{t.dashboard.overallMaturity}</h3>
               {summary.overallMaturityPct > 0 && (
                 <span className="text-sm font-bold text-brand-purple">
-                  {summary.overallMaturityPct}%
+                  {summary.overallMaturityScore.toFixed(2)} / 5 · {summary.overallMaturityPct}%
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3 text-[11px] text-muted">
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm bg-brand-purple inline-block" /> NDI
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-brand-light inline-block" /> NAII
               </span>
             </div>
           </div>
