@@ -11,12 +11,12 @@ export async function PATCH(req: Request, { params }: { params: { relTypeId: str
   const relTypeId = Number(params.relTypeId);
   const body = await req.json();
   const {
-    relNameText, nameArText, inverseNameText, inverseNameArText,
+    relNameText, inverseNameText,
     fromEndpoints, toEndpoints, cardinalityCode, attributesSchema, isEnabled,
   } = body ?? {};
 
   await updateRelationshipType(relTypeId, {
-    relNameText, nameArText, inverseNameText, inverseNameArText,
+    relNameText, inverseNameText,
     fromEndpoints, toEndpoints, cardinalityCode, attributesSchema, isEnabled,
   });
 

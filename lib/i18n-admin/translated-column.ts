@@ -21,12 +21,20 @@
  * at render time via pickTranslation(), not surface outdated text silently.
  */
 export function translatedColumnSql(keyCodeSql: string, alias: string): string {
+  // Aliases are deliberately namespaced (not the generic "t"/"tk" it's tempting
+  // to use) — this fragment gets spliced into an outer query whose own driving
+  // table is very often aliased "t", and a correlated subquery's alias shadows
+  // the outer one of the same name. That collision doesn't error cleanly: the
+  // shadowed outer reference (e.g. "t.type_id" in keyCodeSql) silently resolves
+  // to the inner table instead, which usually has no such column — surfacing as
+  // a confusing "column does not exist" deep inside postgres.js, not a clear
+  // "ambiguous alias" — found live in getCustomAssetTypes()'s FROM ... t query.
   return `(
-    SELECT jsonb_object_agg(t.language_code, t.translated_text)
-    FROM bayanat.translation_keys tk
-    JOIN bayanat.translations t
-      ON t.key_id = tk.key_id AND t.status_code <> 'STALE' AND t.translated_text IS NOT NULL
-    WHERE tk.key_code = ${keyCodeSql}
+    SELECT jsonb_object_agg(__i18n_tr.language_code, __i18n_tr.translated_text)
+    FROM bayanat.translation_keys __i18n_tk
+    JOIN bayanat.translations __i18n_tr
+      ON __i18n_tr.key_id = __i18n_tk.key_id AND __i18n_tr.status_code <> 'STALE' AND __i18n_tr.translated_text IS NOT NULL
+    WHERE __i18n_tk.key_code = ${keyCodeSql}
   ) AS "${alias}"`;
 }
 

@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
+
 export type EditableField = {
   attr_code: string;
   attr_name_text: string;
-  name_ar_text: string;
   data_type_code: string;
   enum_values_text: string; // comma-separated, edited as plain text
   is_required_indicator: boolean;
@@ -13,7 +14,7 @@ export type EditableField = {
 export const DATA_TYPES = ["TEXT", "LONGTEXT", "NUMBER", "DATE", "BOOLEAN", "ENUM", "USER", "URL"];
 
 export const BLANK_FIELD: EditableField = {
-  attr_code: "", attr_name_text: "", name_ar_text: "", data_type_code: "TEXT",
+  attr_code: "", attr_name_text: "", data_type_code: "TEXT",
   enum_values_text: "", is_required_indicator: false, is_unique_indicator: false,
 };
 
@@ -21,7 +22,6 @@ export function toApiFields(fields: EditableField[], includeUnique: boolean) {
   return fields.map((f) => ({
     attr_code: f.attr_code.trim().toUpperCase().replace(/\s+/g, "_"),
     attr_name_text: f.attr_name_text.trim(),
-    name_ar_text: f.name_ar_text.trim() || null,
     data_type_code: f.data_type_code,
     enum_values_json: f.data_type_code === "ENUM"
       ? f.enum_values_text.split(",").map((v) => v.trim()).filter(Boolean)
@@ -61,10 +61,8 @@ export function AttributeSchemaEditor({
         <div key={idx} className="border border-line rounded-md p-3 grid grid-cols-12 gap-2 items-start bg-canvas-soft">
           <input className="field-input col-span-2" placeholder="CODE" value={f.attr_code}
             onChange={(e) => update(idx, { attr_code: e.target.value })} />
-          <input className="field-input col-span-3" placeholder="Name (EN)" value={f.attr_name_text}
+          <input className="field-input col-span-5" placeholder="Name (EN)" value={f.attr_name_text}
             onChange={(e) => update(idx, { attr_name_text: e.target.value })} />
-          <input className="field-input col-span-2" placeholder="Name (AR)" value={f.name_ar_text}
-            onChange={(e) => update(idx, { name_ar_text: e.target.value })} />
           <select className="field-input col-span-2" value={f.data_type_code}
             onChange={(e) => update(idx, { data_type_code: e.target.value })}>
             {DATA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -108,6 +106,10 @@ export function AttributeSchemaEditor({
         </div>
       ))}
       <button type="button" onClick={add} className="text-sm text-brand-purple font-semibold hover:underline">+ Add Field</button>
+      <p className="text-[11px] text-muted">
+        Arabic and any other enabled language are added afterward in{" "}
+        <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+      </p>
     </div>
   );
 }

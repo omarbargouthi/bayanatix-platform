@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const {
-    relCode, relNameText, nameArText, inverseNameText, inverseNameArText,
+    relCode, relNameText, inverseNameText,
     fromEndpoints, toEndpoints, cardinalityCode, attributesSchema,
   } = body ?? {};
 
@@ -47,8 +47,8 @@ export async function POST(req: Request) {
   let relTypeId: number;
   try {
     relTypeId = await createRelationshipType({
-      relCode, relNameText: relNameText.trim(), nameArText: nameArText?.trim() || null,
-      inverseNameText: inverseNameText?.trim() || null, inverseNameArText: inverseNameArText?.trim() || null,
+      relCode, relNameText: relNameText.trim(),
+      inverseNameText: inverseNameText?.trim() || null,
       fromEndpoints, toEndpoints, cardinalityCode,
       attributesSchema: Array.isArray(attributesSchema) && attributesSchema.length > 0 ? attributesSchema : null,
       createdByUserId: session.userId,

@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -8,7 +9,7 @@ export type CustomAssetType = {
   typeId: number;
   typeCode: string;
   typeNameText: string;
-  nameArText: string | null;
+  nameTranslations: Record<string, string> | null;
   descriptionText: string | null;
   iconCode: string | null;
   colorHex: string | null;
@@ -21,7 +22,7 @@ export type CustomAssetTypeAttribute = {
   typeId: number;
   attrCode: string;
   attrNameText: string;
-  nameArText: string | null;
+  nameTranslations: Record<string, string> | null;
   dataTypeCode: AttrDataType;
   enumValuesJson: string[] | null;
   isRequired: boolean;
@@ -57,9 +58,9 @@ export type CustomRelationshipType = {
   relTypeId: number;
   relCode: string;
   relNameText: string;
-  nameArText: string | null;
+  nameTranslations: Record<string, string> | null;
   inverseNameText: string | null;
-  inverseNameArText: string | null;
+  inverseNameTranslations: Record<string, string> | null;
   fromEndpoints: string[];
   toEndpoints: string[];
   cardinalityCode: "M:N" | "1:N" | "N:1";
@@ -88,7 +89,8 @@ export const CORE_ASSET_TYPES = ["DATA_SOURCES", "DATA_SCHEMAS", "DATA_ENTITIES"
 export async function getCustomAssetTypes(includeDisabled = false): Promise<CustomAssetType[]> {
   const rows = await sql<any[]>`
     SELECT t.type_id AS "typeId", t.type_code AS "typeCode", t.type_name_text AS "typeNameText",
-           t.name_ar_text AS "nameArText", t.description_text AS "descriptionText",
+           ${sql.unsafe(translatedColumnSql(`'custom_asset_types.' || t.type_id || '.name'`, "nameTranslations"))},
+           t.description_text AS "descriptionText",
            t.icon_code AS "iconCode", t.color_hex AS "colorHex", t.is_enabled_indicator AS "isEnabled",
            (SELECT count(*)::int FROM bayanat.custom_assets ca WHERE ca.type_id = t.type_id) AS "instanceCount"
     FROM bayanat.custom_asset_types t
@@ -101,7 +103,8 @@ export async function getCustomAssetTypes(includeDisabled = false): Promise<Cust
 export async function getCustomAssetTypeByCode(typeCode: string): Promise<CustomAssetType | null> {
   const rows = await sql<any[]>`
     SELECT type_id AS "typeId", type_code AS "typeCode", type_name_text AS "typeNameText",
-           name_ar_text AS "nameArText", description_text AS "descriptionText",
+           ${sql.unsafe(translatedColumnSql(`'custom_asset_types.' || type_id || '.name'`, "nameTranslations"))},
+           description_text AS "descriptionText",
            icon_code AS "iconCode", color_hex AS "colorHex", is_enabled_indicator AS "isEnabled"
     FROM bayanat.custom_asset_types WHERE type_code = ${typeCode}
   `;
@@ -111,7 +114,8 @@ export async function getCustomAssetTypeByCode(typeCode: string): Promise<Custom
 export async function getTypeAttributes(typeId: number): Promise<CustomAssetTypeAttribute[]> {
   return sql<CustomAssetTypeAttribute[]>`
     SELECT attr_def_id AS "attrDefId", type_id AS "typeId", attr_code AS "attrCode",
-           attr_name_text AS "attrNameText", name_ar_text AS "nameArText",
+           attr_name_text AS "attrNameText",
+           ${sql.unsafe(translatedColumnSql(`'custom_asset_attrs.' || attr_def_id || '.name'`, "nameTranslations"))},
            data_type_code AS "dataTypeCode", enum_values_json AS "enumValuesJson",
            is_required_indicator AS "isRequired", is_unique_indicator AS "isUnique",
            display_order_int AS "displayOrder"
@@ -122,13 +126,13 @@ export async function getTypeAttributes(typeId: number): Promise<CustomAssetType
 }
 
 export async function createCustomAssetType(data: {
-  typeCode: string; typeNameText: string; nameArText: string | null; descriptionText: string | null;
+  typeCode: string; typeNameText: string; descriptionText: string | null;
   iconCode: string | null; colorHex: string | null; createdByUserId: string;
   attributes: AttrFieldDef[];
 }): Promise<number> {
   const rows = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.custom_asset_types (type_code, type_name_text, name_ar_text, description_text, icon_code, color_hex, created_by_user_id)
-    VALUES (${data.typeCode}, ${data.typeNameText}, ${data.nameArText}, ${data.descriptionText}, ${data.iconCode}, ${data.colorHex}, ${data.createdByUserId})
+    INSERT INTO bayanat.custom_asset_types (type_code, type_name_text, description_text, icon_code, color_hex, created_by_user_id)
+    VALUES (${data.typeCode}, ${data.typeNameText}, ${data.descriptionText}, ${data.iconCode}, ${data.colorHex}, ${data.createdByUserId})
     RETURNING type_id AS id
   `;
   const typeId = rows[0].id;
@@ -144,13 +148,12 @@ export async function createCustomAssetType(data: {
 }
 
 export async function updateCustomAssetType(typeId: number, data: {
-  typeNameText?: string; nameArText?: string | null; descriptionText?: string | null;
+  typeNameText?: string; descriptionText?: string | null;
   iconCode?: string | null; colorHex?: string | null; isEnabled?: boolean;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.custom_asset_types SET
       type_name_text = COALESCE(${data.typeNameText ?? null}, type_name_text),
-      name_ar_text = ${data.nameArText !== undefined ? data.nameArText : sql`name_ar_text`},
       description_text = ${data.descriptionText !== undefined ? data.descriptionText : sql`description_text`},
       icon_code = ${data.iconCode !== undefined ? data.iconCode : sql`icon_code`},
       color_hex = ${data.colorHex !== undefined ? data.colorHex : sql`color_hex`},
@@ -196,7 +199,9 @@ export async function canDeleteType(typeId: number): Promise<boolean> {
 export async function getRelationshipTypes(includeDisabled = false): Promise<CustomRelationshipType[]> {
   const rows = await sql<any[]>`
     SELECT rel_type_id AS "relTypeId", rel_code AS "relCode", rel_name_text AS "relNameText",
-           name_ar_text AS "nameArText", inverse_name_text AS "inverseNameText", inverse_name_ar_text AS "inverseNameArText",
+           ${sql.unsafe(translatedColumnSql(`'custom_relationship_types.' || rel_type_id || '.name'`, "nameTranslations"))},
+           inverse_name_text AS "inverseNameText",
+           ${sql.unsafe(translatedColumnSql(`'custom_relationship_types.' || rel_type_id || '.inverse_name'`, "inverseNameTranslations"))},
            from_endpoint_json AS "fromEndpoints", to_endpoint_json AS "toEndpoints",
            cardinality_code AS "cardinalityCode", attributes_schema_json AS "attributesSchema",
            is_enabled_indicator AS "isEnabled"
@@ -219,17 +224,17 @@ export async function getRelationshipTypesForAssetType(assetTypeCode: string): P
 }
 
 export async function createRelationshipType(data: {
-  relCode: string; relNameText: string; nameArText: string | null;
-  inverseNameText: string | null; inverseNameArText: string | null;
+  relCode: string; relNameText: string;
+  inverseNameText: string | null;
   fromEndpoints: string[]; toEndpoints: string[]; cardinalityCode: "M:N" | "1:N" | "N:1";
   attributesSchema: AttrFieldDef[] | null; createdByUserId: string;
 }): Promise<number> {
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.custom_relationship_types
-      (rel_code, rel_name_text, name_ar_text, inverse_name_text, inverse_name_ar_text,
+      (rel_code, rel_name_text, inverse_name_text,
        from_endpoint_json, to_endpoint_json, cardinality_code, attributes_schema_json, created_by_user_id)
     VALUES (
-      ${data.relCode}, ${data.relNameText}, ${data.nameArText}, ${data.inverseNameText}, ${data.inverseNameArText},
+      ${data.relCode}, ${data.relNameText}, ${data.inverseNameText},
       ${data.fromEndpoints as any}::jsonb, ${data.toEndpoints as any}::jsonb, ${data.cardinalityCode},
       ${data.attributesSchema as any}::jsonb, ${data.createdByUserId}
     )
@@ -239,16 +244,14 @@ export async function createRelationshipType(data: {
 }
 
 export async function updateRelationshipType(relTypeId: number, data: {
-  relNameText?: string; nameArText?: string | null; inverseNameText?: string | null; inverseNameArText?: string | null;
+  relNameText?: string; inverseNameText?: string | null;
   fromEndpoints?: string[]; toEndpoints?: string[]; cardinalityCode?: "M:N" | "1:N" | "N:1";
   attributesSchema?: AttrFieldDef[] | null; isEnabled?: boolean;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.custom_relationship_types SET
       rel_name_text = COALESCE(${data.relNameText ?? null}, rel_name_text),
-      name_ar_text = ${data.nameArText !== undefined ? data.nameArText : sql`name_ar_text`},
       inverse_name_text = ${data.inverseNameText !== undefined ? data.inverseNameText : sql`inverse_name_text`},
-      inverse_name_ar_text = ${data.inverseNameArText !== undefined ? data.inverseNameArText : sql`inverse_name_ar_text`},
       from_endpoint_json = ${data.fromEndpoints ? sql`${data.fromEndpoints as any}::jsonb` : sql`from_endpoint_json`},
       to_endpoint_json = ${data.toEndpoints ? sql`${data.toEndpoints as any}::jsonb` : sql`to_endpoint_json`},
       cardinality_code = COALESCE(${data.cardinalityCode ?? null}, cardinality_code),

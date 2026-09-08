@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { typeCode, typeNameText, nameArText, descriptionText, iconCode, colorHex, attributes } = body ?? {};
+  const { typeCode, typeNameText, descriptionText, iconCode, colorHex, attributes } = body ?? {};
 
   if (!typeCode || typeof typeCode !== "string" || !/^[A-Z0-9_]+$/.test(typeCode)) {
     return NextResponse.json({ error: "typeCode must be uppercase letters/numbers/underscores" }, { status: 400 });
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   let typeId: number;
   try {
     typeId = await createCustomAssetType({
-      typeCode, typeNameText: typeNameText.trim(), nameArText: nameArText?.trim() || null,
+      typeCode, typeNameText: typeNameText.trim(),
       descriptionText: descriptionText?.trim() || null, iconCode: iconCode || null, colorHex: colorHex || null,
       createdByUserId: session.userId, attributes: attrs,
     });

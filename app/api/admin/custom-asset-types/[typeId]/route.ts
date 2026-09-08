@@ -22,7 +22,7 @@ export async function PATCH(req: Request, { params }: { params: { typeId: string
 
   const typeId = Number(params.typeId);
   const body = await req.json();
-  const { typeNameText, nameArText, descriptionText, iconCode, colorHex, isEnabled, attributes, confirmFieldDeletion } = body ?? {};
+  const { typeNameText, descriptionText, iconCode, colorHex, isEnabled, attributes, confirmFieldDeletion } = body ?? {};
 
   if (attributes !== undefined) {
     const attrs: AttrFieldDef[] = Array.isArray(attributes) ? attributes : [];
@@ -50,7 +50,7 @@ export async function PATCH(req: Request, { params }: { params: { typeId: string
     ]);
   }
 
-  await updateCustomAssetType(typeId, { typeNameText, nameArText, descriptionText, iconCode, colorHex, isEnabled });
+  await updateCustomAssetType(typeId, { typeNameText, descriptionText, iconCode, colorHex, isEnabled });
   if (isEnabled !== undefined) {
     await logUpdate("CUSTOM_ASSET_TYPE", typeId, session.userId, [
       { field: "is_enabled_indicator", oldVal: String(!isEnabled), newVal: String(isEnabled), force: true },

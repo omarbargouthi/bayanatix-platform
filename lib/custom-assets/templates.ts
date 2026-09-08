@@ -7,8 +7,21 @@
 
 import {
   getCustomAssetTypeByCode, getRelationshipTypeByCode, createCustomAssetType, createRelationshipType,
-  type AttrFieldDef,
+  getTypeAttributes, type AttrFieldDef,
 } from "../queries/custom-assets";
+import { upsertKey, type Counters } from "../i18n-admin/translatable-fields";
+
+// Templates install with real, curated Arabic content (not placeholders), but
+// createCustomAssetType/createRelationshipType no longer accept nameArText —
+// name_ar_text columns were dropped from the runtime read path in favor of
+// translation_keys/translations (see translated-column.ts). So a template
+// install seeds that Arabic directly as a VERIFIED translation, using the same
+// key_code convention (custom_asset_types.{id}.name, etc.) the regular sync
+// uses — the seed content ends up exactly where an admin's own Workbench edit
+// would have put it, just pre-filled instead of MISSING.
+function seedCounters(): Counters {
+  return { keysCreated: 0, keysUpdatedStale: 0, secondarySeeded: 0 };
+}
 
 export type TemplateTypeDef = {
   typeCode: string; typeNameText: string; nameArText: string | null; descriptionText: string | null;
@@ -129,25 +142,40 @@ export async function installTemplate(templateCode: string, userId: string): Pro
   const createdRelationshipTypes: string[] = [];
   const skipped: string[] = [];
 
+  const counters = seedCounters();
+
   for (const t of tpl.types) {
     const existing = await getCustomAssetTypeByCode(t.typeCode);
     if (existing) { skipped.push(`Type ${t.typeCode} (already exists)`); continue; }
-    await createCustomAssetType({
-      typeCode: t.typeCode, typeNameText: t.typeNameText, nameArText: t.nameArText, descriptionText: t.descriptionText,
+    const typeId = await createCustomAssetType({
+      typeCode: t.typeCode, typeNameText: t.typeNameText, descriptionText: t.descriptionText,
       iconCode: t.iconCode, colorHex: t.colorHex, createdByUserId: userId, attributes: t.attributes,
     });
+    await upsertKey(counters, "CUSTOM_ASSET_TYPES", `custom_asset_types.${typeId}.name`, t.typeNameText, "en", "ar", t.nameArText);
+
+    const createdAttrs = await getTypeAttributes(typeId);
+    for (const a of t.attributes) {
+      const attrDef = createdAttrs.find((c) => c.attrCode === a.attr_code);
+      if (attrDef && a.name_ar_text) {
+        await upsertKey(counters, "CUSTOM_ASSET_ATTRS", `custom_asset_attrs.${attrDef.attrDefId}.name`, a.attr_name_text, "en", "ar", a.name_ar_text);
+      }
+    }
     createdTypes.push(t.typeCode);
   }
 
   for (const r of tpl.relationshipTypes) {
     const existing = await getRelationshipTypeByCode(r.relCode);
     if (existing) { skipped.push(`Relationship ${r.relCode} (already exists)`); continue; }
-    await createRelationshipType({
-      relCode: r.relCode, relNameText: r.relNameText, nameArText: r.nameArText,
-      inverseNameText: r.inverseNameText, inverseNameArText: r.inverseNameArText,
+    const relTypeId = await createRelationshipType({
+      relCode: r.relCode, relNameText: r.relNameText,
+      inverseNameText: r.inverseNameText,
       fromEndpoints: r.fromEndpoints, toEndpoints: r.toEndpoints, cardinalityCode: r.cardinalityCode,
       attributesSchema: r.attributesSchema, createdByUserId: userId,
     });
+    await upsertKey(counters, "CUSTOM_RELATIONSHIP_TYPES", `custom_relationship_types.${relTypeId}.name`, r.relNameText, "en", "ar", r.nameArText);
+    if (r.inverseNameText) {
+      await upsertKey(counters, "CUSTOM_RELATIONSHIP_TYPES", `custom_relationship_types.${relTypeId}.inverse_name`, r.inverseNameText, "en", "ar", r.inverseNameArText);
+    }
     createdRelationshipTypes.push(r.relCode);
   }
 

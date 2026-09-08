@@ -196,10 +196,16 @@ function slugify(text: string): string {
 
 export type SyncResult = { keysCreated: number; keysUpdatedStale: number; secondarySeeded: number };
 
-type Counters = { keysCreated: number; keysUpdatedStale: number; secondarySeeded: number };
+export type Counters = { keysCreated: number; keysUpdatedStale: number; secondarySeeded: number };
 
-/** Shared upsert: one translation_keys row + an optional pre-filled VERIFIED secondary-language translation. */
-async function upsertKey(counters: Counters, categoryCode: string, keyCode: string, baseText: string, baseLang: string, secondaryLang: string, rawSecondary: unknown): Promise<void> {
+/**
+ * Shared upsert: one translation_keys row + an optional pre-filled VERIFIED
+ * secondary-language translation. Exported (beyond syncListValueKeys' own use)
+ * so a one-off seeder — e.g. a template installer creating a new row that isn't
+ * live in the source table yet at sync time — can seed the same key_code
+ * convention directly instead of waiting for the next sync pass.
+ */
+export async function upsertKey(counters: Counters, categoryCode: string, keyCode: string, baseText: string, baseLang: string, secondaryLang: string, rawSecondary: unknown): Promise<void> {
   const [existing] = await sql<{ keyId: number; baseText: string }[]>`
     SELECT key_id AS "keyId", base_text AS "baseText" FROM bayanat.translation_keys WHERE key_code = ${keyCode}
   `;

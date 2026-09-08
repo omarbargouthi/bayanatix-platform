@@ -7,14 +7,14 @@ import {
 } from "@/components/custom-assets/AttributeSchemaEditor";
 
 type CustomAssetType = {
-  typeId: number; typeCode: string; typeNameText: string; nameArText: string | null;
+  typeId: number; typeCode: string; typeNameText: string;
   descriptionText: string | null; iconCode: string | null; colorHex: string | null;
   isEnabled: boolean; instanceCount?: number;
 };
 
 type CustomRelationshipType = {
-  relTypeId: number; relCode: string; relNameText: string; nameArText: string | null;
-  inverseNameText: string | null; inverseNameArText: string | null;
+  relTypeId: number; relCode: string; relNameText: string;
+  inverseNameText: string | null;
   fromEndpoints: string[]; toEndpoints: string[]; cardinalityCode: string;
   attributesSchema: { attr_code: string; attr_name_text: string; data_type_code: string }[] | null;
   isEnabled: boolean;
@@ -23,9 +23,9 @@ type CustomRelationshipType = {
 const CORE_ASSET_TYPES = ["DATA_SOURCES", "DATA_SCHEMAS", "DATA_ENTITIES", "DATA_ATTRIBUTES"];
 const CARDINALITIES = ["M:N", "1:N", "N:1"];
 
-const BLANK_TYPE_FORM = { typeCode: "", typeNameText: "", nameArText: "", descriptionText: "", iconCode: "", colorHex: "#6058A0" };
+const BLANK_TYPE_FORM = { typeCode: "", typeNameText: "", descriptionText: "", iconCode: "", colorHex: "#6058A0" };
 const BLANK_REL_FORM = {
-  relCode: "", relNameText: "", nameArText: "", inverseNameText: "", inverseNameArText: "", cardinalityCode: "M:N",
+  relCode: "", relNameText: "", inverseNameText: "", cardinalityCode: "M:N",
   fromEndpoints: [] as string[], toEndpoints: [] as string[],
 };
 
@@ -112,7 +112,7 @@ export default function CustomAssetsAdminPage() {
   async function startEditType(t: CustomAssetType) {
     setEditingType(t);
     setTypeForm({
-      typeCode: t.typeCode, typeNameText: t.typeNameText, nameArText: t.nameArText ?? "",
+      typeCode: t.typeCode, typeNameText: t.typeNameText,
       descriptionText: t.descriptionText ?? "", iconCode: t.iconCode ?? "", colorHex: t.colorHex ?? "#6058A0",
     });
     setTypeError(null);
@@ -121,7 +121,7 @@ export default function CustomAssetsAdminPage() {
     setTypeFields(
       attrs.length > 0
         ? attrs.map((a: any) => ({
-            attr_code: a.attrCode, attr_name_text: a.attrNameText, name_ar_text: a.nameArText ?? "",
+            attr_code: a.attrCode, attr_name_text: a.attrNameText,
             data_type_code: a.dataTypeCode, enum_values_text: (a.enumValuesJson ?? []).join(", "),
             is_required_indicator: a.isRequired, is_unique_indicator: a.isUnique,
           }))
@@ -139,7 +139,7 @@ export default function CustomAssetsAdminPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          typeNameText: typeForm.typeNameText, nameArText: typeForm.nameArText || null,
+          typeNameText: typeForm.typeNameText,
           descriptionText: typeForm.descriptionText || null, iconCode: typeForm.iconCode || null,
           colorHex: typeForm.colorHex || null, attributes, confirmFieldDeletion,
         }),
@@ -187,13 +187,13 @@ export default function CustomAssetsAdminPage() {
   function startEditRel(r: CustomRelationshipType) {
     setEditingRel(r);
     setRelForm({
-      relCode: r.relCode, relNameText: r.relNameText, nameArText: r.nameArText ?? "",
-      inverseNameText: r.inverseNameText ?? "", inverseNameArText: r.inverseNameArText ?? "",
+      relCode: r.relCode, relNameText: r.relNameText,
+      inverseNameText: r.inverseNameText ?? "",
       cardinalityCode: r.cardinalityCode, fromEndpoints: r.fromEndpoints, toEndpoints: r.toEndpoints,
     });
     setRelFields(
       (r.attributesSchema ?? []).map((a: any) => ({
-        attr_code: a.attr_code, attr_name_text: a.attr_name_text, name_ar_text: a.name_ar_text ?? "",
+        attr_code: a.attr_code, attr_name_text: a.attr_name_text,
         data_type_code: a.data_type_code, enum_values_text: (a.enum_values_json ?? []).join(", "),
         is_required_indicator: a.is_required_indicator ?? false, is_unique_indicator: false,
       })),
@@ -266,8 +266,6 @@ export default function CustomAssetsAdminPage() {
                   onChange={(e) => setTypeForm({ ...typeForm, typeCode: e.target.value })} />
                 <input className="field-input" placeholder="Name (English)" value={typeForm.typeNameText}
                   onChange={(e) => setTypeForm({ ...typeForm, typeNameText: e.target.value })} />
-                <input className="field-input" placeholder="Name (Arabic)" value={typeForm.nameArText}
-                  onChange={(e) => setTypeForm({ ...typeForm, nameArText: e.target.value })} />
                 <input className="field-input" placeholder="Icon code (optional)" value={typeForm.iconCode}
                   onChange={(e) => setTypeForm({ ...typeForm, iconCode: e.target.value })} />
                 <input className="field-input" type="color" value={typeForm.colorHex}
@@ -275,6 +273,10 @@ export default function CustomAssetsAdminPage() {
                 <input className="field-input col-span-2" placeholder="Description (optional)" value={typeForm.descriptionText}
                   onChange={(e) => setTypeForm({ ...typeForm, descriptionText: e.target.value })} />
               </div>
+              <p className="text-[11px] text-muted">
+                Arabic and any other enabled language are added afterward in{" "}
+                <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+              </p>
               <div>
                 <div className="field-label">Attribute Schema</div>
                 <AttributeSchemaEditor fields={typeFields} onChange={setTypeFields} showUnique />
@@ -339,13 +341,13 @@ export default function CustomAssetsAdminPage() {
                 </select>
                 <input className="field-input" placeholder="Name (e.g. Consumes)" value={relForm.relNameText}
                   onChange={(e) => setRelForm({ ...relForm, relNameText: e.target.value })} />
-                <input className="field-input" placeholder="Name (Arabic)" value={relForm.nameArText}
-                  onChange={(e) => setRelForm({ ...relForm, nameArText: e.target.value })} />
                 <input className="field-input" placeholder="Inverse label (e.g. Consumed by)" value={relForm.inverseNameText}
                   onChange={(e) => setRelForm({ ...relForm, inverseNameText: e.target.value })} />
-                <input className="field-input" placeholder="Inverse label (Arabic)" value={relForm.inverseNameArText}
-                  onChange={(e) => setRelForm({ ...relForm, inverseNameArText: e.target.value })} />
               </div>
+              <p className="text-[11px] text-muted">
+                Arabic and any other enabled language are added afterward in{" "}
+                <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+              </p>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
