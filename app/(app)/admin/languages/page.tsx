@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { LanguagesAdminClient } from "@/components/admin/LanguagesAdminClient";
 
@@ -12,14 +11,6 @@ export default async function LanguagesAdminPage() {
 
   return (
     <>
-      <Header
-        crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
-          { label: "Administration", href: "/admin/user-management" },
-          { label: "Languages & Translations" },
-        ]}
-        user={user}
-      />
       <main className="px-8 py-7 pb-14">
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-ink">Languages &amp; Translations</h1>

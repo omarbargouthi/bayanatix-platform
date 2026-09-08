@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { AiProvidersClient } from "@/components/admin/AiProvidersClient";
 
@@ -12,14 +11,6 @@ export default async function AiProvidersPage() {
 
   return (
     <>
-      <Header
-        crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
-          { label: "Administration", href: "/admin/user-management" },
-          { label: "AI Providers" },
-        ]}
-        user={user}
-      />
       <main className="px-8 py-7 pb-14">
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-ink">AI Providers</h1>
