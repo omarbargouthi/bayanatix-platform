@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import type {
   ComplianceFramework, LevelConfig, ConfigItem, DomainConfig,
 } from "@/lib/queries/gov-compliance";
@@ -17,18 +18,22 @@ const CGROUP_LABELS: Record<string, string> = {
 function blankLevels(fwId: number): LevelConfig[] {
   return Array.from({ length: 6 }, (_, i) => ({
     configId: 0, frameworkId: fwId, levelNum: i,
-    name: DEFAULT_NAMES[i], nameAr: null,
-    colorHex: DEFAULT_COLORS[i], description: null, descriptionAr: null,
+    name: DEFAULT_NAMES[i], nameTranslations: null,
+    colorHex: DEFAULT_COLORS[i], description: null, descriptionTranslations: null,
     rangeFrom: null, rangeTo: null,
   }));
 }
 
-export function ComplianceConfigSection() {
-  // The nameAr/descriptionAr columns this feeds are Arabic-specific regardless of
-  // the entity's configured secondary language — not part of the Language
-  // Management overhaul, left as-is.
-  const secondaryLangCode = "ar";
+function WorkbenchNote() {
+  return (
+    <p className="text-[11px] text-muted mt-2">
+      Arabic and any other enabled language are added afterward in{" "}
+      <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+    </p>
+  );
+}
 
+export function ComplianceConfigSection() {
   const [frameworks,   setFrameworks]   = useState<ComplianceFramework[]>([]);
   const [fwId,         setFwId]         = useState<number | null>(null);
   const [levelCfg,     setLevelCfg]     = useState<LevelConfig[]>([]);
@@ -96,7 +101,7 @@ export function ComplianceConfigSection() {
 
       {!loading && fwId && (
         <div className="space-y-10">
-          <LevelConfigSection levelCfg={levelCfg} frameworkId={fwId} saving={cfgSaving} onSave={saveLevels} secondaryLangCode={secondaryLangCode} />
+          <LevelConfigSection levelCfg={levelCfg} frameworkId={fwId} saving={cfgSaving} onSave={saveLevels} />
 
           {(["STATUS","EVIDENCE_TYPE","COMPLIANCE_TYPE"] as const).map(group => (
             <ConfigItemsGroup
@@ -110,7 +115,7 @@ export function ComplianceConfigSection() {
             />
           ))}
 
-          <DomainConfigGroup frameworkId={fwId} configs={domainConfig} onUpdate={setDomainConfig} secondaryLangCode={secondaryLangCode} />
+          <DomainConfigGroup frameworkId={fwId} configs={domainConfig} onUpdate={setDomainConfig} />
         </div>
       )}
     </div>
@@ -119,13 +124,11 @@ export function ComplianceConfigSection() {
 
 // ── Level Config ──────────────────────────────────────────────────────────────
 
-function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLangCode }: {
+function LevelConfigSection({ levelCfg, frameworkId, saving, onSave }: {
   levelCfg: LevelConfig[]; frameworkId: number; saving: boolean;
-  onSave: (rows: LevelConfig[]) => void; secondaryLangCode: string;
+  onSave: (rows: LevelConfig[]) => void;
 }) {
-  const [rows,        setRows]        = useState<LevelConfig[]>(levelCfg);
-  const [translating, setTranslating] = useState(false);
-  const [translateMsg, setTranslateMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [rows, setRows] = useState<LevelConfig[]>(levelCfg);
 
   useEffect(() => { setRows(levelCfg); }, [levelCfg]);
 
@@ -135,51 +138,6 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
     setRows(p => p.map(r => r.levelNum === ln ? { ...r, [field]: val } : r));
   }
 
-  async function autoTranslate() {
-    setTranslating(true);
-    setTranslateMsg(null);
-    const updated = rows.map(r => ({ ...r }));
-    let count = 0;
-    let lastError = "";
-    for (const row of updated) {
-      // Translate name if present
-      if (row.name) {
-        try {
-          const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.name, targetLang: secondaryLangCode }),
-          });
-          const d = await res.json();
-          if (d.translation) { row.nameAr = d.translation; count++; }
-          else if (d.error)   { lastError = d.error; }
-        } catch (e) { lastError = String(e); }
-      }
-      // Translate description if present
-      if (row.description) {
-        try {
-          const res = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.description, targetLang: secondaryLangCode }),
-          });
-          const d = await res.json();
-          if (d.translation) { row.descriptionAr = d.translation; count++; }
-          else if (d.error)   { lastError = d.error; }
-        } catch (e) { lastError = String(e); }
-      }
-    }
-    setRows(updated);
-    setTranslating(false);
-    if (lastError) {
-      setTranslateMsg({ type: "err", text: lastError });
-    } else if (count > 0) {
-      setTranslateMsg({ type: "ok", text: `Translated ${count} field${count !== 1 ? "s" : ""}` });
-      setTimeout(() => setTranslateMsg(null), 4000);
-    } else {
-      setTranslateMsg({ type: "err", text: "Nothing to translate — add names or descriptions first." });
-      setTimeout(() => setTranslateMsg(null), 4000);
-    }
-  }
-
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -187,33 +145,21 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
           <h3 className="font-bold text-brand-deep">Maturity Levels</h3>
           <p className="text-sm text-ink-soft">Names, colours, descriptions, and score ranges for each maturity level (0.00–5.00).</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
-            {translating ? "Translating…" : `Auto-translate ${secondaryLangCode.toUpperCase()}`}
+        {dirty && (
+          <button onClick={() => onSave(rows)} disabled={saving} className="btn btn-primary btn-sm">
+            {saving ? "Saving…" : "Save"}
           </button>
-          {translateMsg && (
-            <span className={`text-[11px] font-semibold ${translateMsg.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
-              {translateMsg.text}
-            </span>
-          )}
-          {dirty && (
-            <button onClick={() => onSave(rows)} disabled={saving} className="btn btn-primary btn-sm">
-              {saving ? "Saving…" : "Save"}
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="w-full text-sm min-w-[1100px]">
+        <table className="w-full text-sm min-w-[820px]">
           <thead>
             <tr className="border-b border-line bg-canvas-soft text-left">
               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-14">Level</th>
               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-10">Colour</th>
-              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">Name (EN)</th>
-              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-32">الاسم (AR)</th>
+              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-40">Name (EN)</th>
               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">Description (EN)</th>
-              <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold">الوصف (AR)</th>
               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24 text-center">Range From</th>
               <th className="px-3 py-2.5 text-[10px] uppercase tracking-wide text-muted font-semibold w-24 text-center">Range To</th>
             </tr>
@@ -235,16 +181,8 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
                     className="input w-full text-sm" placeholder="Level name…" />
                 </td>
                 <td className="px-3 py-2">
-                  <input value={row.nameAr ?? ""} onChange={e => update(row.levelNum, "nameAr", e.target.value)}
-                    className="input w-full text-sm text-right" dir="rtl" placeholder="اسم المستوى…" />
-                </td>
-                <td className="px-3 py-2">
                   <input value={row.description ?? ""} onChange={e => update(row.levelNum, "description", e.target.value)}
                     className="input w-full text-sm" placeholder="Brief description…" />
-                </td>
-                <td className="px-3 py-2">
-                  <input value={row.descriptionAr ?? ""} onChange={e => update(row.levelNum, "descriptionAr", e.target.value)}
-                    className="input w-full text-sm text-right" dir="rtl" placeholder="وصف مختصر…" />
                 </td>
                 <td className="px-3 py-2">
                   <input type="number" min={0} max={5} step={0.01}
@@ -263,6 +201,7 @@ function LevelConfigSection({ levelCfg, frameworkId, saving, onSave, secondaryLa
           </tbody>
         </table>
       </div>
+      <WorkbenchNote />
     </div>
   );
 }
@@ -276,16 +215,15 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
   const [showAdd,    setShowAdd]    = useState(false);
   const [addCode,    setAddCode]    = useState("");
   const [addLabel,   setAddLabel]   = useState("");
-  const [addLabelAr, setAddLabelAr] = useState("");
   const [addColor,   setAddColor]   = useState("#6B7280");
   const [adding,     setAdding]     = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
-  const [editForm,    setEditForm]  = useState({ label: "", labelAr: "", colorHex: "#6B7280" });
+  const [editForm,    setEditForm]  = useState({ label: "", colorHex: "#6B7280" });
   const [editSaving,  setEditSaving]= useState(false);
 
   function startEdit(item: ConfigItem) {
     setEditingCode(item.code);
-    setEditForm({ label: item.label, labelAr: item.labelAr ?? "", colorHex: item.colorHex ?? "#6B7280" });
+    setEditForm({ label: item.label, colorHex: item.colorHex ?? "#6B7280" });
   }
 
   async function saveEdit(code: string) {
@@ -295,12 +233,12 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         configGroup: group, code,
-        label: editForm.label.trim(), labelAr: editForm.labelAr.trim() || null,
+        label: editForm.label.trim(),
         colorHex: editForm.colorHex, sortOrder: item.sortOrder,
       }),
     });
     onUpdate(items.map(i => i.code === code
-      ? { ...i, label: editForm.label.trim(), labelAr: editForm.labelAr.trim() || null, colorHex: editForm.colorHex }
+      ? { ...i, label: editForm.label.trim(), colorHex: editForm.colorHex }
       : i
     ));
     setEditingCode(null);
@@ -314,15 +252,15 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         configGroup: group, code: addCode.trim(), label: addLabel.trim(),
-        labelAr: addLabelAr.trim() || null, colorHex: addColor, sortOrder: items.length + 1,
+        colorHex: addColor, sortOrder: items.length + 1,
       }),
     });
     onUpdate([...items, {
       itemId: Date.now(), configGroup: group, code: addCode.trim(),
-      label: addLabel.trim(), labelAr: addLabelAr.trim() || null,
+      label: addLabel.trim(), labelTranslations: null,
       colorHex: addColor, sortOrder: items.length + 1,
     }]);
-    setAddCode(""); setAddLabel(""); setAddLabelAr(""); setShowAdd(false); setAdding(false);
+    setAddCode(""); setAddLabel(""); setShowAdd(false); setAdding(false);
   }
 
   async function del(code: string) {
@@ -348,7 +286,7 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
 
       {showAdd && (
         <div className="card p-4 mb-4 bg-canvas-soft/50 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Code</label>
               <input value={addCode} onChange={e => setAddCode(e.target.value)}
@@ -358,11 +296,6 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label (EN)</label>
               <input value={addLabel} onChange={e => setAddLabel(e.target.value)}
                 className="input w-full text-sm" placeholder="English" />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">التسمية (AR)</label>
-              <input value={addLabelAr} onChange={e => setAddLabelAr(e.target.value)}
-                className="input w-full text-sm text-right" dir="rtl" placeholder="العربية" />
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -375,8 +308,8 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
       )}
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[36px_110px_1fr_1fr_100px] gap-3 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-          <div></div><div>Code</div><div>English Label</div><div>Arabic Label (عربي)</div><div></div>
+        <div className="grid grid-cols-[36px_110px_1fr_100px] gap-3 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
+          <div></div><div>Code</div><div>English Label</div><div></div>
         </div>
         {[...items].sort((a, b) => a.sortOrder - b.sortOrder).map(item => (
           <div key={item.code} className="border-b border-line-soft last:border-b-0">
@@ -385,16 +318,11 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-mono text-[11px] text-brand-deep font-semibold bg-brand-purple/10 px-2 py-0.5 rounded">{item.code}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label (EN)</label>
                     <input value={editForm.label} onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))}
                       className="input w-full text-sm" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">التسمية (AR)</label>
-                    <input value={editForm.labelAr} onChange={e => setEditForm(f => ({ ...f, labelAr: e.target.value }))}
-                      className="input w-full text-sm text-right" dir="rtl" />
                   </div>
                   <div className="flex items-end gap-2">
                     <div>
@@ -410,16 +338,13 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-[36px_110px_1fr_1fr_100px] gap-3 px-4 py-3 items-center hover:bg-canvas-soft">
+              <div className="grid grid-cols-[36px_110px_1fr_100px] gap-3 px-4 py-3 items-center hover:bg-canvas-soft">
                 <div>
                   <span className="w-5 h-5 rounded-full inline-block border border-line"
                     style={{ backgroundColor: item.colorHex ?? "#6B7280" }} />
                 </div>
                 <div className="font-mono text-[11px] text-muted font-semibold">{item.code}</div>
                 <div className="font-medium text-sm text-ink">{item.label}</div>
-                <div className="text-sm text-ink text-right" dir="rtl">
-                  {item.labelAr ?? <span className="text-muted italic text-[11px]">Not set</span>}
-                </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => startEdit(item)}
                     className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold">Edit</button>
@@ -434,25 +359,23 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
           <div className="px-4 py-6 text-center text-sm text-muted italic">No items configured.</div>
         )}
       </div>
+      <WorkbenchNote />
     </div>
   );
 }
 
 // ── Domain Config ─────────────────────────────────────────────────────────────
 
-function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }: {
-  frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void; secondaryLangCode: string;
+function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
+  frameworkId: number; configs: DomainConfig[]; onUpdate: (c: DomainConfig[]) => void;
 }) {
   const [rows,        setRows]        = useState<DomainConfig[]>(configs);
   const [dirty,       setDirty]       = useState(false);
   const [saving,      setSaving]      = useState(false);
-  const [translating, setTranslating] = useState(false);
   const [showAdd,     setShowAdd]     = useState(false);
   const [addCode,     setAddCode]     = useState("");
   const [addNameEn,   setAddNameEn]   = useState("");
-  const [addNameAr,   setAddNameAr]   = useState("");
   const [addDescEn,   setAddDescEn]   = useState("");
-  const [addDescAr,   setAddDescAr]   = useState("");
   const [addWeight,   setAddWeight]   = useState("");
 
   useEffect(() => { setRows(configs); setDirty(false); }, [configs]);
@@ -468,8 +391,8 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
       await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          domainCode: row.domainCode, nameEn: row.nameEn, nameAr: row.nameAr ?? null,
-          descriptionEn: row.descriptionEn ?? null, descriptionAr: row.descriptionAr ?? null,
+          domainCode: row.domainCode, nameEn: row.nameEn,
+          descriptionEn: row.descriptionEn ?? null,
           sortOrder: row.sortOrder, weight: row.weight ?? null,
         }),
       });
@@ -495,50 +418,22 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
     const res = await fetch(`/api/governance/compliance/${frameworkId}/domain-config`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        domainCode: addCode.trim(), nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null,
-        descriptionEn: addDescEn.trim() || null, descriptionAr: addDescAr.trim() || null,
+        domainCode: addCode.trim(), nameEn: addNameEn.trim(),
+        descriptionEn: addDescEn.trim() || null,
         sortOrder: rows.length, weight: addWeight ? Number(addWeight) : null,
       }),
     });
     const data = await res.json();
     const newRow: DomainConfig = {
       configId: data.id, frameworkId, domainCode: addCode.trim(),
-      nameEn: addNameEn.trim(), nameAr: addNameAr.trim() || null,
-      descriptionEn: addDescEn.trim() || null, descriptionAr: addDescAr.trim() || null,
+      nameEn: addNameEn.trim(), nameTranslations: null,
+      descriptionEn: addDescEn.trim() || null, descriptionTranslations: null,
       sortOrder: rows.length, weight: addWeight ? Number(addWeight) : null,
     };
     const updated = [...rows, newRow];
     setRows(updated);
     onUpdate(updated);
-    setAddCode(""); setAddNameEn(""); setAddNameAr(""); setAddDescEn(""); setAddDescAr(""); setAddWeight(""); setShowAdd(false);
-  }
-
-  async function autoTranslate() {
-    setTranslating(true);
-    const updated = rows.map(r => ({ ...r }));
-    for (const row of updated) {
-      try {
-        if (row.nameEn && !row.nameAr) {
-          const r = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.nameEn, targetLang: secondaryLangCode }),
-          });
-          const d = await r.json();
-          if (d.translation) row.nameAr = d.translation;
-        }
-        if (row.descriptionEn && !row.descriptionAr) {
-          const r = await fetch(`/api/governance/compliance/${frameworkId}/translate`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: row.descriptionEn, targetLang: secondaryLangCode }),
-          });
-          const d = await r.json();
-          if (d.translation) row.descriptionAr = d.translation;
-        }
-      } catch {}
-    }
-    setRows([...updated]);
-    setDirty(true);
-    setTranslating(false);
+    setAddCode(""); setAddNameEn(""); setAddDescEn(""); setAddWeight(""); setShowAdd(false);
   }
 
   // Total weight display
@@ -560,9 +455,6 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={autoTranslate} disabled={translating || saving} className="btn btn-sm">
-            {translating ? "Translating…" : `Auto-translate ${secondaryLangCode.toUpperCase()}`}
-          </button>
           <button onClick={() => setShowAdd(v => !v)} className="btn btn-sm">
             {showAdd ? "Cancel" : "+ Add"}
           </button>
@@ -576,7 +468,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
 
       {showAdd && (
         <div className="card p-4 mb-4 bg-canvas-soft/50 space-y-3">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Domain Code</label>
               <input value={addCode} onChange={e => setAddCode(e.target.value)}
@@ -588,25 +480,15 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
                 className="input w-full text-sm" placeholder="Data Governance" />
             </div>
             <div>
-              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">الاسم (AR)</label>
-              <input value={addNameAr} onChange={e => setAddNameAr(e.target.value)}
-                className="input w-full text-sm text-right" dir="rtl" placeholder="حوكمة البيانات" />
-            </div>
-            <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Weight (%)</label>
               <input type="number" min={0} max={100} step={0.01} value={addWeight}
                 onChange={e => setAddWeight(e.target.value)}
                 className="input w-full text-sm" placeholder="e.g. 10" />
             </div>
-            <div>
+            <div className="col-span-3">
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Description (EN)</label>
               <input value={addDescEn} onChange={e => setAddDescEn(e.target.value)}
                 className="input w-full text-sm" />
-            </div>
-            <div className="col-span-3">
-              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">الوصف (AR)</label>
-              <input value={addDescAr} onChange={e => setAddDescAr(e.target.value)}
-                className="input w-full text-sm text-right" dir="rtl" />
             </div>
           </div>
           <button onClick={addRow} disabled={!addCode.trim() || !addNameEn.trim()}
@@ -615,21 +497,17 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
       )}
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[70px_1fr_1fr_1fr_1fr_80px_60px] gap-2 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-          <div>Code</div><div>Name EN</div><div>الاسم AR</div><div>Description EN</div><div>الوصف AR</div>
+        <div className="grid grid-cols-[70px_1fr_1fr_80px_60px] gap-2 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
+          <div>Code</div><div>Name EN</div><div>Description EN</div>
           <div className="text-center">Weight %</div><div></div>
         </div>
         {rows.map((row, idx) => (
-          <div key={row.configId} className="grid grid-cols-[70px_1fr_1fr_1fr_1fr_80px_60px] gap-2 px-4 py-2 items-center border-b border-line-soft last:border-b-0">
+          <div key={row.configId} className="grid grid-cols-[70px_1fr_1fr_80px_60px] gap-2 px-4 py-2 items-center border-b border-line-soft last:border-b-0">
             <div className="font-mono text-[11px] font-bold text-muted">{row.domainCode}</div>
             <input value={row.nameEn} onChange={e => updateRow(idx, "nameEn", e.target.value)}
               className="input w-full text-sm" />
-            <input value={row.nameAr ?? ""} onChange={e => updateRow(idx, "nameAr", e.target.value)}
-              className="input w-full text-sm text-right" dir="rtl" />
             <input value={row.descriptionEn ?? ""} onChange={e => updateRow(idx, "descriptionEn", e.target.value)}
               className="input w-full text-sm" />
-            <input value={row.descriptionAr ?? ""} onChange={e => updateRow(idx, "descriptionAr", e.target.value)}
-              className="input w-full text-sm text-right" dir="rtl" />
             <div className="flex items-center gap-0.5">
               <input type="number" min={0} max={100} step={0.01}
                 value={row.weight ?? ""}
@@ -647,6 +525,7 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate, secondaryLangCode }
           <div className="px-4 py-6 text-center text-sm text-muted italic">No domains configured.</div>
         )}
       </div>
+      <WorkbenchNote />
     </div>
   );
 }

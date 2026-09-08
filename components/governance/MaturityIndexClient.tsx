@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import type {
   ComplianceFramework, ComplianceRequirement,
   LevelConfig, UserOption, ConfigItem, DomainConfig,
 } from "@/lib/queries/gov-compliance";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function parseLevelNum(ml: string | null): number | null {
@@ -417,9 +419,9 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
                                       <span className="text-[11px] font-bold uppercase tracking-wide">
                                         {cfg ? cfg.name : `Level ${lev.levelNum}`}
                                       </span>
-                                      {cfg?.nameAr && (
+                                      {cfg && pickTranslation(cfg.name, cfg.nameTranslations, "ar") !== cfg.name && (
                                         <span className="text-[11px] opacity-60 ml-1" dir="rtl">
-                                          {cfg.nameAr}
+                                          {pickTranslation(cfg.name, cfg.nameTranslations, "ar")}
                                         </span>
                                       )}
                                       <span className="ml-auto text-[10px] opacity-50">
@@ -503,8 +505,8 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
     if (!raw) return "";
     const direct = complianceTypeItems.find(i => i.label.toLowerCase() === raw.toLowerCase());
     if (direct) return direct.code;
-    const arMatch = complianceTypeItems.find(i => i.labelAr === raw);
-    if (arMatch) return arMatch.code;
+    const translatedMatch = complianceTypeItems.find(i => Object.values(i.labelTranslations ?? {}).includes(raw));
+    if (translatedMatch) return translatedMatch.code;
     const t = complianceTypeLabel(raw);
     if (t) {
       const fb = complianceTypeItems.find(i =>
@@ -519,12 +521,7 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
   const initCompCode    = resolveComplianceCode(req.complianceOrMaturity);
 
   const [v, setV] = useState({
-    question:             req.question            ?? "",
-    supportingEvidence:   req.supportingEvidence  ?? "",
-    admissionCriteria:    req.admissionCriteria   ?? "",
-    managementSector:     req.managementSector    ?? "",
     directoryCode:        req.directoryCode       ?? "",
-    directoryType:        req.directoryType       ?? "",
     complianceOrMaturity: req.complianceOrMaturity ?? "",
     evidentAdministrator: req.evidentAdministrator ?? "",
     domainOwner:          req.domainOwner          ?? "",
@@ -547,6 +544,8 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
 
   const selectedCompItem = complianceTypeItems.find(i => i.code === compCode);
   const selectedLevel    = levelCfg.find(lc => String(lc.levelNum) === v.maturityLevel);
+  const selectedCompItemAr = selectedCompItem ? pickTranslation(selectedCompItem.label, selectedCompItem.labelTranslations, "ar") : "";
+  const selectedLevelAr    = selectedLevel ? pickTranslation(selectedLevel.name, selectedLevel.nameTranslations, "ar") : "";
 
   function save() {
     const original = {
@@ -563,12 +562,15 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
     onSave(updates as Partial<ComplianceRequirement>);
   }
 
-  const bilingualFields: Array<[string, string, keyof typeof v, keyof typeof v]> = [
-    ["Question",                       "السؤال",        "questionEn",           "question"],
-    ["Supporting Evidence",            "الدليل الداعم", "supportingEvidenceEn", "supportingEvidence"],
-    ["Admission Criteria",             "معايير القبول", "admissionCriteriaEn",  "admissionCriteria"],
-    ["Management & Supporting Sector", "القطاع الداعم", "managementSectorEn",   "managementSector"],
-    ["Evidence Type",                  "نوع الدليل",    "directoryTypeEn",      "directoryType"],
+  // English-editable fields. Their non-English text (Arabic and any other
+  // enabled language) now lives entirely in the Translation Workbench, not
+  // here — same recipe as every other domain migrated this session.
+  const editableFields: Array<[string, keyof typeof v]> = [
+    ["Question",                       "questionEn"],
+    ["Supporting Evidence",            "supportingEvidenceEn"],
+    ["Admission Criteria",             "admissionCriteriaEn"],
+    ["Management & Supporting Sector", "managementSectorEn"],
+    ["Evidence Type",                  "directoryTypeEn"],
   ];
 
   return (
@@ -582,23 +584,16 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
           <button onClick={onClose} className="text-muted hover:text-ink text-xl">×</button>
         </div>
         <div className="px-6 py-5 space-y-5">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-b border-line pb-2 mb-1">
-            <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide">English (EN)</div>
-            <div className="text-[10px] font-bold text-brand-purple uppercase tracking-wide text-right" dir="rtl">العربية (AR)</div>
-          </div>
-
-          {bilingualFields.map(([labelEn, labelAr, keyEn, keyAr]) => (
-            <div key={keyEn} className="grid grid-cols-2 gap-x-4">
-              <div>
-                <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">{labelEn}</label>
-                <textarea value={v[keyEn]} onChange={e => set(keyEn, e.target.value)} rows={2} className="field text-sm w-full" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1 text-right" dir="rtl">{labelAr}</label>
-                <textarea value={v[keyAr]} onChange={e => set(keyAr, e.target.value)} rows={2} dir="rtl" className="field text-sm w-full text-right" />
-              </div>
+          {editableFields.map(([label, key]) => (
+            <div key={key}>
+              <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">{label}</label>
+              <textarea value={v[key]} onChange={e => set(key, e.target.value)} rows={2} className="field text-sm w-full" />
             </div>
           ))}
+          <p className="text-[11px] text-muted">
+            Arabic and any other enabled language are added afterward in{" "}
+            <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+          </p>
 
           <div className="border-t border-line pt-4 space-y-4">
             <div>
@@ -626,7 +621,7 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
                 <div>
                   <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block text-right" dir="rtl">العربية (AR)</label>
                   <div className="field text-sm w-full text-right bg-canvas-soft text-ink-soft min-h-[38px] flex items-center justify-end px-3" dir="rtl">
-                    {selectedCompItem?.labelAr ?? <span className="italic text-muted/60 text-[11px]">—</span>}
+                    {selectedCompItemAr || <span className="italic text-muted/60 text-[11px]">—</span>}
                   </div>
                 </div>
               </div>
@@ -649,7 +644,7 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
                 <div>
                   <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block text-right" dir="rtl">العربية (AR)</label>
                   <div className="field text-sm w-full text-right bg-canvas-soft text-ink-soft min-h-[38px] flex items-center justify-end px-3" dir="rtl">
-                    {selectedLevel?.nameAr ?? <span className="italic text-muted/60 text-[11px]">—</span>}
+                    {selectedLevelAr || <span className="italic text-muted/60 text-[11px]">—</span>}
                   </div>
                 </div>
               </div>

@@ -24,9 +24,7 @@ export async function POST(
   const id = await upsertDomainConfig(fwId, {
     domainCode:    body.domainCode,
     nameEn:        body.nameEn,
-    nameAr:        body.nameAr        ?? null,
     descriptionEn: body.descriptionEn ?? null,
-    descriptionAr: body.descriptionAr ?? null,
     sortOrder:     body.sortOrder      ?? 0,
     weight:        body.weight != null ? Number(body.weight) : null,
   });

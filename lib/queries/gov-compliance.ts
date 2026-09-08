@@ -81,8 +81,8 @@ export type LevelConfig = {
   name:          string;
   colorHex:      string;
   description:   string | null;
-  nameAr:        string | null;
-  descriptionAr: string | null;
+  nameTranslations:        Record<string, string> | null;
+  descriptionTranslations: Record<string, string> | null;
   rangeFrom:     number | null;
   rangeTo:       number | null;
 };
@@ -98,7 +98,7 @@ export type ConfigItem = {
   configGroup: string;
   code:        string;
   label:       string;
-  labelAr:     string | null;
+  labelTranslations: Record<string, string> | null;
   colorHex:    string | null;
   sortOrder:   number;
 };
@@ -330,18 +330,18 @@ export async function importRequirements(
   }
 }
 
+// question/supportingEvidence/admissionCriteria/managementSector/directoryType
+// (the bare, historically-Arabic-native columns) are intentionally not editable
+// here — that text now moves entirely through the Translation Workbench, same
+// as every other domain. The *En columns stay the directly-editable base/
+// source-of-record language, matching every other domain's own admin screen.
 export async function updateRequirement(reqId: number, fields: {
   standard?: string;
-  question?: string;
   maturityLevel?: string;
-  supportingEvidence?: string;
-  admissionCriteria?: string;
   directoryCode?: string;
-  directoryType?: string;
   complianceOrMaturity?: string;
   evidentAdministrator?: string;
   domainOwner?: string;
-  managementSector?: string;
   questionEn?: string | null;
   supportingEvidenceEn?: string | null;
   admissionCriteriaEn?: string | null;
@@ -351,16 +351,11 @@ export async function updateRequirement(reqId: number, fields: {
   await sql`
     UPDATE bayanat.gov_compliance_requirements SET
       standard               = COALESCE(${fields.standard              ?? null}, standard),
-      req_text               = COALESCE(${fields.question              ?? null}, req_text),
       maturity_level         = COALESCE(${fields.maturityLevel         ?? null}, maturity_level),
-      supporting_evidence    = COALESCE(${fields.supportingEvidence    ?? null}, supporting_evidence),
-      admission_criteria     = COALESCE(${fields.admissionCriteria     ?? null}, admission_criteria),
       directory_code         = COALESCE(${fields.directoryCode         ?? null}, directory_code),
-      directory_type         = COALESCE(${fields.directoryType         ?? null}, directory_type),
       compliance_or_maturity = COALESCE(${fields.complianceOrMaturity  ?? null}, compliance_or_maturity),
       evident_administrator  = COALESCE(${fields.evidentAdministrator  ?? null}, evident_administrator),
       domain_owner           = COALESCE(${fields.domainOwner           ?? null}, domain_owner),
-      management_sector      = COALESCE(${fields.managementSector      ?? null}, management_sector),
       question_en            = ${fields.questionEn            !== undefined ? (fields.questionEn            ?? null) : sql`question_en`},
       supporting_evidence_en = ${fields.supportingEvidenceEn  !== undefined ? (fields.supportingEvidenceEn  ?? null) : sql`supporting_evidence_en`},
       admission_criteria_en  = ${fields.admissionCriteriaEn   !== undefined ? (fields.admissionCriteriaEn   ?? null) : sql`admission_criteria_en`},
@@ -663,8 +658,8 @@ export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]
       name,
       color_hex      AS "colorHex",
       description,
-      name_ar        AS "nameAr",
-      description_ar AS "descriptionAr",
+      ${sql.unsafe(translatedColumnSql(`'list.compliance_levels.' || framework_id || '.' || level_num || '.name'`, "nameTranslations"))},
+      ${sql.unsafe(translatedColumnSql(`'list.compliance_levels.' || framework_id || '.' || level_num || '.description'`, "descriptionTranslations"))},
       range_from     AS "rangeFrom",
       range_to       AS "rangeTo"
     FROM bayanat.gov_compliance_level_config
@@ -672,16 +667,19 @@ export async function getLevelConfig(frameworkId: number): Promise<LevelConfig[]
     ORDER BY level_num
   `;
   const defaults = [
-    { name: "No Capability", colorHex: "#D84848", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
-    { name: "Build",         colorHex: "#E88030", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
-    { name: "Definition",    colorHex: "#2D4AA0", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
-    { name: "Activation",    colorHex: "#3D7EC8", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
-    { name: "Managed",       colorHex: "#1E8C76", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
-    { name: "Innovation",    colorHex: "#5CA85C", description: "", nameAr: null, descriptionAr: null, rangeFrom: null, rangeTo: null },
+    { name: "No Capability", colorHex: "#D84848", description: "" },
+    { name: "Build",         colorHex: "#E88030", description: "" },
+    { name: "Definition",    colorHex: "#2D4AA0", description: "" },
+    { name: "Activation",    colorHex: "#3D7EC8", description: "" },
+    { name: "Managed",       colorHex: "#1E8C76", description: "" },
+    { name: "Innovation",    colorHex: "#5CA85C", description: "" },
   ];
   return Array.from({ length: 6 }, (_, i) => {
     const existing = rows.find((r) => r.levelNum === i);
-    return existing ?? { configId: 0, frameworkId, levelNum: i, ...defaults[i] };
+    return existing ?? {
+      configId: 0, frameworkId, levelNum: i, ...defaults[i],
+      nameTranslations: null, descriptionTranslations: null, rangeFrom: null, rangeTo: null,
+    };
   });
 }
 
@@ -689,22 +687,20 @@ export async function saveLevelConfig(
   frameworkId: number,
   levels: Array<{
     levelNum: number; name: string; colorHex: string;
-    description: string | null; nameAr: string | null; descriptionAr: string | null;
+    description: string | null;
     rangeFrom?: number | null; rangeTo?: number | null;
   }>
 ): Promise<void> {
   for (const l of levels) {
     await sql`
       INSERT INTO bayanat.gov_compliance_level_config
-        (framework_id, level_num, name, color_hex, description, name_ar, description_ar, range_from, range_to)
+        (framework_id, level_num, name, color_hex, description, range_from, range_to)
       VALUES (${frameworkId}, ${l.levelNum}, ${l.name}, ${l.colorHex}, ${l.description ?? null},
-              ${l.nameAr ?? null}, ${l.descriptionAr ?? null}, ${l.rangeFrom ?? null}, ${l.rangeTo ?? null})
+              ${l.rangeFrom ?? null}, ${l.rangeTo ?? null})
       ON CONFLICT (framework_id, level_num) DO UPDATE SET
         name           = EXCLUDED.name,
         color_hex      = EXCLUDED.color_hex,
         description    = EXCLUDED.description,
-        name_ar        = EXCLUDED.name_ar,
-        description_ar = EXCLUDED.description_ar,
         range_from     = EXCLUDED.range_from,
         range_to       = EXCLUDED.range_to
     `;
@@ -720,7 +716,7 @@ export async function getConfigItems(frameworkId: number): Promise<ConfigItem[]>
       config_group AS "configGroup",
       code,
       label,
-      label_ar     AS "labelAr",
+      ${sql.unsafe(translatedColumnSql(`'list.compliance_config.' || framework_id || '.' || config_group || '.' || code`, "labelTranslations"))},
       color_hex    AS "colorHex",
       sort_order   AS "sortOrder"
     FROM bayanat.compliance_config_items
@@ -731,18 +727,17 @@ export async function getConfigItems(frameworkId: number): Promise<ConfigItem[]>
 
 export async function upsertConfigItem(frameworkId: number, item: {
   configGroup: string; code: string; label: string;
-  labelAr?: string | null; colorHex?: string | null; sortOrder?: number;
+  colorHex?: string | null; sortOrder?: number;
 }): Promise<void> {
   await sql`
     INSERT INTO bayanat.compliance_config_items
-      (framework_id, config_group, code, label, label_ar, color_hex, sort_order)
+      (framework_id, config_group, code, label, color_hex, sort_order)
     VALUES (
       ${frameworkId}, ${item.configGroup}, ${item.code}, ${item.label},
-      ${item.labelAr ?? null}, ${item.colorHex ?? null}, ${item.sortOrder ?? 0}
+      ${item.colorHex ?? null}, ${item.sortOrder ?? 0}
     )
     ON CONFLICT (framework_id, config_group, code) DO UPDATE SET
       label      = EXCLUDED.label,
-      label_ar   = EXCLUDED.label_ar,
       color_hex  = EXCLUDED.color_hex,
       sort_order = EXCLUDED.sort_order
   `;
@@ -801,9 +796,9 @@ export type DomainConfig = {
   frameworkId:   number;
   domainCode:    string;
   nameEn:        string;
-  nameAr:        string | null;
   descriptionEn: string | null;
-  descriptionAr: string | null;
+  nameTranslations:        Record<string, string> | null;
+  descriptionTranslations: Record<string, string> | null;
   sortOrder:     number;
   weight:        number | null;
 };
@@ -815,9 +810,9 @@ export async function listDomainConfig(frameworkId: number): Promise<DomainConfi
       framework_id   AS "frameworkId",
       domain_code    AS "domainCode",
       name_en        AS "nameEn",
-      name_ar        AS "nameAr",
       description_en AS "descriptionEn",
-      description_ar AS "descriptionAr",
+      ${sql.unsafe(translatedColumnSql(`'list.compliance_domains.' || framework_id || '.' || domain_code || '.name'`, "nameTranslations"))},
+      ${sql.unsafe(translatedColumnSql(`'list.compliance_domains.' || framework_id || '.' || domain_code || '.description'`, "descriptionTranslations"))},
       sort_order     AS "sortOrder",
       weight
     FROM bayanat.gov_compliance_domain_config
@@ -827,23 +822,20 @@ export async function listDomainConfig(frameworkId: number): Promise<DomainConfi
 }
 
 export async function upsertDomainConfig(frameworkId: number, cfg: {
-  domainCode: string; nameEn: string; nameAr?: string | null;
-  descriptionEn?: string | null; descriptionAr?: string | null;
+  domainCode: string; nameEn: string;
+  descriptionEn?: string | null;
   sortOrder?: number; weight?: number | null;
 }): Promise<number> {
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_compliance_domain_config
-      (framework_id, domain_code, name_en, name_ar, description_en, description_ar, sort_order, weight)
+      (framework_id, domain_code, name_en, description_en, sort_order, weight)
     VALUES (
-      ${frameworkId}, ${cfg.domainCode}, ${cfg.nameEn},
-      ${cfg.nameAr ?? null}, ${cfg.descriptionEn ?? null}, ${cfg.descriptionAr ?? null},
+      ${frameworkId}, ${cfg.domainCode}, ${cfg.nameEn}, ${cfg.descriptionEn ?? null},
       ${cfg.sortOrder ?? 0}, ${cfg.weight ?? null}
     )
     ON CONFLICT (framework_id, domain_code) DO UPDATE SET
       name_en        = EXCLUDED.name_en,
-      name_ar        = EXCLUDED.name_ar,
       description_en = EXCLUDED.description_en,
-      description_ar = EXCLUDED.description_ar,
       sort_order     = EXCLUDED.sort_order,
       weight         = EXCLUDED.weight
     RETURNING config_id AS id

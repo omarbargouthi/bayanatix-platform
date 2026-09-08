@@ -130,13 +130,11 @@ export function ComplianceClient({
   const lvlColor = (n: number) => levelCfg.find((c) => c.levelNum === n)?.colorHex ?? DEFAULT_LEVEL_COLORS[n] ?? "#888";
   const lvlName  = (n: number) => {
     const cfg = levelCfg.find((c) => c.levelNum === n);
-    if (isRtl && cfg?.nameAr) return cfg.nameAr;
-    return cfg?.name ?? DEFAULT_LEVEL_NAMES[n] ?? `Level ${n}`;
+    return pickTranslation(cfg?.name ?? DEFAULT_LEVEL_NAMES[n] ?? `Level ${n}`, cfg?.nameTranslations, lang);
   };
   const lvlDesc  = (n: number) => {
     const cfg = levelCfg.find((c) => c.levelNum === n);
-    if (isRtl && cfg?.descriptionAr) return cfg.descriptionAr;
-    return cfg?.description ?? "";
+    return pickTranslation(cfg?.description ?? "", cfg?.descriptionTranslations, lang);
   };
 
   // Helper: show a toast then hide after 4s
@@ -180,7 +178,7 @@ export function ComplianceClient({
       const key = r.domain ?? "Other";
       if (!map.has(key)) {
         const cfg = cfgByCode.get(r.domainCode ?? "");
-        map.set(key, cfg?.nameAr ?? key);
+        map.set(key, cfg ? pickTranslation(cfg.nameEn, cfg.nameTranslations, "ar") : key);
       }
     });
     return map;
@@ -241,7 +239,7 @@ export function ComplianceClient({
     const map = new Map<string, ConfigItem>();
     configItems.filter((i) => i.configGroup === "COMPLIANCE_TYPE").forEach((item) => {
       map.set(item.label, item);
-      if (item.labelAr) map.set(item.labelAr, item);
+      Object.values(item.labelTranslations ?? {}).forEach((v) => { if (v) map.set(v, item); });
       map.set(item.code, item);
     });
     return map;
@@ -854,7 +852,7 @@ export function ComplianceClient({
                                         const type = complianceTypeLabel(raw);
                                         if (!cfgItem && !type) return null;
                                         const label = cfgItem
-                                          ? (isRtl && cfgItem.labelAr ? cfgItem.labelAr : cfgItem.label)
+                                          ? pickTranslation(cfgItem.label, cfgItem.labelTranslations, lang)
                                           : (type?.label ?? "");
                                         const isCompliance = type?.isCompliance ?? label.toLowerCase().includes("compliance");
                                         return (
@@ -1373,11 +1371,11 @@ const STATUSES_FALLBACK = [
 function StatusSelect({ value, onChange, statusItems }: {
   value: string; onChange: (v: string) => void; statusItems: ConfigItem[];
 }) {
-  const { isRtl } = useLang();
+  const { lang } = useLang();
   const statuses = statusItems.length > 0
     ? statusItems.map((i) => ({
         code: i.code,
-        label: isRtl && i.labelAr ? i.labelAr : i.label,
+        label: pickTranslation(i.label, i.labelTranslations, lang),
         hex: i.colorHex ?? "#6B7280",
       }))
     : STATUSES_FALLBACK;
