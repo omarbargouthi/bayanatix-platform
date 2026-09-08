@@ -141,9 +141,12 @@ export type Steward = {
 export type GovernanceDomain = {
   domainCode:    string;
   name:          string;
-  nameAr?:       string | null;
   description:   string;
-  descriptionAr?: string | null;
+  // Live-resolved {language_code: text} maps from translation_keys/translations
+  // — see lib/i18n-admin/translated-column.ts::pickTranslation(). Replaces the
+  // old hardcoded name_ar/description_ar columns as the runtime source.
+  nameTranslations:        Record<string, string> | null;
+  descriptionTranslations: Record<string, string> | null;
   compliancePct: number;
   maturityLevel: number;
   maturityScore: number;
@@ -214,7 +217,10 @@ export type CustomAttributeDefinition = {
   assetType:    CustomAttributeAssetType;
   attrCode:     string;
   attrName:     string;
-  nameAr:       string | null;
+  // Live-resolved {language_code: text} map from translation_keys/translations
+  // — replaces the old nameAr field. Edited via the Language Management
+  // Workbench, not this feature's own admin form.
+  nameTranslations: Record<string, string> | null;
   dataType:     CustomAttributeDataType;
   enumValues:   string[] | null;
   isRequired:   boolean;

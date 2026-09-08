@@ -4,18 +4,19 @@
 
 import { sql } from "../db";
 import type { CustomAttributeDefinition, CustomAttributeAssetType } from "../types";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 
 const DEF_COLS = `
   attr_def_id      AS "attrDefId",
   asset_type_code  AS "assetType",
   attr_code        AS "attrCode",
   attr_name_text   AS "attrName",
-  name_ar_text     AS "nameAr",
   data_type_code   AS "dataType",
   enum_values_json AS "enumValues",
   is_required_indicator AS "isRequired",
   is_enabled_indicator  AS "isEnabled",
-  display_order_int     AS "displayOrder"
+  display_order_int     AS "displayOrder",
+  ${translatedColumnSql(`'custom_attributes.' || custom_attribute_definitions.attr_def_id || '.name'`, "nameTranslations")}
 `;
 
 export async function listAllCustomAttributeDefinitions(): Promise<CustomAttributeDefinition[]> {
@@ -34,14 +35,14 @@ export async function listCustomAttributeDefinitions(assetType: CustomAttributeA
 }
 
 export async function createCustomAttributeDefinition(input: {
-  assetType: CustomAttributeAssetType; attrCode: string; attrName: string; nameAr: string | null;
+  assetType: CustomAttributeAssetType; attrCode: string; attrName: string;
   dataType: string; enumValues: string[] | null; isRequired: boolean; displayOrder: number; userId: string;
 }): Promise<number> {
   const [row] = await sql<{ attrDefId: number }[]>`
     INSERT INTO bayanat.custom_attribute_definitions
-      (asset_type_code, attr_code, attr_name_text, name_ar_text, data_type_code, enum_values_json,
+      (asset_type_code, attr_code, attr_name_text, data_type_code, enum_values_json,
        is_required_indicator, display_order_int, created_by_user_id)
-    VALUES (${input.assetType}, ${input.attrCode}, ${input.attrName}, ${input.nameAr},
+    VALUES (${input.assetType}, ${input.attrCode}, ${input.attrName},
             ${input.dataType}, ${sql.json(input.enumValues ?? null)},
             ${input.isRequired}, ${input.displayOrder}, ${input.userId})
     RETURNING attr_def_id AS "attrDefId"
@@ -50,13 +51,12 @@ export async function createCustomAttributeDefinition(input: {
 }
 
 export async function updateCustomAttributeDefinition(attrDefId: number, patch: {
-  attrName?: string; nameAr?: string | null; enumValues?: string[] | null;
+  attrName?: string; enumValues?: string[] | null;
   isRequired?: boolean; isEnabled?: boolean; displayOrder?: number;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.custom_attribute_definitions SET
       attr_name_text         = COALESCE(${patch.attrName ?? null}, attr_name_text),
-      name_ar_text           = CASE WHEN ${patch.nameAr !== undefined} THEN ${patch.nameAr ?? null} ELSE name_ar_text END,
       enum_values_json        = CASE WHEN ${patch.enumValues !== undefined} THEN ${sql.json(patch.enumValues ?? null)} ELSE enum_values_json END,
       is_required_indicator  = COALESCE(${patch.isRequired ?? null}, is_required_indicator),
       is_enabled_indicator   = COALESCE(${patch.isEnabled ?? null}, is_enabled_indicator),

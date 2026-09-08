@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import type { CustomAttributeDefinition, CustomAttributeAssetType, CustomAttributeDataType } from "@/lib/types";
 
 const ASSET_TYPE_LABELS: Record<CustomAttributeAssetType, string> = {
@@ -19,7 +20,7 @@ const DATA_TYPE_LABELS: Record<CustomAttributeDataType, string> = {
 const DATA_TYPES = Object.keys(DATA_TYPE_LABELS) as CustomAttributeDataType[];
 
 const BLANK = {
-  attrCode: "", attrName: "", nameAr: "", dataType: "TEXT" as CustomAttributeDataType,
+  attrCode: "", attrName: "", dataType: "TEXT" as CustomAttributeDataType,
   enumValuesText: "", isRequired: false, displayOrder: 0,
 };
 
@@ -58,7 +59,6 @@ export function CustomAttributesConfigSection() {
           assetType: activeType,
           attrCode: form.attrCode,
           attrName: form.attrName,
-          nameAr: form.nameAr || null,
           dataType: form.dataType,
           enumValues,
           isRequired: form.isRequired,
@@ -133,15 +133,14 @@ export function CustomAttributesConfigSection() {
                 {DATA_TYPES.map((t) => <option key={t} value={t}>{DATA_TYPE_LABELS[t]}</option>)}
               </select>
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label (EN) *</label>
               <input className="input w-full" placeholder="Owning Team" value={form.attrName}
                 onChange={(e) => setForm((f) => ({ ...f, attrName: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">التسمية (AR)</label>
-              <input className="input w-full" dir="rtl" value={form.nameAr}
-                onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} />
+              <p className="text-[11px] text-muted mt-1">
+                Arabic and any other enabled language are added afterward in{" "}
+                <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+              </p>
             </div>
             {form.dataType === "ENUM" && (
               <div className="col-span-2">

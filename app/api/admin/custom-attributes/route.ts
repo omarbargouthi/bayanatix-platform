@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { assetType, attrCode, attrName, nameAr, dataType, enumValues, isRequired, displayOrder } = body;
+  const { assetType, attrCode, attrName, dataType, enumValues, isRequired, displayOrder } = body;
 
   if (!ASSET_TYPES.includes(assetType)) return NextResponse.json({ error: "Invalid assetType" }, { status: 400 });
   if (!DATA_TYPES.includes(dataType)) return NextResponse.json({ error: "Invalid dataType" }, { status: 400 });
@@ -30,7 +30,6 @@ export async function POST(req: Request) {
     assetType,
     attrCode: attrCode.trim().toUpperCase().replace(/\s+/g, "_"),
     attrName: attrName.trim(),
-    nameAr: nameAr?.trim() || null,
     dataType,
     enumValues: dataType === "ENUM" ? enumValues : null,
     isRequired: !!isRequired,

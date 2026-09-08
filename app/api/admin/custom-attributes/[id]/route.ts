@@ -8,8 +8,8 @@ export async function PATCH(req: Request, { params }: Params) {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { attrName, nameAr, enumValues, isRequired, isEnabled, displayOrder } = await req.json();
-  await updateCustomAttributeDefinition(Number(params.id), { attrName, nameAr, enumValues, isRequired, isEnabled, displayOrder });
+  const { attrName, enumValues, isRequired, isEnabled, displayOrder } = await req.json();
+  await updateCustomAttributeDefinition(Number(params.id), { attrName, enumValues, isRequired, isEnabled, displayOrder });
   return NextResponse.json({ ok: true });
 }
 

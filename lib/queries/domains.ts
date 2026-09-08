@@ -1,5 +1,11 @@
 import { sql } from "../db";
 import type { GovernanceDomain, ComplianceSummary } from "../types";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
+
+const DOMAIN_TRANSLATION_COLS = [
+  translatedColumnSql(`'governance_domains.' || d.domain_code || '.name'`, "nameTranslations"),
+  translatedColumnSql(`'governance_domains.' || d.domain_code || '.description'`, "descriptionTranslations"),
+].join(",\n      ");
 
 export async function getDomains(): Promise<GovernanceDomain[]> {
   return sql<GovernanceDomain[]>`
@@ -36,11 +42,10 @@ export async function getDomains(): Promise<GovernanceDomain[]> {
         AND  da.avg_level BETWEEN lc.range_from AND lc.range_to
     )
     SELECT
+      ${sql.unsafe(DOMAIN_TRANSLATION_COLS)},
       d.domain_code          AS "domainCode",
       d.domain_name          AS "name",
-      d.name_ar              AS "nameAr",
       d.domain_description   AS "description",
-      d.description_ar       AS "descriptionAr",
       CASE
         WHEN d.domain_code = 'AIG' THEN 62
         WHEN dm.ndi_domain_code IS NOT NULL

@@ -108,6 +108,21 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
       { keySuffix: "standard", textColumn: "standard", secondaryColumn: "standard_ar" },
     ],
   },
+  {
+    categoryCode: "GOVERNANCE_DOMAINS", table: "bayanat.governance_domains", idExpr: "domain_code",
+    keyPrefix: "governance_domains",
+    fields: [
+      { keySuffix: "name", textColumn: "domain_name", secondaryColumn: "name_ar" },
+      { keySuffix: "description", textColumn: "domain_description", secondaryColumn: "description_ar" },
+    ],
+  },
+  {
+    categoryCode: "CUSTOM_ATTRIBUTES", table: "bayanat.custom_attribute_definitions", idExpr: "attr_def_id::text",
+    keyPrefix: "custom_attributes",
+    fields: [
+      { keySuffix: "name", textColumn: "attr_name_text", secondaryColumn: "name_ar_text" },
+    ],
+  },
 ];
 
 // Small, heavily-repeated value sets embedded as free text in a larger table (no

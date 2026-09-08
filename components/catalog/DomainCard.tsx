@@ -4,6 +4,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import type { GovernanceDomain } from "@/lib/types";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 type WarnLevel = "red" | "amber" | null;
 
@@ -33,7 +34,7 @@ const accentClass: Record<NonNullable<WarnLevel>, string> = {
 };
 
 export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { compliance: string; maturity: string } }) {
-  const { isRtl } = useLang();
+  const { lang } = useLang();
   const DOMAIN_HREFS: Record<string, string> = {
     DG:   "/governance",
     DCAT: "/catalog",
@@ -42,8 +43,8 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
   const href = DOMAIN_HREFS[d.domainCode] ?? "#";
   const requestCount = d.openRequestCount ?? 0;
   const level        = warnLevel(requestCount);
-  const displayName        = isRtl && d.nameAr        ? d.nameAr        : d.name;
-  const displayDescription = isRtl && d.descriptionAr ? d.descriptionAr : d.description;
+  const displayName        = pickTranslation(d.name, d.nameTranslations, lang);
+  const displayDescription = pickTranslation(d.description, d.descriptionTranslations, lang);
 
   // AIG is a standalone domain — render it distinctly
   if (d.domainCode === "AIG") {

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { CustomAttributeAssetType, CustomAttributeDefinition } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 type Props = {
   assetType: CustomAttributeAssetType;
@@ -66,11 +68,14 @@ function ValueInput({
 }
 
 export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptyState = false }: Props) {
+  const { lang } = useLang();
   const [data, setData] = useState<ValuesResponse | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+
+  const label = (def: CustomAttributeDefinition) => pickTranslation(def.attrName, def.nameTranslations, lang);
 
   useEffect(() => {
     fetch(`/api/assets/${assetType}/${assetId}/custom-attributes`)
@@ -101,7 +106,7 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
 
   async function save() {
     const missing = data!.definitions.filter((d) => d.isRequired && (draft[d.attrCode] === undefined || draft[d.attrCode] === null || draft[d.attrCode] === ""));
-    if (missing.length > 0) { setErr(`${missing.map((d) => d.attrName).join(", ")} — required`); return; }
+    if (missing.length > 0) { setErr(`${missing.map(label).join(", ")} — required`); return; }
     setSaving(true);
     const res = await fetch(`/api/assets/${assetType}/${assetId}/custom-attributes`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -129,7 +134,7 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
           {data.definitions.map((def) => (
             <div key={def.attrDefId}>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">
-                {def.attrName}{def.isRequired && " *"}
+                {label(def)}{def.isRequired && " *"}
               </label>
               <ValueInput def={def} value={draft[def.attrCode]} onChange={(v) => setDraft((p) => ({ ...p, [def.attrCode]: v }))} />
             </div>
@@ -143,7 +148,7 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
         <dl className="space-y-2.5">
           {data.definitions.map((def) => (
             <div key={def.attrDefId} className="flex items-start gap-3">
-              <dt className="text-[11px] uppercase tracking-wider text-muted w-32 shrink-0 pt-0.5">{def.attrName}</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-muted w-32 shrink-0 pt-0.5">{label(def)}</dt>
               <dd className="flex-1 text-sm text-ink"><ValueDisplay def={def} value={data.values[def.attrCode]} /></dd>
             </div>
           ))}
