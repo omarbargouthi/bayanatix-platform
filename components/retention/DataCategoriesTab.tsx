@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import type { DataCategory, RetentionSchedule } from "@/lib/types";
 
 // ── Sensitivity badge ─────────────────────────────────────────────────────────
@@ -187,15 +189,15 @@ function CategoryRow({
   depth?: number;
   onAdded: () => void;
 }) {
-  const { t, isRtl } = useLang();
+  const { t, isRtl, lang } = useLang();
   const r = t.retention;
   const [open, setOpen] = useState(false);
   const [showSchedules, setShowSchedules] = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
-  const [subForm, setSubForm] = useState({ name: "", nameAr: "", sensitivity: "INTERNAL" });
+  const [subForm, setSubForm] = useState({ name: "", sensitivity: "INTERNAL" });
   const [saving, setSaving] = useState(false);
 
-  const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const displayName = pickTranslation(category.name, category.nameTranslations, lang);
 
   async function addSubcategory() {
     if (!subForm.name) return;
@@ -207,7 +209,7 @@ function CategoryRow({
     });
     setSaving(false);
     setShowAddSub(false);
-    setSubForm({ name: "", nameAr: "", sensitivity: "INTERNAL" });
+    setSubForm({ name: "", sensitivity: "INTERNAL" });
     onAdded();
   }
 
@@ -249,10 +251,7 @@ function CategoryRow({
       {/* Add subcategory inline form */}
       {showAddSub && (
         <div className="mb-2 p-2.5 bg-gray-50 rounded-lg border border-line text-[11px] space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input className="input-sm" placeholder={r.categoryName} value={subForm.name} onChange={(e) => setSubForm((f) => ({ ...f, name: e.target.value }))} />
-            <input className="input-sm" placeholder={r.categoryNameAr} value={subForm.nameAr} onChange={(e) => setSubForm((f) => ({ ...f, nameAr: e.target.value }))} />
-          </div>
+          <input className="input-sm w-full" placeholder={r.categoryName} value={subForm.name} onChange={(e) => setSubForm((f) => ({ ...f, name: e.target.value }))} />
           <div className="flex items-center gap-2">
             <select className="input-sm flex-1" value={subForm.sensitivity} onChange={(e) => setSubForm((f) => ({ ...f, sensitivity: e.target.value }))}>
               <option value="PUBLIC">{r.sensitivityPublic}</option>
@@ -285,7 +284,7 @@ export function DataCategoriesTab() {
   const r = t.retention;
   const [categories, setCategories] = useState<DataCategory[] | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", nameAr: "", sensitivity: "INTERNAL", description: "" });
+  const [form, setForm] = useState({ name: "", sensitivity: "INTERNAL", description: "" });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
@@ -307,7 +306,7 @@ export function DataCategoriesTab() {
     });
     setSaving(false);
     setShowAdd(false);
-    setForm({ name: "", nameAr: "", sensitivity: "INTERNAL", description: "" });
+    setForm({ name: "", sensitivity: "INTERNAL", description: "" });
     load();
   }
 
@@ -323,10 +322,11 @@ export function DataCategoriesTab() {
 
         {showAdd && (
           <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-line text-[12px] space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <input className="input-sm" placeholder={r.categoryName} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-              <input className="input-sm" placeholder={r.categoryNameAr} value={form.nameAr} onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} />
-            </div>
+            <input className="input-sm w-full" placeholder={r.categoryName} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            <p className="text-[11px] text-muted">
+              Arabic and any other enabled language are added afterward in{" "}
+              <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+            </p>
             <div className="flex items-center gap-2">
               <select className="input-sm flex-1" value={form.sensitivity} onChange={(e) => setForm((f) => ({ ...f, sensitivity: e.target.value }))}>
                 <option value="PUBLIC">{r.sensitivityPublic}</option>

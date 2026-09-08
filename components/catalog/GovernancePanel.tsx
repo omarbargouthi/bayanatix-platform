@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { UserSearchPicker } from "./UserSearchPicker";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 export type GovernanceRoleLabels = {
-  OWNER:       { name: string; description: string | null };
-  BIZ_STEWARD: { name: string; description: string | null };
-  TECH_STEWARD:{ name: string; description: string | null };
+  OWNER:       { name: string; description: string | null; nameTranslations: Record<string, string> | null };
+  BIZ_STEWARD: { name: string; description: string | null; nameTranslations: Record<string, string> | null };
+  TECH_STEWARD:{ name: string; description: string | null; nameTranslations: Record<string, string> | null };
 };
 
 export type Stakeholder = {
@@ -43,7 +44,7 @@ type Props = {
 };
 
 export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, canEdit, roleLabels }: Props) {
-  const { lookupLabel, t } = useLang();
+  const { lookupLabel, t, lang } = useLang();
   const g = t.catalog;
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>(initialStakeholders);
   const [editing,      setEditing]      = useState(false);
@@ -53,9 +54,9 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
 
   // Role labels from lookup cache (with server-fetched fallback until cache loads)
   const GROUPS = [
-    { roleCode: "OWNER",        label: lookupLabel("GOVERNANCE_ROLE", "OWNER")        || roleLabels.OWNER.name,        singular: true  },
-    { roleCode: "BIZ_STEWARD",  label: lookupLabel("GOVERNANCE_ROLE", "BIZ_STEWARD")  || roleLabels.BIZ_STEWARD.name,  singular: false },
-    { roleCode: "TECH_STEWARD", label: lookupLabel("GOVERNANCE_ROLE", "TECH_STEWARD") || roleLabels.TECH_STEWARD.name, singular: false },
+    { roleCode: "OWNER",        label: lookupLabel("GOVERNANCE_ROLE", "OWNER")        || pickTranslation(roleLabels.OWNER.name, roleLabels.OWNER.nameTranslations, lang),        singular: true  },
+    { roleCode: "BIZ_STEWARD",  label: lookupLabel("GOVERNANCE_ROLE", "BIZ_STEWARD")  || pickTranslation(roleLabels.BIZ_STEWARD.name, roleLabels.BIZ_STEWARD.nameTranslations, lang),  singular: false },
+    { roleCode: "TECH_STEWARD", label: lookupLabel("GOVERNANCE_ROLE", "TECH_STEWARD") || pickTranslation(roleLabels.TECH_STEWARD.name, roleLabels.TECH_STEWARD.nameTranslations, lang), singular: false },
   ];
 
   async function handleAdd(roleCode: string, user: UserResult) {

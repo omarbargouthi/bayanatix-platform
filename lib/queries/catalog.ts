@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { logUpdate } from "../audit";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 import type {
   DataSource,
   DataSchema,
@@ -313,6 +314,7 @@ export async function getEntityById(entityId: number): Promise<
       bg_cls.term_name_text        as "classTermName",
       bg_cls.classification_code   as "classTermClassCode",
       ct_cls.class_name_text       as "classTermClassName",
+      ${sql.unsafe(translatedColumnSql(`'list.classification_types.' || ct_cls.class_code`, "classTermClassNameTranslations"))},
       bg_cls.is_pii_indicator      as "classTermIsPii",
       bg_cls.pi_category_code      as "classTermPiCategoryCode",
       pct_cls.category_name_text   as "classTermPiCategoryName"

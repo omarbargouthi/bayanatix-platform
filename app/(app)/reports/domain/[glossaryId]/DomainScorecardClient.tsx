@@ -5,6 +5,7 @@ import { getRagStatus, RAG_CLASSES } from "@/lib/reports/rag";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 function formatValue(value: number, format: "PERCENT" | "NUMBER" | "DAYS"): string {
   if (format === "PERCENT") return `${value}%`;
@@ -63,7 +64,7 @@ export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: Do
               <div key={c.reportCode} className={`card border-l-4 px-4 py-3 ${classes.border} ${classes.bg}`}>
                 <div className={`text-xl font-extrabold ${classes.text}`}>{formatValue(c.value, c.format)}</div>
                 <div className="text-[10px] text-muted mt-0.5 uppercase tracking-wider">{capabilityLabel(t, c.reportCode)}</div>
-                <div className="text-[10px] text-ink-soft mt-0.5">{lang !== "en" ? (c.kpiNameAr ?? c.kpiName) : c.kpiName}</div>
+                <div className="text-[10px] text-ink-soft mt-0.5">{pickTranslation(c.kpiName, c.kpiNameTranslations, lang)}</div>
               </div>
             );
           })}

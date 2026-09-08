@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { translatedColumnSql } from "@/lib/i18n-admin/translated-column";
 
 export async function GET() {
   const session = await getSession();
@@ -9,11 +10,11 @@ export async function GET() {
   const rows = await sql<{
     categoryId: number;
     name: string;
-    nameAr: string | null;
+    nameTranslations: Record<string, string> | null;
     parentId: number | null;
     sensitivity: string;
     description: string | null;
-    descriptionAr: string | null;
+    descriptionTranslations: Record<string, string> | null;
     examples: string | null;
     sortOrder: number;
     isActive: boolean;
@@ -24,11 +25,11 @@ export async function GET() {
     SELECT
       dc.category_id        AS "categoryId",
       dc.name               AS name,
-      dc.name_ar            AS "nameAr",
+      ${sql.unsafe(translatedColumnSql(`'data_categories.' || dc.category_id || '.name'`, "nameTranslations"))},
       dc.parent_id          AS "parentId",
       dc.sensitivity        AS sensitivity,
       dc.description        AS description,
-      dc.description_ar     AS "descriptionAr",
+      ${sql.unsafe(translatedColumnSql(`'data_categories.' || dc.category_id || '.description'`, "descriptionTranslations"))},
       dc.examples           AS examples,
       dc.sort_order         AS "sortOrder",
       dc.is_active          AS "isActive",
@@ -67,18 +68,16 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, nameAr, parentId, sensitivity, description, descriptionAr, examples, sortOrder } = body;
+  const { name, parentId, sensitivity, description, examples, sortOrder } = body;
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
   const [row] = await sql<{ categoryId: number }[]>`
-    INSERT INTO bayanat.data_categories (name, name_ar, parent_id, sensitivity, description, description_ar, examples, sort_order)
+    INSERT INTO bayanat.data_categories (name, parent_id, sensitivity, description, examples, sort_order)
     VALUES (
       ${name},
-      ${nameAr ?? null},
       ${parentId ?? null},
       ${sensitivity ?? "INTERNAL"},
       ${description ?? null},
-      ${descriptionAr ?? null},
       ${examples ?? null},
       ${sortOrder ?? 0}
     )

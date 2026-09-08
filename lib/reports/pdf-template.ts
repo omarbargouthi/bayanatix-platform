@@ -1,5 +1,6 @@
 import type { KpiCardData, TrendPoint } from "../queries/reports";
 import { getRagStatus, type RagStatus } from "./rag";
+import { pickTranslation } from "../i18n-admin/translated-column";
 
 const RAG_HEX: Record<RagStatus, { border: string; bg: string; text: string }> = {
   green: { border: "#34d399", bg: "#ecfdf5", text: "#059669" },
@@ -65,7 +66,7 @@ export function buildReportPdfHtml(opts: {
   const kpiCards = opts.kpis.map((k) => {
     const rag = getRagStatus(k.value, k.targetValue, k.direction);
     const colors = RAG_HEX[rag];
-    const name = opts.lang === "ar" ? (k.nameAr ?? k.nameEn) : k.nameEn;
+    const name = pickTranslation(k.nameEn, k.nameTranslations, opts.lang);
     return `
       <div style="border-${dir === "rtl" ? "right" : "left"}:4px solid ${colors.border};background:${colors.bg};padding:10px 14px;border-radius:6px;">
         <div style="font-size:20px;font-weight:800;color:${colors.text};">${formatValue(k.value, k.format)}</div>

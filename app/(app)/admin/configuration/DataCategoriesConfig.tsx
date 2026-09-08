@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import type { DataCategory } from "@/lib/types";
 
-// ── Single category row (name + AR name, expand children, add sub, edit, delete) ─
+// ── Single category row (name, expand children, add sub, edit, delete) ─────────
 
 function CategoryRow({
   category,
@@ -15,16 +17,16 @@ function CategoryRow({
   depth: number;
   onRefresh: () => void;
 }) {
-  const { isRtl } = useLang();
+  const { isRtl, lang } = useLang();
   const [open, setOpen]           = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
   const [editing, setEditing]     = useState(false);
-  const [subForm, setSubForm]     = useState({ name: "", nameAr: "" });
-  const [editForm, setEditForm]   = useState({ name: category.name, nameAr: category.nameAr ?? "" });
+  const [subForm, setSubForm]     = useState({ name: "" });
+  const [editForm, setEditForm]   = useState({ name: category.name });
   const [saving, setSaving]       = useState(false);
 
   const hasChildren = (category.children?.length ?? 0) > 0;
-  const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const displayName = pickTranslation(category.name, category.nameTranslations, lang);
 
   async function saveEdit() {
     if (!editForm.name.trim()) return;
@@ -32,7 +34,7 @@ function CategoryRow({
     await fetch(`/api/retention/categories/${category.categoryId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editForm.name.trim(), nameAr: editForm.nameAr.trim() || null }),
+      body: JSON.stringify({ name: editForm.name.trim() }),
     });
     setSaving(false);
     setEditing(false);
@@ -47,14 +49,13 @@ function CategoryRow({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name:      subForm.name.trim(),
-        nameAr:    subForm.nameAr.trim() || null,
         parentId:  category.categoryId,
         sensitivity: category.sensitivity,
       }),
     });
     setSaving(false);
     setShowAddSub(false);
-    setSubForm({ name: "", nameAr: "" });
+    setSubForm({ name: "" });
     setOpen(true);
     onRefresh();
   }
@@ -81,13 +82,6 @@ function CategoryRow({
             onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
             autoFocus
           />
-          <input
-            className="input-sm flex-1 min-w-[140px]"
-            placeholder="الاسم بالعربي"
-            dir="rtl"
-            value={editForm.nameAr}
-            onChange={e => setEditForm(f => ({ ...f, nameAr: e.target.value }))}
-          />
           <button
             className="btn-primary text-[11px] py-1 px-3"
             disabled={saving}
@@ -97,7 +91,7 @@ function CategoryRow({
           </button>
           <button
             className="btn-secondary text-[11px] py-1 px-3"
-            onClick={() => { setEditing(false); setEditForm({ name: category.name, nameAr: category.nameAr ?? "" }); }}
+            onClick={() => { setEditing(false); setEditForm({ name: category.name }); }}
           >
             Cancel
           </button>
@@ -111,12 +105,6 @@ function CategoryRow({
             {hasChildren ? (open ? "▼" : "▶") : "·"}
           </button>
           <span className="flex-1 text-[13px] font-medium text-ink truncate">{displayName}</span>
-          {category.nameAr && !isRtl && (
-            <span className="text-[11px] text-muted" dir="rtl">{category.nameAr}</span>
-          )}
-          {!isRtl && category.nameAr == null && (
-            <span className="text-[11px] text-muted italic">No Arabic</span>
-          )}
           <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 shrink-0">
             <button
               className="text-[11px] text-brand-purple hover:underline"
@@ -126,7 +114,7 @@ function CategoryRow({
             </button>
             <button
               className="text-[11px] text-brand-purple hover:underline"
-              onClick={() => { setEditing(true); setEditForm({ name: category.name, nameAr: category.nameAr ?? "" }); }}
+              onClick={() => { setEditing(true); setEditForm({ name: category.name }); }}
             >
               Edit
             </button>
@@ -143,22 +131,13 @@ function CategoryRow({
       {/* Add sub-category inline */}
       {showAddSub && (
         <div className="mb-2 p-2.5 bg-gray-50 rounded-lg border border-line text-[11px] space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              className="input-sm"
-              placeholder="Sub-category name (EN)"
-              value={subForm.name}
-              onChange={e => setSubForm(f => ({ ...f, name: e.target.value }))}
-              autoFocus
-            />
-            <input
-              className="input-sm"
-              placeholder="الاسم بالعربي"
-              dir="rtl"
-              value={subForm.nameAr}
-              onChange={e => setSubForm(f => ({ ...f, nameAr: e.target.value }))}
-            />
-          </div>
+          <input
+            className="input-sm w-full"
+            placeholder="Sub-category name (EN)"
+            value={subForm.name}
+            onChange={e => setSubForm(f => ({ ...f, name: e.target.value }))}
+            autoFocus
+          />
           <div className="flex justify-end gap-2">
             <button className="btn-secondary text-[10px] py-1" onClick={() => setShowAddSub(false)}>Cancel</button>
             <button className="btn-primary text-[10px] py-1" disabled={saving} onClick={addSub}>
@@ -181,7 +160,7 @@ function CategoryRow({
 export function DataCategoriesConfig() {
   const [categories, setCategories] = useState<DataCategory[] | null>(null);
   const [showAdd, setShowAdd]       = useState(false);
-  const [form, setForm]             = useState({ name: "", nameAr: "" });
+  const [form, setForm]             = useState({ name: "" });
   const [saving, setSaving]         = useState(false);
 
   const load = useCallback(() => {
@@ -201,13 +180,12 @@ export function DataCategoriesConfig() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name:        form.name.trim(),
-        nameAr:      form.nameAr.trim() || null,
         sensitivity: "INTERNAL",
       }),
     });
     setSaving(false);
     setShowAdd(false);
-    setForm({ name: "", nameAr: "" });
+    setForm({ name: "" });
     load();
   }
 
@@ -225,24 +203,19 @@ export function DataCategoriesConfig() {
 
       {showAdd && (
         <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-line space-y-2 text-[12px]">
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              className="input-sm"
-              placeholder="Category name (EN)"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              autoFocus
-            />
-            <input
-              className="input-sm"
-              placeholder="اسم الفئة بالعربي"
-              dir="rtl"
-              value={form.nameAr}
-              onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
-            />
-          </div>
+          <input
+            className="input-sm w-full"
+            placeholder="Category name (EN)"
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            autoFocus
+          />
+          <p className="text-[11px] text-muted">
+            Arabic and any other enabled language are added afterward in{" "}
+            <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+          </p>
           <div className="flex justify-end gap-2">
-            <button className="btn btn-sm" onClick={() => { setShowAdd(false); setForm({ name: "", nameAr: "" }); }}>
+            <button className="btn btn-sm" onClick={() => { setShowAdd(false); setForm({ name: "" }); }}>
               Cancel
             </button>
             <button className="btn btn-primary btn-sm" disabled={saving} onClick={addCategory}>

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 
 type KpiDefinition = {
-  kpiCode: string; reportCode: string; nameEn: string; nameAr: string | null;
+  kpiCode: string; reportCode: string; nameEn: string;
+  nameTranslations: Record<string, string> | null;
   capabilityCode: string; metricKey: string | null; customSql: string | null;
   targetValue: number | null; direction: "UP" | "DOWN"; format: "PERCENT" | "NUMBER" | "DAYS";
   sortOrder: number; isActive: boolean;
@@ -21,7 +23,7 @@ const REPORT_LABELS: Record<string, string> = {
 };
 
 const BLANK_ADD = {
-  kpiCode: "", reportCode: "R2_DQ", nameEn: "", nameAr: "", capabilityCode: "",
+  kpiCode: "", reportCode: "R2_DQ", nameEn: "", capabilityCode: "",
   customSql: "", targetValue: "", direction: "UP" as "UP" | "DOWN", format: "NUMBER" as "PERCENT" | "NUMBER" | "DAYS",
 };
 
@@ -156,8 +158,13 @@ export default function ReportsKpiAdminPage() {
             <select className="field-input" value={addForm.reportCode} onChange={(e) => setAddForm({ ...addForm, reportCode: e.target.value })}>
               {Object.entries(REPORT_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
             </select>
-            <input className="field-input" placeholder="Name (English)" value={addForm.nameEn} onChange={(e) => setAddForm({ ...addForm, nameEn: e.target.value })} />
-            <input className="field-input" placeholder="Name (Arabic, optional)" value={addForm.nameAr} onChange={(e) => setAddForm({ ...addForm, nameAr: e.target.value })} />
+            <div className="col-span-2">
+              <input className="field-input w-full" placeholder="Name (English)" value={addForm.nameEn} onChange={(e) => setAddForm({ ...addForm, nameEn: e.target.value })} />
+              <p className="text-[11px] text-muted mt-1">
+                Arabic and any other enabled language are added afterward in{" "}
+                <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+              </p>
+            </div>
             <select className="field-input" value={addForm.direction} onChange={(e) => setAddForm({ ...addForm, direction: e.target.value as "UP" | "DOWN" })}>
               <option value="UP">Higher is better</option>
               <option value="DOWN">Lower is better</option>

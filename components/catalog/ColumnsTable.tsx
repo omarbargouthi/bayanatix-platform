@@ -12,6 +12,7 @@ import { ColumnTypeBadge } from "./ColumnTypeBadge";
 import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
 import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
 import { CustomAttributesPanel } from "./CustomAttributesPanel";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { useLang } from "@/lib/lang-context";
 
@@ -203,6 +204,7 @@ function EnrichmentTermsCell({ attributeId }: { attributeId: number }) {
 type TagRow = { tagId: number; tagName: string; colorHex: string };
 
 function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: () => void; canEdit: boolean }) {
+  const { lang } = useLang();
   const [tags,            setTags]            = useState<TagRow[]  | null>(null);
   const [enrichment,      setEnrichment]      = useState<TermRow[] | null>(null);
   const [showRelationships, setShowRelationships] = useState(false);
@@ -274,7 +276,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
               <div className="flex items-center gap-1.5">
                 <ClassificationTag code={attr.classTermClassCode ?? undefined} />
                 {attr.classTermClassName && (
-                  <span className="text-[12px] text-ink">{attr.classTermClassName}</span>
+                  <span className="text-[12px] text-ink">{pickTranslation(attr.classTermClassName, attr.classTermClassNameTranslations, lang)}</span>
                 )}
               </div>
             </div>

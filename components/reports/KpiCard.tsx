@@ -3,6 +3,7 @@
 import { getRagStatus, RAG_CLASSES } from "@/lib/reports/rag";
 import type { KpiCardData } from "@/lib/queries/reports";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 function formatValue(value: number, format: KpiCardData["format"]): string {
   if (format === "PERCENT") return `${value}%`;
@@ -15,7 +16,7 @@ export function KpiCard({ kpi, selected, onSelect }: { kpi: KpiCardData; selecte
   const rc = t.reports.common;
   const rag = getRagStatus(kpi.value, kpi.targetValue, kpi.direction);
   const classes = RAG_CLASSES[rag];
-  const name = lang !== "en" ? (kpi.nameAr ?? kpi.nameEn) : kpi.nameEn;
+  const name = pickTranslation(kpi.nameEn, kpi.nameTranslations, lang);
 
   return (
     <button

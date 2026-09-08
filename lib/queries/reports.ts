@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import { KPI_REGISTRY, type ReportFilters, type KpiResult } from "../reports/kpi-registry";
 import { runCustomKpiSql } from "../reports/kpi-sandbox";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 
 export type { ReportFilters, KpiResult };
 
@@ -73,7 +74,7 @@ export type KpiDefinition = {
   kpiCode: string;
   reportCode: string;
   nameEn: string;
-  nameAr: string | null;
+  nameTranslations: Record<string, string> | null;
   capabilityCode: string;
   metricKey: string | null;
   customSql: string | null;
@@ -84,11 +85,16 @@ export type KpiDefinition = {
   isActive: boolean;
 };
 
+const KPI_COLS = `
+  kpi_code AS "kpiCode", report_code AS "reportCode", name_en AS "nameEn",
+  ${translatedColumnSql(`'report_kpis.' || kpi_code || '.name'`, "nameTranslations")},
+  capability_code AS "capabilityCode", metric_key AS "metricKey", custom_sql AS "customSql",
+  target_value AS "targetValue", direction, format, sort_order AS "sortOrder", is_active AS "isActive"
+`;
+
 export async function getKpiDefinitions(reportCode: string): Promise<KpiDefinition[]> {
   const rows = await sql<any[]>`
-    SELECT kpi_code AS "kpiCode", report_code AS "reportCode", name_en AS "nameEn", name_ar AS "nameAr",
-           capability_code AS "capabilityCode", metric_key AS "metricKey", custom_sql AS "customSql",
-           target_value AS "targetValue", direction, format, sort_order AS "sortOrder", is_active AS "isActive"
+    SELECT ${sql.unsafe(KPI_COLS)}
     FROM   bayanat.report_kpi_definitions
     WHERE  report_code = ${reportCode} AND is_active = true
     ORDER BY sort_order
@@ -106,9 +112,7 @@ export async function getAllReportCodes(): Promise<string[]> {
 // Admin view: every KPI across every report, active or not.
 export async function getAllKpiDefinitions(): Promise<KpiDefinition[]> {
   const rows = await sql<any[]>`
-    SELECT kpi_code AS "kpiCode", report_code AS "reportCode", name_en AS "nameEn", name_ar AS "nameAr",
-           capability_code AS "capabilityCode", metric_key AS "metricKey", custom_sql AS "customSql",
-           target_value AS "targetValue", direction, format, sort_order AS "sortOrder", is_active AS "isActive"
+    SELECT ${sql.unsafe(KPI_COLS)}
     FROM   bayanat.report_kpi_definitions
     ORDER BY report_code, sort_order
   `;
@@ -125,16 +129,16 @@ export async function updateKpiDefinition(kpiCode: string, data: { targetValue?:
 }
 
 export async function createCustomKpiDefinition(data: {
-  kpiCode: string; reportCode: string; nameEn: string; nameAr: string | null;
+  kpiCode: string; reportCode: string; nameEn: string;
   capabilityCode: string; customSql: string; targetValue: number | null;
   direction: "UP" | "DOWN"; format: "PERCENT" | "NUMBER" | "DAYS"; createdByUserId: string;
 }): Promise<void> {
   await sql`
     INSERT INTO bayanat.report_kpi_definitions
-      (kpi_code, report_code, name_en, name_ar, capability_code, metric_key, custom_sql,
+      (kpi_code, report_code, name_en, capability_code, metric_key, custom_sql,
        target_value, direction, format, sort_order, created_by_user_id)
     VALUES
-      (${data.kpiCode}, ${data.reportCode}, ${data.nameEn}, ${data.nameAr}, ${data.capabilityCode}, NULL, ${data.customSql},
+      (${data.kpiCode}, ${data.reportCode}, ${data.nameEn}, ${data.capabilityCode}, NULL, ${data.customSql},
        ${data.targetValue}, ${data.direction}, ${data.format}, 999, ${data.createdByUserId})
   `;
 }
@@ -930,7 +934,7 @@ export type DomainScorecardCapability = {
   reportLabel: string;
   kpiCode: string;
   kpiName: string;
-  kpiNameAr: string | null;
+  kpiNameTranslations: Record<string, string> | null;
   value: number;
   targetValue: number | null;
   direction: "UP" | "DOWN";
@@ -999,7 +1003,7 @@ export async function getDomainScorecard(glossaryId: number): Promise<DomainScor
       ]);
       return {
         reportCode, reportLabel: SCORECARD_REPORT_LABELS[reportCode],
-        kpiCode: primary.kpiCode, kpiName: primary.nameEn, kpiNameAr: primary.nameAr, value: result.value,
+        kpiCode: primary.kpiCode, kpiName: primary.nameEn, kpiNameTranslations: primary.nameTranslations, value: result.value,
         targetValue: primary.targetValue, direction: primary.direction, format: primary.format, trend,
       };
     }),

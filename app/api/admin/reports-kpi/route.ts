@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { kpiCode, reportCode, nameEn, nameAr, capabilityCode, customSql, targetValue, direction, format } = body ?? {};
+  const { kpiCode, reportCode, nameEn, capabilityCode, customSql, targetValue, direction, format } = body ?? {};
 
   if (!kpiCode || typeof kpiCode !== "string" || !/^[A-Z0-9_]+$/.test(kpiCode)) {
     return NextResponse.json({ error: "kpiCode must be uppercase letters/numbers/underscores" }, { status: 400 });
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
   try {
     await createCustomKpiDefinition({
-      kpiCode, reportCode, nameEn: nameEn.trim(), nameAr: nameAr?.trim() || null, capabilityCode: capabilityCode || reportCode,
+      kpiCode, reportCode, nameEn: nameEn.trim(), capabilityCode: capabilityCode || reportCode,
       customSql, targetValue: targetValue != null ? Number(targetValue) : null, direction, format,
       createdByUserId: session.userId,
     });

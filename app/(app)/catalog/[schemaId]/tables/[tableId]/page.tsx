@@ -57,7 +57,7 @@ export default async function TablePage({
     activeTab === "Schema" ? getEntityProfile(id)   : Promise.resolve(null),
     activeTab === "Schema" ? getDqRules({ assetTypeCode: "DATA_ENTITIES", assetId: id }) : Promise.resolve([]),
     activeTab === "Schema" ? getStakeholders("DATA_ENTITIES", id) : Promise.resolve([]),
-    activeTab === "Schema" ? getGovernanceRoleLabels() : Promise.resolve({} as Record<string, { name: string; description: string | null }>),
+    activeTab === "Schema" ? getGovernanceRoleLabels() : Promise.resolve({} as Record<string, { name: string; description: string | null; nameTranslations: Record<string, string> | null }>),
   ]);
   if (!entity) notFound();
 
@@ -201,9 +201,9 @@ export default async function TablePage({
               initialStakeholders={stakeholders}
               canEdit={canEdit}
               roleLabels={{
-                OWNER:        roleLabels.OWNER        ?? { name: "Owner",            description: null },
-                BIZ_STEWARD:  roleLabels.BIZ_STEWARD  ?? { name: "Business Steward", description: null },
-                TECH_STEWARD: roleLabels.TECH_STEWARD ?? { name: "Technical Steward",description: null },
+                OWNER:        roleLabels.OWNER        ?? { name: "Owner",            description: null, nameTranslations: null },
+                BIZ_STEWARD:  roleLabels.BIZ_STEWARD  ?? { name: "Business Steward", description: null, nameTranslations: null },
+                TECH_STEWARD: roleLabels.TECH_STEWARD ?? { name: "Technical Steward",description: null, nameTranslations: null },
               }}
             />
 

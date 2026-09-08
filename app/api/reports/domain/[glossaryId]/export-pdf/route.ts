@@ -21,7 +21,9 @@ export async function GET(req: Request, { params }: { params: { glossaryId: stri
   const kpis: KpiCardData[] = scorecard.capabilities.map((c) => ({
     kpiCode: c.kpiCode, reportCode: c.reportCode,
     nameEn: `${c.reportLabel} — ${c.kpiName}`,
-    nameAr: c.kpiNameAr ? `${c.reportLabel} — ${c.kpiNameAr}` : null,
+    nameTranslations: c.kpiNameTranslations
+      ? Object.fromEntries(Object.entries(c.kpiNameTranslations).map(([code, text]) => [code, `${c.reportLabel} — ${text}`]))
+      : null,
     capabilityCode: c.reportCode, metricKey: null, customSql: null, targetValue: c.targetValue, direction: c.direction,
     format: c.format, sortOrder: 0, isActive: true, value: c.value, breakdown: [],
   }));

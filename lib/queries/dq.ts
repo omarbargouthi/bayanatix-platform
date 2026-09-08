@@ -1,13 +1,14 @@
 import { sql } from "../db";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type DqDimension = {
   code:          string;
   name:          string;
-  nameAr:        string | null;
   description:   string | null;
-  descriptionAr: string | null;
+  nameTranslations:        Record<string, string> | null;
+  descriptionTranslations: Record<string, string> | null;
 };
 
 export type DqRule = {
@@ -88,19 +89,22 @@ export type DqDashboardStats = {
 // ── Dimensions ─────────────────────────────────────────────────────────────────
 
 export async function getDqDimensions(): Promise<DqDimension[]> {
-  const rows = await sql<{ code: string; name: string; nameAr: string | null; desc: string | null; descAr: string | null }[]>`
+  const rows = await sql<{
+    code: string; name: string; desc: string | null;
+    nameTranslations: Record<string, string> | null; descriptionTranslations: Record<string, string> | null;
+  }[]>`
     SELECT
       dimension_code     AS code,
       dimension_name_text AS name,
-      name_ar_text        AS "nameAr",
       description_text    AS desc,
-      description_ar_text AS "descAr"
+      ${sql.unsafe(translatedColumnSql(`'dq_dimensions.' || dimension_code || '.name'`, "nameTranslations"))},
+      ${sql.unsafe(translatedColumnSql(`'dq_dimensions.' || dimension_code || '.description'`, "descriptionTranslations"))}
     FROM bayanat.dq_dimensions
     ORDER BY dimension_name_text
   `;
   return rows.map((r) => ({
-    code: r.code, name: r.name, nameAr: r.nameAr,
-    description: r.desc, descriptionAr: r.descAr,
+    code: r.code, name: r.name, description: r.desc,
+    nameTranslations: r.nameTranslations, descriptionTranslations: r.descriptionTranslations,
   }));
 }
 

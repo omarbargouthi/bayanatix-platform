@@ -15,15 +15,13 @@ export async function PUT(req: Request, { params }: Ctx) {
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { name, nameAr, sensitivity, description, descriptionAr, examples, sortOrder, isActive } = body;
+  const { name, sensitivity, description, examples, sortOrder, isActive } = body;
 
   await sql`
     UPDATE bayanat.data_categories SET
       name            = COALESCE(${name ?? null}, name),
-      name_ar         = ${nameAr ?? null},
       sensitivity     = COALESCE(${sensitivity ?? null}, sensitivity),
       description     = ${description ?? null},
-      description_ar  = ${descriptionAr ?? null},
       examples        = ${examples ?? null},
       sort_order      = COALESCE(${sortOrder ?? null}, sort_order),
       is_active       = COALESCE(${isActive ?? null}, is_active)

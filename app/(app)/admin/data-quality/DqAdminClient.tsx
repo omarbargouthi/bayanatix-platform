@@ -6,6 +6,7 @@ import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
 import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ function RuleFormModal({
   const { t, lang, lookupLabel } = useLang();
   const dq = t.dq;
   function dimLabel(d: DqDimension) {
-    return lookupLabel("DQ_DIMENSION", d.code) || (lang !== "en" && d.nameAr ? d.nameAr : d.name);
+    return lookupLabel("DQ_DIMENSION", d.code) || pickTranslation(d.name, d.nameTranslations, lang);
   }
   const [form, setForm] = useState<RuleFormData>(
     editRule
@@ -597,7 +598,7 @@ export function DqAdminClient({
   const dq = t.dq;
 
   function dimLabel(d: DqDimension) {
-    return lookupLabel("DQ_DIMENSION", d.code) || (lang !== "en" && d.nameAr ? d.nameAr : d.name);
+    return lookupLabel("DQ_DIMENSION", d.code) || pickTranslation(d.name, d.nameTranslations, lang);
   }
   function statusLabel(code: string | null): string {
     if (!code) return "—";

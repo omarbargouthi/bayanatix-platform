@@ -126,6 +126,7 @@ export type DataAttribute = {
   classTermName?:           string | null;
   classTermClassCode?:      string | null;
   classTermClassName?:      string | null;
+  classTermClassNameTranslations?: Record<string, string> | null;
   classTermIsPii?:          boolean | null;
   classTermPiCategoryCode?: string | null;
   classTermPiCategoryName?: string | null;
@@ -561,11 +562,11 @@ export type AssetRequest = {
 export type DataCategory = {
   categoryId:     number;
   name:           string;
-  nameAr:         string | null;
   parentId:       number | null;
   sensitivity:    "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   description:    string | null;
-  descriptionAr:  string | null;
+  nameTranslations:        Record<string, string> | null;
+  descriptionTranslations: Record<string, string> | null;
   examples:       string | null;
   sortOrder:      number;
   isActive:       boolean;

@@ -123,6 +123,49 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
       { keySuffix: "name", textColumn: "attr_name_text", secondaryColumn: "name_ar_text" },
     ],
   },
+  {
+    categoryCode: "DQ_DIMENSIONS", table: "bayanat.dq_dimensions", idExpr: "dimension_code",
+    keyPrefix: "dq_dimensions",
+    fields: [
+      { keySuffix: "name", textColumn: "dimension_name_text", secondaryColumn: "name_ar_text" },
+      { keySuffix: "description", textColumn: "description_text", secondaryColumn: "description_ar_text" },
+    ],
+  },
+  {
+    categoryCode: "DATA_CATEGORIES", table: "bayanat.data_categories", idExpr: "category_id::text",
+    keyPrefix: "data_categories",
+    fields: [
+      { keySuffix: "name", textColumn: "name", secondaryColumn: "name_ar" },
+      { keySuffix: "description", textColumn: "description", secondaryColumn: "description_ar" },
+    ],
+  },
+  {
+    categoryCode: "REPORT_KPIS", table: "bayanat.report_kpi_definitions", idExpr: "kpi_code",
+    keyPrefix: "report_kpis",
+    fields: [{ keySuffix: "name", textColumn: "name_en", secondaryColumn: "name_ar" }],
+  },
+  {
+    // Schema/config-level names only (what an admin defines) — custom_assets
+    // itself (user-created instances, e.g. "ACME Corp") is deliberately excluded:
+    // its name_ar_text is independently-entered bilingual data, not a label to
+    // translate, same reasoning as Custom Attributes' per-asset values.
+    categoryCode: "CUSTOM_ASSET_TYPES", table: "bayanat.custom_asset_types", idExpr: "type_id::text",
+    keyPrefix: "custom_asset_types",
+    fields: [{ keySuffix: "name", textColumn: "type_name_text", secondaryColumn: "name_ar_text" }],
+  },
+  {
+    categoryCode: "CUSTOM_ASSET_ATTRS", table: "bayanat.custom_asset_type_attributes", idExpr: "attr_def_id::text",
+    keyPrefix: "custom_asset_attrs",
+    fields: [{ keySuffix: "name", textColumn: "attr_name_text", secondaryColumn: "name_ar_text" }],
+  },
+  {
+    categoryCode: "CUSTOM_RELATIONSHIP_TYPES", table: "bayanat.custom_relationship_types", idExpr: "rel_type_id::text",
+    keyPrefix: "custom_relationship_types",
+    fields: [
+      { keySuffix: "name", textColumn: "rel_name_text", secondaryColumn: "name_ar_text" },
+      { keySuffix: "inverse_name", textColumn: "inverse_name_text", secondaryColumn: "inverse_name_ar_text" },
+    ],
+  },
 ];
 
 // Small, heavily-repeated value sets embedded as free text in a larger table (no
