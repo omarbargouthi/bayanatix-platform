@@ -25,6 +25,7 @@ import { MindMapTab } from "@/components/catalog/MindMapTab";
 import { TableTypeBadge } from "@/components/catalog/TableTypeBadge";
 import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
 import { SetChatContext } from "@/components/chat/SetChatContext";
+import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -249,13 +250,7 @@ export default async function TablePage({
 
         {/* ── Custom Properties tab ────────────────────────────────────── */}
         {activeTab === "Custom Properties" && (
-          <div className="card p-10 text-center">
-            <div className="text-4xl mb-3">🏷</div>
-            <h3 className="font-semibold text-ink mb-1">Custom Properties</h3>
-            <p className="text-sm text-muted max-w-sm mx-auto">
-              Define and manage custom metadata fields for this table. Custom property schemas are configured under Administration → Configuration.
-            </p>
-          </div>
+          <CustomAttributesPanel assetType="DATA_ENTITIES" assetId={id} canEdit={canEdit} showEmptyState />
         )}
       </main>
     </>

@@ -100,6 +100,11 @@ export type DataSourceConnection = {
   lineageScanMatviews:   boolean;
   lineageScanProcedures: boolean;
   lineageScanFunctions:  boolean;
+  /** The catalog-facing bayanat.data_sources row for this connection, if one
+   *  exists yet (created on first crawl) — null before that. This is the id
+   *  the rest of the app means by asset_type_code='DATA_SOURCES' (asset_tags,
+   *  stakeholders, custom attributes, ...), distinct from connectionId. */
+  dataSourceId: number | null;
 };
 
 const COLS = sql.unsafe(`
@@ -128,7 +133,9 @@ const COLS = sql.unsafe(`
   coalesce(lineage_scan_views, true)       AS "lineageScanViews",
   coalesce(lineage_scan_matviews, true)    AS "lineageScanMatviews",
   coalesce(lineage_scan_procedures, true)  AS "lineageScanProcedures",
-  coalesce(lineage_scan_functions, true)   AS "lineageScanFunctions"
+  coalesce(lineage_scan_functions, true)   AS "lineageScanFunctions",
+  (SELECT ds.data_source_id FROM bayanat.data_sources ds
+   WHERE ds.connection_id = connection_registry.connection_id LIMIT 1) AS "dataSourceId"
 `);
 
 export async function listConnections(): Promise<DataSourceConnection[]> {

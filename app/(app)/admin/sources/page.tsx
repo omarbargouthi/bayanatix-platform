@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 
 type Conn = {
   connectionId: number; connectionName: string; dbTypeCode: string;
@@ -13,6 +14,7 @@ type Conn = {
   lastDiscoveryTimestamp: string | null; createdAtTimestamp: string;
   lineageEnabled: boolean; lineageScanViews: boolean; lineageScanMatviews: boolean;
   lineageScanProcedures: boolean; lineageScanFunctions: boolean;
+  dataSourceId: number | null;
 };
 
 type CrawlJob = {
@@ -823,6 +825,12 @@ export default function DataSourcesPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Custom Attributes — only once this connection has been crawled at
+                    least once and has a catalog-facing data_sources row */}
+                {selected.dataSourceId != null && (
+                  <CustomAttributesPanel assetType="DATA_SOURCES" assetId={selected.dataSourceId} canEdit />
+                )}
 
                 {/* Test Connection */}
                 <div className="bg-white border border-line rounded-xl p-6">

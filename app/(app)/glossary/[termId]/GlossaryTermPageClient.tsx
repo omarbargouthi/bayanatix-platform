@@ -5,6 +5,7 @@ import { Tag } from "@/components/ui/Tag";
 import { IconGlossary, IconTable, IconLines } from "@/components/layout/icons";
 import { TermEditButton } from "@/components/glossary/TermEditButton";
 import { TermHistoryButton } from "@/components/glossary/TermHistoryButton";
+import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { useLang } from "@/lib/lang-context";
 import type { GlossaryTermDetail } from "@/lib/types";
 
@@ -172,6 +173,8 @@ export function GlossaryTermPageClient({ term, canEdit }: Props) {
               </div>
             </Section>
           )}
+
+          <CustomAttributesPanel assetType="BUSINESS_GLOSSARIES" assetId={term.glossaryId} canEdit={canEdit} />
 
           {term.linkedAttributes.length > 0 && (
             <div className="card overflow-hidden">

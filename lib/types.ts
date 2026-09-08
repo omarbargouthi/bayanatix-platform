@@ -206,6 +206,22 @@ export type AdminUser = {
   teamCount:   number;
 };
 
+export type CustomAttributeAssetType = "DATA_SOURCES" | "DATA_SCHEMAS" | "DATA_ENTITIES" | "DATA_ATTRIBUTES" | "BUSINESS_GLOSSARIES";
+export type CustomAttributeDataType = "TEXT" | "LONGTEXT" | "NUMBER" | "DATE" | "BOOLEAN" | "ENUM" | "USER" | "URL";
+
+export type CustomAttributeDefinition = {
+  attrDefId:    number;
+  assetType:    CustomAttributeAssetType;
+  attrCode:     string;
+  attrName:     string;
+  nameAr:       string | null;
+  dataType:     CustomAttributeDataType;
+  enumValues:   string[] | null;
+  isRequired:   boolean;
+  isEnabled:    boolean;
+  displayOrder: number;
+};
+
 export type Role = {
   roleId:         number;
   roleName:       string;

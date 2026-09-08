@@ -8,6 +8,7 @@ import { HighlightScroll } from "@/components/catalog/HighlightScroll";
 import { SchemaHero } from "@/components/catalog/SchemaHero";
 import { SchemaTableList } from "@/components/catalog/SchemaTableList";
 import { DataModelTab } from "@/components/catalog/DataModelTab";
+import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { SchemaTabNav } from "./SchemaTabNav";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,10 @@ export default async function SchemaPage({
           totalCols={totalCols}
           canEdit={canEdit}
         />
+
+        <div className="mb-6">
+          <CustomAttributesPanel assetType="DATA_SCHEMAS" assetId={id} canEdit={canEdit} />
+        </div>
 
         <SchemaTabNav schemaId={id} activeView={activeView} />
 

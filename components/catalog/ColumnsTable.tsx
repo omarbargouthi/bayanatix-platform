@@ -11,6 +11,7 @@ import { MindMapTab } from "./MindMapTab";
 import { ColumnTypeBadge } from "./ColumnTypeBadge";
 import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
 import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
+import { CustomAttributesPanel } from "./CustomAttributesPanel";
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { useLang } from "@/lib/lang-context";
 
@@ -342,6 +343,9 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
 
       {/* Related custom assets */}
       <RelatedAssetsPanel assetTypeCode="DATA_ATTRIBUTES" assetId={attr.attributeId} compact />
+
+      {/* Custom attributes — only renders once an admin defines fields for columns */}
+      <CustomAttributesPanel assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} canEdit={canEdit} />
 
       {/* Action row */}
       <div className="flex items-center justify-between pt-1">

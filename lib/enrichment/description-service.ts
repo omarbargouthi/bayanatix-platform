@@ -22,8 +22,6 @@ function formatContext(ctx: ContextPackage): string {
     if (ctx.isPrimaryKey) lines.push("Role: primary key");
     if (ctx.assetClass) lines.push(`Asset class: ${ctx.assetClass}`);
   }
-  if (ctx.rowCountEstimate != null) lines.push(`Row count: ~${ctx.rowCountEstimate.toLocaleString()}`);
-
   if (ctx.outboundFks.length) {
     lines.push(`Foreign keys: ${ctx.outboundFks.map((f) => `${f.columnName} -> ${f.refTableName}.${f.refColumnName}`).join(", ")}`);
   }
@@ -70,7 +68,7 @@ export async function generateDescription(ctx: ContextPackage, lang: Lang = "en"
   const prompt = [
     `You are a data governance assistant writing a concise, business-friendly description for a data catalog.`,
     `Write ONLY in ${LANG_NAME[lang]}. Base the description strictly on the metadata below — never invent facts, table relationships, or values that are not present in it.`,
-    `Keep it to 1-2 sentences. Do not restate the raw column name or data type unless it clarifies meaning. Return ONLY the description text, with no preamble, quotes, or labels.`,
+    `Keep it to 1-2 sentences. Do not restate the raw column name or data type unless it clarifies meaning. Never state a specific row/record count or other number that will go stale as the data changes. Return ONLY the description text, with no preamble, quotes, or labels.`,
     ``,
     formatContext(gatedCtx),
   ].join("\n");
@@ -100,7 +98,7 @@ export async function generateDescriptionsBatch(
     `Write ONLY in ${LANG_NAME[lang]}. Base every description strictly on that column's metadata — never invent facts.`,
     `Table context (shared by every column below): ${formatContext(tableCtx)}`,
     ``,
-    `For each of the following columns, write a 1-2 sentence description. Return ONLY a JSON object mapping each attribute_id (as a string) to its description string — no other text, no markdown fences.`,
+    `For each of the following columns, write a 1-2 sentence description. Never state a specific row/record count or other number that will go stale as the data changes. Return ONLY a JSON object mapping each attribute_id (as a string) to its description string — no other text, no markdown fences.`,
     ``,
     columnBlocks,
   ].join("\n");
@@ -141,6 +139,7 @@ export async function rephraseDescription(ctx: ContextPackage, currentText: stri
     `Style 1: ${REPHRASE_STYLES[0].instruction}.`,
     `Style 2: ${REPHRASE_STYLES[1].instruction}.`,
     `Style 3: ${REPHRASE_STYLES[2].instruction}.`,
+    `If the current description states a specific row/record count or other number that would go stale as the data changes, drop it rather than carrying it into the rewrite.`,
     `Grounding context (for terminology only — do not add facts beyond this + the current description): ${formatContext(gatedCtx)}`,
     ``,
     `Current description: "${currentText}"`,

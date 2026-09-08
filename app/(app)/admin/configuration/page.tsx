@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
+import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -38,6 +39,7 @@ export default function ConfigurationPage() {
   const [showComplianceConfig, setShowComplianceConfig] = useState(false);
   const [showDataCategories, setShowDataCategories]     = useState(false);
   const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
+  const [showCustomAttributes, setShowCustomAttributes] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -73,6 +75,7 @@ export default function ConfigurationPage() {
     setShowComplianceConfig(false);
     setShowDataCategories(false);
     setShowEnrichmentSettings(false);
+    setShowCustomAttributes(false);
     setAdding(false);
   }
 
@@ -152,7 +155,7 @@ export default function ConfigurationPage() {
   }
 
   const isNothingSelected =
-    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings;
+    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings && !showCustomAttributes;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -203,6 +206,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Data Categories</div>
             <div className="text-[10px] text-muted mt-0.5">Open Data · Privacy · Retention</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowCustomAttributes(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showCustomAttributes ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Custom Attributes</div>
+            <div className="text-[10px] text-muted mt-0.5">Source · Schema · Table · Column · Term</div>
+          </button>
 
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
@@ -238,6 +248,9 @@ export default function ConfigurationPage() {
 
         {/* ── AI Enrichment Settings panel ── */}
         {showEnrichmentSettings && <EnrichmentSettingsSection />}
+
+        {/* ── Custom Attributes panel ── */}
+        {showCustomAttributes && <CustomAttributesConfigSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (
