@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import { logUpdate } from "../audit";
 import { startWorkflow } from "../workflow";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 
 export type ComplianceFramework = {
   frameworkId:         number;
@@ -45,6 +46,18 @@ export type ComplianceRequirement = {
   managementSectorEn:    string | null;
   domainEn:              string | null;
   directoryTypeEn:       string | null;
+  // Live-resolved {language_code: text} maps from bayanat.translation_keys/
+  // translations — covers every enabled language beyond English/Arabic with
+  // zero schema change. Prefer these over questionAr/standardAr etc. going
+  // forward; use lib/i18n-admin/translated-column.ts's pickTranslation().
+  // The old *_ar-style columns (standardAr, req_text, admission_criteria, ...)
+  // stay in the DB as the historical import source but are no longer the
+  // runtime source for anything but English.
+  questionTranslations:            Record<string, string> | null;
+  supportingEvidenceTranslations:  Record<string, string> | null;
+  admissionCriteriaTranslations:   Record<string, string> | null;
+  managementSectorTranslations:    Record<string, string> | null;
+  standardTranslations:            Record<string, string> | null;
   // Assessment fields (editable)
   submissionStatus:      string;
   evidentAdminOverride:  string | null;
@@ -216,9 +229,18 @@ function deriveWorkflowStatus(row: ReviewStatusRow | undefined): string {
   return "SUBMITTED";
 }
 
+const REQUIREMENT_TRANSLATION_COLS = [
+  translatedColumnSql(`'compliance.req.' || r.req_id || '.question'`, "questionTranslations"),
+  translatedColumnSql(`'compliance.req.' || r.req_id || '.supporting_evidence'`, "supportingEvidenceTranslations"),
+  translatedColumnSql(`'compliance.req.' || r.req_id || '.admission_criteria'`, "admissionCriteriaTranslations"),
+  translatedColumnSql(`'compliance.req.' || r.req_id || '.management_sector'`, "managementSectorTranslations"),
+  translatedColumnSql(`'compliance.req.' || r.req_id || '.standard'`, "standardTranslations"),
+].join(",\n      ");
+
 export async function listRequirements(frameworkId: number): Promise<ComplianceRequirement[]> {
   const rows = await sql<(ComplianceRequirement & { reviewRequestId: number | null })[]>`
     SELECT
+      ${sql.unsafe(REQUIREMENT_TRANSLATION_COLS)},
       r.req_id                  AS "reqId",
       r.framework_id            AS "frameworkId",
       r.req_code                AS "reqCode",

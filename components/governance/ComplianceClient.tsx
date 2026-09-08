@@ -8,6 +8,7 @@ import type {
 } from "@/lib/queries/gov-compliance";
 import type { SessionUser } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
+import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
@@ -99,7 +100,7 @@ export function ComplianceClient({
   users, initialMaturitySelections, initialConfigItems, initialDomainConfig, currentUser,
 }: Props) {
   const router = useRouter();
-  const { isRtl, t } = useLang();
+  const { isRtl, t, lang } = useLang();
   const ca = t.governance.ca;
   const [reqs, setReqs]                 = useState<ComplianceRequirement[]>(initialRequirements);
   const [levelCfg, setLevelCfg]         = useState<LevelConfig[]>(initialLevelConfig);
@@ -148,6 +149,14 @@ export function ComplianceClient({
   function disp(en: string | null | undefined, ar: string | null | undefined): string {
     return isRtl ? (ar ?? en ?? "") : (en ?? ar ?? "");
   }
+  // Same job as disp(), but resolved from the live translation_keys/translations
+  // map instead of a hardcoded en/ar column pair — works for any enabled
+  // language, not just Arabic. Used for the requirement fields that now carry a
+  // *Translations map (question/supportingEvidence/admissionCriteria/
+  // managementSector/standard) — see lib/queries/gov-compliance.ts.
+  function dispT(base: string | null | undefined, translations: Record<string, string> | null | undefined): string {
+    return pickTranslation(base, translations, lang);
+  }
 
   // ── Data derived ────────────────────────────────────────────────────────────
   // Map Arabic domain key → English/Arabic display names (from domainConfig → fallbacks)
@@ -193,9 +202,9 @@ export function ComplianceClient({
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([std, rep]) => ({
         std,
-        question: isRtl ? (rep.question ?? rep.questionEn ?? "") : (rep.questionEn ?? rep.question ?? ""),
+        question: dispT(rep.questionEn ?? rep.question, rep.questionTranslations),
       }));
-  }, [reqs, selDomain, isRtl]);
+  }, [reqs, selDomain, isRtl, lang]);
 
   // Cumulative: level 0 → only lvl 0; level N≥1 → levels 1..N
   const questionsForView = useMemo(() => {
@@ -441,7 +450,7 @@ export function ComplianceClient({
 
   const { total, complete, na, notDone, pct } = overallStats;
   const selectedQuestion = selStandard
-    ? (() => { const r = reqs.find((x) => deriveStandard(x) === selStandard); return r ? disp(r.questionEn, r.question) : ""; })()
+    ? (() => { const r = reqs.find((x) => deriveStandard(x) === selStandard); return r ? dispT(r.questionEn ?? r.question, r.questionTranslations) : ""; })()
     : "";
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -831,7 +840,7 @@ export function ComplianceClient({
                                     <td className="px-3 py-3">
                                       <div className="text-[12px] text-ink leading-snug"
                                         dir={isRtl ? "rtl" : undefined}>
-                                        {req.supportingEvidenceOverride || disp(req.supportingEvidenceEn, req.supportingEvidence)
+                                        {req.supportingEvidenceOverride || dispT(req.supportingEvidenceEn ?? req.supportingEvidence, req.supportingEvidenceTranslations)
                                           || <span className="text-muted italic">—</span>}
                                       </div>
                                     </td>
@@ -984,27 +993,29 @@ function EvidenceExpanded({
   onWorkflow: (action: "submit"|"confirm"|"endorse"|"reject") => void;
   translations: Record<string, string>;
 }) {
-  const { isRtl, t } = useLang();
+  const { isRtl, t, lang } = useLang();
   const ca = t.governance.ca;
   function d(en: string | null | undefined, ar: string | null | undefined) {
     return isRtl ? (ar ?? en ?? "") : (en ?? ar ?? "");
   }
+  const mgmtT = (r: ComplianceRequirement) => pickTranslation(r.managementSectorEn ?? r.managementSector, r.managementSectorTranslations, lang);
+  const evidenceT = (r: ComplianceRequirement) => pickTranslation(r.supportingEvidenceEn ?? r.supportingEvidence, r.supportingEvidenceTranslations, lang);
 
-  const mgmtImported = d(req.managementSectorEn, req.managementSector);
-  const evidenceImported = d(req.supportingEvidenceEn, req.supportingEvidence);
+  const mgmtImported = mgmtT(req);
+  const evidenceImported = evidenceT(req);
   const [mgmt,     setMgmt]     = useState(req.managementNotes ?? mgmtImported);
   const [evidence, setEvidence] = useState(req.supportingEvidenceOverride ?? evidenceImported);
   const [comments, setComments] = useState(req.comments ?? "");
   const [saving,   setSaving]   = useState(false);
 
-  useEffect(() => { setMgmt(req.managementNotes ?? d(req.managementSectorEn, req.managementSector)); },
-    [req.managementNotes, req.managementSectorEn, req.managementSector, isRtl]); // eslint-disable-line
-  useEffect(() => { setEvidence(req.supportingEvidenceOverride ?? d(req.supportingEvidenceEn, req.supportingEvidence)); },
-    [req.supportingEvidenceOverride, req.supportingEvidenceEn, req.supportingEvidence, isRtl]); // eslint-disable-line
+  useEffect(() => { setMgmt(req.managementNotes ?? mgmtT(req)); },
+    [req.managementNotes, req.managementSectorEn, req.managementSector, req.managementSectorTranslations, lang]); // eslint-disable-line
+  useEffect(() => { setEvidence(req.supportingEvidenceOverride ?? evidenceT(req)); },
+    [req.supportingEvidenceOverride, req.supportingEvidenceEn, req.supportingEvidence, req.supportingEvidenceTranslations, lang]); // eslint-disable-line
   useEffect(() => { setComments(req.comments ?? ""); }, [req.comments]);
 
-  const isDirty = mgmt   !== (req.managementNotes ?? d(req.managementSectorEn, req.managementSector)) ||
-                  evidence !== (req.supportingEvidenceOverride ?? d(req.supportingEvidenceEn, req.supportingEvidence)) ||
+  const isDirty = mgmt   !== (req.managementNotes ?? mgmtT(req)) ||
+                  evidence !== (req.supportingEvidenceOverride ?? evidenceT(req)) ||
                   comments !== (req.comments ?? "");
 
   async function saveAll() {
@@ -1019,7 +1030,7 @@ function EvidenceExpanded({
   const canEndorse = status === "CONFIRMED" && role === "ADMIN";
   const canReject  = (status === "SUBMITTED" && (role === "ADMIN" || role === "STEWARD")) || (status === "CONFIRMED" && role === "ADMIN");
 
-  const admissionCriteria = d(req.admissionCriteriaEn, req.admissionCriteria);
+  const admissionCriteria = pickTranslation(req.admissionCriteriaEn ?? req.admissionCriteria, req.admissionCriteriaTranslations, lang);
   const directoryType     = d(req.directoryTypeEn,     req.directoryType);
 
   return (
