@@ -851,6 +851,212 @@ export async function getClassificationStatsScoped(scope?: { schemaId?: number; 
   };
 }
 
+// ----- Catalog page header gauges (CDEs Coverage, Data Classification, Metadata/Data Quality for CDEs) -----
+//
+// A "CDE" (Critical Data Element) here follows the same convention already used by
+// getClassificationStats()/app/api/classification/columns: a column whose governed
+// CLASSIFICATION-role glossary term carries CONFIDENTIAL/SECRET/TOP_SECRET sensitivity.
+// Scoped to attribute_class_code='BUSINESS' since CDEs are by definition business columns.
+const CDE_CLASSIFICATION_CODES = ["CONFIDENTIAL", "SECRET", "TOP_SECRET"];
+
+export type CdeCoverage = { businessColumns: number; cdeColumns: number };
+
+export async function getCdeCoverage(): Promise<CdeCoverage> {
+  const [row] = await sql<{ businessColumns: number; cdeColumns: number }[]>`
+    SELECT
+      COUNT(*) FILTER (WHERE a.attribute_class_code = 'BUSINESS')::int AS "businessColumns",
+      COUNT(*) FILTER (
+        WHERE a.attribute_class_code = 'BUSINESS'
+          AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+      )::int AS "cdeColumns"
+    FROM bayanat.data_attributes a
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+  `;
+  return {
+    businessColumns: Number(row?.businessColumns ?? 0),
+    cdeColumns: Number(row?.cdeColumns ?? 0),
+  };
+}
+
+export type ClassificationSegment = { code: string; name: string; count: number };
+export type BusinessClassificationBreakdown = {
+  total: number; classified: number; segments: ClassificationSegment[];
+};
+
+// Classification completed for business columns specifically (attribute_class_code='BUSINESS'),
+// as distinct from getClassificationStats()'s catalog-wide numbers.
+export async function getBusinessClassificationBreakdown(): Promise<BusinessClassificationBreakdown> {
+  const [totals] = await sql<{ total: number; classified: number }[]>`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE abt.glossary_id IS NOT NULL)::int AS classified
+    FROM bayanat.data_attributes a
+    LEFT JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    WHERE a.attribute_class_code = 'BUSINESS'
+  `;
+  const segments = await sql<ClassificationSegment[]>`
+    SELECT bg.classification_code AS code, ct.class_name_text AS name, COUNT(*)::int AS count
+    FROM bayanat.data_attributes a
+    JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    JOIN bayanat.classification_types ct ON ct.class_code = bg.classification_code
+    WHERE a.attribute_class_code = 'BUSINESS'
+    GROUP BY bg.classification_code, ct.class_name_text, ct.rank_order
+    ORDER BY ct.rank_order
+  `;
+  return {
+    total: Number(totals?.total ?? 0),
+    classified: Number(totals?.classified ?? 0),
+    segments: segments.map((s) => ({ code: s.code, name: s.name, count: Number(s.count) })),
+  };
+}
+
+export type CdeMetadataQuality = {
+  totalCdes: number; completeness: number; accuracy: number; consistency: number;
+};
+
+// Completeness = CDEs with a filled-in description. Accuracy = CDEs with a DATA-dimension
+// certification (someone verified the actual values, not just the docs — cert_dimension
+// mirrors CertifyAssetModal's METADATA/DATA split). Consistency = CDEs linked to a governed
+// ENRICHMENT business term, i.e. their definition comes from the shared glossary rather than
+// a one-off local description, so it stays consistent with every other column citing that term.
+export async function getCdeMetadataQuality(): Promise<CdeMetadataQuality> {
+  const [row] = await sql<{
+    total: number; withDescription: number; certified: number; withEnrichment: number;
+  }[]>`
+    WITH cde AS (
+      SELECT a.attribute_id, a.description_text
+      FROM bayanat.data_attributes a
+      JOIN bayanat.asset_business_terms abt
+        ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+      JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+      WHERE a.attribute_class_code = 'BUSINESS'
+        AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+    )
+    SELECT
+      (SELECT COUNT(*) FROM cde)::int AS total,
+      (SELECT COUNT(*) FROM cde WHERE description_text IS NOT NULL AND TRIM(description_text) <> '')::int AS "withDescription",
+      (SELECT COUNT(DISTINCT ac.asset_id) FROM bayanat.asset_certifications ac
+         JOIN cde ON cde.attribute_id = ac.asset_id
+         WHERE ac.asset_type_code = 'DATA_ATTRIBUTES' AND ac.cert_dimension = 'DATA')::int AS certified,
+      (SELECT COUNT(DISTINCT abt2.asset_id) FROM bayanat.asset_business_terms abt2
+         JOIN cde ON cde.attribute_id = abt2.asset_id
+         WHERE abt2.asset_type_code = 'DATA_ATTRIBUTES' AND abt2.term_role = 'ENRICHMENT')::int AS "withEnrichment"
+  `;
+  const total = Number(row?.total ?? 0);
+  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  return {
+    totalCdes: total,
+    completeness: pct(Number(row?.withDescription ?? 0)),
+    accuracy: pct(Number(row?.certified ?? 0)),
+    consistency: pct(Number(row?.withEnrichment ?? 0)),
+  };
+}
+
+// ----- Data Quality for CDEs (configurable composite) -----
+//
+// Reuses the existing dq_rules engine (see lib/queries/dq.ts) rather than inventing a parallel
+// scoring path: each dq_rule is already tagged with a dimension_code and scoped to an asset
+// (asset_type_code/asset_id), and last_score is kept current by the DQ run pipeline. A dimension's
+// CDE score is the average last_score of active rules attached to CDE columns; the composite is a
+// weighted average of dq_cde_dimension_config.weight across dimensions that are both enabled and
+// have at least one scored rule, re-normalized over just those — so a dimension nobody has written
+// rules for yet is left out rather than silently dragging the score to 0. Dimensions/weights are
+// admin-editable via getCdeDataQualityConfig/updateCdeDataQualityConfig (see the config panel on
+// the Data Catalog page), so this can be retuned without a code change.
+// "Timeliness" (as requested for this card) maps to the shared FRESHNESS dq_dimensions code.
+
+export type CdeDqDimensionConfig = {
+  dimensionCode: string; label: string; weight: number; isEnabled: boolean;
+};
+export type CdeDqDimensionResult = CdeDqDimensionConfig & { score: number | null; ruleCount: number };
+export type CdeDataQuality = {
+  overallScore: number | null; totalCdes: number; dimensions: CdeDqDimensionResult[];
+};
+
+export async function getCdeDataQualityConfig(): Promise<CdeDqDimensionConfig[]> {
+  const rows = await sql<{ dimensionCode: string; label: string; weight: number; isEnabled: boolean }[]>`
+    SELECT dimension_code AS "dimensionCode", display_label_text AS label,
+           weight::float8 AS weight, is_enabled AS "isEnabled"
+    FROM bayanat.dq_cde_dimension_config
+    ORDER BY dimension_code
+  `;
+  return rows.map((r) => ({ ...r, weight: Number(r.weight), isEnabled: Boolean(r.isEnabled) }));
+}
+
+export async function updateCdeDataQualityConfig(
+  updates: { dimensionCode: string; weight: number; isEnabled: boolean }[],
+  userId: string
+): Promise<void> {
+  for (const u of updates) {
+    await sql`
+      UPDATE bayanat.dq_cde_dimension_config SET
+        weight = ${u.weight},
+        is_enabled = ${u.isEnabled},
+        updated_by_user_id = ${userId},
+        updated_at_timestamp = NOW()
+      WHERE dimension_code = ${u.dimensionCode}
+    `;
+  }
+}
+
+export async function getCdeDataQuality(): Promise<CdeDataQuality> {
+  const config = await getCdeDataQualityConfig();
+
+  const cdeIdRows = await sql<{ id: number }[]>`
+    SELECT a.attribute_id AS id
+    FROM bayanat.data_attributes a
+    JOIN bayanat.asset_business_terms abt
+      ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
+    JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    WHERE a.attribute_class_code = 'BUSINESS'
+      AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+  `;
+  const cdeIds = cdeIdRows.map((r) => r.id);
+
+  if (cdeIds.length === 0) {
+    return {
+      overallScore: null,
+      totalCdes: 0,
+      dimensions: config.map((c) => ({ ...c, score: null, ruleCount: 0 })),
+    };
+  }
+
+  const scoreRows = await sql<{ dimensionCode: string; avgScore: number | null; ruleCount: number }[]>`
+    SELECT dimension_code AS "dimensionCode",
+           AVG(last_score)::float8 AS "avgScore",
+           COUNT(*) FILTER (WHERE last_score IS NOT NULL)::int AS "ruleCount"
+    FROM bayanat.dq_rules
+    WHERE asset_type_code = 'DATA_ATTRIBUTES'
+      AND asset_id = ANY(${cdeIds})
+      AND is_active_indicator = true
+      AND dimension_code IS NOT NULL
+    GROUP BY dimension_code
+  `;
+  const scoreMap = new Map(scoreRows.map((s) => [s.dimensionCode, s]));
+
+  const dimensions: CdeDqDimensionResult[] = config.map((c) => {
+    const s = scoreMap.get(c.dimensionCode);
+    return {
+      ...c,
+      score: s?.avgScore != null ? Number(s.avgScore) : null,
+      ruleCount: Number(s?.ruleCount ?? 0),
+    };
+  });
+
+  const withData = dimensions.filter((d) => d.isEnabled && d.score != null);
+  const totalWeight = withData.reduce((sum, d) => sum + d.weight, 0);
+  const overallScore = totalWeight > 0
+    ? Math.round(withData.reduce((sum, d) => sum + d.score! * d.weight, 0) / totalWeight)
+    : null;
+
+  return { overallScore, totalCdes: cdeIds.length, dimensions };
+}
+
 // ----- Glossaries (top-level domains) -----
 export async function getGlossaryRoots() {
   return sql<{ glossaryId: number; termName: string; termCount: number }[]>`
@@ -862,4 +1068,33 @@ export async function getGlossaryRoots() {
     where g.parent_glossary_id is null
     order by g.term_name_text
   `;
+}
+
+// ----- Glossary stats (Data Catalog page) -----
+export async function getGlossaryStats(): Promise<{
+  totalTerms: number; linkedTerms: number; linkedAssets: number;
+}> {
+  const rows = await sql<{ totalTerms: number; linkedTerms: number; linkedAssets: number }[]>`
+    select
+      count(*)::int as "totalTerms",
+      count(*) filter (
+        where exists (
+          select 1 from bayanat.asset_business_terms abt where abt.glossary_id = g.glossary_id
+        )
+      )::int as "linkedTerms",
+      (
+        select count(distinct (abt2.asset_type_code, abt2.asset_id))::int
+        from bayanat.asset_business_terms abt2
+        join bayanat.business_glossaries g2 on g2.glossary_id = abt2.glossary_id
+        where g2.parent_glossary_id is not null
+      ) as "linkedAssets"
+    from bayanat.business_glossaries g
+    where g.parent_glossary_id is not null
+  `;
+  const r = rows[0];
+  return {
+    totalTerms: Number(r?.totalTerms ?? 0),
+    linkedTerms: Number(r?.linkedTerms ?? 0),
+    linkedAssets: Number(r?.linkedAssets ?? 0),
+  };
 }

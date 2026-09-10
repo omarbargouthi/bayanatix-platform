@@ -392,17 +392,26 @@ export type I18nStrings = {
     filterBtn:        string;
     exportBtn:        string;
     // Coverage cards
-    sqlCoverage:      string;
-    sqlLinked:        string;
+    cdesCoverage:     string;
+    cdesCovered:      string;
+    dataClassification: string;
+    columnsClassifiedLabel: string;
     metadataQuality:  string;
     dataQuality:      string;
     score:            string;
-    descFilled:       string;
-    ownersAssigned:   string;
-    glossaryLinked:   string;
     completeness:     string;
+    accuracy:         string;
+    consistency:      string;
+    timeliness:       string;
     validity:         string;
     uniqueness:       string;
+    noCdesYet:        string;
+    configureBtn:     string;
+    dqConfigTitle:    string;
+    dqConfigDesc:     string;
+    dqWeight:         string;
+    dqIncluded:       string;
+    noRulesYet:       string;
     // Asset tree / glossaries
     dataAssets:       string;
     glossaries:       string;
@@ -414,7 +423,7 @@ export type I18nStrings = {
     schemas:          string;
     terms:            string;
     categories:       string;
-    approved:         string;
+    linkedTerms:      string;
     linkedAssets:     string;
     termsCount:       string;
     // Schema sub-page tabs

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui/Tag";
 import { Donut } from "@/components/ui/Donut";
@@ -9,6 +10,7 @@ import { IconBook } from "@/components/layout/icons";
 import { fmtNumber } from "@/lib/utils";
 import { useLang } from "@/lib/lang-context";
 import type { DataSource, DataSchema } from "@/lib/types";
+import { CdeDqConfigModal } from "./CdeDqConfigModal";
 
 type CatalogStats = {
   tables: number; schemas: number; sources: number; records: number;
@@ -16,93 +18,193 @@ type CatalogStats = {
 type GlossaryRoot = {
   glossaryId: number; termName: string; termCount: number;
 };
+type GlossaryStats = {
+  totalTerms: number; linkedTerms: number; linkedAssets: number;
+};
+type CdeCoverage = { businessColumns: number; cdeColumns: number };
+type ClassificationSegment = { code: string; name: string; count: number };
+type BusinessClassification = { total: number; classified: number; segments: ClassificationSegment[] };
+type CdeMetadataQuality = { totalCdes: number; completeness: number; accuracy: number; consistency: number };
+type CdeDqDimension = {
+  dimensionCode: string; label: string; weight: number; isEnabled: boolean;
+  score: number | null; ruleCount: number;
+};
+type CdeDataQuality = { overallScore: number | null; totalCdes: number; dimensions: CdeDqDimension[] };
+
+// Rank-ordered gradient (light → dark) applied to classification segments by position, not code,
+// so any classification level configured in bayanat.classification_types renders sensibly.
+const SEGMENT_COLORS = ["#81B4E1", "#6D7FC4", "#6058A0", "#4D3B8D", "#3A2B66", "#1F1740"];
 
 export function CatalogPageClient({
-  stats, sources, glossaries, canEdit,
+  stats, sources, glossaries, glossaryStats, cdeCoverage, classification, cdeMetadataQuality, cdeDataQuality, canEdit,
 }: {
   stats: CatalogStats;
   sources: (DataSource & { schemas: DataSchema[] })[];
   glossaries: GlossaryRoot[];
+  glossaryStats: GlossaryStats;
+  cdeCoverage: CdeCoverage;
+  classification: BusinessClassification;
+  cdeMetadataQuality: CdeMetadataQuality;
+  cdeDataQuality: CdeDataQuality;
   canEdit: boolean;
 }) {
   const { t } = useLang();
   const c = t.catalog;
-  const glossaryTermCount = glossaries.reduce((s, g) => s + g.termCount, 0);
+  const [dqConfigOpen, setDqConfigOpen] = useState(false);
+
+  const cdeCoveragePct = cdeCoverage.businessColumns > 0
+    ? Math.round((cdeCoverage.cdeColumns / cdeCoverage.businessColumns) * 100) : 0;
+  const classifiedPct = classification.total > 0
+    ? Math.round((classification.classified / classification.total) * 100) : 0;
+  const metadataCompositePct = Math.round(
+    (cdeMetadataQuality.completeness + cdeMetadataQuality.accuracy + cdeMetadataQuality.consistency) / 3
+  );
 
   return (
     <main className="px-8 py-7 pb-14">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-bold flex items-center gap-2.5">
-          {c.pageTitle}
-          <Tag>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            KSA · All sources
-          </Tag>
-        </h1>
-        <div className="flex items-center gap-2">
-          <button className="btn btn-sm">{c.filterBtn}</button>
-          <button className="btn btn-sm">{c.exportBtn}</button>
-          <AddAssetButton />
+      {/* Header + CDEs Coverage */}
+      <div className="flex items-stretch gap-5 mb-6">
+        <div className="card p-5 flex-[1.4] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-2xl font-bold flex items-center gap-2.5">
+                {c.pageTitle}
+                <Tag>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  KSA · All sources
+                </Tag>
+              </h1>
+              <div className="flex items-center gap-2">
+                <button className="btn btn-sm">{c.filterBtn}</button>
+                <button className="btn btn-sm">{c.exportBtn}</button>
+                <AddAssetButton />
+              </div>
+            </div>
+            <p className="text-ink-soft max-w-2xl">{c.pageDesc}</p>
+          </div>
+        </div>
+
+        <div className="card p-5 flex-1 min-w-[260px]">
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="font-bold">{c.cdesCoverage}</h3>
+          </div>
+          <div className="text-3xl font-extrabold text-brand-deep mb-1">{cdeCoveragePct}%</div>
+          <div className="h-2 rounded-full bg-canvas overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-brand-light to-brand-purple" style={{ width: `${cdeCoveragePct}%` }} />
+          </div>
+          <p className="text-[11px] text-muted mt-2">
+            {fmtNumber(cdeCoverage.cdeColumns)} / {fmtNumber(cdeCoverage.businessColumns)} {c.cdesCovered}
+          </p>
         </div>
       </div>
-      <p className="text-ink-soft max-w-2xl mb-7">{c.pageDesc}</p>
 
       {/* Coverage cards */}
-      <section className="grid grid-cols-[1.1fr_1fr_1fr] gap-5 mb-6">
+      <section className="grid grid-cols-3 gap-5 mb-6">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2.5">
-            <h3 className="font-bold">{c.sqlCoverage}</h3>
-            <Tag variant="purple">Last scan · 2h ago</Tag>
+            <h3 className="font-bold">{c.dataClassification}</h3>
           </div>
-          <div className="flex items-center gap-5">
-            <div className="text-3xl font-extrabold text-brand-deep">71%</div>
-            <div className="flex-1">
-              <div className="h-2 rounded-full bg-canvas overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-brand-light to-brand-purple" style={{ width: "71%" }} />
+          <div className="text-3xl font-extrabold text-brand-deep mb-1">{classifiedPct}%</div>
+          <p className="text-[11px] text-muted mb-3">
+            {fmtNumber(classification.classified)} / {fmtNumber(classification.total)} {c.columnsClassifiedLabel}
+          </p>
+          {classification.classified > 0 ? (
+            <>
+              <div className="h-2 rounded-full bg-canvas overflow-hidden flex">
+                {classification.segments.map((s, i) => (
+                  <div
+                    key={s.code}
+                    style={{
+                      width: `${(s.count / classification.classified) * 100}%`,
+                      backgroundColor: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+                    }}
+                  />
+                ))}
               </div>
-              <p className="text-[11px] text-muted mt-2">{c.sqlLinked}</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2.5 pt-3.5 mt-4 border-t border-line-soft">
-            <Mini label={c.tables}  value={fmtNumber(stats.tables)} />
-            <Mini label={c.schemas} value={fmtNumber(stats.schemas)} />
-            <Mini label={c.sources} value={fmtNumber(stats.sources)} />
-          </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-3.5 mt-3 border-t border-line-soft">
+                {classification.segments.map((s, i) => (
+                  <div key={s.code} className="flex items-center gap-1.5 text-[11px] text-muted">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }} />
+                    {s.name} · {Math.round((s.count / classification.classified) * 100)}%
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-[12px] text-muted italic pt-3.5 mt-3 border-t border-line-soft">{t.common.noData}</p>
+          )}
         </div>
 
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-bold">{c.metadataQuality}</h3>
-            <Tag variant="green">▲ 4.2%</Tag>
           </div>
-          <div className="flex items-center gap-4">
-            <Donut value={62.5} label={c.score} size={120} strokeWidth={14} gradientId="g-meta" startColor="#6058A0" endColor="#4D4B8D" />
-            <div className="flex-1 space-y-1.5">
-              <Mini label={c.descFilled}     value="82%" />
-              <Mini label={c.ownersAssigned} value="71%" />
-              <Mini label={c.glossaryLinked} value="54%" />
+          {cdeMetadataQuality.totalCdes > 0 ? (
+            <div className="flex items-center gap-4">
+              <Donut value={metadataCompositePct} label={c.score} size={120} strokeWidth={14} gradientId="g-meta" startColor="#6058A0" endColor="#4D4B8D" />
+              <div className="flex-1 space-y-1.5">
+                <Mini label={c.completeness} value={`${cdeMetadataQuality.completeness}%`} />
+                <Mini label={c.accuracy}     value={`${cdeMetadataQuality.accuracy}%`} />
+                <Mini label={c.consistency}  value={`${cdeMetadataQuality.consistency}%`} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <p className="text-[12px] text-muted italic py-8">{c.noCdesYet}</p>
+          )}
         </div>
 
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-bold">{c.dataQuality}</h3>
-            <Tag variant="amber">12 issues</Tag>
+            {canEdit && (
+              <button onClick={() => setDqConfigOpen(true)} className="text-[11px] text-brand-purple hover:underline">
+                {c.configureBtn}
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-4">
-            <Donut value={62} label={c.score} size={120} strokeWidth={14} gradientId="g-dq" startColor="#81B4E1" endColor="#7AA1D0" />
-            <div className="flex-1 space-y-1.5">
-              <Mini label={c.completeness} value="91%" />
-              <Mini label={c.validity}     value="88%" />
-              <Mini label={c.uniqueness}   value="64%" />
+          {cdeDataQuality.totalCdes > 0 ? (
+            <div className="flex items-center gap-4">
+              {cdeDataQuality.overallScore != null ? (
+                <Donut
+                  value={cdeDataQuality.overallScore}
+                  label={c.score}
+                  size={120}
+                  strokeWidth={14}
+                  gradientId="g-dq"
+                  startColor="#81B4E1"
+                  endColor="#7AA1D0"
+                />
+              ) : (
+                <div
+                  style={{ width: 120, height: 120 }}
+                  className="shrink-0 rounded-full border-[14px] border-canvas grid place-items-center text-center"
+                >
+                  <span className="text-[11px] text-muted px-2">{c.noRulesYet}</span>
+                </div>
+              )}
+              <div className="flex-1 space-y-1.5">
+                {cdeDataQuality.dimensions.map((d) => (
+                  <Mini key={d.dimensionCode} label={d.label} value={d.score != null ? `${Math.round(d.score)}%` : c.noRulesYet} />
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <p className="text-[12px] text-muted italic py-8">{c.noCdesYet}</p>
+          )}
         </div>
       </section>
+
+      {dqConfigOpen && (
+        <CdeDqConfigModal
+          dimensions={cdeDataQuality.dimensions.map((d) => ({
+            dimensionCode: d.dimensionCode, label: d.label, weight: d.weight, isEnabled: d.isEnabled,
+          }))}
+          onClose={() => setDqConfigOpen(false)}
+        />
+      )}
 
       {/* Data Assets + Glossaries */}
       <section className="grid grid-cols-2 gap-5">
@@ -131,10 +233,10 @@ export function CatalogPageClient({
             <button className="btn btn-sm">{c.newTerm}</button>
           </div>
           <div className="grid grid-cols-4 gap-2.5 px-5 py-3.5 border-b border-line-soft">
-            <Big label={c.terms}        value={glossaryTermCount + glossaries.length} />
+            <Big label={c.terms}        value={glossaryStats.totalTerms} />
             <Big label={c.categories}   value={glossaries.length} />
-            <Big label={c.approved}     value="86%" />
-            <Big label={c.linkedAssets} value="800" />
+            <Big label={c.linkedTerms}  value={glossaryStats.linkedTerms} />
+            <Big label={c.linkedAssets} value={glossaryStats.linkedAssets} />
           </div>
           <div className="py-2">
             {glossaries.map((g) => (
