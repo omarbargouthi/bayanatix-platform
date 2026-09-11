@@ -820,15 +820,14 @@ COMMENT ON COLUMN bayanat.business_glossaries.pi_category_code IS 'The specific 
 COMMENT ON COLUMN bayanat.business_glossaries.npi_category_code IS 'The specific category for non-personal data.';
 
 -- Table Triggers
-
-create trigger trg_audit_business_glossaries after
-delete
-    or
-update
-    on
-    bayanat.business_glossaries for each row execute function bayanat.fn_audit_metadata_changes();
-
-COMMENT ON TRIGGER trg_audit_business_glossaries ON bayanat.business_glossaries IS 'Tracks all modifications to the business glossary terms.';
+--
+-- trg_audit_business_glossaries (fn_audit_metadata_changes(), fired on UPDATE/DELETE) used to be
+-- created here, but it references audit_logs/history_logs and OLD/NEW.id without schema-qualifying
+-- them or matching this table's actual PK column, so it throws on the first UPDATE any later
+-- migration seed performs (before 009_fix_audit.sql — which drops it — ever gets a chance to run
+-- on a fresh DB). 009_fix_audit.sql's own comment confirms auditing has moved to the app layer;
+-- not creating it here keeps a from-scratch `npm run db:migrate` run consistent with that
+-- steady state instead of crashing partway through.
 
 
 -- bayanat.data_lineage definition
@@ -977,12 +976,18 @@ COMMENT ON COLUMN bayanat.history_logs.new_value_text IS 'The new data value aft
 
 -- DROP TABLE bayanat.tags;
 
+-- Column names/types here are kept in sync with 010_incidents_tags.sql's
+-- `CREATE TABLE IF NOT EXISTS bayanat.tags` (tag_name/color_hex/description, no
+-- created_at_timestamp) — that migration's own INSERTs, and the app's
+-- lib/queries/catalog.ts, assume that shape. The two definitions used to disagree
+-- (tag_name_text/description_text, no color_hex), which made a from-scratch
+-- `npm run db:migrate` crash the first time 010 tried to seed a root tag.
 CREATE TABLE bayanat.tags (
 	tag_id serial4 NOT NULL, -- Unique surrogate identifier for the tag.
 	parent_tag_id int4 NULL, -- Self-reference to create a hierarchy (e.g., Parent: "Compliance", Child: "GDPR").
-	tag_name_text varchar(100) NOT NULL, -- The specific label or keyword for the tag.
-	description_text text NULL, -- Business definition and usage guidelines for when to apply this tag.
-	created_at_timestamp timestamp DEFAULT CURRENT_TIMESTAMP NULL, -- Audit timestamp of when the tag was first defined in the system.
+	tag_name varchar(100) NOT NULL, -- The specific label or keyword for the tag.
+	color_hex varchar(7) NOT NULL DEFAULT '#6058A0', -- Display color for the tag chip in the UI.
+	description text NULL, -- Business definition and usage guidelines for when to apply this tag.
 	CONSTRAINT tags_pkey PRIMARY KEY (tag_id),
 	CONSTRAINT tags_parent_tag_id_fkey FOREIGN KEY (parent_tag_id) REFERENCES bayanat.tags(tag_id)
 );
@@ -992,9 +997,9 @@ COMMENT ON TABLE bayanat.tags IS 'The central repository for hierarchical metada
 
 COMMENT ON COLUMN bayanat.tags.tag_id IS 'Unique surrogate identifier for the tag.';
 COMMENT ON COLUMN bayanat.tags.parent_tag_id IS 'Self-reference to create a hierarchy (e.g., Parent: "Compliance", Child: "GDPR").';
-COMMENT ON COLUMN bayanat.tags.tag_name_text IS 'The specific label or keyword for the tag.';
-COMMENT ON COLUMN bayanat.tags.description_text IS 'Business definition and usage guidelines for when to apply this tag.';
-COMMENT ON COLUMN bayanat.tags.created_at_timestamp IS 'Audit timestamp of when the tag was first defined in the system.';
+COMMENT ON COLUMN bayanat.tags.tag_name IS 'The specific label or keyword for the tag.';
+COMMENT ON COLUMN bayanat.tags.color_hex IS 'Display color for the tag chip in the UI.';
+COMMENT ON COLUMN bayanat.tags.description IS 'Business definition and usage guidelines for when to apply this tag.';
 
 
 -- bayanat.workflow_stages definition
@@ -1342,10 +1347,7 @@ COMMENT ON COLUMN bayanat.data_attributes.is_primary_key_indicator IS 'Indicates
 COMMENT ON COLUMN bayanat.data_attributes.description_text IS 'Functional definition of the field, including calculation logic or validation rules.';
 
 -- Table Triggers
-
-create trigger trg_audit_data_attributes after
-delete
-    or
-update
-    on
-    bayanat.data_attributes for each row execute function bayanat.fn_audit_metadata_changes();
+--
+-- trg_audit_data_attributes (same fn_audit_metadata_changes() trigger as business_glossaries
+-- above) is likewise not created here — see the comment near
+-- trg_audit_business_glossaries for why; 009_fix_audit.sql drops it either way.

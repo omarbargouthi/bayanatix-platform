@@ -1,4 +1,7 @@
-ALTER TABLE bayanat.business_glossaries DISABLE TRIGGER trg_audit_business_glossaries;
+-- The DISABLE/ENABLE TRIGGER trg_audit_business_glossaries bracketing this file used to
+-- guard these UPDATEs against firing the broken fn_audit_metadata_changes() trigger. That
+-- trigger is no longer created at all (see the comment near trg_audit_business_glossaries
+-- in 000_base_schema.sql), so there's nothing left to disable here.
 
 UPDATE bayanat.business_glossaries SET
     definition_text = 'Covers all financial instruments, transactions, and reporting concepts including accounts receivable, invoicing, and payment processing.',
@@ -24,5 +27,3 @@ UPDATE bayanat.business_glossaries SET
     definition_text = 'Standardised KSA government reference codes for regions, cities, currencies, industry classifications (ISIC), and public-sector identifiers.',
     classification_code = 'PUBLIC'
 WHERE glossary_id = 5;
-
-ALTER TABLE bayanat.business_glossaries ENABLE TRIGGER trg_audit_business_glossaries;

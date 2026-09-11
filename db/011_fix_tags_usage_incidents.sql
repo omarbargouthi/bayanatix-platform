@@ -1,7 +1,12 @@
 -- Fix tags table (wrong column names from earlier migration) and add missing tables
 
--- 1. Drop old tags-related tables (safe: no important data, code never used them)
+-- 1. Drop old tags-related tables (safe: no important data, code never used them).
+-- asset_tags is included too — on a from-scratch install 010_incidents_tags.sql already
+-- created it (with no rows yet), and dropping bayanat.tags CASCADE only strips its
+-- tag_id FK constraint rather than dropping the table, which would otherwise leave
+-- asset_tags permanently missing that FK once tags is recreated below.
 DROP TABLE IF EXISTS bayanat.tag_assignments CASCADE;
+DROP TABLE IF EXISTS bayanat.asset_tags CASCADE;
 DROP TABLE IF EXISTS bayanat.tags CASCADE;
 
 -- 2. Recreate tags with correct schema
