@@ -19,7 +19,6 @@ export const ar: I18nStrings = {
     openData:          "البيانات المفتوحة",
     foi:               "طلبات حرية المعلومات",
     customAssets:      "الأصول المخصصة",
-    aiGovernance:      "حوكمة الذكاء الاصطناعي",
     userManagement:    "إدارة المستخدمين",
     workflows:         "سير العمل",
     dataSources:       "مصادر البيانات",
@@ -36,7 +35,6 @@ export const ar: I18nStrings = {
     sectionDomains:    "النطاقات",
     sectionAdmin:      "الإدارة",
     sectionCompliance: "الامتثال",
-    sectionStandalone: "NAII - مؤشر الذكاء الاصطناعي الوطني",
   },
 
   roles: {

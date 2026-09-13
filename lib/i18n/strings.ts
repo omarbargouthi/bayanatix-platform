@@ -25,7 +25,6 @@ export type I18nStrings = {
     openData:         string;
     foi:              string;
     customAssets:     string;
-    aiGovernance:     string;
     // Admin section items
     userManagement:   string;
     workflows:        string;
@@ -46,7 +45,6 @@ export type I18nStrings = {
     sectionDomains:    string;
     sectionAdmin:      string;
     sectionCompliance: string;
-    sectionStandalone: string;
   };
 
   // ── User role labels ────────────────────────────────────────────────────────

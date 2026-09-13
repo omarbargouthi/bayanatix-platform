@@ -19,7 +19,6 @@ export const en: I18nStrings = {
     openData:          "Open Data",
     foi:               "FOI Requests",
     customAssets:      "Custom Assets",
-    aiGovernance:      "AI Governance",
     userManagement:    "User Management",
     workflows:         "Workflows",
     dataSources:       "Data Sources",
@@ -36,7 +35,6 @@ export const en: I18nStrings = {
     sectionDomains:    "Domains",
     sectionAdmin:      "Administration",
     sectionCompliance: "Compliance",
-    sectionStandalone: "NAII - National Artificial Intelligence Index",
   },
 
   roles: {

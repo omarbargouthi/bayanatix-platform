@@ -14,9 +14,6 @@ import {
   IconTable, IconBulk, IconGlossary, IconDB, IconLineage,
 } from "./icons";
 
-// AI Enrichment reuses the existing IconAI (same glyph as the AI Governance nav item) —
-// the two live in different sidebar sections so there's no visual ambiguity.
-
 type Item = {
   href:   string;
   label:  string;
@@ -47,10 +44,6 @@ const NAV_DOMAINS_DEF = [
   { href: "/assets",         key: "customAssets"  as const, Icon: IconGlossary },
 ];
 
-const NAV_STANDALONE_DEF = [
-  { href: "/ai-governance",  key: "aiGovernance"  as const, Icon: IconAI },
-];
-
 const NAV_ADMIN_DEF = [
   { href: "/admin/user-management",      key: "userManagement"      as const, Icon: IconShield },
   { href: "/admin/workflows",            key: "workflows"           as const, Icon: IconLines },
@@ -76,8 +69,6 @@ export function Sidebar({ user }: { user: SessionUser }) {
   const NAV_DOMAINS: Item[] = NAV_DOMAINS_DEF.map((d) => ({
     href: d.href, label: t.nav[d.key], Icon: d.Icon, badge: (d as { badge?: number }).badge,
   }));
-
-  const NAV_STANDALONE: Item[] = NAV_STANDALONE_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
 
   const NAV_ADMIN: Item[] = NAV_ADMIN_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
 
@@ -114,17 +105,6 @@ export function Sidebar({ user }: { user: SessionUser }) {
         }
 
         {NAV_DOMAINS.map((it) => (
-          <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={collapsed} isRtl={isRtl} />
-        ))}
-
-        {/* Standalone domain section */}
-        {collapsed
-          ? <div className="my-2 mx-1 border-t border-line" />
-          : <div className="px-3 pt-3 pb-1 text-[10px] tracking-[0.12em] uppercase text-muted font-semibold">
-              {t.nav.sectionStandalone}
-            </div>
-        }
-        {NAV_STANDALONE.map((it) => (
           <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={collapsed} isRtl={isRtl} />
         ))}
 

@@ -47,30 +47,23 @@ export async function getDomains(): Promise<GovernanceDomain[]> {
       d.domain_name          AS "name",
       d.domain_description   AS "description",
       CASE
-        WHEN d.domain_code = 'AIG' THEN 62
         WHEN dm.ndi_domain_code IS NOT NULL
           THEN ROUND(dm.avg_level / 5 * 100)::int
         ELSE d.compliance_pct
       END                    AS "compliancePct",
       CASE
-        WHEN d.domain_code = 'AIG' THEN 3
         WHEN dm.ndi_domain_code IS NOT NULL THEN COALESCE(dm.level_num, 0)
         ELSE d.maturity_level
       END                    AS "maturityLevel",
       CASE
-        WHEN d.domain_code = 'AIG' THEN 3.0
         WHEN dm.ndi_domain_code IS NOT NULL THEN dm.avg_level
         ELSE d.maturity_level::numeric
       END::float8               AS "maturityScore",
       CASE
-        WHEN d.domain_code = 'AIG' THEN 'Activation'
         WHEN dm.ndi_domain_code IS NOT NULL THEN COALESCE(dm.level_name, 'No Capability')
         ELSE d.maturity_label
       END                    AS "level",
-      CASE
-        WHEN d.domain_code = 'AIG' THEN '#3D7EC8'
-        ELSE COALESCE(dm.level_color, '#D84848')
-      END                    AS "levelColor",
+      COALESCE(dm.level_color, '#D84848') AS "levelColor",
       d.alert_count          AS "alertCount",
       d.sort_order           AS "sortOrder",
       COALESCE(cfg.weight, 0) AS "weight",
@@ -86,6 +79,7 @@ export async function getDomains(): Promise<GovernanceDomain[]> {
     LEFT   JOIN bayanat.gov_compliance_domain_config cfg
       ON   cfg.name_en = d.domain_name AND cfg.framework_id = 1
     LEFT   JOIN domain_maturity dm ON dm.ndi_domain_code = cfg.domain_code
+    WHERE  d.domain_code <> 'AIG'
     ORDER  BY d.sort_order ASC
   `;
 }
