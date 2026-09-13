@@ -1638,6 +1638,9 @@ export type I18nStrings = {
     reviewQueueSubtitle:      string;
     tabDescriptions:          string;
     tabDqRules:                string;
+    tabDescriptionsAndDq:      string;
+    tabColumnTypes:            string;
+    tabTableTypes:             string;
     bulkAccept:                 string;
     driftWarning:                string;
     langLabel:                   string;

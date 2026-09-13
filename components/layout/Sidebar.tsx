@@ -11,7 +11,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI,
-  IconTable, IconBulk, IconGlossary, IconDB, IconLineage,
+  IconBulk, IconGlossary, IconDB, IconLineage,
 } from "./icons";
 
 type Item = {
@@ -34,9 +34,7 @@ const NAV_DOMAINS_DEF = [
   { href: "/lineage",        key: "lineage"       as const, Icon: IconLineage },
   { href: "/quality",        key: "quality"       as const, Icon: IconCheck },
   { href: "/classification", key: "classification"as const, Icon: IconLines },
-  { href: "/column-types",   key: "columnTypes"   as const, Icon: IconTable },
   { href: "/enrichment",     key: "enrichment"    as const, Icon: IconAI },
-  { href: "/bulk-operations",key: "bulkOperations"as const, Icon: IconBulk },
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
   { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },
@@ -46,6 +44,7 @@ const NAV_DOMAINS_DEF = [
 
 const NAV_ADMIN_DEF = [
   { href: "/admin/user-management",      key: "userManagement"      as const, Icon: IconShield },
+  { href: "/bulk-operations",            key: "bulkOperations"      as const, Icon: IconBulk },
   { href: "/admin/workflows",            key: "workflows"           as const, Icon: IconLines },
   { href: "/admin/sources",             key: "dataSources"          as const, Icon: IconShare },
   { href: "/admin/audit-logs",          key: "auditLogs"            as const, Icon: IconHistory },

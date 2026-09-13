@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
-import { EnrichmentReviewClient } from "@/components/catalog/EnrichmentReviewClient";
+import { EnrichmentHubClient } from "@/components/catalog/EnrichmentHubClient";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +20,16 @@ export default async function EnrichmentPage() {
           { label: "Enrichment" },
         ]}
         user={user}
-        contextTypes={["COLUMN", "TERM"]}
+        contextTypes={["COLUMN", "TABLE", "TERM"]}
       />
       <main className="px-8 py-7 pb-14">
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-ink">{"AI Metadata Enrichment"}</h1>
           <p className="text-sm text-muted mt-1">
-            {"Review AI-suggested descriptions and data quality rules before they become official."}
+            {"Review AI-suggested descriptions, data quality rules, and column/table type classifications in one place."}
           </p>
         </div>
-        <EnrichmentReviewClient canEdit={canEdit} />
+        <EnrichmentHubClient canEdit={canEdit} />
       </main>
     </>
   );

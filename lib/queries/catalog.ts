@@ -560,6 +560,55 @@ export async function confirmEntityCategory(
   }
 }
 
+export type EntityCategorySuggestionRow = {
+  entityId: number;
+  entityName: string;
+  schemaId: number;
+  schemaName: string;
+  category: string | null;
+  categoryConfidence: "HIGH" | "MEDIUM" | "LOW" | null;
+  categoryIsConfirmed: boolean;
+  rowCount: number | null;
+};
+
+// Feeds the Table Types tab on the AI Enrichment hub — the table-level counterpart
+// to getSuggestionsQueue() (column types) in lib/queries/classification.ts.
+export async function getEntityCategorySuggestions(filter: {
+  schemaId?: number; dataSourceId?: number; confirmed?: boolean;
+  page?: number; limit?: number;
+}): Promise<{ rows: EntityCategorySuggestionRow[]; total: number }> {
+  const { schemaId, dataSourceId, confirmed, page = 1, limit = 25 } = filter;
+  const offset = (page - 1) * limit;
+
+  const whereSchema    = schemaId != null ? sql`AND s.schema_id = ${schemaId}` : sql``;
+  const whereSource    = dataSourceId != null ? sql`AND s.data_source_id = ${dataSourceId}` : sql``;
+  const whereConfirmed = confirmed != null ? sql`AND coalesce(e.category_is_confirmed, false) = ${confirmed}` : sql``;
+
+  const rows = await sql<EntityCategorySuggestionRow[]>`
+    SELECT
+      e.entity_id AS "entityId", e.entity_name_text AS "entityName",
+      s.schema_id AS "schemaId", s.schema_name_text AS "schemaName",
+      e.entity_category_code AS "category",
+      e.category_confidence_code AS "categoryConfidence",
+      coalesce(e.category_is_confirmed, false) AS "categoryIsConfirmed",
+      e.row_count_estimate AS "rowCount"
+    FROM bayanat.data_entities e
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    WHERE e.entity_category_code IS NOT NULL ${whereSchema} ${whereSource} ${whereConfirmed}
+    ORDER BY coalesce(e.category_is_confirmed, false) ASC, e.entity_name_text
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const [{ cnt }] = await sql<{ cnt: number }[]>`
+    SELECT count(*)::int AS cnt
+    FROM bayanat.data_entities e
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    WHERE e.entity_category_code IS NOT NULL ${whereSchema} ${whereSource} ${whereConfirmed}
+  `;
+
+  return { rows, total: cnt };
+}
+
 export async function updateAttribute(
   attributeId: number,
   userId: string,
