@@ -5,6 +5,7 @@
 import ExcelJS from "exceljs";
 import { getFieldsForSheet, type SheetName } from "./sheets";
 import type { RowPlan } from "./validate";
+import type { ParsedWorkbook } from "./workbook-reader";
 
 const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
 
@@ -48,6 +49,50 @@ export async function buildResultWorkbook(plans: RowPlan[]): Promise<Buffer> {
       if (plan.errors.length > 0) {
         resultCell.note = { texts: plan.errors.map((e) => ({ text: `${e}\n` })) };
       }
+    }
+  }
+
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+
+// Bulk Upload — rejected-records workbook: exactly the ERROR-outcome rows, in the
+// SAME column layout the uploaded file itself used (including the _ID/_TYPE system
+// columns needed to re-match existing rows), plus a trailing Reason column. A
+// steward can fix the flagged cells in place and re-upload this file directly
+// through the normal Upload flow — the extra Reason column is simply an
+// unrecognized header the reader ignores, same as _Result/_Detail already are on
+// the full result workbook above. Returns null when nothing was rejected.
+export async function buildRejectedWorkbook(parsed: ParsedWorkbook, plans: RowPlan[]): Promise<Buffer | null> {
+  const errorPlans = plans.filter((p) => p.outcome === "ERROR");
+  if (errorPlans.length === 0) return null;
+
+  const workbook = new ExcelJS.Workbook();
+  const bySheet = new Map<SheetName, RowPlan[]>();
+  for (const p of errorPlans) {
+    if (!bySheet.has(p.sheet)) bySheet.set(p.sheet, []);
+    bySheet.get(p.sheet)!.push(p);
+  }
+
+  for (const sheetName of SHEET_ORDER) {
+    const plansForSheet = bySheet.get(sheetName);
+    if (!plansForSheet) continue;
+    const fields = getFieldsForSheet(sheetName);
+    const parsedRows = parsed.sheets[sheetName] ?? [];
+
+    const ws = workbook.addWorksheet(sheetName);
+    ws.columns = [
+      ...fields.map((f) => ({ header: f.header, key: f.key, width: 30 })),
+      { header: "Reason", key: "_reason", width: 60 },
+    ];
+    ws.getRow(1).font = { bold: true };
+
+    for (const plan of plansForSheet.sort((a, b) => a.rowNumber - b.rowNumber)) {
+      const original = parsedRows.find((r) => r.rowNumber === plan.rowNumber);
+      if (!original) continue; // shouldn't happen — plan and parsed rows come from the same file
+      const values: Record<string, unknown> = { ...original.values, _reason: [...plan.errors, ...plan.warnings].join(" | ") };
+      const excelRow = ws.addRow(values);
+      excelRow.getCell("_reason").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4CCCC" } };
     }
   }
 

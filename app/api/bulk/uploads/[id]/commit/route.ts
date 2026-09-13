@@ -4,12 +4,16 @@ import { canEditMetadata } from "@/lib/can";
 import { parseUploadedWorkbook } from "@/lib/bulk/workbook-reader";
 import { validateWorkbook, summarizePlans } from "@/lib/bulk/validate";
 import { commitPlans } from "@/lib/bulk/commit";
-import { buildResultWorkbook } from "@/lib/bulk/result-writer";
-import { getBulkJob, getBulkJobFile, finishUploadCommit, failJob } from "@/lib/queries/bulk-jobs";
+import { buildResultWorkbook, buildRejectedWorkbook } from "@/lib/bulk/result-writer";
+import { buildJobLogText } from "@/lib/bulk/log-writer";
+import { getBulkJob, getBulkJobFile, markJobRunning, finishUploadCommit, failJob } from "@/lib/queries/bulk-jobs";
 
 // Body: { conflict_policy?: "SKIP"|"OVERWRITE", confirmed: true, override_row_keys?: string[] }
-// Re-validates fresh from the stored file (never trusts a client-supplied plan) then
-// commits exactly what that validation produced.
+// Re-validates fresh from the stored file (never trusts a client-supplied plan), then
+// responds immediately with { jobId, status: "RUNNING" } while the actual commit runs
+// in the background (see lib/queries/bulk-jobs.ts's top note) — poll
+// GET /api/bulk/jobs/{id} until status is COMMITTED/FAILED, then
+// GET /api/bulk/uploads/{id}/result-file (and /rejected-file, /log-file).
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -24,6 +28,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const job = await getBulkJob(jobId);
   if (!job || job.jobTypeCode !== "UPLOAD") return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (job.status === "COMMITTED") return NextResponse.json({ error: "This upload has already been committed" }, { status: 409 });
+  if (job.status === "RUNNING") return NextResponse.json({ error: "This upload is already being committed" }, { status: 409 });
 
   const file = await getBulkJobFile(jobId);
   if (!file?.fileData) return NextResponse.json({ error: "Upload file no longer available (purged)" }, { status: 404 });
@@ -31,18 +36,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const conflictPolicy = (body.conflict_policy === "OVERWRITE" ? "OVERWRITE" : "SKIP") as "SKIP" | "OVERWRITE";
   const overrideRowKeys = new Set<string>(Array.isArray(body.override_row_keys) ? body.override_row_keys : []);
 
-  try {
-    const parsed = await parseUploadedWorkbook(file.fileData);
-    const exportSnapshotAt = job.exportSnapshotAt ? new Date(job.exportSnapshotAt) : null;
-    const plans = await validateWorkbook(parsed, { session, strictMode: job.strictMode, exportSnapshotAt });
+  await markJobRunning(jobId);
 
-    const totals = await commitPlans(jobId, plans, { session, conflictPolicy, overrideRowKeys });
-    const resultFile = await buildResultWorkbook(plans);
-    await finishUploadCommit(jobId, { ...summarizePlans(plans), ...totals }, resultFile);
+  void (async () => {
+    try {
+      const parsed = await parseUploadedWorkbook(file.fileData!);
+      const exportSnapshotAt = job.exportSnapshotAt ? new Date(job.exportSnapshotAt) : null;
+      const plans = await validateWorkbook(parsed, { session, strictMode: job.strictMode, exportSnapshotAt });
 
-    return NextResponse.json({ jobId, totals });
-  } catch (err) {
-    await failJob(jobId, err instanceof Error ? err.message : "Commit failed");
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Commit failed" }, { status: 500 });
-  }
+      const commitTotals = await commitPlans(jobId, plans, { session, conflictPolicy, overrideRowKeys });
+      const resultFile = await buildResultWorkbook(plans);
+      const rejectedFile = await buildRejectedWorkbook(parsed, plans);
+      const totals = { ...summarizePlans(plans), ...commitTotals };
+
+      const logFile = buildJobLogText({ ...job, status: "COMMITTED", totals, finishedAt: new Date().toISOString() });
+      await finishUploadCommit(jobId, totals, resultFile, logFile, rejectedFile);
+    } catch (err) {
+      await failJob(jobId, err instanceof Error ? err.message : "Commit failed");
+    }
+  })();
+
+  return NextResponse.json({ jobId, status: "RUNNING" }, { status: 202 });
 }

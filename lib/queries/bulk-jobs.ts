@@ -2,6 +2,13 @@
 // table directly (bytea) rather than a separate plans-cache: every diff/commit call
 // re-parses + re-validates from the stored bytes, which is simple and always
 // reflects current DB state rather than a possibly-stale cached plan.
+//
+// Jobs run in the background (see app/api/bulk/downloads and
+// app/api/bulk/uploads/[id]/commit): the POST handler creates the job row and
+// returns immediately, then keeps working after the response is sent (this only
+// works because this app is a persistent Node process — `next dev`/`next start` —
+// not a serverless function that freezes after responding; if ever deployed to
+// Vercel serverless, this needs `unstable_after()` or a real queue instead).
 
 import { sql } from "../db";
 
@@ -22,6 +29,10 @@ export type BulkJob = {
   createdAt: string;
   finishedAt: string | null;
   errorText: string | null;
+  hasFile: boolean;
+  hasResultFile: boolean;
+  hasLogFile: boolean;
+  hasRejectedFile: boolean;
 };
 
 const JOB_COLS = `
@@ -29,7 +40,9 @@ const JOB_COLS = `
   status_code AS status, totals_json AS totals, export_snapshot_at::text AS "exportSnapshotAt",
   strict_mode_indicator AS "strictMode", conflict_policy_code AS "conflictPolicy",
   created_by_user_id AS "createdByUserId", created_at::text AS "createdAt", finished_at::text AS "finishedAt",
-  error_text AS "errorText"
+  error_text AS "errorText",
+  (file_data IS NOT NULL) AS "hasFile", (result_file_data IS NOT NULL) AS "hasResultFile",
+  (log_file_data IS NOT NULL) AS "hasLogFile", (rejected_file_data IS NOT NULL) AS "hasRejectedFile"
 `;
 
 export async function createDownloadJob(scope: unknown, userId: string): Promise<number> {
@@ -41,9 +54,10 @@ export async function createDownloadJob(scope: unknown, userId: string): Promise
   return row.id;
 }
 
-export async function finishDownloadJob(jobId: number, fileName: string, fileData: Buffer, totals: unknown): Promise<void> {
+export async function finishDownloadJob(jobId: number, fileName: string, fileData: Buffer, logFile: Buffer, totals: unknown): Promise<void> {
   await sql`
-    UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', file_name_text = ${fileName}, file_data = ${fileData}, totals_json = ${JSON.stringify(totals) as never}, finished_at = NOW()
+    UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', file_name_text = ${fileName}, file_data = ${fileData},
+      log_file_data = ${logFile}, totals_json = ${JSON.stringify(totals) as never}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;
 }
@@ -57,6 +71,11 @@ export async function createUploadJob(fileName: string, fileData: Buffer, userId
     RETURNING job_id AS id
   `;
   return row.id;
+}
+
+/** Flips an AWAITING_CONFIRM upload job to RUNNING right before the (backgrounded) commit starts. */
+export async function markJobRunning(jobId: number): Promise<void> {
+  await sql`UPDATE bayanat.bulk_jobs SET status_code = 'RUNNING' WHERE job_id = ${jobId}`;
 }
 
 export async function getBulkJob(jobId: number): Promise<BulkJob | null> {
@@ -76,9 +95,20 @@ export async function getBulkJobResultFile(jobId: number): Promise<Buffer | null
   return rows[0]?.resultFileData ?? null;
 }
 
-export async function finishUploadCommit(jobId: number, totals: unknown, resultFile: Buffer): Promise<void> {
+export async function getBulkJobLogFile(jobId: number): Promise<Buffer | null> {
+  const rows = await sql<{ logFileData: Buffer | null }[]>`SELECT log_file_data AS "logFileData" FROM bayanat.bulk_jobs WHERE job_id = ${jobId}`;
+  return rows[0]?.logFileData ?? null;
+}
+
+export async function getBulkJobRejectedFile(jobId: number): Promise<Buffer | null> {
+  const rows = await sql<{ rejectedFileData: Buffer | null }[]>`SELECT rejected_file_data AS "rejectedFileData" FROM bayanat.bulk_jobs WHERE job_id = ${jobId}`;
+  return rows[0]?.rejectedFileData ?? null;
+}
+
+export async function finishUploadCommit(jobId: number, totals: unknown, resultFile: Buffer, logFile: Buffer, rejectedFile: Buffer | null): Promise<void> {
   await sql`
-    UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', totals_json = ${JSON.stringify(totals) as never}, result_file_data = ${resultFile}, finished_at = NOW()
+    UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', totals_json = ${JSON.stringify(totals) as never},
+      result_file_data = ${resultFile}, log_file_data = ${logFile}, rejected_file_data = ${rejectedFile}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;
 }
@@ -95,8 +125,8 @@ export async function listBulkJobs(userId?: string): Promise<BulkJob[]> {
 /** Retention sweep (spec §6, default 90 days) — admin-triggered, no background cron. */
 export async function purgeExpiredJobFiles(): Promise<number> {
   const result = await sql`
-    UPDATE bayanat.bulk_jobs SET file_data = NULL, result_file_data = NULL
-    WHERE purge_after IS NOT NULL AND purge_after < NOW() AND (file_data IS NOT NULL OR result_file_data IS NOT NULL)
+    UPDATE bayanat.bulk_jobs SET file_data = NULL, result_file_data = NULL, log_file_data = NULL, rejected_file_data = NULL
+    WHERE purge_after IS NOT NULL AND purge_after < NOW() AND (file_data IS NOT NULL OR result_file_data IS NOT NULL OR log_file_data IS NOT NULL OR rejected_file_data IS NOT NULL)
   `;
   return result.count;
 }
