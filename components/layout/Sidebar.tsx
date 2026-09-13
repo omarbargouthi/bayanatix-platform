@@ -125,7 +125,7 @@ export function Sidebar({ user }: { user: SessionUser }) {
             ) : (
               <>
                 {NAV_ADMIN.map((it) => (
-                  <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={false} indent isRtl={isRtl} />
+                  <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={false} isRtl={isRtl} />
                 ))}
               </>
             )}
@@ -158,8 +158,8 @@ export function Sidebar({ user }: { user: SessionUser }) {
   );
 }
 
-function NavLink({ item, active, collapsed, indent, isRtl }: {
-  item: Item; active: boolean; collapsed: boolean; indent?: boolean; isRtl?: boolean;
+function NavLink({ item, active, collapsed, isRtl }: {
+  item: Item; active: boolean; collapsed: boolean; isRtl?: boolean;
 }) {
   const { Icon } = item;
   // Active indicator: left-side bar in LTR, right-side bar in RTL
@@ -167,17 +167,13 @@ function NavLink({ item, active, collapsed, indent, isRtl }: {
     ? "shadow-[inset_-3px_0_0_#6058A0]"
     : "shadow-[inset_3px_0_0_#6058A0]";
 
-  const indentClass = isRtl
-    ? indent ? "pr-7 pl-3" : "px-3"
-    : indent ? "pl-7 pr-3" : "px-3";
-
   return (
     <Link
       href={item.href}
       title={collapsed ? item.label : undefined}
       className={[
         "flex items-center gap-2.5 py-1.5 rounded-md text-sm font-medium transition-colors",
-        collapsed ? "justify-center px-2" : indentClass,
+        collapsed ? "justify-center px-2" : "px-3",
         active
           ? `bg-brand-purple/10 text-brand-deep ${activeShadow}`
           : "text-ink-soft hover:bg-canvas hover:text-brand-deep",
