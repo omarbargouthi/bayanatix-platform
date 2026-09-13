@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
-import { resolveDownloadScope, type DownloadScope } from "@/lib/bulk/scope-resolver";
+import { resolveDownloadScope, describeDownloadScope, type DownloadScope } from "@/lib/bulk/scope-resolver";
 import { buildDownloadWorkbooks } from "@/lib/bulk/workbook-writer";
 import { buildJobLogText } from "@/lib/bulk/log-writer";
+import { slugifyForFilename, timestampForFilename } from "@/lib/bulk/filename";
 import { createDownloadJob, finishDownloadJob, failJob, getBulkJob } from "@/lib/queries/bulk-jobs";
 
 // Body: { scope: DownloadScope } -> { jobId, status: "RUNNING" } immediately; the
@@ -40,7 +41,8 @@ export async function POST(req: Request) {
       // them together isn't wired at the storage layer. Not exercised by any real
       // scope in this app's demo data (nowhere near 50k rows), disclosed as a
       // known gap rather than silently dropping the remaining files.
-      const fileName = `bayanatix-export-${jobId}${buffers.length > 1 ? "-part1-of-" + buffers.length : ""}.xlsx`;
+      const itemName = slugifyForFilename(describeDownloadScope(scope, sheetRows));
+      const fileName = `${itemName}_${timestampForFilename(new Date())}${buffers.length > 1 ? "_part1-of-" + buffers.length : ""}.xlsx`;
       const totals = {
         rows: totalRows, files: buffers.length,
         sheets: Object.fromEntries(Object.entries(sheetRows).map(([k, v]) => [k, v?.length ?? 0])),

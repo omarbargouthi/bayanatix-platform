@@ -35,9 +35,15 @@ export type BulkJob = {
   hasRejectedFile: boolean;
 };
 
+// A few early jobs had totals_json double-encoded (JSON.stringify()'d into a plain
+// jsonb string rather than a jsonb object — the same postgres.js gotcha as
+// elsewhere in this codebase; fixed at the write side by using sql.json()). This
+// unwraps any such row on read so old jobs don't break the Jobs tab.
+const TOTALS_EXPR = `CASE WHEN jsonb_typeof(totals_json) = 'string' THEN (totals_json #>> '{}')::jsonb ELSE totals_json END`;
+
 const JOB_COLS = `
   job_id AS "jobId", job_type_code AS "jobTypeCode", scope_json AS scope, file_name_text AS "fileName",
-  status_code AS status, totals_json AS totals, export_snapshot_at::text AS "exportSnapshotAt",
+  status_code AS status, ${TOTALS_EXPR} AS totals, export_snapshot_at::text AS "exportSnapshotAt",
   strict_mode_indicator AS "strictMode", conflict_policy_code AS "conflictPolicy",
   created_by_user_id AS "createdByUserId", created_at::text AS "createdAt", finished_at::text AS "finishedAt",
   error_text AS "errorText",
@@ -48,7 +54,7 @@ const JOB_COLS = `
 export async function createDownloadJob(scope: unknown, userId: string): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.bulk_jobs (job_type_code, scope_json, status_code, created_by_user_id, purge_after)
-    VALUES ('DOWNLOAD', ${JSON.stringify(scope) as never}, 'RUNNING', ${userId}, NOW() + INTERVAL '90 days')
+    VALUES ('DOWNLOAD', ${sql.json(scope as any)}, 'RUNNING', ${userId}, NOW() + INTERVAL '90 days')
     RETURNING job_id AS id
   `;
   return row.id;
@@ -57,7 +63,7 @@ export async function createDownloadJob(scope: unknown, userId: string): Promise
 export async function finishDownloadJob(jobId: number, fileName: string, fileData: Buffer, logFile: Buffer, totals: unknown): Promise<void> {
   await sql`
     UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', file_name_text = ${fileName}, file_data = ${fileData},
-      log_file_data = ${logFile}, totals_json = ${JSON.stringify(totals) as never}, finished_at = NOW()
+      log_file_data = ${logFile}, totals_json = ${sql.json(totals as any)}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;
 }
@@ -107,7 +113,7 @@ export async function getBulkJobRejectedFile(jobId: number): Promise<Buffer | nu
 
 export async function finishUploadCommit(jobId: number, totals: unknown, resultFile: Buffer, logFile: Buffer, rejectedFile: Buffer | null): Promise<void> {
   await sql`
-    UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', totals_json = ${JSON.stringify(totals) as never},
+    UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', totals_json = ${sql.json(totals as any)},
       result_file_data = ${resultFile}, log_file_data = ${logFile}, rejected_file_data = ${rejectedFile}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;

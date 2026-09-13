@@ -157,6 +157,20 @@ async function resolveAttributeIdsForEntities(entityIds: number[]): Promise<numb
   return rows.map((r) => r.id);
 }
 
+// Human-readable label for the export filename (spec: name the file after the
+// catalog item being exported, not just a job id) — pulled from the resolved
+// rows themselves rather than a second lookup, since one row already carries it.
+export function describeDownloadScope(scope: DownloadScope, rows: SheetRows): string {
+  if (scope.type === "DATA_SOURCE") return (rows.DataSources?.[0]?.sourceName as string) || "data-source";
+  if (scope.type === "SELECTED") return "selected-items";
+  if (scope.type === "SEARCH_RESULTS") return "search-results";
+  if (scope.type === "BUSINESS_TERMS_ALL") return "all-business-terms";
+  if (scope.type === "BUSINESS_TERMS_DOMAIN") return (rows.BusinessTerms?.[0]?.domainName as string) || "business-terms";
+  if (scope.type === "CUSTOM_ASSETS_BY_TYPE") return (rows.CustomAssets?.[0]?.typeCode as string) || "custom-assets";
+  if (scope.type === "CUSTOM_ASSET_LINKS_BY_REL_TYPE") return (rows.CustomAssetLinks?.[0]?.relCode as string) || "custom-asset-links";
+  return "export";
+}
+
 export async function resolveDownloadScope(scope: DownloadScope): Promise<SheetRows> {
   const result: SheetRows = {};
 
