@@ -591,7 +591,7 @@ export async function getEntityCategorySuggestions(filter: {
       e.entity_category_code AS "category",
       e.category_confidence_code AS "categoryConfidence",
       coalesce(e.category_is_confirmed, false) AS "categoryIsConfirmed",
-      e.row_count_estimate AS "rowCount"
+      e.row_count_estimate::float8 AS "rowCount"
     FROM bayanat.data_entities e
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     WHERE e.entity_category_code IS NOT NULL ${whereSchema} ${whereSource} ${whereConfirmed}
