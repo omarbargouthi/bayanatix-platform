@@ -565,6 +565,8 @@ export type EntityCategorySuggestionRow = {
   entityName: string;
   schemaId: number;
   schemaName: string;
+  dataSourceId: number;
+  sourceName: string;
   category: string | null;
   categoryConfidence: "HIGH" | "MEDIUM" | "LOW" | null;
   categoryIsConfirmed: boolean;
@@ -588,12 +590,14 @@ export async function getEntityCategorySuggestions(filter: {
     SELECT
       e.entity_id AS "entityId", e.entity_name_text AS "entityName",
       s.schema_id AS "schemaId", s.schema_name_text AS "schemaName",
+      src.data_source_id AS "dataSourceId", src.source_name_text AS "sourceName",
       e.entity_category_code AS "category",
       e.category_confidence_code AS "categoryConfidence",
       coalesce(e.category_is_confirmed, false) AS "categoryIsConfirmed",
       e.row_count_estimate::float8 AS "rowCount"
     FROM bayanat.data_entities e
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.data_sources src ON src.data_source_id = s.data_source_id
     WHERE e.entity_category_code IS NOT NULL ${whereSchema} ${whereSource} ${whereConfirmed}
     ORDER BY coalesce(e.category_is_confirmed, false) ASC, e.entity_name_text
     LIMIT ${limit} OFFSET ${offset}
@@ -607,6 +611,24 @@ export async function getEntityCategorySuggestions(filter: {
   `;
 
   return { rows, total: cnt };
+}
+
+// Checkbox-driven bulk accept for the Table Types tab — accepts each unconfirmed
+// entity's current (crawler-suggested) category as-is, same effect as clicking
+// "Accept" on each row individually. Already-confirmed rows are skipped.
+export async function bulkConfirmEntityCategories(entityIds: number[], userId: string): Promise<number[]> {
+  const rows = await sql<{ entityId: number; category: string | null; categoryIsConfirmed: boolean }[]>`
+    SELECT entity_id AS "entityId", entity_category_code AS category,
+           coalesce(category_is_confirmed, false) AS "categoryIsConfirmed"
+    FROM bayanat.data_entities WHERE entity_id = ANY(${entityIds})
+  `;
+  const accepted: number[] = [];
+  for (const r of rows) {
+    if (r.categoryIsConfirmed) continue;
+    await confirmEntityCategory(r.entityId, userId, r.category);
+    accepted.push(r.entityId);
+  }
+  return accepted;
 }
 
 export async function updateAttribute(

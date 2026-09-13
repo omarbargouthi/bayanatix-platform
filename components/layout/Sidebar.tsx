@@ -23,28 +23,28 @@ type Item = {
 
 // ── Static item definitions (labels overridden at runtime via i18n) ───────────
 const NAV_TOP_DEF = [
-  { href: "/dashboard", key: "dashboard" as const, Icon: IconDashboard },
-  { href: "/homepage",  key: "homepage"  as const, Icon: IconHome },
-  { href: "/reports",   key: "reports"   as const, Icon: IconReports },
+  { href: "/dashboard",  key: "dashboard"    as const, Icon: IconDashboard },
+  { href: "/homepage",   key: "homepage"     as const, Icon: IconHome },
+  { href: "/reports",    key: "reports"      as const, Icon: IconReports },
+  { href: "/enrichment", key: "enrichment"   as const, Icon: IconAI },
+  { href: "/assets",     key: "customAssets" as const, Icon: IconGlossary },
 ];
 
 const NAV_DOMAINS_DEF = [
   { href: "/governance",     key: "governance"    as const, Icon: IconCircle },
   { href: "/catalog",        key: "catalog"       as const, Icon: IconBook },
-  { href: "/lineage",        key: "lineage"       as const, Icon: IconLineage },
   { href: "/quality",        key: "quality"       as const, Icon: IconCheck },
   { href: "/classification", key: "classification"as const, Icon: IconLines },
-  { href: "/enrichment",     key: "enrichment"    as const, Icon: IconAI },
   { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
   { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
   { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },
   { href: "/foi",            key: "foi"           as const, Icon: IconChat },
-  { href: "/assets",         key: "customAssets"  as const, Icon: IconGlossary },
 ];
 
 const NAV_ADMIN_DEF = [
   { href: "/admin/user-management",      key: "userManagement"      as const, Icon: IconShield },
   { href: "/bulk-operations",            key: "bulkOperations"      as const, Icon: IconBulk },
+  { href: "/lineage",                    key: "lineage"             as const, Icon: IconLineage },
   { href: "/admin/workflows",            key: "workflows"           as const, Icon: IconLines },
   { href: "/admin/sources",             key: "dataSources"          as const, Icon: IconShare },
   { href: "/admin/audit-logs",          key: "auditLogs"            as const, Icon: IconHistory },

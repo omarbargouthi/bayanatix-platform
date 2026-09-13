@@ -12,12 +12,15 @@ export async function GET(req: Request) {
   const assetType = (searchParams.get("asset_type") as AssetType | null) ?? undefined;
   const entityId = searchParams.get("entity_id");
   const jobId = searchParams.get("job_id");
+  const dataSourceId = searchParams.get("dataSourceId");
   const page = Number(searchParams.get("page") ?? "1");
   const limit = Number(searchParams.get("limit") ?? "50");
 
   const { rows, total } = await getDqSuggestionsQueue({
     status, assetType, entityId: entityId ? Number(entityId) : undefined,
-    jobId: jobId ? Number(jobId) : undefined, page, limit,
+    jobId: jobId ? Number(jobId) : undefined,
+    dataSourceId: dataSourceId ? Number(dataSourceId) : undefined,
+    page, limit,
   });
   return NextResponse.json({ data: rows, total, page, limit });
 }

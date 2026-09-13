@@ -3,16 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { SourceSystemSelect } from "./SourceSystemSelect";
 
 type DescRow = {
   suggestionId: number; assetType: string; assetId: number; assetName: string; entityName: string | null;
-  schemaId: number | null; modeCode: string; suggestedText: string; originalText: string | null;
+  schemaId: number | null; dataSourceId: number | null; sourceName: string | null;
+  modeCode: string; suggestedText: string; originalText: string | null;
   status: string; currentOfficialText: string | null; drift: boolean; modelRef: string | null; createdAt: string;
 };
 
 type DqRow = {
   suggestionId: number; assetType: string; assetId: number; assetName: string; entityName: string | null;
-  schemaId: number | null; dimensionCode: string | null; ruleName: string | null; ruleTemplateCode: string | null;
+  schemaId: number | null; dataSourceId: number | null; sourceName: string | null;
+  dimensionCode: string | null; ruleName: string | null; ruleTemplateCode: string | null;
   severity: string; provenance: string; status: string; createdAt: string;
 };
 
@@ -36,6 +39,7 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
 
   const [tab, setTab] = useState<"descriptions" | "dq">("descriptions");
   const [status, setStatus] = useState("PENDING");
+  const [dataSourceId, setDataSourceId] = useState("");
   const [descRows, setDescRows] = useState<DescRow[]>([]);
   const [dqRows, setDqRows] = useState<DqRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -47,19 +51,21 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
     setLoading(true);
     setChecked(new Set());
     try {
+      const params = new URLSearchParams({ status, limit: "100" });
+      if (dataSourceId) params.set("dataSourceId", dataSourceId);
       if (tab === "descriptions") {
-        const res = await fetch(`/api/enrichment/descriptions?status=${status}&limit=100`);
+        const res = await fetch(`/api/enrichment/descriptions?${params.toString()}`);
         const data = await res.json();
         setDescRows(data.data ?? []); setTotal(data.total ?? 0);
       } else {
-        const res = await fetch(`/api/enrichment/dq?status=${status}&limit=100`);
+        const res = await fetch(`/api/enrichment/dq?${params.toString()}`);
         const data = await res.json();
         setDqRows(data.data ?? []); setTotal(data.total ?? 0);
       }
     } finally {
       setLoading(false);
     }
-  }, [tab, status]);
+  }, [tab, status, dataSourceId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -99,6 +105,21 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  async function bulkReject() {
+    if (checked.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const endpoint = tab === "descriptions" ? "/api/enrichment/descriptions/bulk-discard" : "/api/enrichment/dq/bulk-discard";
+      await fetch(endpoint, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestion_ids: [...checked] }),
+      });
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -118,11 +139,17 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
             <option value="DISCARDED">DISCARDED</option>
             {tab === "dq" && <option value="DUPLICATE">DUPLICATE</option>}
           </select>
+          <SourceSystemSelect value={dataSourceId} onChange={(v) => setDataSourceId(v)} />
           <span className="text-[12px] text-muted">{total}</span>
           {canEdit && checked.size > 0 && (
-            <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
-              {bulkBusy ? "…" : `${e.bulkAccept} (${checked.size})`}
-            </button>
+            <>
+              <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
+                {bulkBusy ? "…" : `${e.bulkAccept} (${checked.size})`}
+              </button>
+              <button onClick={bulkReject} disabled={bulkBusy} className="text-[12px] font-semibold text-red-600 hover:underline disabled:opacity-50 px-2">
+                {bulkBusy ? "…" : `Bulk reject (${checked.size})`}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -148,6 +175,7 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[r.status] ?? "bg-gray-100"}`}>{r.status}</span>
                       {r.drift && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700" title={e.driftWarning}>{e.driftWarning}</span>}
                       <span className="text-[10px] text-muted">{r.modeCode}</span>
+                      {r.sourceName && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted">{r.sourceName}</span>}
                     </div>
                     <p className="text-[12px] text-ink-soft mt-1">{r.suggestedText}</p>
                   </div>
@@ -179,6 +207,7 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
                     </Link>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[r.status] ?? "bg-gray-100"}`}>{r.status}</span>
                     {r.provenance === "LLM" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">AI</span>}
+                    {r.sourceName && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted">{r.sourceName}</span>}
                   </div>
                   <p className="text-[12px] text-ink-soft mt-1">{r.ruleName} · {r.dimensionCode} · {r.ruleTemplateCode ?? "CUSTOM_SQL"}</p>
                 </div>

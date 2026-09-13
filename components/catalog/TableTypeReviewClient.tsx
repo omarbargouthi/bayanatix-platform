@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { SourceSystemSelect } from "./SourceSystemSelect";
 
 type SuggestionRow = {
   entityId: number;
   entityName: string;
   schemaId: number;
   schemaName: string;
+  dataSourceId: number;
+  sourceName: string;
   category: string | null;
   categoryConfidence: "HIGH" | "MEDIUM" | "LOW" | null;
   categoryIsConfirmed: boolean;
@@ -38,19 +41,24 @@ export function TableTypeReviewClient({ canEdit }: { canEdit: boolean }) {
   const c = t.catalog;
 
   const [confirmed, setConfirmed] = useState<"false" | "true" | "">("false");
+  const [dataSourceId, setDataSourceId] = useState("");
   const [rows, setRows] = useState<SuggestionRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [changingId, setChangingId] = useState<number | null>(null);
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const limit = 25;
 
   const load = useCallback(async () => {
     setLoading(true);
+    setChecked(new Set());
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (confirmed) params.set("confirmed", confirmed);
+      if (dataSourceId) params.set("dataSourceId", dataSourceId);
       const res = await fetch(`/api/catalog/entities/category-suggestions?${params.toString()}`);
       const data = await res.json();
       setRows(data.data ?? []);
@@ -58,9 +66,13 @@ export function TableTypeReviewClient({ canEdit }: { canEdit: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [confirmed, page]);
+  }, [confirmed, dataSourceId, page]);
 
   useEffect(() => { void load(); }, [load]);
+
+  function toggle(id: number) {
+    setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
 
   const labelFor = (code: string | null) => {
     const opt = CATEGORY_OPTIONS.find(o => o.value === code);
@@ -84,6 +96,20 @@ export function TableTypeReviewClient({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  async function bulkAccept() {
+    if (checked.size === 0) return;
+    setBulkBusy(true);
+    try {
+      await fetch("/api/catalog/entities/bulk-confirm-category", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_ids: [...checked] }),
+      });
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
@@ -99,8 +125,14 @@ export function TableTypeReviewClient({ canEdit }: { canEdit: boolean }) {
             <option value="true">Confirmed</option>
             <option value="">All</option>
           </select>
+          <SourceSystemSelect value={dataSourceId} onChange={(v) => { setDataSourceId(v); setPage(1); }} />
           <span className="text-[12px] text-muted">{total} table{total !== 1 ? "s" : ""}</span>
         </div>
+        {canEdit && checked.size > 0 && (
+          <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
+            {bulkBusy ? "…" : `Bulk accept (${checked.size})`}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -112,10 +144,14 @@ export function TableTypeReviewClient({ canEdit }: { canEdit: boolean }) {
           {rows.map((r) => (
             <div key={r.entityId} className="border border-line rounded-lg px-3 py-2.5">
               <div className="flex items-center gap-3 flex-wrap">
+                {canEdit && !r.categoryIsConfirmed && (
+                  <input type="checkbox" checked={checked.has(r.entityId)} onChange={() => toggle(r.entityId)} className="w-3.5 h-3.5 accent-brand-purple shrink-0" />
+                )}
                 <div className="min-w-0 flex-1">
                   <Link href={`/catalog/${r.schemaId}/tables/${r.entityId}`} className="text-[12px] font-semibold text-brand-deep hover:text-brand-purple hover:underline">
                     {r.schemaName}.{r.entityName}
                   </Link>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted ml-2">{r.sourceName}</span>
                   {r.rowCount != null && (
                     <span className="text-[11px] text-muted ml-2">{r.rowCount.toLocaleString()} rows</span>
                   )}

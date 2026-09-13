@@ -9,6 +9,8 @@ export type SuggestionRow = {
   entityName: string;
   schemaId: number;
   schemaName: string;
+  dataSourceId: number;
+  sourceName: string;
   suggestedClass: string | null;
   confidence: number | null;
   band: "HIGH" | "MEDIUM" | "LOW" | null;
@@ -44,6 +46,7 @@ export async function getSuggestionsQueue(filter: {
     SELECT
       a.attribute_id AS "attributeId", a.physical_name_text AS "physicalName", a.friendly_name_text AS "friendlyName",
       e.entity_id AS "entityId", e.entity_name_text AS "entityName", s.schema_id AS "schemaId", s.schema_name_text AS "schemaName",
+      src.data_source_id AS "dataSourceId", src.source_name_text AS "sourceName",
       a.suggested_class_code AS "suggestedClass", a.suggestion_confidence AS confidence,
       (${bandExpr()}) AS band,
       a.suggestion_status_code AS status, a.suggestion_rationale_json AS rationale,
@@ -51,6 +54,7 @@ export async function getSuggestionsQueue(filter: {
     FROM bayanat.data_attributes a
     JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.data_sources src ON src.data_source_id = s.data_source_id
     WHERE 1=1 ${whereEntity} ${whereSchema} ${whereSource} ${whereStatus} ${whereBand}
     ORDER BY a.suggestion_confidence DESC NULLS LAST, a.attribute_id
     LIMIT ${limit} OFFSET ${offset}
@@ -129,6 +133,24 @@ export async function overrideSuggestion(
               ${`Added from override of "${old.physicalName}" by steward — ${reason.trim()}`})
     `;
   }
+}
+
+// Checkbox-driven bulk accept for the Column Types tab — accepts exactly the
+// selected (manually reviewed) attribute ids, regardless of confidence band.
+// Distinct from bulkAcceptHighBand() below, which blanket-accepts an entire
+// filtered set without per-row review and is therefore restricted to HIGH band.
+export async function bulkAcceptByIds(attributeIds: number[], userId: string): Promise<number[]> {
+  const rows = await sql<{ attributeId: number; status: string }[]>`
+    SELECT attribute_id AS "attributeId", suggestion_status_code AS status
+    FROM bayanat.data_attributes WHERE attribute_id = ANY(${attributeIds})
+  `;
+  const accepted: number[] = [];
+  for (const r of rows) {
+    if (r.status !== "PENDING" && r.status !== "STALE") continue;
+    await acceptSuggestion(r.attributeId, userId);
+    accepted.push(r.attributeId);
+  }
+  return accepted;
 }
 
 export async function bulkAcceptHighBand(

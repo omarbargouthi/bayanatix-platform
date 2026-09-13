@@ -14,6 +14,8 @@ export type DescriptionSuggestionRow = {
   assetName: string;
   entityName: string | null;
   schemaId: number | null;
+  dataSourceId: number | null;
+  sourceName: string | null;
   modeCode: "GENERATE" | "REPHRASE";
   suggestedText: string;
   variantNumber: number;
@@ -70,14 +72,16 @@ export async function createDescriptionSuggestion(input: {
 }
 
 export async function getSuggestionsQueue(filter: {
-  status?: string; assetType?: AssetType; entityId?: number; jobId?: number; page?: number; limit?: number;
+  status?: string; assetType?: AssetType; entityId?: number; jobId?: number;
+  dataSourceId?: number; page?: number; limit?: number;
 }): Promise<{ rows: DescriptionSuggestionRow[]; total: number }> {
-  const { status, assetType, entityId, jobId, page = 1, limit = 50 } = filter;
+  const { status, assetType, entityId, jobId, dataSourceId, page = 1, limit = 50 } = filter;
   const offset = (page - 1) * limit;
 
   const whereStatus = status ? sql`AND ds.status_code = ${status}` : sql`AND ds.status_code != 'SUPERSEDED'`;
   const whereType = assetType ? sql`AND ds.asset_type_code = ${assetType}` : sql``;
   const whereJob = jobId != null ? sql`AND ds.job_id = ${jobId}` : sql``;
+  const whereSource = dataSourceId != null ? sql`AND coalesce(s1.data_source_id, s2.data_source_id) = ${dataSourceId}` : sql``;
   const whereEntity = entityId != null ? sql`AND (
     (ds.asset_type_code = 'DATA_ENTITIES' AND ds.asset_id = ${entityId})
     OR (ds.asset_type_code = 'DATA_ATTRIBUTES' AND EXISTS (SELECT 1 FROM bayanat.data_attributes a WHERE a.attribute_id = ds.asset_id AND a.entity_id = ${entityId}))
@@ -89,6 +93,8 @@ export async function getSuggestionsQueue(filter: {
       CASE WHEN ds.asset_type_code = 'DATA_ENTITIES' THEN e1.entity_name_text ELSE a.physical_name_text END AS "assetName",
       CASE WHEN ds.asset_type_code = 'DATA_ATTRIBUTES' THEN e2.entity_name_text ELSE NULL END AS "entityName",
       coalesce(s1.schema_id, s2.schema_id) AS "schemaId",
+      coalesce(src1.data_source_id, src2.data_source_id) AS "dataSourceId",
+      coalesce(src1.source_name_text, src2.source_name_text) AS "sourceName",
       ds.mode_code AS "modeCode", ds.suggested_text AS "suggestedText", ds.variant_number AS "variantNumber",
       ds.rationale_json AS rationale, ds.original_text AS "originalText",
       ds.status_code AS status, ds.accepted_text AS "acceptedText", ds.job_id AS "jobId",
@@ -96,10 +102,12 @@ export async function getSuggestionsQueue(filter: {
     FROM bayanat.description_suggestions ds
     LEFT JOIN bayanat.data_entities e1 ON ds.asset_type_code = 'DATA_ENTITIES' AND e1.entity_id = ds.asset_id
     LEFT JOIN bayanat.data_schemas s1 ON s1.schema_id = e1.schema_id
+    LEFT JOIN bayanat.data_sources src1 ON src1.data_source_id = s1.data_source_id
     LEFT JOIN bayanat.data_attributes a ON ds.asset_type_code = 'DATA_ATTRIBUTES' AND a.attribute_id = ds.asset_id
     LEFT JOIN bayanat.data_entities e2 ON e2.entity_id = a.entity_id
     LEFT JOIN bayanat.data_schemas s2 ON s2.schema_id = e2.schema_id
-    WHERE 1=1 ${whereStatus} ${whereType} ${whereJob} ${whereEntity}
+    LEFT JOIN bayanat.data_sources src2 ON src2.data_source_id = s2.data_source_id
+    WHERE 1=1 ${whereStatus} ${whereType} ${whereJob} ${whereEntity} ${whereSource}
     ORDER BY ds.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -107,8 +115,12 @@ export async function getSuggestionsQueue(filter: {
   const [{ cnt }] = await sql<{ cnt: number }[]>`
     SELECT count(*)::int AS cnt
     FROM bayanat.description_suggestions ds
+    LEFT JOIN bayanat.data_entities e1 ON ds.asset_type_code = 'DATA_ENTITIES' AND e1.entity_id = ds.asset_id
+    LEFT JOIN bayanat.data_schemas s1 ON s1.schema_id = e1.schema_id
     LEFT JOIN bayanat.data_attributes a ON ds.asset_type_code = 'DATA_ATTRIBUTES' AND a.attribute_id = ds.asset_id
-    WHERE 1=1 ${whereStatus} ${whereType} ${whereJob} ${whereEntity}
+    LEFT JOIN bayanat.data_entities e2 ON e2.entity_id = a.entity_id
+    LEFT JOIN bayanat.data_schemas s2 ON s2.schema_id = e2.schema_id
+    WHERE 1=1 ${whereStatus} ${whereType} ${whereJob} ${whereEntity} ${whereSource}
   `;
 
   const withDrift: DescriptionSuggestionRow[] = [];
@@ -180,4 +192,19 @@ export async function bulkAcceptDescriptions(suggestionIds: number[], userId: st
     accepted.push(r.suggestionId);
   }
   return { accepted, skippedDrift };
+}
+
+/** Bulk-reject: discards every PENDING row in the checked set. */
+export async function bulkDiscardDescriptions(suggestionIds: number[], userId: string): Promise<number[]> {
+  const rows = await sql<{ suggestionId: number; status: string }[]>`
+    SELECT suggestion_id AS "suggestionId", status_code AS status
+    FROM bayanat.description_suggestions WHERE suggestion_id = ANY(${suggestionIds})
+  `;
+  const discarded: number[] = [];
+  for (const r of rows) {
+    if (r.status !== "PENDING") continue;
+    await discardDescriptionSuggestion(r.suggestionId, userId);
+    discarded.push(r.suggestionId);
+  }
+  return discarded;
 }

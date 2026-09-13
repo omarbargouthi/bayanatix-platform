@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { SourceSystemSelect } from "./SourceSystemSelect";
 
 type SuggestionRow = {
   attributeId: number;
@@ -12,6 +13,8 @@ type SuggestionRow = {
   entityName: string;
   schemaId: number;
   schemaName: string;
+  dataSourceId: number;
+  sourceName: string;
   suggestedClass: string | null;
   confidence: number | null;
   band: "HIGH" | "MEDIUM" | "LOW" | null;
@@ -50,6 +53,7 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
 
   const [status, setStatus] = useState<string>("PENDING");
   const [band, setBand] = useState<string>("");
+  const [dataSourceId, setDataSourceId] = useState("");
   const [rows, setRows] = useState<SuggestionRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -58,15 +62,18 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [overridingId, setOverridingId] = useState<number | null>(null);
   const [reason, setReason] = useState("");
+  const [checked, setChecked] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const limit = 25;
 
   const load = useCallback(async () => {
     setLoading(true);
+    setChecked(new Set());
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (status) params.set("status", status);
       if (band) params.set("band", band);
+      if (dataSourceId) params.set("dataSourceId", dataSourceId);
       const res = await fetch(`/api/classification/suggestions?${params.toString()}`);
       const data = await res.json();
       setRows(data.data ?? []);
@@ -74,9 +81,13 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [status, band, page]);
+  }, [status, band, dataSourceId, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  function toggle(id: number) {
+    setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
 
   async function accept(attributeId: number) {
     setBusyId(attributeId);
@@ -113,12 +124,13 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
     }
   }
 
-  async function bulkAcceptHigh() {
+  async function bulkAccept() {
+    if (checked.size === 0) return;
     setBulkBusy(true);
     try {
       await fetch("/api/classification/attributes/bulk-accept", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filter: {} }),
+        body: JSON.stringify({ attribute_ids: [...checked] }),
       });
       await load();
     } finally {
@@ -151,11 +163,12 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
             <option value="">All confidence bands</option>
             {BAND_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
+          <SourceSystemSelect value={dataSourceId} onChange={(v) => { setDataSourceId(v); setPage(1); }} />
           <span className="text-[12px] text-muted">{total} suggestion{total !== 1 ? "s" : ""}</span>
         </div>
-        {canEdit && (
-          <button onClick={bulkAcceptHigh} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
-            {bulkBusy ? "Accepting…" : "Bulk-accept HIGH confidence"}
+        {canEdit && checked.size > 0 && (
+          <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
+            {bulkBusy ? "…" : `Bulk accept (${checked.size})`}
           </button>
         )}
       </div>
@@ -169,6 +182,9 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
           {rows.map((r) => (
             <div key={r.attributeId} className="border border-line rounded-lg overflow-hidden">
               <div className="flex items-center gap-3 px-3 py-2.5">
+                {canEdit && (r.status === "PENDING" || r.status === "STALE") && (
+                  <input type="checkbox" checked={checked.has(r.attributeId)} onChange={() => toggle(r.attributeId)} className="w-3.5 h-3.5 accent-brand-purple shrink-0" />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Link href={`/catalog/${r.schemaId}/tables/${r.entityId}`} className="text-[12px] font-semibold text-brand-deep hover:text-brand-purple hover:underline truncate">
@@ -176,6 +192,7 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
                     </Link>
                     <span className="text-muted text-[12px]">·</span>
                     <span className="text-[12px] font-mono text-ink">{r.physicalName}</span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted">{r.sourceName}</span>
                   </div>
                   {r.friendlyName && <div className="text-[11px] text-muted truncate">{r.friendlyName}</div>}
                 </div>
