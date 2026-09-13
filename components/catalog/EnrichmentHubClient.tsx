@@ -6,19 +6,20 @@ import { EnrichmentReviewClient } from "./EnrichmentReviewClient";
 import { ColumnTypeReviewClient } from "./ColumnTypeReviewClient";
 import { TableTypeReviewClient } from "./TableTypeReviewClient";
 
-type HubTab = "descriptions" | "columnTypes" | "tableTypes";
+type HubTab = "descriptions" | "dq" | "columnTypes" | "tableTypes";
 
-// Single landing page for everything AI-suggests across the catalog — description/DQ
-// suggestions, column type (Business/Technical) suggestions, and table type
-// (Master/Transactional/...) suggestions each used to live behind their own sidebar
-// link; this groups them under one set of top-level tabs instead.
+// Single landing page for everything AI-suggests across the catalog — description,
+// DQ rule, column type (Business/Technical), and table type (Master/Transactional/...)
+// suggestions each used to live behind their own sidebar link (or buried as a sub-tab
+// of one another); this groups all four as peer top-level tabs instead.
 export function EnrichmentHubClient({ canEdit }: { canEdit: boolean }) {
   const { t } = useLang();
   const e = t.enrichment;
   const [tab, setTab] = useState<HubTab>("descriptions");
 
   const tabs: { key: HubTab; label: string }[] = [
-    { key: "descriptions", label: e.tabDescriptionsAndDq },
+    { key: "descriptions", label: e.tabDescriptions },
+    { key: "dq",           label: e.tabDqRules },
     { key: "columnTypes",  label: e.tabColumnTypes },
     { key: "tableTypes",   label: e.tabTableTypes },
   ];
@@ -37,7 +38,8 @@ export function EnrichmentHubClient({ canEdit }: { canEdit: boolean }) {
         ))}
       </div>
 
-      {tab === "descriptions" && <EnrichmentReviewClient canEdit={canEdit} />}
+      {tab === "descriptions" && <EnrichmentReviewClient canEdit={canEdit} fixedTab="descriptions" />}
+      {tab === "dq"           && <EnrichmentReviewClient canEdit={canEdit} fixedTab="dq" />}
       {tab === "columnTypes"  && <ColumnTypeReviewClient canEdit={canEdit} />}
       {tab === "tableTypes"   && <TableTypeReviewClient canEdit={canEdit} />}
     </div>

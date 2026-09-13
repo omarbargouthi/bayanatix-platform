@@ -33,11 +33,12 @@ const STATUS_STYLE: Record<string, string> = {
   DUPLICATE: "bg-amber-100 text-amber-700",
 };
 
-export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
+export function EnrichmentReviewClient({ canEdit, fixedTab }: { canEdit: boolean; fixedTab?: "descriptions" | "dq" }) {
   const { t } = useLang();
   const e = t.enrichment;
 
-  const [tab, setTab] = useState<"descriptions" | "dq">("descriptions");
+  const [internalTab, setInternalTab] = useState<"descriptions" | "dq">("descriptions");
+  const tab = fixedTab ?? internalTab;
   const [status, setStatus] = useState("PENDING");
   const [dataSourceId, setDataSourceId] = useState("");
   const [descRows, setDescRows] = useState<DescRow[]>([]);
@@ -123,14 +124,18 @@ export function EnrichmentReviewClient({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1">
-          <button onClick={() => setTab("descriptions")} className={`text-[12px] font-semibold px-3 py-1.5 rounded-md ${tab === "descriptions" ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}>
-            {e.tabDescriptions}
-          </button>
-          <button onClick={() => setTab("dq")} className={`text-[12px] font-semibold px-3 py-1.5 rounded-md ${tab === "dq" ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}>
-            {e.tabDqRules}
-          </button>
-        </div>
+        {fixedTab ? (
+          <h2 className="text-[13px] font-bold text-ink">{tab === "descriptions" ? e.tabDescriptions : e.tabDqRules}</h2>
+        ) : (
+          <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1">
+            <button onClick={() => setInternalTab("descriptions")} className={`text-[12px] font-semibold px-3 py-1.5 rounded-md ${tab === "descriptions" ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}>
+              {e.tabDescriptions}
+            </button>
+            <button onClick={() => setInternalTab("dq")} className={`text-[12px] font-semibold px-3 py-1.5 rounded-md ${tab === "dq" ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}>
+              {e.tabDqRules}
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <select value={status} onChange={(ev) => setStatus(ev.target.value)} className="text-[12px] border border-line rounded-md px-2 py-1.5">
             <option value="PENDING">PENDING</option>
