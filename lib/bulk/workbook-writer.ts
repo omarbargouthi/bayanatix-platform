@@ -104,13 +104,18 @@ async function buildOneWorkbook(
   if (hasTermColumn) await registerList("TERM", await loadExistingTermNames());
   const hasTagsColumn = SHEET_ORDER.some((s) => sheetRows[s] && getFieldsForSheet(s, extendedFields[s]).some((f) => f.type === "TAGS"));
   if (hasTagsColumn) await registerList("TAGS_REFERENCE", await loadExistingTagNames());
-  // Extended ENUM fields carry their own inline allowed-values list (no shared
-  // EnumSource group) — register each under its own field key.
+  // ENUM fields with their own inline allowed-values list (no shared EnumSource
+  // group — e.g. Source Type, or an extended/custom-attribute ENUM) register
+  // under their own field key. Extended BOOLEAN fields share one Yes/No list.
+  let hasExtendedBoolean = false;
   for (const sheet of SHEET_ORDER) {
-    for (const f of extendedFields[sheet] ?? []) {
+    if (!sheetRows[sheet]) continue;
+    for (const f of getFieldsForSheet(sheet, extendedFields[sheet])) {
       if (f.type === "ENUM" && f.enumValues) await registerList(f.key, f.enumValues);
+      if (f.type === "BOOLEAN" && f.key.startsWith(EXT_FIELD_PREFIX)) hasExtendedBoolean = true;
     }
   }
+  if (hasExtendedBoolean) await registerList("YES_NO", ["Yes", "No"]);
 
   // ── One worksheet per populated sheet ──────────────────────────────────────────
   for (const sheetName of SHEET_ORDER) {
@@ -141,17 +146,24 @@ async function buildOneWorkbook(
       });
     });
 
-    // Dropdown validation on ENUM/TERM columns, referencing the _Lists sheet.
+    // Dropdown validation on ENUM/TERM/extended-BOOLEAN columns, referencing the _Lists sheet.
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
-      const listName = f.type === "ENUM" ? (f.enumSource ?? f.key) : f.type === "TERM" ? "TERM" : null;
+      const listName = f.type === "ENUM" ? (f.enumSource ?? f.key)
+        : f.type === "TERM" ? "TERM"
+        : (f.type === "BOOLEAN" && f.key.startsWith(EXT_FIELD_PREFIX)) ? "YES_NO"
+        : null;
       if (!listName) continue;
       const letter = listColumns[listName];
       if (!letter) continue;
       const count = Math.max(1, listCounts[listName] ?? 1);
       const range = `_Lists!$${letter}$2:$${letter}$${count + 1}`;
       const colLetterOnSheet = colLetter(i);
-      for (let r = 2; r <= rows.length + 1; r++) {
+      // Empty templates (no rows yet — nothing to protect) get the dropdown applied
+      // down a generous blank range instead of just "through the last existing
+      // row" (which would be zero rows), so new rows the user types in still get it.
+      const lastRow = rows.length > 0 ? rows.length + 1 : 500;
+      for (let r = 2; r <= lastRow; r++) {
         ws.getCell(`${colLetterOnSheet}${r}`).dataValidation = { type: "list", allowBlank: true, formulae: [range] };
       }
     }

@@ -25,9 +25,16 @@ export type FieldDef = {
 const SYS: (key: string, header: string) => FieldDef = (key, header) => ({ key, header, kind: "SYSTEM", type: "TEXT" });
 const REF = (key: string, header: string, type: FieldType = "TEXT"): FieldDef => ({ key, header, kind: "REFERENCE", type });
 
+// Not DB-enforced (data_sources.source_type_code is a plain varchar, no CHECK
+// constraint) — this is every value already in use in this app's data, offered as
+// a constrained list so a bulk-created row can't introduce an unrecognized one.
+export const SOURCE_TYPE_VALUES = ["POSTGRES", "MSSQL", "ORACLE", "SNOWFLAKE", "CSV", "EXCEL", "POWERBI", "FABRIC"];
+
 export const DATA_SOURCES_FIELDS: FieldDef[] = [
   SYS("_ID", "_ID"), SYS("_TYPE", "_TYPE"),
-  SYS("sourceName", "Source Name"), SYS("sourceType", "Source Type"), SYS("databaseName", "Database Name"),
+  SYS("sourceName", "Source Name"),
+  { key: "sourceType", header: "Source Type", kind: "SYSTEM", type: "ENUM", enumValues: SOURCE_TYPE_VALUES },
+  SYS("databaseName", "Database Name"),
   { key: "description", header: "Description", kind: "EDITABLE", type: "LONGTEXT", maxLength: 2000 },
   { key: "businessAppName", header: "Business App Name", kind: "EDITABLE", type: "TEXT", maxLength: 200 },
   REF("schemaCount", "Schema Count", "NUMBER"), REF("tableCount", "Table Count", "NUMBER"),

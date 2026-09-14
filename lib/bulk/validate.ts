@@ -363,6 +363,7 @@ async function validateDataSourceCreateRow(fields: FieldDef[], row: ParsedRow, o
   if (!sourceName) errors.push("Source Name is required to create a new data source");
   if (!sourceType) errors.push("Source Type is required to create a new data source");
   if (!databaseName) errors.push("Database Name is required to create a new data source");
+  if (sourceType) await validateFieldValue(fields.find((f) => f.key === "sourceType")!, sourceType, errors);
 
   if (sourceName) {
     const [dup] = await sql<{ id: number }[]>`
