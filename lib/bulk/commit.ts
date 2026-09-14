@@ -33,7 +33,7 @@ async function coerceExtendedValues(
   for (const [code, v] of Object.entries(raw)) {
     if (v == null) { coerced[code] = null; continue; }
     const dataType = dataTypeByCode.get(code);
-    if (dataType === "BOOLEAN") coerced[code] = typeof v === "boolean" ? v : String(v).toUpperCase() === "TRUE";
+    if (dataType === "BOOLEAN") coerced[code] = typeof v === "boolean" ? v : ["TRUE", "YES"].includes(String(v).toUpperCase());
     else if (dataType === "NUMBER") coerced[code] = typeof v === "number" ? v : (Number(v) || null);
     else coerced[code] = v;
   }
@@ -116,6 +116,22 @@ async function applyDataSourceRow(plan: RowPlan, userId: string): Promise<void> 
   const businessAppName = changeVal(plan, "businessAppName") ?? current?.businessAppName ?? "";
   await updateDataSource(plan.assetId!, userId, { description: description ?? "", businessAppName: businessAppName ?? "" });
   await applyExtendedAttributeChanges("DataSources", plan.assetId!, plan.changes, userId);
+}
+
+async function applyDataSourceCreate(plan: RowPlan, userId: string): Promise<number> {
+  const p = plan.createPayload!;
+  const [row] = await sql<{ id: number }[]>`
+    INSERT INTO bayanat.data_sources (source_name_text, source_type_code, database_name_text, description_text, business_app_name)
+    VALUES (${p.sourceName as string}, ${p.sourceType as string}, ${p.databaseName as string}, ${(p.description as string | null) ?? null}, ${(p.businessAppName as string | null) ?? null})
+    RETURNING data_source_id AS id
+  `;
+  await logCreate("DATA_SOURCES", row.id, userId, [
+    { field: "source_name_text", newVal: p.sourceName as string },
+    { field: "source_type_code", newVal: p.sourceType as string },
+    { field: "database_name_text", newVal: p.databaseName as string },
+  ]);
+  await saveExtendedAttributesFromPayload("DataSources", row.id, p, userId);
+  return row.id;
 }
 
 async function applyTableRow(plan: RowPlan, userId: string): Promise<void> {
@@ -291,6 +307,7 @@ export async function commitPlans(jobId: number, plans: RowPlan[], opts: CommitO
         }
       } else if (plan.outcome === "CREATE") {
         const newId =
+          plan.sheet === "DataSources" ? await applyDataSourceCreate(plan, opts.session.userId) :
           plan.sheet === "BusinessTerms" ? await applyTermCreate(plan, opts.session.userId) :
           plan.sheet === "CustomAssets" ? await applyCustomAssetCreate(plan, opts.session.userId) :
           await applyCustomAssetLinkCreate(plan, opts.session.userId);

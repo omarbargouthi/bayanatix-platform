@@ -5,7 +5,7 @@
 import ExcelJS from "exceljs";
 import { getFieldsForSheet, ROW_CAP_PER_FILE, TEMPLATE_SCHEMA_VERSION, type SheetName, type FieldDef } from "./sheets";
 import { loadEnumValues, loadExistingTagNames, loadExistingTermNames } from "./enum-sources";
-import { loadExtendedFieldsBySheet } from "./extended-fields";
+import { loadExtendedFieldsBySheet, EXT_FIELD_PREFIX } from "./extended-fields";
 import type { SheetRows } from "./scope-resolver";
 
 const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
@@ -28,7 +28,12 @@ function formatCellValue(field: FieldDef, value: unknown): unknown {
   // serialize those, same class of issue seen elsewhere in this codebase.
   if (typeof value === "bigint") value = Number(value);
   if (value == null) return "";
-  if (field.type === "BOOLEAN") return value ? "TRUE" : "FALSE";
+  if (field.type === "BOOLEAN") {
+    // Extended/custom-attribute booleans use Yes/No (matches the admin Custom
+    // Attributes UI's own display convention); native fields keep TRUE/FALSE,
+    // the convention the rest of this bulk module's validation already expects.
+    return field.key.startsWith(EXT_FIELD_PREFIX) ? (value ? "Yes" : "No") : (value ? "TRUE" : "FALSE");
+  }
   if (field.type === "NUMBER") return typeof value === "string" ? Number(value) : value;
   return String(value);
 }

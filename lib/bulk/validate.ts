@@ -6,7 +6,7 @@ import { sql } from "../db";
 import { canEditAsset, canEditMetadata } from "../can";
 import { getFieldsForSheet, CLEAR_SENTINEL, SHEET_ASSET_TYPE, type SheetName, type FieldDef } from "./sheets";
 import { loadEnumValues } from "./enum-sources";
-import { loadExtendedFieldsBySheet, customAttrAssetTypeForSheet } from "./extended-fields";
+import { loadExtendedFieldsBySheet, customAttrAssetTypeForSheet, EXT_FIELD_PREFIX } from "./extended-fields";
 import { getCustomAttributeValuesForAssets } from "../queries/custom-attributes";
 import type { ParsedRow, ParsedWorkbook } from "./workbook-reader";
 import type { SessionUser } from "../types";
@@ -163,9 +163,11 @@ async function mergeExtendedIntoCurrentMap(
   for (const [assetId, entry] of currentMap) {
     const raw = values.get(assetId) ?? {};
     for (const field of extendedFields) {
-      const code = field.key.slice("ext:".length);
+      const code = field.key.slice(EXT_FIELD_PREFIX.length);
       const v = raw[code];
-      entry[field.key] = v == null ? null : field.type === "BOOLEAN" ? (v ? "TRUE" : "FALSE") : String(v);
+      // Yes/No, not TRUE/FALSE — matches the admin Custom Attributes UI's own
+      // display convention (see formatCellValue's matching choice in workbook-writer.ts).
+      entry[field.key] = v == null ? null : field.type === "BOOLEAN" ? (v ? "Yes" : "No") : String(v);
     }
   }
 }
@@ -186,8 +188,11 @@ async function validateFieldValue(field: FieldDef, newVal: string | null, errors
     const valid = field.enumValues ?? (field.enumSource ? await loadEnumValues(field.enumSource) : null);
     if (valid && !valid.includes(newVal)) errors.push(`${field.header}: "${newVal}" is not a valid value (expected one of ${valid.join(", ")})`);
   }
-  if (field.type === "BOOLEAN" && !["TRUE", "FALSE"].includes(newVal.toUpperCase())) {
-    errors.push(`${field.header}: expected TRUE or FALSE, got "${newVal}"`);
+  if (field.type === "BOOLEAN") {
+    const validBooleans = field.key.startsWith(EXT_FIELD_PREFIX) ? ["YES", "NO"] : ["TRUE", "FALSE"];
+    if (!validBooleans.includes(newVal.toUpperCase())) {
+      errors.push(`${field.header}: expected ${validBooleans[0]} or ${validBooleans[1]}, got "${newVal}"`);
+    }
   }
 }
 
@@ -232,7 +237,9 @@ export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOpt
     await mergeExtendedIntoCurrentMap(sheet, currentMap, extendedFields[sheet]);
 
     for (const row of rows) {
-      const plan = await validateSimpleRow(sheet, assetType, fields, row, currentMap, opts, canCreateTags);
+      const plan = sheet === "DataSources" && toNum(row.values._ID) == null
+        ? await validateDataSourceCreateRow(fields, row, opts)
+        : await validateSimpleRow(sheet, assetType, fields, row, currentMap, opts, canCreateTags);
       plans.push(plan);
     }
   }
@@ -280,7 +287,7 @@ async function validateSimpleRow(
   const idNum = toNum(row.values._ID);
 
   if (idNum == null) {
-    errors.push("_ID is missing or not a number (only the Business Terms sheet allows creating new rows)");
+    errors.push("_ID is missing or not a number (Tables/Columns are crawler-discovered and can't be bulk-created)");
     return { sheet, rowNumber: row.rowNumber, assetType, assetId: null, isCreate: false, outcome: "ERROR", changes: [], errors, warnings };
   }
   const current = currentMap.get(idNum);
@@ -339,6 +346,58 @@ async function validateSimpleRow(
   return { sheet, rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "UPDATE", changes, errors, warnings, newTagNames };
 }
 
+// New Data Source rows (blank _ID) — only path where sourceName/sourceType/
+// databaseName (SYSTEM-kind, locked when editing an existing row) get read at
+// all; there's nothing else on the DataSources sheet that supports create.
+async function validateDataSourceCreateRow(fields: FieldDef[], row: ParsedRow, opts: ValidateOptions): Promise<RowPlan> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const assetType = "DATA_SOURCES";
+
+  const canCreate = await canEditMetadata(opts.session);
+  if (!canCreate) errors.push("You don't have permission to create data sources");
+
+  const sourceName = row.values.sourceName?.trim();
+  const sourceType = row.values.sourceType?.trim().toUpperCase();
+  const databaseName = row.values.databaseName?.trim();
+  if (!sourceName) errors.push("Source Name is required to create a new data source");
+  if (!sourceType) errors.push("Source Type is required to create a new data source");
+  if (!databaseName) errors.push("Database Name is required to create a new data source");
+
+  if (sourceName) {
+    const [dup] = await sql<{ id: number }[]>`
+      SELECT data_source_id AS id FROM bayanat.data_sources WHERE lower(source_name_text) = lower(${sourceName})
+    `;
+    if (dup) errors.push(`A data source named "${sourceName}" already exists`);
+  }
+
+  for (const field of fields) {
+    if (!field.key.startsWith(EXT_FIELD_PREFIX) || !row.values[field.key]) continue;
+    await validateFieldValue(field, row.values[field.key], errors);
+  }
+
+  if (errors.length > 0) {
+    return { sheet: "DataSources", rowNumber: row.rowNumber, assetType, assetId: null, isCreate: true, outcome: "ERROR", changes: [], errors, warnings };
+  }
+
+  return {
+    sheet: "DataSources", rowNumber: row.rowNumber, assetType, assetId: null, isCreate: true, outcome: "CREATE",
+    changes: [
+      { field: "sourceName", header: "Source Name", oldVal: null, newVal: sourceName ?? null },
+      { field: "sourceType", header: "Source Type", oldVal: null, newVal: sourceType ?? null },
+      { field: "databaseName", header: "Database Name", oldVal: null, newVal: databaseName ?? null },
+      ...fields.filter((f) => f.kind === "EDITABLE" && row.values[f.key]).map((f) => ({ field: f.key, header: f.header, oldVal: null, newVal: row.values[f.key] })),
+    ],
+    errors, warnings,
+    createPayload: {
+      sourceName, sourceType, databaseName,
+      description: row.values.description?.trim() || null,
+      businessAppName: row.values.businessAppName?.trim() || null,
+      ...Object.fromEntries(fields.filter((f) => f.key.startsWith(EXT_FIELD_PREFIX)).map((f) => [f.key, row.values[f.key] || null])),
+    },
+  };
+}
+
 async function validateTermRow(
   fields: FieldDef[], row: ParsedRow, currentMap: Map<number, Record<string, string | null>>, opts: ValidateOptions,
 ): Promise<RowPlan> {
@@ -348,7 +407,7 @@ async function validateTermRow(
   const idNum = toNum(row.values._ID);
 
   if (idNum == null) {
-    // Create new term (only sheet where creation is allowed — spec §3.1 step 1)
+    // Create new term (spec §3.1 step 1)
     const termName = row.values.termName?.trim();
     const domainName = row.values.domainName?.trim();
     const definition = row.values.definition?.trim();

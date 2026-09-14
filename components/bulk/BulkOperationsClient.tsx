@@ -124,6 +124,7 @@ function JobStatusCard({ job, title }: { job: BulkJob; title: string }) {
 }
 
 const CREATABLE_SHEETS = [
+  { value: "DataSources", label: "Data Source" },
   { value: "BusinessTerms", label: "Business Terms" },
   { value: "CustomAssets", label: "Custom Assets" },
   { value: "CustomAssetLinks", label: "Custom Asset Links" },
@@ -278,25 +279,40 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
         </div>
 
         {downloadKind === "SOURCE" && (
-          <div className="flex items-center gap-4 mb-4 flex-wrap">
-            <select value={sourceId} onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
+          <div className="mb-4">
+            <select value={sourceId} onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px] mb-3">
               <option value="">Select a data source…</option>
               {sources.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.dbType})</option>)}
             </select>
+            <div className="flex items-center gap-4 flex-wrap">
+              <label className="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" checked={includeTables} onChange={(e) => { setIncludeTables(e.target.checked); if (!e.target.checked) setIncludeColumns(false); }} /> Include Tables
+              </label>
+              <label className="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" checked={includeColumns} disabled={!includeTables} onChange={(e) => setIncludeColumns(e.target.checked)} /> Include Columns
+              </label>
+              <label className="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
+              </label>
+            </div>
+          </div>
+        )}
+        {downloadKind === "TERMS_ALL" && (
+          <div className="mb-4">
             <label className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={includeTables} onChange={(e) => { setIncludeTables(e.target.checked); if (!e.target.checked) setIncludeColumns(false); }} /> Include Tables
-            </label>
-            <label className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={includeColumns} disabled={!includeTables} onChange={(e) => setIncludeColumns(e.target.checked)} /> Include Columns
+              <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
             </label>
           </div>
         )}
         {downloadKind === "TERMS_DOMAIN" && (
           <div className="mb-4">
-            <select value={domainId} onChange={(e) => setDomainId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
+            <select value={domainId} onChange={(e) => setDomainId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px] mb-3">
               <option value="">Select a domain…</option>
               {domains.map((d) => <option key={d.glossaryId} value={d.glossaryId}>{d.domainName}</option>)}
             </select>
+            <label className="flex items-center gap-1.5 text-sm">
+              <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
+            </label>
           </div>
         )}
         {downloadKind === "CUSTOM_TYPE" && (
@@ -323,10 +339,6 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
             <p className="text-[11px] text-muted mt-2">Headers only, no rows. Leave the _ID column blank on every row you add — new records get their id assigned automatically when uploaded.</p>
           </div>
         )}
-
-        <label className="flex items-center gap-1.5 text-sm mb-4">
-          <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes (admin-defined fields), if any are configured
-        </label>
 
         {downloadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{downloadError}</div>}
         <button onClick={download} disabled={downloading || !canEdit} className="btn btn-primary btn-sm">

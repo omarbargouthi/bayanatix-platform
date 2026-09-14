@@ -27,7 +27,7 @@ const REF = (key: string, header: string, type: FieldType = "TEXT"): FieldDef =>
 
 export const DATA_SOURCES_FIELDS: FieldDef[] = [
   SYS("_ID", "_ID"), SYS("_TYPE", "_TYPE"),
-  SYS("sourceName", "Source Name"), SYS("sourceType", "Source Type"),
+  SYS("sourceName", "Source Name"), SYS("sourceType", "Source Type"), SYS("databaseName", "Database Name"),
   { key: "description", header: "Description", kind: "EDITABLE", type: "LONGTEXT", maxLength: 2000 },
   { key: "businessAppName", header: "Business App Name", kind: "EDITABLE", type: "TEXT", maxLength: 200 },
   REF("schemaCount", "Schema Count", "NUMBER"), REF("tableCount", "Table Count", "NUMBER"),

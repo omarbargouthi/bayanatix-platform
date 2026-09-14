@@ -8,11 +8,12 @@ import { loadExtendedFieldsBySheet, customAttrAssetTypeForSheet } from "./extend
 import { getCustomAttributeValuesForAssets } from "../queries/custom-attributes";
 
 // Sheets where the commit pipeline supports creating a brand-new row from a blank
-// _ID cell (auto-assigning the id) — see validateTermRow/validateCustomAssetRow/
-// validateCustomAssetLinkRow in lib/bulk/validate.ts. DataSources/Tables/Columns
-// are crawler-discovered only and can't be bulk-created, so they're not offered
-// as an empty-template sheet.
-export type CreatableSheetName = "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
+// _ID cell (auto-assigning the id) — see validateDataSourceCreateRow/validateTermRow/
+// validateCustomAssetRow/validateCustomAssetLinkRow in lib/bulk/validate.ts.
+// Tables/Columns stay update-only — they're crawler-discovered, so a bulk-created
+// row would have no real table/column behind it. A Data Source itself is just
+// registered metadata (name/type/database), so bulk-creating one is fine.
+export type CreatableSheetName = "DataSources" | "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
 
 export type DownloadScope =
   | { type: "DATA_SOURCE"; dataSourceId: number; includeTables?: boolean; includeColumns?: boolean }
@@ -31,7 +32,7 @@ async function fetchDataSourceRows(dataSourceIds: number[]): Promise<Record<stri
   return sql<Record<string, unknown>[]>`
     SELECT
       ds.data_source_id AS "_ID", 'DATA_SOURCES' AS "_TYPE",
-      ds.source_name_text AS "sourceName", ds.source_type_code AS "sourceType",
+      ds.source_name_text AS "sourceName", ds.source_type_code AS "sourceType", ds.database_name_text AS "databaseName",
       ds.description_text AS description, ds.business_app_name AS "businessAppName",
       (SELECT count(*)::int FROM bayanat.data_schemas s WHERE s.data_source_id = ds.data_source_id) AS "schemaCount",
       (SELECT count(*)::int FROM bayanat.data_entities e JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id WHERE s.data_source_id = ds.data_source_id) AS "tableCount"

@@ -47,10 +47,15 @@ function ValueInput({
       return <input type="date" className={base} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value || null)} />;
     case "BOOLEAN":
       return (
-        <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 accent-brand-purple" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
-          {value ? "Yes" : "No"}
-        </label>
+        <select
+          className={base}
+          value={value === true ? "true" : value === false ? "false" : ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value === "true")}
+        >
+          <option value="">— select —</option>
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
       );
     case "ENUM":
       return (
