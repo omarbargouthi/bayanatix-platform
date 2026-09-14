@@ -18,13 +18,14 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const scope = body.scope as DownloadScope;
+  const includeExtended = body.includeExtended !== false;
   if (!scope?.type) return NextResponse.json({ error: "scope is required" }, { status: 400 });
 
   const jobId = await createDownloadJob(scope, session.userId);
 
   void (async () => {
     try {
-      const sheetRows = await resolveDownloadScope(scope);
+      const sheetRows = await resolveDownloadScope(scope, { includeExtended });
       const totalRows = Object.values(sheetRows).reduce((sum, rows) => sum + (rows?.length ?? 0), 0);
       if (totalRows === 0 && scope.type !== "EMPTY_TEMPLATE") {
         await failJob(jobId, "No rows matched the requested scope");
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
       const buffers = await buildDownloadWorkbooks(sheetRows, {
         exportId: `job-${jobId}`, scopeDescription: JSON.stringify(scope),
         exportedByUserId: session.userId, exportedAt: new Date(),
-      });
+      }, { includeExtended });
 
       // NOTE: scopes over ROW_CAP_PER_FILE split into multiple workbook buffers
       // (spec §2.2), but only the first is persisted/downloadable today — zipping

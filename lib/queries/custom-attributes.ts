@@ -82,6 +82,19 @@ export async function getCustomAttributeValues(
   return { definitions, values: row?.valuesJson ?? {} };
 }
 
+/** Batched current-values lookup for many assets at once — used by the bulk
+ *  upload validator's per-sheet "current row" fetchers (avoids one query per row). */
+export async function getCustomAttributeValuesForAssets(
+  assetType: CustomAttributeAssetType, assetIds: number[],
+): Promise<Map<number, Record<string, unknown>>> {
+  if (assetIds.length === 0) return new Map();
+  const rows = await sql<{ assetId: number; valuesJson: Record<string, unknown> }[]>`
+    SELECT asset_id AS "assetId", values_json AS "valuesJson" FROM bayanat.custom_attribute_values
+    WHERE asset_type_code = ${assetType} AND asset_id = ANY(${assetIds})
+  `;
+  return new Map(rows.map((r) => [r.assetId, r.valuesJson ?? {}]));
+}
+
 export async function saveCustomAttributeValues(
   assetType: CustomAttributeAssetType, assetId: number,
   values: Record<string, string | number | boolean | null>, userId: string,

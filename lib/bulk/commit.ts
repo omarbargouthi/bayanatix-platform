@@ -13,8 +13,60 @@ import { updateJobProgress } from "../queries/bulk-jobs";
 import { updateDataSource, updateEntity, updateAttribute } from "../queries/catalog";
 import { supersedePendingSuggestions } from "../queries/enrichment-descriptions";
 import { createInstance, updateInstance, createLink } from "../queries/custom-assets";
-import type { RowPlan } from "./validate";
-import type { SessionUser } from "../types";
+import { getCustomAttributeValues, saveCustomAttributeValues, listCustomAttributeDefinitions } from "../queries/custom-attributes";
+import { customAttrAssetTypeForSheet, EXT_FIELD_PREFIX } from "./extended-fields";
+import type { RowPlan, FieldChange } from "./validate";
+import type { SheetName } from "./sheets";
+import type { SessionUser, CustomAttributeAssetType } from "../types";
+
+// Bulk rows carry every field (including extended ones) as plain strings, but the
+// admin Custom Attributes UI expects real booleans/numbers in values_json (e.g.
+// CustomAttributesPanel.tsx renders `{value ? "Yes" : "No"}` — the STRING "FALSE"
+// is truthy and would render "Yes"). Coerce by each attribute's declared data type
+// before saving so bulk-set values match what the admin UI writes.
+async function coerceExtendedValues(
+  assetType: CustomAttributeAssetType, raw: Record<string, string | number | boolean | null>,
+): Promise<Record<string, string | number | boolean | null>> {
+  const defs = await listCustomAttributeDefinitions(assetType);
+  const dataTypeByCode = new Map(defs.map((d) => [d.attrCode, d.dataType]));
+  const coerced: Record<string, string | number | boolean | null> = {};
+  for (const [code, v] of Object.entries(raw)) {
+    if (v == null) { coerced[code] = null; continue; }
+    const dataType = dataTypeByCode.get(code);
+    if (dataType === "BOOLEAN") coerced[code] = typeof v === "boolean" ? v : String(v).toUpperCase() === "TRUE";
+    else if (dataType === "NUMBER") coerced[code] = typeof v === "number" ? v : (Number(v) || null);
+    else coerced[code] = v;
+  }
+  return coerced;
+}
+
+// Writes any changed ext:<code> fields (Custom Attributes framework — see
+// lib/bulk/extended-fields.ts) back to custom_attribute_values. values_json is a
+// full-replace blob, not a per-key patch, so this reads the current blob and
+// merges the changed keys in rather than clobbering untouched extended values.
+async function applyExtendedAttributeChanges(sheet: SheetName, assetId: number, changes: FieldChange[], userId: string): Promise<void> {
+  const extChanges = changes.filter((c) => c.field.startsWith(EXT_FIELD_PREFIX));
+  if (extChanges.length === 0) return;
+  const assetType = customAttrAssetTypeForSheet(sheet);
+  if (!assetType) return;
+  const { values } = await getCustomAttributeValues(assetType, assetId);
+  const merged: Record<string, string | number | boolean | null> = { ...(values as Record<string, string | number | boolean | null>) };
+  for (const c of extChanges) merged[c.field.slice(EXT_FIELD_PREFIX.length)] = c.newVal;
+  await saveCustomAttributeValues(assetType, assetId, await coerceExtendedValues(assetType, merged), userId);
+}
+
+// CREATE path variant — createPayload already carries ext:<code> keys straight
+// from the upload row (see validateTermRow's createPayload spread), so there's
+// nothing to merge against: a brand-new asset has no prior custom attribute values.
+async function saveExtendedAttributesFromPayload(sheet: SheetName, assetId: number, payload: Record<string, unknown>, userId: string): Promise<void> {
+  const assetType = customAttrAssetTypeForSheet(sheet);
+  if (!assetType) return;
+  const extEntries = Object.entries(payload).filter(([k]) => k.startsWith(EXT_FIELD_PREFIX));
+  if (extEntries.length === 0) return;
+  const values: Record<string, string | number | boolean | null> = {};
+  for (const [k, v] of extEntries) values[k.slice(EXT_FIELD_PREFIX.length)] = v as string | number | boolean | null;
+  await saveCustomAttributeValues(assetType, assetId, await coerceExtendedValues(assetType, values), userId);
+}
 
 export type CommitOptions = {
   session: SessionUser;
@@ -63,6 +115,7 @@ async function applyDataSourceRow(plan: RowPlan, userId: string): Promise<void> 
   const description = changeVal(plan, "description") ?? current?.description ?? "";
   const businessAppName = changeVal(plan, "businessAppName") ?? current?.businessAppName ?? "";
   await updateDataSource(plan.assetId!, userId, { description: description ?? "", businessAppName: businessAppName ?? "" });
+  await applyExtendedAttributeChanges("DataSources", plan.assetId!, plan.changes, userId);
 }
 
 async function applyTableRow(plan: RowPlan, userId: string): Promise<void> {
@@ -80,6 +133,7 @@ async function applyTableRow(plan: RowPlan, userId: string): Promise<void> {
   }
   const tagsChange = changeVal(plan, "tags");
   if (tagsChange !== undefined) await applyTags("DATA_ENTITIES", plan.assetId!, tagsChange ?? "", userId);
+  await applyExtendedAttributeChanges("Tables", plan.assetId!, plan.changes, userId);
 }
 
 async function applyColumnRow(plan: RowPlan, userId: string): Promise<void> {
@@ -104,6 +158,7 @@ async function applyColumnRow(plan: RowPlan, userId: string): Promise<void> {
   }
   const tagsChange = changeVal(plan, "tags");
   if (tagsChange !== undefined) await applyTags("DATA_ATTRIBUTES", plan.assetId!, tagsChange ?? "", userId);
+  await applyExtendedAttributeChanges("Columns", plan.assetId!, plan.changes, userId);
 }
 
 async function applyTermCreate(plan: RowPlan, userId: string): Promise<number> {
@@ -122,6 +177,7 @@ async function applyTermCreate(plan: RowPlan, userId: string): Promise<number> {
     { field: "term_name_text", newVal: p.termName as string },
     { field: "definition_text", newVal: p.definition as string },
   ]);
+  await saveExtendedAttributesFromPayload("BusinessTerms", row.id, p, userId);
   return row.id;
 }
 
@@ -150,6 +206,7 @@ async function applyTermUpdate(plan: RowPlan, userId: string): Promise<void> {
     WHERE glossary_id = ${plan.assetId}
   `;
   await logUpdate("BUSINESS_TERMS", plan.assetId!, userId, plan.changes.map((c) => ({ field: c.field, oldVal: c.oldVal, newVal: c.newVal })));
+  await applyExtendedAttributeChanges("BusinessTerms", plan.assetId!, plan.changes, userId);
 }
 
 // ── Custom Assets (deferred spec FR-4.2) ────────────────────────────────────────

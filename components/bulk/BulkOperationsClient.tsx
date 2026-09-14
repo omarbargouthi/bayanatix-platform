@@ -145,6 +145,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [customTypeId, setCustomTypeId] = useState<number | "">("");
   const [customRelTypeId, setCustomRelTypeId] = useState<number | "">("");
   const [emptyTemplateSheet, setEmptyTemplateSheet] = useState<typeof CREATABLE_SHEETS[number]["value"]>("BusinessTerms");
+  const [includeExtended, setIncludeExtended] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadJobId, setDownloadJobId] = useState<number | null>(null);
@@ -173,7 +174,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       if (downloadKind === "CUSTOM_REL_TYPE" && !customRelTypeId) { setDownloadError("Choose a relationship type"); return; }
 
       const res = await fetch("/api/bulk/downloads", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, includeExtended }),
       });
       const data = await res.json();
       if (!res.ok) { setDownloadError(data.error ?? "Download failed"); return; }
@@ -322,6 +323,10 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
             <p className="text-[11px] text-muted mt-2">Headers only, no rows. Leave the _ID column blank on every row you add — new records get their id assigned automatically when uploaded.</p>
           </div>
         )}
+
+        <label className="flex items-center gap-1.5 text-sm mb-4">
+          <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes (admin-defined fields), if any are configured
+        </label>
 
         {downloadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{downloadError}</div>}
         <button onClick={download} disabled={downloading || !canEdit} className="btn btn-primary btn-sm">

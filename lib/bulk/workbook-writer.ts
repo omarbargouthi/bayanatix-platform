@@ -5,6 +5,7 @@
 import ExcelJS from "exceljs";
 import { getFieldsForSheet, ROW_CAP_PER_FILE, TEMPLATE_SCHEMA_VERSION, type SheetName, type FieldDef } from "./sheets";
 import { loadEnumValues, loadExistingTagNames, loadExistingTermNames } from "./enum-sources";
+import { loadExtendedFieldsBySheet } from "./extended-fields";
 import type { SheetRows } from "./scope-resolver";
 
 const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
@@ -44,9 +45,12 @@ export type WorkbookMeta = {
  *  scopes split into numbered files in one zip"). In practice every sheet in this
  *  app's demo data is far under the cap, so multi-file splitting is implemented but
  *  not exercised against real data here. */
-export async function buildDownloadWorkbooks(sheetRows: SheetRows, meta: Omit<WorkbookMeta, "schemaVersion">): Promise<Buffer[]> {
+export async function buildDownloadWorkbooks(
+  sheetRows: SheetRows, meta: Omit<WorkbookMeta, "schemaVersion">, opts?: { includeExtended?: boolean },
+): Promise<Buffer[]> {
   const maxRows = Math.max(0, ...Object.values(sheetRows).map((rows) => rows?.length ?? 0));
   const fileCount = Math.max(1, Math.ceil(maxRows / ROW_CAP_PER_FILE));
+  const extendedFields = opts?.includeExtended !== false ? await loadExtendedFieldsBySheet() : {};
 
   const buffers: Buffer[] = [];
   for (let fileIndex = 0; fileIndex < fileCount; fileIndex++) {
@@ -54,12 +58,15 @@ export async function buildDownloadWorkbooks(sheetRows: SheetRows, meta: Omit<Wo
     for (const [sheet, rows] of Object.entries(sheetRows) as [SheetName, Record<string, unknown>[]][]) {
       chunk[sheet] = rows.slice(fileIndex * ROW_CAP_PER_FILE, (fileIndex + 1) * ROW_CAP_PER_FILE);
     }
-    buffers.push(await buildOneWorkbook(chunk, { ...meta, schemaVersion: TEMPLATE_SCHEMA_VERSION }, fileIndex + 1, fileCount));
+    buffers.push(await buildOneWorkbook(chunk, { ...meta, schemaVersion: TEMPLATE_SCHEMA_VERSION }, fileIndex + 1, fileCount, extendedFields));
   }
   return buffers;
 }
 
-async function buildOneWorkbook(sheetRows: SheetRows, meta: WorkbookMeta, fileIndex: number, fileCount: number): Promise<Buffer> {
+async function buildOneWorkbook(
+  sheetRows: SheetRows, meta: WorkbookMeta, fileIndex: number, fileCount: number,
+  extendedFields: Partial<Record<SheetName, FieldDef[]>>,
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Bayanatix";
   workbook.created = meta.exportedAt;
@@ -83,21 +90,28 @@ async function buildOneWorkbook(sheetRows: SheetRows, meta: WorkbookMeta, fileIn
   const enumSourcesUsed = new Set<string>();
   for (const sheet of SHEET_ORDER) {
     if (!sheetRows[sheet]) continue;
-    for (const f of getFieldsForSheet(sheet)) if (f.enumSource) enumSourcesUsed.add(f.enumSource);
+    for (const f of getFieldsForSheet(sheet, extendedFields[sheet])) if (f.enumSource) enumSourcesUsed.add(f.enumSource);
   }
   for (const source of enumSourcesUsed) {
     await registerList(source, await loadEnumValues(source as Parameters<typeof loadEnumValues>[0]));
   }
-  const hasTermColumn = SHEET_ORDER.some((s) => sheetRows[s] && getFieldsForSheet(s).some((f) => f.type === "TERM"));
+  const hasTermColumn = SHEET_ORDER.some((s) => sheetRows[s] && getFieldsForSheet(s, extendedFields[s]).some((f) => f.type === "TERM"));
   if (hasTermColumn) await registerList("TERM", await loadExistingTermNames());
-  const hasTagsColumn = SHEET_ORDER.some((s) => sheetRows[s] && getFieldsForSheet(s).some((f) => f.type === "TAGS"));
+  const hasTagsColumn = SHEET_ORDER.some((s) => sheetRows[s] && getFieldsForSheet(s, extendedFields[s]).some((f) => f.type === "TAGS"));
   if (hasTagsColumn) await registerList("TAGS_REFERENCE", await loadExistingTagNames());
+  // Extended ENUM fields carry their own inline allowed-values list (no shared
+  // EnumSource group) — register each under its own field key.
+  for (const sheet of SHEET_ORDER) {
+    for (const f of extendedFields[sheet] ?? []) {
+      if (f.type === "ENUM" && f.enumValues) await registerList(f.key, f.enumValues);
+    }
+  }
 
   // ── One worksheet per populated sheet ──────────────────────────────────────────
   for (const sheetName of SHEET_ORDER) {
     const rows = sheetRows[sheetName];
     if (!rows) continue;
-    const fields = getFieldsForSheet(sheetName);
+    const fields = getFieldsForSheet(sheetName, extendedFields[sheetName]);
     const ws = workbook.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: 1 }] });
     ws.columns = fields.map((f) => ({ header: f.header, key: f.key, width: f.type === "LONGTEXT" ? 40 : 20 }));
 
@@ -125,7 +139,7 @@ async function buildOneWorkbook(sheetRows: SheetRows, meta: WorkbookMeta, fileIn
     // Dropdown validation on ENUM/TERM columns, referencing the _Lists sheet.
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
-      const listName = f.type === "ENUM" ? f.enumSource : f.type === "TERM" ? "TERM" : null;
+      const listName = f.type === "ENUM" ? (f.enumSource ?? f.key) : f.type === "TERM" ? "TERM" : null;
       if (!listName) continue;
       const letter = listColumns[listName];
       if (!letter) continue;

@@ -6,6 +6,8 @@ import { sql } from "../db";
 import { canEditAsset, canEditMetadata } from "../can";
 import { getFieldsForSheet, CLEAR_SENTINEL, SHEET_ASSET_TYPE, type SheetName, type FieldDef } from "./sheets";
 import { loadEnumValues } from "./enum-sources";
+import { loadExtendedFieldsBySheet, customAttrAssetTypeForSheet } from "./extended-fields";
+import { getCustomAttributeValuesForAssets } from "../queries/custom-attributes";
 import type { ParsedRow, ParsedWorkbook } from "./workbook-reader";
 import type { SessionUser } from "../types";
 import {
@@ -148,6 +150,26 @@ async function fetchCurrentCustomAssetLinks(ids: number[]): Promise<Map<number, 
   return new Map(rows.map((r) => [r.id, r]));
 }
 
+/** Merges each asset's extended/custom-attribute values into its "current row" map,
+ *  keyed the same way the writer/reader key those columns (ext:<code>), so the
+ *  existing generic per-EDITABLE-field diff loop below picks them up for free. */
+async function mergeExtendedIntoCurrentMap(
+  sheet: SheetName, currentMap: Map<number, Record<string, string | null>>, extendedFields?: FieldDef[],
+): Promise<void> {
+  if (!extendedFields?.length) return;
+  const assetType = customAttrAssetTypeForSheet(sheet);
+  if (!assetType) return;
+  const values = await getCustomAttributeValuesForAssets(assetType, [...currentMap.keys()]);
+  for (const [assetId, entry] of currentMap) {
+    const raw = values.get(assetId) ?? {};
+    for (const field of extendedFields) {
+      const code = field.key.slice("ext:".length);
+      const v = raw[code];
+      entry[field.key] = v == null ? null : field.type === "BOOLEAN" ? (v ? "TRUE" : "FALSE") : String(v);
+    }
+  }
+}
+
 function toNum(s: string): number | null {
   const n = Number(s);
   return Number.isFinite(n) && s.trim() !== "" ? n : null;
@@ -160,9 +182,9 @@ async function validateFieldValue(field: FieldDef, newVal: string | null, errors
   if (field.maxLength && newVal.length > field.maxLength) {
     errors.push(`${field.header}: exceeds maximum length of ${field.maxLength} characters`);
   }
-  if (field.type === "ENUM" && field.enumSource) {
-    const valid = await loadEnumValues(field.enumSource);
-    if (!valid.includes(newVal)) errors.push(`${field.header}: "${newVal}" is not a valid value (expected one of ${valid.join(", ")})`);
+  if (field.type === "ENUM") {
+    const valid = field.enumValues ?? (field.enumSource ? await loadEnumValues(field.enumSource) : null);
+    if (valid && !valid.includes(newVal)) errors.push(`${field.header}: "${newVal}" is not a valid value (expected one of ${valid.join(", ")})`);
   }
   if (field.type === "BOOLEAN" && !["TRUE", "FALSE"].includes(newVal.toUpperCase())) {
     errors.push(`${field.header}: expected TRUE or FALSE, got "${newVal}"`);
@@ -195,17 +217,19 @@ export function summarizePlans(plans: RowPlan[]): Record<string, number> {
 export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOptions): Promise<RowPlan[]> {
   const plans: RowPlan[] = [];
   const canCreateTags = await canEditMetadata(opts.session);
+  const extendedFields = await loadExtendedFieldsBySheet();
 
   for (const sheet of ["DataSources", "Tables", "Columns"] as SheetName[]) {
     const rows = parsed.sheets[sheet];
     if (!rows) continue;
     const assetType = SHEET_ASSET_TYPE[sheet];
-    const fields = getFieldsForSheet(sheet);
+    const fields = getFieldsForSheet(sheet, extendedFields[sheet]);
     const ids = rows.map((r) => toNum(r.values._ID)).filter((n): n is number => n != null);
     const currentMap =
       sheet === "DataSources" ? await fetchCurrentDataSources(ids) :
       sheet === "Tables" ? await fetchCurrentTables(ids) :
       await fetchCurrentColumns(ids);
+    await mergeExtendedIntoCurrentMap(sheet, currentMap, extendedFields[sheet]);
 
     for (const row of rows) {
       const plan = await validateSimpleRow(sheet, assetType, fields, row, currentMap, opts, canCreateTags);
@@ -215,9 +239,10 @@ export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOpt
 
   const termRows = parsed.sheets.BusinessTerms;
   if (termRows) {
-    const fields = getFieldsForSheet("BusinessTerms");
+    const fields = getFieldsForSheet("BusinessTerms", extendedFields.BusinessTerms);
     const ids = termRows.map((r) => toNum(r.values._ID)).filter((n): n is number => n != null);
     const currentMap = await fetchCurrentTerms(ids);
+    await mergeExtendedIntoCurrentMap("BusinessTerms", currentMap, extendedFields.BusinessTerms);
     for (const row of termRows) {
       plans.push(await validateTermRow(fields, row, currentMap, opts));
     }
@@ -347,6 +372,10 @@ async function validateTermRow(
     }
     if (row.values.classification) await validateFieldValue(fields.find((f) => f.key === "classification")!, row.values.classification, errors);
     if (row.values.piCategory) await validateFieldValue(fields.find((f) => f.key === "piCategory")!, row.values.piCategory, errors);
+    for (const field of fields) {
+      if (!field.key.startsWith("ext:") || !row.values[field.key]) continue;
+      await validateFieldValue(field, row.values[field.key], errors);
+    }
 
     if (errors.length > 0) return { sheet: "BusinessTerms", rowNumber: row.rowNumber, assetType, assetId: null, isCreate: true, outcome: "ERROR", changes: [], errors, warnings };
 

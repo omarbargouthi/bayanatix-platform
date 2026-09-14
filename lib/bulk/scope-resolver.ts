@@ -4,6 +4,8 @@
 
 import { sql } from "../db";
 import type { SheetName } from "./sheets";
+import { loadExtendedFieldsBySheet, customAttrAssetTypeForSheet } from "./extended-fields";
+import { getCustomAttributeValuesForAssets } from "../queries/custom-attributes";
 
 // Sheets where the commit pipeline supports creating a brand-new row from a blank
 // _ID cell (auto-assigning the id) — see validateTermRow/validateCustomAssetRow/
@@ -180,7 +182,7 @@ export function describeDownloadScope(scope: DownloadScope, rows: SheetRows): st
   return "export";
 }
 
-export async function resolveDownloadScope(scope: DownloadScope): Promise<SheetRows> {
+export async function resolveDownloadScope(scope: DownloadScope, opts?: { includeExtended?: boolean }): Promise<SheetRows> {
   const result: SheetRows = {};
 
   if (scope.type === "DATA_SOURCE") {
@@ -220,5 +222,26 @@ export async function resolveDownloadScope(scope: DownloadScope): Promise<SheetR
     result[scope.sheet] = [];
   }
 
+  if (opts?.includeExtended !== false) await enrichWithExtendedAttributes(result);
   return result;
+}
+
+/** Merges each row's admin-defined Custom Attribute values in as `ext:<code>` keys
+ *  (see lib/bulk/extended-fields.ts) so they export as real columns. */
+async function enrichWithExtendedAttributes(result: SheetRows): Promise<void> {
+  const extendedFields = await loadExtendedFieldsBySheet();
+  for (const [sheet, rows] of Object.entries(result) as [SheetName, Record<string, unknown>[]][]) {
+    const fields = extendedFields[sheet];
+    const assetType = customAttrAssetTypeForSheet(sheet);
+    if (!fields?.length || !assetType || !rows.length) continue;
+
+    const ids = rows.map((r) => r._ID as number).filter((id): id is number => typeof id === "number");
+    const values = await getCustomAttributeValuesForAssets(assetType, ids);
+    for (const row of rows) {
+      const raw = values.get(row._ID as number) ?? {};
+      for (const field of fields) {
+        row[field.key] = raw[field.key.slice("ext:".length)] ?? null;
+      }
+    }
+  }
 }

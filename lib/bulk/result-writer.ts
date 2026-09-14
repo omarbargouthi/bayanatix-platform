@@ -4,6 +4,7 @@
 
 import ExcelJS from "exceljs";
 import { getFieldsForSheet, type SheetName } from "./sheets";
+import { loadExtendedFieldsBySheet } from "./extended-fields";
 import type { RowPlan } from "./validate";
 import type { ParsedWorkbook } from "./workbook-reader";
 
@@ -11,6 +12,7 @@ const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessT
 
 export async function buildResultWorkbook(plans: RowPlan[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
+  const extendedFields = await loadExtendedFieldsBySheet();
   const bySheet = new Map<SheetName, RowPlan[]>();
   for (const p of plans) {
     if (!bySheet.has(p.sheet)) bySheet.set(p.sheet, []);
@@ -20,7 +22,7 @@ export async function buildResultWorkbook(plans: RowPlan[]): Promise<Buffer> {
   for (const sheetName of SHEET_ORDER) {
     const rows = bySheet.get(sheetName);
     if (!rows) continue;
-    const fields = getFieldsForSheet(sheetName);
+    const fields = getFieldsForSheet(sheetName, extendedFields[sheetName]);
     const ws = workbook.addWorksheet(sheetName);
     ws.columns = [
       { header: "Row", key: "_row", width: 8 },
@@ -68,6 +70,7 @@ export async function buildRejectedWorkbook(parsed: ParsedWorkbook, plans: RowPl
   if (errorPlans.length === 0) return null;
 
   const workbook = new ExcelJS.Workbook();
+  const extendedFields = await loadExtendedFieldsBySheet();
   const bySheet = new Map<SheetName, RowPlan[]>();
   for (const p of errorPlans) {
     if (!bySheet.has(p.sheet)) bySheet.set(p.sheet, []);
@@ -77,7 +80,7 @@ export async function buildRejectedWorkbook(parsed: ParsedWorkbook, plans: RowPl
   for (const sheetName of SHEET_ORDER) {
     const plansForSheet = bySheet.get(sheetName);
     if (!plansForSheet) continue;
-    const fields = getFieldsForSheet(sheetName);
+    const fields = getFieldsForSheet(sheetName, extendedFields[sheetName]);
     const parsedRows = parsed.sheets[sheetName] ?? [];
 
     const ws = workbook.addWorksheet(sheetName);

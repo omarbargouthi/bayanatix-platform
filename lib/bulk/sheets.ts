@@ -15,19 +15,12 @@ export type FieldDef = {
   kind: FieldKind;
   type: FieldType;
   enumSource?: EnumSource;
+  // Inline allowed values for an ENUM field that isn't backed by one of the fixed
+  // EnumSource lookup groups above — used by extended/custom-attribute ENUM fields,
+  // whose values are admin-defined per attribute rather than a shared app lookup.
+  enumValues?: string[];
   maxLength?: number;
 };
-
-// Extended/custom attributes (spec §2.3, `ext:<code>` columns) would be appended here
-// per-sheet at export time by reading a registry of custom-field definitions — no such
-// registry exists anywhere in this codebase today (confirmed: the table page's "Custom
-// Properties" tab is a UI-only placeholder with no backing schema). This hook always
-// returns an empty list until that system exists; the workbook writer/reader already
-// handle an empty extended-attribute list correctly, so nothing else needs to change
-// when it eventually does.
-export function getExtendedAttributeFields(_sheet: SheetName): FieldDef[] {
-  return [];
-}
 
 const SYS: (key: string, header: string) => FieldDef = (key, header) => ({ key, header, kind: "SYSTEM", type: "TEXT" });
 const REF = (key: string, header: string, type: FieldType = "TEXT"): FieldDef => ({ key, header, kind: "REFERENCE", type });
@@ -106,7 +99,12 @@ export const CUSTOM_ASSET_LINKS_FIELDS: FieldDef[] = [
   { key: "validToDate", header: "Valid To", kind: "EDITABLE", type: "TEXT", maxLength: 10 },
 ];
 
-export function getFieldsForSheet(sheet: SheetName): FieldDef[] {
+// `extended` — admin-defined Custom Attribute fields (see lib/bulk/extended-fields.ts)
+// for this sheet, fetched ONCE per operation by the caller (getFieldsForSheet itself
+// stays synchronous so it can be called from tight loops/`.some()` callbacks) and
+// passed in here. Omit it (or pass []) for callers that don't care about them, e.g.
+// CustomAssets/CustomAssetLinks, which the Custom Attributes framework doesn't cover.
+export function getFieldsForSheet(sheet: SheetName, extended: FieldDef[] = []): FieldDef[] {
   const base =
     sheet === "DataSources" ? DATA_SOURCES_FIELDS :
     sheet === "Tables" ? TABLES_FIELDS :
@@ -114,7 +112,7 @@ export function getFieldsForSheet(sheet: SheetName): FieldDef[] {
     sheet === "BusinessTerms" ? BUSINESS_TERMS_FIELDS :
     sheet === "CustomAssets" ? CUSTOM_ASSETS_FIELDS :
     CUSTOM_ASSET_LINKS_FIELDS;
-  return [...base, ...getExtendedAttributeFields(sheet)];
+  return [...base, ...extended];
 }
 
 export const SHEET_ASSET_TYPE: Record<SheetName, string> = {

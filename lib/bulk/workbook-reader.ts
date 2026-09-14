@@ -5,6 +5,7 @@
 
 import ExcelJS from "exceljs";
 import { getFieldsForSheet, TEMPLATE_SCHEMA_VERSION, type SheetName } from "./sheets";
+import { loadExtendedFieldsBySheet } from "./extended-fields";
 
 export type ParsedRow = { rowNumber: number; values: Record<string, string> };
 export type ParsedWorkbook = {
@@ -49,11 +50,12 @@ export async function parseUploadedWorkbook(buffer: Buffer): Promise<ParsedWorkb
   }
   const schemaVersionMismatch = meta?.schemaVersion != null && meta.schemaVersion < TEMPLATE_SCHEMA_VERSION;
 
+  const extendedFields = await loadExtendedFieldsBySheet();
   const sheets: ParsedWorkbook["sheets"] = {};
   for (const sheetName of SHEET_NAMES) {
     const ws = workbook.getWorksheet(sheetName);
     if (!ws) continue;
-    const fields = getFieldsForSheet(sheetName);
+    const fields = getFieldsForSheet(sheetName, extendedFields[sheetName]);
 
     const headerRow = ws.getRow(1);
     const colForField: Record<string, number> = {};
