@@ -5,6 +5,13 @@
 import { sql } from "../db";
 import type { SheetName } from "./sheets";
 
+// Sheets where the commit pipeline supports creating a brand-new row from a blank
+// _ID cell (auto-assigning the id) — see validateTermRow/validateCustomAssetRow/
+// validateCustomAssetLinkRow in lib/bulk/validate.ts. DataSources/Tables/Columns
+// are crawler-discovered only and can't be bulk-created, so they're not offered
+// as an empty-template sheet.
+export type CreatableSheetName = "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
+
 export type DownloadScope =
   | { type: "DATA_SOURCE"; dataSourceId: number; includeTables?: boolean; includeColumns?: boolean }
   | { type: "SELECTED"; entityIds?: number[]; attributeIds?: number[] }
@@ -12,7 +19,8 @@ export type DownloadScope =
   | { type: "BUSINESS_TERMS_ALL" }
   | { type: "BUSINESS_TERMS_DOMAIN"; domainId: number }
   | { type: "CUSTOM_ASSETS_BY_TYPE"; typeId: number }
-  | { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE"; relTypeId: number };
+  | { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE"; relTypeId: number }
+  | { type: "EMPTY_TEMPLATE"; sheet: CreatableSheetName };
 
 export type SheetRows = Partial<Record<SheetName, Record<string, unknown>[]>>;
 
@@ -168,6 +176,7 @@ export function describeDownloadScope(scope: DownloadScope, rows: SheetRows): st
   if (scope.type === "BUSINESS_TERMS_DOMAIN") return (rows.BusinessTerms?.[0]?.domainName as string) || "business-terms";
   if (scope.type === "CUSTOM_ASSETS_BY_TYPE") return (rows.CustomAssets?.[0]?.typeCode as string) || "custom-assets";
   if (scope.type === "CUSTOM_ASSET_LINKS_BY_REL_TYPE") return (rows.CustomAssetLinks?.[0]?.relCode as string) || "custom-asset-links";
+  if (scope.type === "EMPTY_TEMPLATE") return `empty-template-${scope.sheet}`;
   return "export";
 }
 
@@ -207,6 +216,8 @@ export async function resolveDownloadScope(scope: DownloadScope): Promise<SheetR
     result.CustomAssets = await fetchCustomAssetRows(scope.typeId);
   } else if (scope.type === "CUSTOM_ASSET_LINKS_BY_REL_TYPE") {
     result.CustomAssetLinks = await fetchCustomAssetLinkRows(scope.relTypeId);
+  } else if (scope.type === "EMPTY_TEMPLATE") {
+    result[scope.sheet] = [];
   }
 
   return result;

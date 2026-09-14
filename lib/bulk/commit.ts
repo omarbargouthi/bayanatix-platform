@@ -9,6 +9,7 @@
 
 import { sql } from "../db";
 import { logCreate, logUpdate } from "../audit";
+import { updateJobProgress } from "../queries/bulk-jobs";
 import { updateDataSource, updateEntity, updateAttribute } from "../queries/catalog";
 import { supersedePendingSuggestions } from "../queries/enrichment-descriptions";
 import { createInstance, updateInstance, createLink } from "../queries/custom-assets";
@@ -205,6 +206,12 @@ async function applyCustomAssetLinkUpdate(plan: RowPlan, userId: string): Promis
 export async function commitPlans(jobId: number, plans: RowPlan[], opts: CommitOptions): Promise<CommitTotals> {
   const totals: CommitTotals = { applied: 0, created: 0, skippedNoop: 0, skippedConflict: 0, errors: 0 };
 
+  // Aim for roughly 100 progress checkpoints over the whole job (capped at every
+  // 200 rows) so the Jobs tab's progress bar moves smoothly on large files without
+  // hammering the DB with an UPDATE per row.
+  const checkpointEvery = Math.max(1, Math.min(200, Math.ceil(plans.length / 100)));
+  await updateJobProgress(jobId, 0, plans.length);
+
   let processed = 0;
   for (const plan of plans) {
     processed++;
@@ -242,11 +249,12 @@ export async function commitPlans(jobId: number, plans: RowPlan[], opts: CommitO
 
     await sql`
       INSERT INTO bayanat.bulk_job_rows (job_id, sheet_name_text, row_number_int, asset_type_code, asset_id, outcome_code, detail_json)
-      VALUES (${jobId}, ${plan.sheet}, ${plan.rowNumber}, ${plan.assetType}, ${plan.assetId}, ${outcomeCode}, ${JSON.stringify(detail) as never})
+      VALUES (${jobId}, ${plan.sheet}, ${plan.rowNumber}, ${plan.assetType}, ${plan.assetId}, ${outcomeCode}, ${sql.json(detail as any)})
     `;
 
-    if (processed % 1000 === 0) {
-      await sql`UPDATE bayanat.bulk_jobs SET totals_json = ${JSON.stringify(totals) as never} WHERE job_id = ${jobId}`;
+    if (processed % checkpointEvery === 0 || processed === plans.length) {
+      await updateJobProgress(jobId, processed, plans.length);
+      await sql`UPDATE bayanat.bulk_jobs SET totals_json = ${sql.json(totals as any)} WHERE job_id = ${jobId}`;
     }
   }
 

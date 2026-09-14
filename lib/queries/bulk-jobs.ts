@@ -33,6 +33,8 @@ export type BulkJob = {
   hasResultFile: boolean;
   hasLogFile: boolean;
   hasRejectedFile: boolean;
+  progressProcessed: number | null;
+  progressTotal: number | null;
 };
 
 // A few early jobs had totals_json double-encoded (JSON.stringify()'d into a plain
@@ -48,7 +50,8 @@ const JOB_COLS = `
   created_by_user_id AS "createdByUserId", created_at::text AS "createdAt", finished_at::text AS "finishedAt",
   error_text AS "errorText",
   (file_data IS NOT NULL) AS "hasFile", (result_file_data IS NOT NULL) AS "hasResultFile",
-  (log_file_data IS NOT NULL) AS "hasLogFile", (rejected_file_data IS NOT NULL) AS "hasRejectedFile"
+  (log_file_data IS NOT NULL) AS "hasLogFile", (rejected_file_data IS NOT NULL) AS "hasRejectedFile",
+  progress_processed AS "progressProcessed", progress_total AS "progressTotal"
 `;
 
 export async function createDownloadJob(scope: unknown, userId: string): Promise<number> {
@@ -68,20 +71,23 @@ export async function finishDownloadJob(jobId: number, fileName: string, fileDat
   `;
 }
 
+// Uploads auto-commit end to end (no manual review/approve step) — the job starts
+// RUNNING immediately, same as a download job, rather than sitting in
+// AWAITING_CONFIRM waiting for a separate /commit call.
 export async function createUploadJob(fileName: string, fileData: Buffer, userId: string, opts: { strictMode: boolean; conflictPolicy: "SKIP" | "OVERWRITE"; exportSnapshotAt: Date | null }): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.bulk_jobs (job_type_code, status_code, file_name_text, file_data, created_by_user_id,
       strict_mode_indicator, conflict_policy_code, export_snapshot_at, purge_after)
-    VALUES ('UPLOAD', 'AWAITING_CONFIRM', ${fileName}, ${fileData}, ${userId},
+    VALUES ('UPLOAD', 'RUNNING', ${fileName}, ${fileData}, ${userId},
       ${opts.strictMode}, ${opts.conflictPolicy}, ${opts.exportSnapshotAt}, NOW() + INTERVAL '90 days')
     RETURNING job_id AS id
   `;
   return row.id;
 }
 
-/** Flips an AWAITING_CONFIRM upload job to RUNNING right before the (backgrounded) commit starts. */
-export async function markJobRunning(jobId: number): Promise<void> {
-  await sql`UPDATE bayanat.bulk_jobs SET status_code = 'RUNNING' WHERE job_id = ${jobId}`;
+/** Progress checkpoint during a long commit — lets the Jobs tab show a real "X of Y rows" bar. */
+export async function updateJobProgress(jobId: number, processed: number, total: number): Promise<void> {
+  await sql`UPDATE bayanat.bulk_jobs SET progress_processed = ${processed}, progress_total = ${total} WHERE job_id = ${jobId}`;
 }
 
 export async function getBulkJob(jobId: number): Promise<BulkJob | null> {

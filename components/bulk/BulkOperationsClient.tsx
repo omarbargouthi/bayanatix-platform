@@ -7,15 +7,6 @@ type DomainOption = { glossaryId: number; domainName: string };
 type CustomTypeOption = { typeId: number; typeCode: string; typeNameText: string };
 type CustomRelTypeOption = { relTypeId: number; relCode: string; relNameText: string };
 
-type RowPlan = {
-  sheet: string; rowNumber: number; assetType: string; assetId: number | null;
-  outcome: "UPDATE" | "CREATE" | "SKIPPED_NOOP" | "SKIPPED_CONFLICT" | "ERROR";
-  changes: { field: string; header: string; oldVal: string | null; newVal: string | null }[];
-  errors: string[];
-};
-
-type Totals = { rows: number; updates: number; creates: number; skipped: number; errors: number; conflicts: number };
-
 type JobStatus = "RUNNING" | "VALIDATED" | "AWAITING_CONFIRM" | "COMMITTED" | "FAILED" | "CANCELLED";
 
 type BulkJob = {
@@ -31,6 +22,8 @@ type BulkJob = {
   hasResultFile: boolean;
   hasLogFile: boolean;
   hasRejectedFile: boolean;
+  progressProcessed: number | null;
+  progressTotal: number | null;
 };
 
 const STATUS_STYLE: Record<JobStatus, string> = {
@@ -49,7 +42,7 @@ const STATUS_LABEL: Record<JobStatus, string> = {
 
 // Polls GET /api/bulk/jobs/{id} every 1.5s while the job is RUNNING, stopping once
 // it reaches a terminal status. Shared by the inline Download/Upload panels (for
-// immediate feedback) and the Jobs tab (for the durable list) polls independently.
+// immediate feedback) — the Jobs tab (for the durable list) polls independently.
 function usePollJob(jobId: number | null): BulkJob | null {
   const [job, setJob] = useState<BulkJob | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,6 +67,19 @@ function usePollJob(jobId: number | null): BulkJob | null {
   }, [jobId]);
 
   return job;
+}
+
+function ProgressBar({ job }: { job: BulkJob }) {
+  if (!job.progressTotal || job.progressTotal <= 0) return null;
+  const pct = Math.min(100, Math.round(((job.progressProcessed ?? 0) / job.progressTotal) * 100));
+  return (
+    <div className="mt-2">
+      <div className="h-1.5 w-full bg-canvas-soft rounded-full overflow-hidden">
+        <div className="h-full bg-brand-purple transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-[11px] text-muted mt-1">{job.progressProcessed ?? 0} / {job.progressTotal} rows ({pct}%)</div>
+    </div>
+  );
 }
 
 function JobFileLinks({ job }: { job: BulkJob }) {
@@ -103,6 +109,7 @@ function JobStatusCard({ job, title }: { job: BulkJob; title: string }) {
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[job.status]}`}>{STATUS_LABEL[job.status]}</span>
         <span className="text-[11px] text-muted">Job #{job.jobId}</span>
       </div>
+      {job.status === "RUNNING" && <ProgressBar job={job} />}
       {job.status === "FAILED" && job.errorText && (
         <div className="text-[12px] text-red-600 mt-1.5">{job.errorText}</div>
       )}
@@ -116,6 +123,12 @@ function JobStatusCard({ job, title }: { job: BulkJob; title: string }) {
   );
 }
 
+const CREATABLE_SHEETS = [
+  { value: "BusinessTerms", label: "Business Terms" },
+  { value: "CustomAssets", label: "Custom Assets" },
+  { value: "CustomAssetLinks", label: "Custom Asset Links" },
+] as const;
+
 export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [tab, setTab] = useState<"download" | "upload" | "jobs">("download");
 
@@ -124,13 +137,14 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [domains, setDomains] = useState<DomainOption[]>([]);
   const [customTypes, setCustomTypes] = useState<CustomTypeOption[]>([]);
   const [customRelTypes, setCustomRelTypes] = useState<CustomRelTypeOption[]>([]);
-  const [downloadKind, setDownloadKind] = useState<"SOURCE" | "TERMS_ALL" | "TERMS_DOMAIN" | "CUSTOM_TYPE" | "CUSTOM_REL_TYPE">("SOURCE");
+  const [downloadKind, setDownloadKind] = useState<"SOURCE" | "TERMS_ALL" | "TERMS_DOMAIN" | "CUSTOM_TYPE" | "CUSTOM_REL_TYPE" | "EMPTY_TEMPLATE">("SOURCE");
   const [sourceId, setSourceId] = useState<number | "">("");
   const [includeTables, setIncludeTables] = useState(true);
   const [includeColumns, setIncludeColumns] = useState(true);
   const [domainId, setDomainId] = useState<number | "">("");
   const [customTypeId, setCustomTypeId] = useState<number | "">("");
   const [customRelTypeId, setCustomRelTypeId] = useState<number | "">("");
+  const [emptyTemplateSheet, setEmptyTemplateSheet] = useState<typeof CREATABLE_SHEETS[number]["value"]>("BusinessTerms");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadJobId, setDownloadJobId] = useState<number | null>(null);
@@ -151,7 +165,8 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
         : downloadKind === "TERMS_ALL" ? { type: "BUSINESS_TERMS_ALL" }
         : downloadKind === "TERMS_DOMAIN" ? { type: "BUSINESS_TERMS_DOMAIN", domainId }
         : downloadKind === "CUSTOM_TYPE" ? { type: "CUSTOM_ASSETS_BY_TYPE", typeId: customTypeId }
-        : { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE", relTypeId: customRelTypeId };
+        : downloadKind === "CUSTOM_REL_TYPE" ? { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE", relTypeId: customRelTypeId }
+        : { type: "EMPTY_TEMPLATE", sheet: emptyTemplateSheet };
       if (downloadKind === "SOURCE" && !sourceId) { setDownloadError("Choose a data source"); return; }
       if (downloadKind === "TERMS_DOMAIN" && !domainId) { setDownloadError("Choose a domain"); return; }
       if (downloadKind === "CUSTOM_TYPE" && !customTypeId) { setDownloadError("Choose a custom asset type"); return; }
@@ -174,17 +189,12 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [conflictPolicy, setConflictPolicy] = useState<"SKIP" | "OVERWRITE">("SKIP");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [jobId, setJobId] = useState<number | null>(null);
-  const [totals, setTotals] = useState<Totals | null>(null);
-  const [rows, setRows] = useState<RowPlan[]>([]);
-  const [filter, setFilter] = useState<"all" | "errors" | "conflicts">("all");
-  const [committing, setCommitting] = useState(false);
-  const [commitJobId, setCommitJobId] = useState<number | null>(null);
-  const commitJob = usePollJob(commitJobId);
+  const [uploadJobId, setUploadJobId] = useState<number | null>(null);
+  const uploadJob = usePollJob(uploadJobId);
 
   async function upload() {
     if (!file) return;
-    setUploading(true); setUploadError(null); setCommitJobId(null);
+    setUploading(true); setUploadError(null); setUploadJobId(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -193,45 +203,11 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       const res = await fetch("/api/bulk/uploads", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) { setUploadError(data.error ?? "Upload failed"); return; }
-      setJobId(data.jobId);
-      setTotals(data.totals);
-      await loadDiff(data.jobId, "all");
+      setUploadJobId(data.jobId);
     } finally {
       setUploading(false);
     }
   }
-
-  async function loadDiff(id: number, f: typeof filter) {
-    const res = await fetch(`/api/bulk/uploads/${id}/diff${f !== "all" ? `?filter=${f}` : ""}`);
-    const data = await res.json();
-    setTotals(data.totals);
-    setRows(data.rows);
-    setFilter(f);
-  }
-
-  async function commit() {
-    if (!jobId) return;
-    setCommitting(true);
-    try {
-      const res = await fetch(`/api/bulk/uploads/${jobId}/commit`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmed: true, conflict_policy: conflictPolicy }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setUploadError(data.error ?? "Commit failed"); return; }
-      setCommitJobId(data.jobId);
-    } finally {
-      setCommitting(false);
-    }
-  }
-
-  const OUTCOME_STYLE: Record<string, string> = {
-    UPDATE: "bg-blue-50 text-blue-700 border-blue-200",
-    CREATE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    SKIPPED_NOOP: "bg-gray-100 text-gray-500 border-gray-200",
-    SKIPPED_CONFLICT: "bg-amber-50 text-amber-700 border-amber-200",
-    ERROR: "bg-red-50 text-red-700 border-red-200",
-  };
 
   // ── Jobs tab ────────────────────────────────────────────────────────────────
   const [jobs, setJobs] = useState<BulkJob[]>([]);
@@ -277,9 +253,9 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       {tab === "download" && (
       <div className="card p-5">
         <h2 className="text-lg font-bold text-ink mb-1">Download</h2>
-        <p className="text-xs text-muted mb-4">Export a scope to Excel for offline bulk editing. Runs as a background job — track it here or in the Jobs tab.</p>
+        <p className="text-xs text-muted mb-4">Export a scope to Excel for offline bulk editing, or download a blank template to create brand-new records. Runs as a background job — track it here or in the Jobs tab.</p>
 
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4 mb-4 flex-wrap">
           <label className="flex items-center gap-1.5 text-sm">
             <input type="radio" checked={downloadKind === "SOURCE"} onChange={() => setDownloadKind("SOURCE")} /> Data Source
           </label>
@@ -294,6 +270,9 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
           </label>
           <label className="flex items-center gap-1.5 text-sm">
             <input type="radio" checked={downloadKind === "CUSTOM_REL_TYPE"} onChange={() => setDownloadKind("CUSTOM_REL_TYPE")} /> Custom Asset Links — By Relationship
+          </label>
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="radio" checked={downloadKind === "EMPTY_TEMPLATE"} onChange={() => setDownloadKind("EMPTY_TEMPLATE")} /> Empty Template (new records)
           </label>
         </div>
 
@@ -335,6 +314,14 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
             </select>
           </div>
         )}
+        {downloadKind === "EMPTY_TEMPLATE" && (
+          <div className="mb-4">
+            <select value={emptyTemplateSheet} onChange={(e) => setEmptyTemplateSheet(e.target.value as typeof emptyTemplateSheet)} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
+              {CREATABLE_SHEETS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <p className="text-[11px] text-muted mt-2">Headers only, no rows. Leave the _ID column blank on every row you add — new records get their id assigned automatically when uploaded.</p>
+          </div>
+        )}
 
         {downloadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{downloadError}</div>}
         <button onClick={download} disabled={downloading || !canEdit} className="btn btn-primary btn-sm">
@@ -350,7 +337,11 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       {tab === "upload" && canEdit && (
         <div className="card p-5">
           <h2 className="text-lg font-bold text-ink mb-1">Upload</h2>
-          <p className="text-xs text-muted mb-4">Upload an edited template — nothing is applied until you review the preview and commit. Committing runs as a background job.</p>
+          <p className="text-xs text-muted mb-4">
+            Upload an edited (or blank, filled-in) template. It's validated and committed automatically as a background
+            job — there's no separate approval step. Any rows that fail land in a downloadable rejected-records file
+            you can fix and re-upload.
+          </p>
 
           <div className="flex items-center gap-4 mb-4 flex-wrap">
             <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
@@ -362,71 +353,12 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
               <option value="OVERWRITE">Conflicts: Overwrite anyway</option>
             </select>
             <button onClick={upload} disabled={!file || uploading} className="btn btn-primary btn-sm">
-              {uploading ? "Validating…" : "Upload & Validate"}
+              {uploading ? "Starting…" : "Upload"}
             </button>
           </div>
           {uploadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{uploadError}</div>}
-        </div>
-      )}
 
-      {/* ── Diff preview ─────────────────────────────────────────────────── */}
-      {tab === "upload" && jobId && totals && (
-        <div className="card p-5">
-          <h2 className="text-lg font-bold text-ink mb-4">Preview</h2>
-
-          <div className="grid grid-cols-5 gap-3 mb-4">
-            {([["Updates", totals.updates, "text-blue-600"], ["Creates", totals.creates, "text-emerald-600"],
-               ["No-op", totals.skipped, "text-gray-500"], ["Conflicts", totals.conflicts, "text-amber-600"],
-               ["Errors", totals.errors, "text-red-600"]] as const).map(([label, val, cls]) => (
-              <div key={label} className="bg-canvas-soft rounded-lg px-3 py-3 text-center">
-                <div className={`text-xl font-extrabold ${cls}`}>{val}</div>
-                <div className="text-[10px] text-muted mt-0.5">{label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 mb-3">
-            {(["all", "errors", "conflicts"] as const).map((f) => (
-              <button key={f} onClick={() => loadDiff(jobId, f)}
-                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${filter === f ? "bg-brand-purple text-white border-brand-purple" : "text-muted border-line hover:border-brand-purple"}`}>
-                {f === "all" ? "All" : f === "errors" ? "Errors only" : "Conflicts only"}
-              </button>
-            ))}
-          </div>
-
-          <div className="max-h-96 overflow-y-auto space-y-1.5 border border-line rounded-lg p-2">
-            {rows.map((r, i) => (
-              <div key={i} className="border border-line-soft rounded-md px-3 py-2 text-[12px]">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${OUTCOME_STYLE[r.outcome]}`}>{r.outcome}</span>
-                  <span className="text-ink-soft">{r.sheet} row {r.rowNumber}</span>
-                  {r.assetId && <span className="text-muted font-mono">#{r.assetId}</span>}
-                </div>
-                {r.changes.length > 0 && (
-                  <div className="mt-1 text-ink-soft">
-                    {r.changes.map((c, j) => <div key={j}>{c.header}: <span className="text-muted">&quot;{c.oldVal ?? ""}&quot;</span> → <span className="font-medium">&quot;{c.newVal ?? ""}&quot;</span></div>)}
-                  </div>
-                )}
-                {r.errors.length > 0 && <div className="mt-1 text-red-600">{r.errors.join("; ")}</div>}
-              </div>
-            ))}
-            {rows.length === 0 && <div className="text-center text-muted text-sm py-6">No rows match this filter.</div>}
-          </div>
-
-          {!commitJob && (
-            <div className="flex items-center gap-3 pt-4">
-              <button onClick={commit} disabled={committing || totals.updates + totals.creates === 0} className="btn btn-primary btn-sm">
-                {committing ? "Starting…" : `Commit ${totals.updates + totals.creates} change(s)`}
-              </button>
-              {totals.conflicts > 0 && (
-                <span className="text-[11px] text-amber-700">
-                  {totals.conflicts} row(s) changed since export — {conflictPolicy === "OVERWRITE" ? "will be overwritten" : "will be skipped"} (change the policy above before committing to change this)
-                </span>
-              )}
-            </div>
-          )}
-
-          {commitJob && <JobStatusCard job={commitJob} title="Commit" />}
+          {uploadJob && <JobStatusCard job={uploadJob} title="Upload" />}
         </div>
       )}
 
@@ -456,6 +388,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
                     Started {new Date(j.createdAt).toLocaleString()}
                     {j.finishedAt && ` · Finished ${new Date(j.finishedAt).toLocaleString()}`}
                   </div>
+                  {j.status === "RUNNING" && <ProgressBar job={j} />}
                   {j.status === "FAILED" && j.errorText && (
                     <div className="text-[12px] text-red-600 mt-1.5">{j.errorText}</div>
                   )}

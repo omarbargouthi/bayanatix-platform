@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     try {
       const sheetRows = await resolveDownloadScope(scope);
       const totalRows = Object.values(sheetRows).reduce((sum, rows) => sum + (rows?.length ?? 0), 0);
-      if (totalRows === 0) {
+      if (totalRows === 0 && scope.type !== "EMPTY_TEMPLATE") {
         await failJob(jobId, "No rows matched the requested scope");
         return;
       }

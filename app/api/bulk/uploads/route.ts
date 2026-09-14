@@ -3,10 +3,21 @@ import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { parseUploadedWorkbook } from "@/lib/bulk/workbook-reader";
 import { validateWorkbook, summarizePlans } from "@/lib/bulk/validate";
-import { createUploadJob, failJob } from "@/lib/queries/bulk-jobs";
+import { commitPlans } from "@/lib/bulk/commit";
+import { buildResultWorkbook, buildRejectedWorkbook } from "@/lib/bulk/result-writer";
+import { buildJobLogText } from "@/lib/bulk/log-writer";
+import { createUploadJob, finishUploadCommit, failJob, getBulkJob } from "@/lib/queries/bulk-jobs";
 import { TEMPLATE_SCHEMA_VERSION } from "@/lib/bulk/sheets";
 
-// multipart/form-data: file, strict_mode?, conflict_policy? -> parse+validate -> AWAITING_CONFIRM job + diff summary
+// multipart/form-data: file, strict_mode?, conflict_policy?
+// Reads and sanity-checks the workbook synchronously (fast — just structure, no
+// per-row DB work) so a wrong/corrupt file fails immediately with a clear error.
+// Everything else — row-by-row validation, the actual commit, and building the
+// result/rejected/log files — runs in the background (see lib/queries/bulk-jobs.ts's
+// top note): there is no manual review/approve step, the upload commits
+// automatically. Poll GET /api/bulk/jobs/{id} (progressProcessed/progressTotal show
+// live progress) or watch the Jobs tab; once COMMITTED, download the result,
+// rejected-records, and log files from there.
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,12 +50,21 @@ export async function POST(req: Request) {
   const exportSnapshotAt = parsed.meta?.exportedAt ? new Date(parsed.meta.exportedAt) : null;
   const jobId = await createUploadJob(file.name, fileData, session.userId, { strictMode, conflictPolicy, exportSnapshotAt });
 
-  try {
-    const plans = await validateWorkbook(parsed, { session, strictMode, exportSnapshotAt });
-    const totals = summarizePlans(plans);
-    return NextResponse.json({ jobId, totals }, { status: 201 });
-  } catch (err) {
-    await failJob(jobId, err instanceof Error ? err.message : "Validation failed");
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Validation failed" }, { status: 500 });
-  }
+  void (async () => {
+    try {
+      const plans = await validateWorkbook(parsed, { session, strictMode, exportSnapshotAt });
+      const commitTotals = await commitPlans(jobId, plans, { session, conflictPolicy, overrideRowKeys: new Set() });
+      const resultFile = await buildResultWorkbook(plans);
+      const rejectedFile = await buildRejectedWorkbook(parsed, plans);
+      const totals = { ...summarizePlans(plans), ...commitTotals };
+
+      const job = await getBulkJob(jobId);
+      const logFile = buildJobLogText({ ...job!, status: "COMMITTED", totals, finishedAt: new Date().toISOString() });
+      await finishUploadCommit(jobId, totals, resultFile, logFile, rejectedFile);
+    } catch (err) {
+      await failJob(jobId, err instanceof Error ? err.message : "Upload processing failed");
+    }
+  })();
+
+  return NextResponse.json({ jobId, status: "RUNNING" }, { status: 202 });
 }
