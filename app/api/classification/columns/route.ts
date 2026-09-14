@@ -30,6 +30,7 @@ export async function GET(req: Request) {
   const filter     = searchParams.get("filter") ?? "all";
   const search     = (searchParams.get("search") ?? "").trim();
   const schemaId   = searchParams.get("schemaId") ? Number(searchParams.get("schemaId")) : null;
+  const dataSourceId = searchParams.get("dataSourceId") ? Number(searchParams.get("dataSourceId")) : null;
   const mySources  = searchParams.get("mySources") === "true";
   const page       = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const limit      = Math.min(100, Math.max(10, Number(searchParams.get("limit") ?? "50")));
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
       AND ${filter === "unclassified" ? sql`abt.glossary_id IS NULL`                     : sql`true`}
       AND ${filter === "cde"      ? sql`bg.classification_code = ANY(${cdeCodes})`       : sql`true`}
       AND ${schemaId != null      ? sql`s.schema_id = ${schemaId}`                       : sql`true`}
+      AND ${dataSourceId != null  ? sql`s.data_source_id = ${dataSourceId}`              : sql`true`}
       AND ${mySources ? sql`
             s.data_source_id IN (
               SELECT DISTINCT asset_id FROM bayanat.asset_stakeholders

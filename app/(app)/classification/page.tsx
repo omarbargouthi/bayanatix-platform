@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
-import { getClassificationStats } from "@/lib/queries/catalog";
+import { getClassificationStatsScoped } from "@/lib/queries/catalog";
 import { ClassificationClient } from "@/components/classification/ClassificationClient";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +9,13 @@ export const dynamic = "force-dynamic";
 export default async function ClassificationPage({
   searchParams,
 }: {
-  searchParams: { filter?: string; search?: string };
+  searchParams: { filter?: string; search?: string; dataSourceId?: string };
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const stats = await getClassificationStats();
+  const dataSourceId = searchParams.dataSourceId ? Number(searchParams.dataSourceId) : undefined;
+  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId });
 
   return (
     <>
@@ -31,6 +32,7 @@ export default async function ClassificationPage({
           initialStats={stats}
           initialFilter={searchParams.filter ?? "all"}
           initialSearch={searchParams.search ?? ""}
+          initialDataSourceId={dataSourceId ? String(dataSourceId) : ""}
           canEdit={user.role === "ADMIN" || user.role === "STEWARD"}
         />
       </main>

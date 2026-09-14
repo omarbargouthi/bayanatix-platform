@@ -161,9 +161,12 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
             </div>
           </div>
 
-          {/* CDEs tile — links to classification page with CDE filter */}
+          {/* CDEs tile — links to classification page with CDE filter, scoped to
+              this schema's data source (cdeCount itself is schema-scoped — see
+              getSchemaById's cdeCount subquery — so the count shown here and the
+              list you land on need to agree on the same source). */}
           <Link
-            href="/classification?filter=cde"
+            href={schema.source ? `/classification?filter=cde&dataSourceId=${schema.source.dataSourceId}` : "/classification?filter=cde"}
             className="bg-white/70 border border-white rounded-xl px-5 py-4 text-center shadow-sm hover:bg-brand-purple/10 hover:border-brand-purple/30 transition-colors group"
           >
             <div className="text-3xl font-extrabold text-brand-purple leading-none mb-1 group-hover:text-brand-deep transition-colors">

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { ClassificationTag } from "@/components/ui/Tag";
+import { SourceSystemSelect } from "@/components/catalog/SourceSystemSelect";
 import type { ClassificationStats } from "@/lib/queries/catalog";
 import type { ClassificationColumn } from "@/app/api/classification/columns/route";
 import type { GlossaryPickerDomain } from "@/app/api/glossary/picker/route";
@@ -295,14 +296,16 @@ type Props = {
   initialStats:  ClassificationStats;
   initialFilter: string;
   initialSearch: string;
+  initialDataSourceId: string;
   canEdit:       boolean;
 };
 
-export function ClassificationClient({ initialStats, initialFilter, initialSearch, canEdit }: Props) {
+export function ClassificationClient({ initialStats, initialFilter, initialSearch, initialDataSourceId, canEdit }: Props) {
   const { t } = useLang();
   const [stats,   setStats]   = useState(initialStats);
   const [filter,  setFilter]  = useState(initialFilter);
   const [search,  setSearch]  = useState(initialSearch);
+  const [dataSourceId, setDataSourceId] = useState(initialDataSourceId);
   const [rows,    setRows]    = useState<ClassificationColumn[]>([]);
   const [total,   setTotal]   = useState(0);
   const [page,    setPage]    = useState(1);
@@ -312,10 +315,11 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
   const [saving,  setSaving]  = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
-  const fetchRows = useCallback(async (f: string, s: string, p: number) => {
+  const fetchRows = useCallback(async (f: string, s: string, p: number, ds: string) => {
     setLoading(true);
     const params = new URLSearchParams({ filter: f, page: String(p), limit: "50" });
     if (s) params.set("search", s);
+    if (ds) params.set("dataSourceId", ds);
     const r = await fetch(`/api/classification/columns?${params}`);
     const data = await r.json();
     setRows(data.data ?? []);
@@ -323,22 +327,30 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchRows(filter, search, page); }, [filter, page]);
+  const refreshStats = useCallback(async (ds: string) => {
+    const params = new URLSearchParams();
+    if (ds) params.set("dataSourceId", ds);
+    const r = await fetch(`/api/classification/stats?${params}`);
+    const s = await r.json();
+    setStats(s);
+  }, []);
+
+  useEffect(() => { fetchRows(filter, search, page, dataSourceId); }, [filter, page]);
 
   function onSearchChange(v: string) {
     setSearch(v);
     clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => { setPage(1); fetchRows(filter, v, 1); }, 350);
+    searchTimeout.current = setTimeout(() => { setPage(1); fetchRows(filter, v, 1, dataSourceId); }, 350);
   }
 
   function onFilterChange(f: string) {
-    setFilter(f); setPage(1); setSelected(new Set()); fetchRows(f, search, 1);
+    setFilter(f); setPage(1); setSelected(new Set()); fetchRows(f, search, 1, dataSourceId);
   }
 
-  async function refreshStats() {
-    const r = await fetch("/api/classification/stats");
-    const s = await r.json();
-    setStats(s);
+  function onDataSourceChange(ds: string) {
+    setDataSourceId(ds); setPage(1); setSelected(new Set());
+    fetchRows(filter, search, 1, ds);
+    refreshStats(ds);
   }
 
   async function assignClassification(attributeIds: number[], classificationId: number | null) {
@@ -350,7 +362,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
     });
     setSaving(false);
     setSelected(new Set());
-    await Promise.all([fetchRows(filter, search, page), refreshStats()]);
+    await Promise.all([fetchRows(filter, search, page, dataSourceId), refreshStats(dataSourceId)]);
   }
 
   function toggleSelect(id: number) {
@@ -430,6 +442,12 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
             </button>
           ))}
         </div>
+
+        <SourceSystemSelect
+          value={dataSourceId}
+          onChange={onDataSourceChange}
+          className="text-sm border border-line rounded-lg px-3 py-1.5 bg-white"
+        />
 
         <div className="flex items-center gap-2 bg-white border border-line rounded-lg px-3 py-1.5 flex-1 max-w-xs">
           <svg className="w-3.5 h-3.5 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
