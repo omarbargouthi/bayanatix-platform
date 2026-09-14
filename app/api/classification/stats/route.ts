@@ -7,6 +7,7 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const dataSourceId = searchParams.get("dataSourceId") ? Number(searchParams.get("dataSourceId")) : undefined;
-  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId });
+  const schemaId = searchParams.get("schemaId") ? Number(searchParams.get("schemaId")) : undefined;
+  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId });
   return NextResponse.json(stats);
 }

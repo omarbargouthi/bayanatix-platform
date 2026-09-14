@@ -297,15 +297,22 @@ type Props = {
   initialFilter: string;
   initialSearch: string;
   initialDataSourceId: string;
+  initialSchemaId: string;
   canEdit:       boolean;
 };
 
-export function ClassificationClient({ initialStats, initialFilter, initialSearch, initialDataSourceId, canEdit }: Props) {
+export function ClassificationClient({ initialStats, initialFilter, initialSearch, initialDataSourceId, initialSchemaId, canEdit }: Props) {
   const { t } = useLang();
   const [stats,   setStats]   = useState(initialStats);
   const [filter,  setFilter]  = useState(initialFilter);
   const [search,  setSearch]  = useState(initialSearch);
   const [dataSourceId, setDataSourceId] = useState(initialDataSourceId);
+  // Deep-links from a specific schema (e.g. the schema page's CDEs tile) narrow to
+  // that one schema, not the whole source — a source can have more than one schema,
+  // so filtering by dataSourceId alone would show a bigger, mismatched total.
+  // Cleared the moment the user touches the Data Source dropdown themselves, so
+  // manually broadening to "the whole source" behaves as expected afterward.
+  const [schemaId, setSchemaId] = useState(initialSchemaId);
   const [rows,    setRows]    = useState<ClassificationColumn[]>([]);
   const [total,   setTotal]   = useState(0);
   const [page,    setPage]    = useState(1);
@@ -315,11 +322,12 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
   const [saving,  setSaving]  = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
-  const fetchRows = useCallback(async (f: string, s: string, p: number, ds: string) => {
+  const fetchRows = useCallback(async (f: string, s: string, p: number, ds: string, schId: string) => {
     setLoading(true);
     const params = new URLSearchParams({ filter: f, page: String(p), limit: "50" });
     if (s) params.set("search", s);
     if (ds) params.set("dataSourceId", ds);
+    if (schId) params.set("schemaId", schId);
     const r = await fetch(`/api/classification/columns?${params}`);
     const data = await r.json();
     setRows(data.data ?? []);
@@ -327,30 +335,31 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
     setLoading(false);
   }, []);
 
-  const refreshStats = useCallback(async (ds: string) => {
+  const refreshStats = useCallback(async (ds: string, schId: string) => {
     const params = new URLSearchParams();
     if (ds) params.set("dataSourceId", ds);
+    if (schId) params.set("schemaId", schId);
     const r = await fetch(`/api/classification/stats?${params}`);
     const s = await r.json();
     setStats(s);
   }, []);
 
-  useEffect(() => { fetchRows(filter, search, page, dataSourceId); }, [filter, page]);
+  useEffect(() => { fetchRows(filter, search, page, dataSourceId, schemaId); }, [filter, page]);
 
   function onSearchChange(v: string) {
     setSearch(v);
     clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => { setPage(1); fetchRows(filter, v, 1, dataSourceId); }, 350);
+    searchTimeout.current = setTimeout(() => { setPage(1); fetchRows(filter, v, 1, dataSourceId, schemaId); }, 350);
   }
 
   function onFilterChange(f: string) {
-    setFilter(f); setPage(1); setSelected(new Set()); fetchRows(f, search, 1, dataSourceId);
+    setFilter(f); setPage(1); setSelected(new Set()); fetchRows(f, search, 1, dataSourceId, schemaId);
   }
 
   function onDataSourceChange(ds: string) {
-    setDataSourceId(ds); setPage(1); setSelected(new Set());
-    fetchRows(filter, search, 1, ds);
-    refreshStats(ds);
+    setDataSourceId(ds); setSchemaId(""); setPage(1); setSelected(new Set());
+    fetchRows(filter, search, 1, ds, "");
+    refreshStats(ds, "");
   }
 
   async function assignClassification(attributeIds: number[], classificationId: number | null) {
@@ -362,7 +371,7 @@ export function ClassificationClient({ initialStats, initialFilter, initialSearc
     });
     setSaving(false);
     setSelected(new Set());
-    await Promise.all([fetchRows(filter, search, page, dataSourceId), refreshStats(dataSourceId)]);
+    await Promise.all([fetchRows(filter, search, page, dataSourceId, schemaId), refreshStats(dataSourceId, schemaId)]);
   }
 
   function toggleSelect(id: number) {

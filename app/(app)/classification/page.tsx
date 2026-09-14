@@ -9,13 +9,14 @@ export const dynamic = "force-dynamic";
 export default async function ClassificationPage({
   searchParams,
 }: {
-  searchParams: { filter?: string; search?: string; dataSourceId?: string };
+  searchParams: { filter?: string; search?: string; dataSourceId?: string; schemaId?: string };
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
   const dataSourceId = searchParams.dataSourceId ? Number(searchParams.dataSourceId) : undefined;
-  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId });
+  const schemaId = searchParams.schemaId ? Number(searchParams.schemaId) : undefined;
+  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId });
 
   return (
     <>
@@ -33,6 +34,7 @@ export default async function ClassificationPage({
           initialFilter={searchParams.filter ?? "all"}
           initialSearch={searchParams.search ?? ""}
           initialDataSourceId={dataSourceId ? String(dataSourceId) : ""}
+          initialSchemaId={schemaId ? String(schemaId) : ""}
           canEdit={user.role === "ADMIN" || user.role === "STEWARD"}
         />
       </main>
