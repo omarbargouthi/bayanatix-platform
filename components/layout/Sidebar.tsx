@@ -10,7 +10,7 @@ import { LanguagePicker } from "./LanguagePicker";
 import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
-  IconLock, IconShare, IconChat, IconCog, IconHelp, IconShield, IconHistory, IconFlag, IconAI,
+  IconLock, IconShare, IconChat, IconCog, IconShield, IconHistory, IconFlag, IconAI,
   IconBulk, IconGlossary, IconDB, IconLineage,
 } from "./icons";
 
@@ -135,9 +135,6 @@ export function Sidebar({ user }: { user: SessionUser }) {
 
       {/* Bottom */}
       <div className="border-t border-line px-2.5 py-3">
-        <NavLink item={{ href: "/support",  label: t.nav.support,  Icon: IconHelp }} active={isActive("/support")}  collapsed={collapsed} isRtl={isRtl} />
-        <NavLink item={{ href: "/settings", label: t.nav.settings, Icon: IconCog  }} active={isActive("/settings")} collapsed={collapsed} isRtl={isRtl} />
-
         {/* Language picker */}
         <div className={`w-full mt-1 ${collapsed ? "flex justify-center" : ""}`}>
           <LanguagePicker

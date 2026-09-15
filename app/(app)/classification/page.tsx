@@ -22,7 +22,7 @@ export default async function ClassificationPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
+          { label: "Bayanat", href: "/dashboard" },
           { label: "Classification" },
         ]}
         user={user}

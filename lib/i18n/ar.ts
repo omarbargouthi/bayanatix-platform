@@ -30,8 +30,6 @@ export const ar: I18nStrings = {
     customAssetTypes:   "أنواع الأصول المخصصة",
     complianceConfig:   "إعدادات الامتثال",
     indexSetup:        "إعداد الفهرس",
-    support:           "الدعم",
-    settings:          "الإعدادات",
     sectionDomains:    "النطاقات",
     sectionAdmin:      "الإدارة",
     sectionCompliance: "الامتثال",

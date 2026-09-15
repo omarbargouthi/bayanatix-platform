@@ -13,7 +13,7 @@ export default async function FoiPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
+          { label: "Bayanat", href: "/dashboard" },
           { label: "Freedom of Information" },
         ]}
         user={session}

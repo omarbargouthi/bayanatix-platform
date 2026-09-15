@@ -321,7 +321,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
         )}
       </div>
 
-      {/* Right actions: Language · Notification · History · Collaboration */}
+      {/* Right actions: Language · Notification · Collaboration */}
       <div className={`${isRtl ? "mr-auto" : "ml-auto"} flex items-center gap-1`}>
         {/* Language */}
         <div className="hidden sm:block">
@@ -331,11 +331,6 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
         {/* Notification */}
         <HeaderIconBtn label="Notifications" badgeCount={unreadCount} onClick={() => setNotifOpen(true)}>
           <IconBell className="w-[17px] h-[17px]" />
-        </HeaderIconBtn>
-
-        {/* History */}
-        <HeaderIconBtn label="Activity history">
-          <IconHistory className="w-[17px] h-[17px]" />
         </HeaderIconBtn>
 
         {/* Collaboration */}

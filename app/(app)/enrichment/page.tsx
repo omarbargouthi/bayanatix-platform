@@ -16,7 +16,7 @@ export default async function EnrichmentPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
+          { label: "Bayanat", href: "/dashboard" },
           { label: "Enrichment" },
         ]}
         user={user}

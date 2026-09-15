@@ -30,8 +30,6 @@ export const en: I18nStrings = {
     customAssetTypes:   "Custom Asset Types",
     complianceConfig:   "Configuration",
     indexSetup:        "Index Setup",
-    support:           "Support",
-    settings:          "Settings",
     sectionDomains:    "Domains",
     sectionAdmin:      "Administration",
     sectionCompliance: "Compliance",

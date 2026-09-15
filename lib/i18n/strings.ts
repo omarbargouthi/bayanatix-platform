@@ -38,9 +38,6 @@ export type I18nStrings = {
     // Compliance sub-items (kept for backward compat)
     complianceConfig: string;
     indexSetup:       string;
-    // Bottom
-    support:          string;
-    settings:         string;
     // Section group headers
     sectionDomains:    string;
     sectionAdmin:      string;

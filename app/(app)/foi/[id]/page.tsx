@@ -26,7 +26,7 @@ export default async function FoiCasePage({ params }: Props) {
     <>
       <Header
         crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
+          { label: "Bayanat", href: "/dashboard" },
           { label: "Freedom of Information", href: "/foi" },
           { label: refCode },
         ]}

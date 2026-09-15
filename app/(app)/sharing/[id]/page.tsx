@@ -33,7 +33,7 @@ export default async function DsaPage({ params }: Props) {
     <>
       <Header
         crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
+          { label: "Bayanat", href: "/dashboard" },
           { label: "Data Sharing Agreements", href: "/sharing" },
           { label: titleText },
         ]}

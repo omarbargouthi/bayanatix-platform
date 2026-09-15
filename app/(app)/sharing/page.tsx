@@ -13,7 +13,7 @@ export default async function SharingPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanatix", href: "/dashboard" },
+          { label: "Bayanat", href: "/dashboard" },
           { label: "Data Sharing Agreements" },
         ]}
         user={user}
