@@ -6,6 +6,7 @@ import { Tag } from "@/components/ui/Tag";
 import { Donut } from "@/components/ui/Donut";
 import { AssetTree } from "@/components/catalog/AssetTree";
 import { AddAssetButton } from "@/components/catalog/AddAssetButton";
+import { NewTermModal } from "@/components/glossary/NewTermModal";
 import { IconBook } from "@/components/layout/icons";
 import { fmtNumber } from "@/lib/utils";
 import { useLang } from "@/lib/lang-context";
@@ -51,13 +52,14 @@ export function CatalogPageClient({
   const { t } = useLang();
   const c = t.catalog;
   const [dqConfigOpen, setDqConfigOpen] = useState(false);
+  const [showNewTerm, setShowNewTerm] = useState(false);
 
-  // Source filter — narrows the Data Assets tree below to one source; "KSA · ..."
-  // reflects whichever is currently selected (empty = All sources). The four
-  // coverage/quality cards above stay catalog-wide regardless of this filter —
-  // re-scoping those would mean per-source variants of getCdeCoverage() and
-  // friends, out of scope for what was asked here.
-  const [sourceFilterId, setSourceFilterId] = useState<number | "">("");
+  // Source filter — narrows the Data Assets tree below to any number of sources
+  // (multi-select); "KSA · ..." reflects the current selection (empty = All
+  // sources). The four coverage/quality cards above stay catalog-wide regardless
+  // of this filter — re-scoping those would mean per-source variants of
+  // getCdeCoverage() and friends, out of scope for what was asked here.
+  const [sourceFilterIds, setSourceFilterIds] = useState<Set<number>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -69,10 +71,50 @@ export function CatalogPageClient({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filteredSources = sourceFilterId === "" ? sources : sources.filter((s) => s.dataSourceId === sourceFilterId);
-  const scopeLabel = sourceFilterId === ""
+  function toggleSourceFilter(id: number) {
+    setSourceFilterIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  const sourceFiltered = sourceFilterIds.size === 0 ? sources : sources.filter((s) => sourceFilterIds.has(s.dataSourceId));
+  const scopeLabel = sourceFilterIds.size === 0
     ? "All sources"
-    : sources.find((s) => s.dataSourceId === sourceFilterId)?.sourceName ?? "All sources";
+    : sourceFilterIds.size === 1
+    ? sources.find((s) => sourceFilterIds.has(s.dataSourceId))?.sourceName ?? "All sources"
+    : `${sourceFilterIds.size} sources`;
+
+  // Data Assets panel — search-by-name + sort, applied on top of the source filter.
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetSearchOpen, setAssetSearchOpen] = useState(false);
+  const [assetSort, setAssetSort] = useState<"name" | "nameDesc" | "tables" | "schemas">("name");
+  const [sortOpen, setSortOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setAssetSearchOpen(false);
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const q = assetSearch.trim().toLowerCase();
+  const searchFiltered = q === "" ? sourceFiltered : sourceFiltered
+    .map((s) => ({ ...s, schemas: s.schemas.filter((sc) => sc.schemaName.toLowerCase().includes(q)) }))
+    .filter((s) => s.sourceName.toLowerCase().includes(q) || s.schemas.length > 0);
+
+  const tableCount = (s: DataSource & { schemas: DataSchema[] }) => s.schemas.reduce((sum, sc) => sum + (sc.tableCount ?? 0), 0);
+  const filteredSources = [...searchFiltered].sort((a, b) => {
+    if (assetSort === "name") return a.sourceName.localeCompare(b.sourceName);
+    if (assetSort === "nameDesc") return b.sourceName.localeCompare(a.sourceName);
+    if (assetSort === "tables") return tableCount(b) - tableCount(a);
+    return b.schemas.length - a.schemas.length;
+  });
 
   const cdeCoveragePct = cdeCoverage.businessColumns > 0
     ? Math.round((cdeCoverage.cdeColumns / cdeCoverage.businessColumns) * 100) : 0;
@@ -101,25 +143,34 @@ export function CatalogPageClient({
               </h1>
               <div className="flex items-center gap-2">
                 <div className="relative" ref={filterRef}>
-                  <button onClick={() => setFilterOpen((v) => !v)} className="btn btn-sm">{c.filterBtn}</button>
+                  <button onClick={() => setFilterOpen((v) => !v)} className="btn btn-sm">
+                    {c.filterBtn}{sourceFilterIds.size > 0 && ` (${sourceFilterIds.size})`}
+                  </button>
                   {filterOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-line rounded-lg shadow-lg z-50 py-1">
+                    <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-line rounded-lg shadow-lg z-50 py-1">
                       <button
-                        onClick={() => { setSourceFilterId(""); setFilterOpen(false); }}
-                        className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-canvas ${sourceFilterId === "" ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
+                        onClick={() => setSourceFilterIds(new Set())}
+                        className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-canvas ${sourceFilterIds.size === 0 ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
                       >
                         All sources
                       </button>
                       <div className="border-t border-line-soft my-1" />
-                      {sources.map((s) => (
-                        <button
-                          key={s.dataSourceId}
-                          onClick={() => { setSourceFilterId(s.dataSourceId); setFilterOpen(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-canvas truncate ${sourceFilterId === s.dataSourceId ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
-                        >
-                          {s.sourceName}
-                        </button>
-                      ))}
+                      <div className="max-h-64 overflow-y-auto">
+                        {sources.map((s) => (
+                          <label
+                            key={s.dataSourceId}
+                            className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-ink-soft hover:bg-canvas cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={sourceFilterIds.has(s.dataSourceId)}
+                              onChange={() => toggleSourceFilter(s.dataSourceId)}
+                              className="w-3.5 h-3.5 accent-brand-purple shrink-0"
+                            />
+                            <span className="truncate">{s.sourceName}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -256,17 +307,48 @@ export function CatalogPageClient({
           <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
             <h3 className="font-bold">{c.dataAssets}</h3>
             <div className="flex items-center gap-2">
-              <button className="btn btn-sm">{c.sortBtn}</button>
-              <button className="btn btn-sm">{c.filterBtn}</button>
+              <div className="relative" ref={sortRef}>
+                <button onClick={() => setSortOpen((v) => !v)} className="btn btn-sm">{c.sortBtn}</button>
+                {sortOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-line rounded-lg shadow-lg z-50 py-1">
+                    {([
+                      ["name", "Name (A–Z)"], ["nameDesc", "Name (Z–A)"],
+                      ["tables", "Most tables"], ["schemas", "Most schemas"],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        onClick={() => { setAssetSort(value); setSortOpen(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-canvas ${assetSort === value ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="relative" ref={searchRef}>
+                <button onClick={() => setAssetSearchOpen((v) => !v)} className="btn btn-sm">{c.filterBtn}</button>
+                {assetSearchOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-60 bg-white border border-line rounded-lg shadow-lg z-50 p-2">
+                    <input
+                      autoFocus
+                      value={assetSearch}
+                      onChange={(e) => setAssetSearch(e.target.value)}
+                      placeholder="Search source or schema name…"
+                      className="w-full text-[13px] border border-line rounded-md px-2 py-1.5 outline-none focus:border-brand-purple"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2.5 px-5 py-3.5 border-b border-line-soft">
-            <Big label={c.sources} value={sourceFilterId === "" ? stats.sources : filteredSources.length} />
+            <Big label={c.sources} value={sourceFilterIds.size === 0 && q === "" ? stats.sources : filteredSources.length} />
             {/* Records has no per-schema breakdown in the `sources` prop to re-sum
                 client-side when filtered — stays the catalog-wide total. */}
             <Big label={c.records} value={stats.records} />
-            <Big label={c.tables}  value={sourceFilterId === "" ? stats.tables : filteredSources.reduce((sum, s) => sum + s.schemas.reduce((s2, sc) => s2 + (sc.tableCount ?? 0), 0), 0)} />
-            <Big label={c.schemas} value={sourceFilterId === "" ? stats.schemas : filteredSources.reduce((sum, s) => sum + s.schemas.length, 0)} />
+            <Big label={c.tables}  value={sourceFilterIds.size === 0 && q === "" ? stats.tables : filteredSources.reduce((sum, s) => sum + tableCount(s), 0)} />
+            <Big label={c.schemas} value={sourceFilterIds.size === 0 && q === "" ? stats.schemas : filteredSources.reduce((sum, s) => sum + s.schemas.length, 0)} />
           </div>
           <div className="px-2 py-2">
             <AssetTree sources={filteredSources} canEdit={canEdit} />
@@ -276,7 +358,7 @@ export function CatalogPageClient({
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
             <h3 className="font-bold">{c.glossaries}</h3>
-            <button className="btn btn-sm">{c.newTerm}</button>
+            <button onClick={() => setShowNewTerm(true)} className="btn btn-sm">{c.newTerm}</button>
           </div>
           <div className="grid grid-cols-4 gap-2.5 px-5 py-3.5 border-b border-line-soft">
             <Big label={c.terms}        value={glossaryStats.totalTerms} />
@@ -299,6 +381,10 @@ export function CatalogPageClient({
           </div>
         </div>
       </section>
+
+      {showNewTerm && (
+        <NewTermModal domains={glossaries} onClose={() => setShowNewTerm(false)} />
+      )}
     </main>
   );
 }

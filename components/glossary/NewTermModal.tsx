@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { GlossaryDomain } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 
 const CLASSIFICATION_OPTIONS = [
@@ -18,8 +17,11 @@ const TERM_TYPE_OPTIONS = [
   { value: "KPI_METRIC", labelKey: "termTypeKpi" as const },
 ];
 
+// Only glossaryId/termName are actually read below — narrower than the full
+// GlossaryDomain type so callers with a lighter-weight domain list (e.g. the
+// Data Catalog page's glossary root summary) can pass it straight through.
 interface Props {
-  domains: GlossaryDomain[];
+  domains: { glossaryId: number; termName: string }[];
   onClose: () => void;
 }
 
