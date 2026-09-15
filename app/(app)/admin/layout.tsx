@@ -1,6 +1,7 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { Header } from "@/components/layout/Header";
+import { AdminHeader } from "@/components/layout/AdminHeader";
 
 export default async function AdminLayout({
   children,
@@ -13,13 +14,11 @@ export default async function AdminLayout({
 
   return (
     <>
-      <Header
-        crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
-          { label: "Administration" },
-        ]}
-        user={user}
-      />
+      {/* Suspense required — AdminHeader uses useSearchParams() to track the
+          active User Management sub-tab */}
+      <Suspense fallback={<div className="sticky top-0 z-20 h-[60px] bg-white border-b border-line" />}>
+        <AdminHeader user={user} />
+      </Suspense>
       {children}
     </>
   );
