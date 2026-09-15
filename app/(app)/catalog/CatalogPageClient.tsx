@@ -37,7 +37,9 @@ type CdeDataQuality = { overallScore: number | null; totalCdes: number; dimensio
 const SEGMENT_COLORS = ["#81B4E1", "#6D7FC4", "#6058A0", "#4D3B8D", "#3A2B66", "#1F1740"];
 
 export function CatalogPageClient({
-  stats, sources, glossaries, glossaryStats, cdeCoverage, classification, cdeMetadataQuality, cdeDataQuality, canEdit,
+  stats: initialStats, sources, glossaries, glossaryStats,
+  cdeCoverage: initialCdeCoverage, classification: initialClassification,
+  cdeMetadataQuality: initialCdeMetadataQuality, cdeDataQuality: initialCdeDataQuality, canEdit,
 }: {
   stats: CatalogStats;
   sources: (DataSource & { schemas: DataSchema[] })[];
@@ -56,12 +58,28 @@ export function CatalogPageClient({
 
   // Source filter — narrows the Data Assets tree below to any number of sources
   // (multi-select); "KSA · ..." reflects the current selection (empty = All
-  // sources). The four coverage/quality cards above stay catalog-wide regardless
-  // of this filter — re-scoping those would mean per-source variants of
-  // getCdeCoverage() and friends, out of scope for what was asked here.
+  // sources). Every analysis card below (stat tiles, CDEs Coverage, Data
+  // Classification, Metadata Quality, Data Quality) re-fetches scoped to this
+  // same selection via GET /api/catalog/stats — see the effect below.
   const [sourceFilterIds, setSourceFilterIds] = useState<Set<number>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+
+  const [analytics, setAnalytics] = useState({
+    stats: initialStats, cdeCoverage: initialCdeCoverage, classification: initialClassification,
+    cdeMetadataQuality: initialCdeMetadataQuality, cdeDataQuality: initialCdeDataQuality,
+  });
+  const { stats, cdeCoverage, classification, cdeMetadataQuality, cdeDataQuality } = analytics;
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const idsParam = [...sourceFilterIds].join(",");
+    fetch(`/api/catalog/stats${idsParam ? `?dataSourceIds=${idsParam}` : ""}`)
+      .then((r) => r.json())
+      .then(setAnalytics)
+      .catch(() => {});
+  }, [sourceFilterIds]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -343,12 +361,13 @@ export function CatalogPageClient({
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2.5 px-5 py-3.5 border-b border-line-soft">
-            <Big label={c.sources} value={sourceFilterIds.size === 0 && q === "" ? stats.sources : filteredSources.length} />
-            {/* Records has no per-schema breakdown in the `sources` prop to re-sum
-                client-side when filtered — stays the catalog-wide total. */}
+            {/* stats.* already comes back scoped to the source filter from
+                GET /api/catalog/stats — only the client-only name search
+                (server doesn't know about it) needs a client-side re-tally. */}
+            <Big label={c.sources} value={q === "" ? stats.sources : filteredSources.length} />
             <Big label={c.records} value={stats.records} />
-            <Big label={c.tables}  value={sourceFilterIds.size === 0 && q === "" ? stats.tables : filteredSources.reduce((sum, s) => sum + tableCount(s), 0)} />
-            <Big label={c.schemas} value={sourceFilterIds.size === 0 && q === "" ? stats.schemas : filteredSources.reduce((sum, s) => sum + s.schemas.length, 0)} />
+            <Big label={c.tables}  value={q === "" ? stats.tables : filteredSources.reduce((sum, s) => sum + tableCount(s), 0)} />
+            <Big label={c.schemas} value={q === "" ? stats.schemas : filteredSources.reduce((sum, s) => sum + s.schemas.length, 0)} />
           </div>
           <div className="px-2 py-2">
             <AssetTree sources={filteredSources} canEdit={canEdit} />

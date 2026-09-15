@@ -50,14 +50,23 @@ export async function getResourcePickerOptions(): Promise<{
 }
 
 // ----- Top-level catalog stats -----
-export async function getCatalogStats(): Promise<CatalogStats> {
+export async function getCatalogStats(dataSourceIds?: number[]): Promise<CatalogStats> {
+  const hasIds = !!dataSourceIds && dataSourceIds.length > 0;
+  const whereDs = hasIds ? sql`AND ds.data_source_id = ANY(${dataSourceIds!})` : sql``;
+  const whereS  = hasIds ? sql`AND s.data_source_id = ANY(${dataSourceIds!})`  : sql``;
   const rows = await sql<CatalogStats[]>`
     select
-      (select count(*)::int from bayanat.data_sources)              as sources,
-      coalesce((select sum(coalesce(row_count_estimate,0))::bigint
-                from bayanat.data_entities), 0)::bigint              as records,
-      (select count(*)::int from bayanat.data_entities)             as tables,
-      (select count(*)::int from bayanat.data_schemas)              as schemas
+      (select count(*)::int from bayanat.data_sources ds
+        where true ${whereDs})                                       as sources,
+      coalesce((select sum(coalesce(e.row_count_estimate,0))::bigint
+                from bayanat.data_entities e
+                join bayanat.data_schemas s on s.schema_id = e.schema_id
+                where true ${whereS}), 0)::bigint                     as records,
+      (select count(*)::int from bayanat.data_entities e
+        join bayanat.data_schemas s on s.schema_id = e.schema_id
+        where true ${whereS})                                        as tables,
+      (select count(*)::int from bayanat.data_schemas s
+        where true ${whereS})                                        as schemas
   `;
   const r = rows[0];
   return {
@@ -932,7 +941,9 @@ const CDE_CLASSIFICATION_CODES = ["CONFIDENTIAL", "SECRET", "TOP_SECRET"];
 
 export type CdeCoverage = { businessColumns: number; cdeColumns: number };
 
-export async function getCdeCoverage(): Promise<CdeCoverage> {
+export async function getCdeCoverage(dataSourceIds?: number[]): Promise<CdeCoverage> {
+  const hasIds = !!dataSourceIds && dataSourceIds.length > 0;
+  const whereS = hasIds ? sql`AND s.data_source_id = ANY(${dataSourceIds!})` : sql``;
   const [row] = await sql<{ businessColumns: number; cdeColumns: number }[]>`
     SELECT
       COUNT(*) FILTER (WHERE a.attribute_class_code = 'BUSINESS')::int AS "businessColumns",
@@ -941,9 +952,12 @@ export async function getCdeCoverage(): Promise<CdeCoverage> {
           AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
       )::int AS "cdeColumns"
     FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    WHERE true ${whereS}
   `;
   return {
     businessColumns: Number(row?.businessColumns ?? 0),
@@ -958,24 +972,30 @@ export type BusinessClassificationBreakdown = {
 
 // Classification completed for business columns specifically (attribute_class_code='BUSINESS'),
 // as distinct from getClassificationStats()'s catalog-wide numbers.
-export async function getBusinessClassificationBreakdown(): Promise<BusinessClassificationBreakdown> {
+export async function getBusinessClassificationBreakdown(dataSourceIds?: number[]): Promise<BusinessClassificationBreakdown> {
+  const hasIds = !!dataSourceIds && dataSourceIds.length > 0;
+  const whereS = hasIds ? sql`AND s.data_source_id = ANY(${dataSourceIds!})` : sql``;
   const [totals] = await sql<{ total: number; classified: number }[]>`
     SELECT
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE abt.glossary_id IS NOT NULL)::int AS classified
     FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
-    WHERE a.attribute_class_code = 'BUSINESS'
+    WHERE a.attribute_class_code = 'BUSINESS' ${whereS}
   `;
   const segments = await sql<ClassificationSegment[]>`
     SELECT bg.classification_code AS code, ct.class_name_text AS name, COUNT(*)::int AS count
     FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     JOIN bayanat.classification_types ct ON ct.class_code = bg.classification_code
-    WHERE a.attribute_class_code = 'BUSINESS'
+    WHERE a.attribute_class_code = 'BUSINESS' ${whereS}
     GROUP BY bg.classification_code, ct.class_name_text, ct.rank_order
     ORDER BY ct.rank_order
   `;
@@ -995,18 +1015,22 @@ export type CdeMetadataQuality = {
 // mirrors CertifyAssetModal's METADATA/DATA split). Consistency = CDEs linked to a governed
 // ENRICHMENT business term, i.e. their definition comes from the shared glossary rather than
 // a one-off local description, so it stays consistent with every other column citing that term.
-export async function getCdeMetadataQuality(): Promise<CdeMetadataQuality> {
+export async function getCdeMetadataQuality(dataSourceIds?: number[]): Promise<CdeMetadataQuality> {
+  const hasIds = !!dataSourceIds && dataSourceIds.length > 0;
+  const whereS = hasIds ? sql`AND s.data_source_id = ANY(${dataSourceIds!})` : sql``;
   const [row] = await sql<{
     total: number; withDescription: number; certified: number; withEnrichment: number;
   }[]>`
     WITH cde AS (
       SELECT a.attribute_id, a.description_text
       FROM bayanat.data_attributes a
+      JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+      JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
       JOIN bayanat.asset_business_terms abt
         ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
       JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
       WHERE a.attribute_class_code = 'BUSINESS'
-        AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+        AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES}) ${whereS}
     )
     SELECT
       (SELECT COUNT(*) FROM cde)::int AS total,
@@ -1075,17 +1099,21 @@ export async function updateCdeDataQualityConfig(
   }
 }
 
-export async function getCdeDataQuality(): Promise<CdeDataQuality> {
+export async function getCdeDataQuality(dataSourceIds?: number[]): Promise<CdeDataQuality> {
   const config = await getCdeDataQualityConfig();
+  const hasIds = !!dataSourceIds && dataSourceIds.length > 0;
+  const whereS = hasIds ? sql`AND s.data_source_id = ANY(${dataSourceIds!})` : sql``;
 
   const cdeIdRows = await sql<{ id: number }[]>`
     SELECT a.attribute_id AS id
     FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     WHERE a.attribute_class_code = 'BUSINESS'
-      AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+      AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES}) ${whereS}
   `;
   const cdeIds = cdeIdRows.map((r) => r.id);
 
