@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui/Tag";
 import { Donut } from "@/components/ui/Donut";
@@ -52,6 +52,28 @@ export function CatalogPageClient({
   const c = t.catalog;
   const [dqConfigOpen, setDqConfigOpen] = useState(false);
 
+  // Source filter — narrows the Data Assets tree below to one source; "KSA · ..."
+  // reflects whichever is currently selected (empty = All sources). The four
+  // coverage/quality cards above stay catalog-wide regardless of this filter —
+  // re-scoping those would mean per-source variants of getCdeCoverage() and
+  // friends, out of scope for what was asked here.
+  const [sourceFilterId, setSourceFilterId] = useState<number | "">("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filteredSources = sourceFilterId === "" ? sources : sources.filter((s) => s.dataSourceId === sourceFilterId);
+  const scopeLabel = sourceFilterId === ""
+    ? "All sources"
+    : sources.find((s) => s.dataSourceId === sourceFilterId)?.sourceName ?? "All sources";
+
   const cdeCoveragePct = cdeCoverage.businessColumns > 0
     ? Math.round((cdeCoverage.cdeColumns / cdeCoverage.businessColumns) * 100) : 0;
   const classifiedPct = classification.total > 0
@@ -74,12 +96,34 @@ export function CatalogPageClient({
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
-                  KSA · All sources
+                  KSA · {scopeLabel}
                 </Tag>
               </h1>
               <div className="flex items-center gap-2">
-                <button className="btn btn-sm">{c.filterBtn}</button>
-                <button className="btn btn-sm">{c.exportBtn}</button>
+                <div className="relative" ref={filterRef}>
+                  <button onClick={() => setFilterOpen((v) => !v)} className="btn btn-sm">{c.filterBtn}</button>
+                  {filterOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-line rounded-lg shadow-lg z-50 py-1">
+                      <button
+                        onClick={() => { setSourceFilterId(""); setFilterOpen(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-canvas ${sourceFilterId === "" ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
+                      >
+                        All sources
+                      </button>
+                      <div className="border-t border-line-soft my-1" />
+                      {sources.map((s) => (
+                        <button
+                          key={s.dataSourceId}
+                          onClick={() => { setSourceFilterId(s.dataSourceId); setFilterOpen(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-canvas truncate ${sourceFilterId === s.dataSourceId ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
+                        >
+                          {s.sourceName}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Link href="/bulk-operations" className="btn btn-sm">{c.exportBtn}</Link>
                 <AddAssetButton />
               </div>
             </div>
@@ -217,13 +261,15 @@ export function CatalogPageClient({
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2.5 px-5 py-3.5 border-b border-line-soft">
-            <Big label={c.sources} value={stats.sources} />
+            <Big label={c.sources} value={sourceFilterId === "" ? stats.sources : filteredSources.length} />
+            {/* Records has no per-schema breakdown in the `sources` prop to re-sum
+                client-side when filtered — stays the catalog-wide total. */}
             <Big label={c.records} value={stats.records} />
-            <Big label={c.tables}  value={stats.tables} />
-            <Big label={c.schemas} value={stats.schemas} />
+            <Big label={c.tables}  value={sourceFilterId === "" ? stats.tables : filteredSources.reduce((sum, s) => sum + s.schemas.reduce((s2, sc) => s2 + (sc.tableCount ?? 0), 0), 0)} />
+            <Big label={c.schemas} value={sourceFilterId === "" ? stats.schemas : filteredSources.reduce((sum, s) => sum + s.schemas.length, 0)} />
           </div>
           <div className="px-2 py-2">
-            <AssetTree sources={sources} canEdit={canEdit} />
+            <AssetTree sources={filteredSources} canEdit={canEdit} />
           </div>
         </div>
 
