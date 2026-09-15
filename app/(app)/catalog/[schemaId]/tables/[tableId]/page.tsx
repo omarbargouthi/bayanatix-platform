@@ -95,7 +95,14 @@ export default async function TablePage({
           <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap">
             <IconTable className="w-6 h-6 text-brand-purple" />
             {entity.entityName}
-            <CertTag code={entity.certCode} />
+            <span className="flex items-center gap-1">
+              <span className="text-[9px] uppercase tracking-wider text-muted">Metadata</span>
+              <CertTag code={entity.certCode} />
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="text-[9px] uppercase tracking-wider text-muted">Data</span>
+              <CertTag code={entity.dataCertCode} />
+            </span>
             <TableTypeBadge
               entityId={entity.entityId}
               category={entity.category}

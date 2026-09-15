@@ -216,6 +216,7 @@ export function SchemaTableList({
   schemaId: number;
   canEdit:  boolean;
 }) {
+  const router = useRouter();
   const { t } = useLang();
   const c = t.catalog;
   const [search,        setSearch]        = useState("");
@@ -649,6 +650,7 @@ export function SchemaTableList({
           assetId={certifyEntity.entityId}
           assetName={certifyEntity.entityName}
           onClose={() => setCertifyEntity(null)}
+          onSaved={() => router.refresh()}
         />
       )}
       {requestsEntity && (

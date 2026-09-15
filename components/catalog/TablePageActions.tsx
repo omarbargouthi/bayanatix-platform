@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
+import { CertifyAssetModal } from "./CertifyAssetModal";
 
 export function TablePageActions({
   entityId,
@@ -15,6 +16,7 @@ export function TablePageActions({
 }) {
   const router = useRouter();
   const [showHistory, setShowHistory] = useState(false);
+  const [showCertify, setShowCertify] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -48,6 +50,11 @@ export function TablePageActions({
             {classifying ? "Suggesting…" : "Suggest Column Types"}
           </button>
         )}
+        {canEdit && (
+          <button onClick={() => setShowCertify(true)} className="btn btn-sm">
+            Certify
+          </button>
+        )}
         <button className="btn btn-primary btn-sm">+ Custom Attribute</button>
       </div>
       {result && <div className="text-[11px] text-muted mt-1.5 text-right">{result}</div>}
@@ -58,6 +65,15 @@ export function TablePageActions({
           assetId={entityId}
           assetName={entityName}
           onClose={() => setShowHistory(false)}
+        />
+      )}
+      {showCertify && (
+        <CertifyAssetModal
+          assetType="DATA_ENTITIES"
+          assetId={entityId}
+          assetName={entityName}
+          onClose={() => setShowCertify(false)}
+          onSaved={() => router.refresh()}
         />
       )}
     </>

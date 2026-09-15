@@ -140,7 +140,15 @@ export async function getSchemaById(schemaId: number): Promise<
            on bg.glossary_id = abt.glossary_id
         where e2.schema_id = s.schema_id
           and bg.classification_code in ('CONFIDENTIAL','SECRET','TOP_SECRET')
-       ) as "cdeCount"
+       ) as "cdeCount",
+      (select cert_type_code from bayanat.asset_certifications c
+        where c.asset_type_code = 'DATA_SCHEMAS' and c.asset_id = s.schema_id
+          and c.cert_dimension = 'METADATA'
+        order by c.certification_id desc limit 1) as "certCode",
+      (select cert_type_code from bayanat.asset_certifications c
+        where c.asset_type_code = 'DATA_SCHEMAS' and c.asset_id = s.schema_id
+          and c.cert_dimension = 'DATA'
+        order by c.certification_id desc limit 1) as "dataCertCode"
     from bayanat.data_schemas s
     left join bayanat.data_sources ds on ds.data_source_id = s.data_source_id
     where s.schema_id = ${schemaId}
@@ -163,11 +171,11 @@ export async function getSchemaById(schemaId: number): Promise<
       (select cert_type_code from bayanat.asset_certifications c
         where c.asset_type_code = 'DATA_ENTITIES' and c.asset_id = e.entity_id
           and c.cert_dimension = 'METADATA'
-        order by c.certification_date desc nulls last limit 1) as "certCode",
+        order by c.certification_id desc limit 1) as "certCode",
       (select cert_type_code from bayanat.asset_certifications c
         where c.asset_type_code = 'DATA_ENTITIES' and c.asset_id = e.entity_id
           and c.cert_dimension = 'DATA'
-        order by c.certification_date desc nulls last limit 1) as "dataCertCode",
+        order by c.certification_id desc limit 1) as "dataCertCode",
       e.trust_score           as "trustScore",
       -- Incidents (open only, for DQ panel)
       coalesce(inc.open_count,   0) as "openIncidentCount",
@@ -290,7 +298,12 @@ export async function getEntityById(entityId: number): Promise<
       e.trust_score as "trustScore",
       (select cert_type_code from bayanat.asset_certifications c
         where c.asset_type_code = 'DATA_ENTITIES' and c.asset_id = e.entity_id
-        order by c.certification_date desc nulls last limit 1) as "certCode"
+          and c.cert_dimension = 'METADATA'
+        order by c.certification_id desc limit 1) as "certCode",
+      (select cert_type_code from bayanat.asset_certifications c
+        where c.asset_type_code = 'DATA_ENTITIES' and c.asset_id = e.entity_id
+          and c.cert_dimension = 'DATA'
+        order by c.certification_id desc limit 1) as "dataCertCode"
     from bayanat.data_entities e
     where e.entity_id = ${entityId}
     limit 1

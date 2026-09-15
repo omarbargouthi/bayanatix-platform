@@ -44,6 +44,8 @@ export type DataSchema = {
   columnCount?: number;
   sourceName?: string;
   cdeCount?: number;
+  certCode?: string | null;
+  dataCertCode?: string | null;
 };
 
 export type DataEntity = {

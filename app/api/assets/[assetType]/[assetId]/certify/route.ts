@@ -16,7 +16,7 @@ export async function GET(_: Request, { params }: Params) {
       certification_notes_text AS "notes"
     FROM bayanat.asset_certifications
     WHERE asset_type_code = ${params.assetType} AND asset_id = ${Number(params.assetId)}
-    ORDER BY cert_dimension, certification_date DESC
+    ORDER BY cert_dimension, certification_id DESC
   `;
   const result: Record<string, { certTypeCode: string; certifiedBy: string | null; certDate: string | null; notes: string | null }> = {};
   for (const r of rows) {

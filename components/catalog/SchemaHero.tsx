@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Tag } from "@/components/ui/Tag";
+import { Tag, CertTag } from "@/components/ui/Tag";
 import { IconDB, IconHistory, IconCollaborate } from "@/components/layout/icons";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { TagPicker } from "./TagPicker";
@@ -61,7 +61,14 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
         {/* Top bar: tags + action icons */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <Tag variant="green">Certified</Tag>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] uppercase tracking-wider text-muted">Metadata</span>
+              <CertTag code={schema.certCode} />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] uppercase tracking-wider text-muted">Data</span>
+              <CertTag code={schema.dataCertCode} />
+            </div>
             <Tag variant="purple">Finance</Tag>
             {schema.source && (
               <Tag>{schema.source.sourceName}</Tag>
@@ -223,6 +230,7 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
           assetId={schema.schemaId}
           assetName={schema.schemaName}
           onClose={() => setShowCertify(false)}
+          onSaved={() => router.refresh()}
         />
       )}
     </>
