@@ -39,6 +39,9 @@
   .tag-red    { @apply bg-red-50 text-red-800 border-red-200; }
   .tag-blue   { @apply bg-blue-50 text-blue-800 border-blue-200; }
   .tag-purple { @apply bg-brand-purple/10 text-brand-purple border-brand-purple/25; }
+  .tag-gold   { @apply bg-yellow-50 text-yellow-800 border-yellow-300; }
+  .tag-gray   { @apply bg-gray-100 text-gray-700 border-gray-300; }
+  .tag-orange { @apply bg-orange-50 text-orange-800 border-orange-200; }
 
   .card { @apply bg-white border border-line rounded-lg shadow-xs; }
   .card-padded { @apply card p-5; }
