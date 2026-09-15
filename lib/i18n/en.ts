@@ -689,11 +689,6 @@ export const en: I18nStrings = {
     colType:            "Type",
     synonymsTitle:      "Synonyms",
     noLinkedColsYet:    "No columns linked yet",
-    newTermModalTitle:  "Create New Term",
-    termNameLabel:      "Term Name *",
-    termDefLabel:       "Definition *",
-    domainLabel:        "Domain *",
-    creating:           "Creating…",
     propertiesSection:  "Properties",
   },
 

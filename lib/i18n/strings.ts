@@ -754,11 +754,6 @@ export type I18nStrings = {
     colType:            string;
     synonymsTitle:      string;
     noLinkedColsYet:    string;
-    newTermModalTitle:  string;
-    termNameLabel:      string;
-    termDefLabel:       string;
-    domainLabel:        string;
-    creating:           string;
     propertiesSection:  string;
   };
 

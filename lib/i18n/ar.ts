@@ -689,11 +689,6 @@ export const ar: I18nStrings = {
     colType:            "النوع",
     synonymsTitle:      "المرادفات",
     noLinkedColsYet:    "لا توجد أعمدة مرتبطة بعد",
-    newTermModalTitle:  "إنشاء مصطلح جديد",
-    termNameLabel:      "اسم المصطلح *",
-    termDefLabel:       "التعريف *",
-    domainLabel:        "النطاق *",
-    creating:           "جارٍ الإنشاء…",
     propertiesSection:  "الخصائص",
   },
 

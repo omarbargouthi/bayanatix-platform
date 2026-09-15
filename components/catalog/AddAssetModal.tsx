@@ -291,10 +291,10 @@ function BusinessTermForm({ refData, onSubmit }: { refData: RefData; onSubmit: (
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 
-export function AddAssetModal({ onClose }: { onClose: () => void }) {
+export function AddAssetModal({ onClose, initialKind }: { onClose: () => void; initialKind?: AssetKind }) {
   const router  = useRouter();
   const refData = useRefData();
-  const [kind,    setKind]    = useState<AssetKind | null>(null);
+  const [kind,    setKind]    = useState<AssetKind | null>(initialKind ?? null);
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

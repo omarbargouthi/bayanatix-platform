@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui/Tag";
 import { IconGlossary, IconBook } from "@/components/layout/icons";
-import { NewTermModal } from "@/components/glossary/NewTermModal";
+import { AddAssetModal } from "@/components/catalog/AddAssetModal";
 import { useLang } from "@/lib/lang-context";
 import type { GlossaryStats } from "@/lib/queries/glossary";
 import type { GlossaryDomain, GlossaryTerm } from "@/lib/types";
@@ -224,7 +224,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
       </div>
 
       {showNewTerm && (
-        <NewTermModal domains={domains} onClose={() => setShowNewTerm(false)} />
+        <AddAssetModal initialKind="BUSINESS_TERM" onClose={() => setShowNewTerm(false)} />
       )}
     </main>
   );

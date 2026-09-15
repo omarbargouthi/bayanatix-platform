@@ -6,7 +6,7 @@ import { Tag } from "@/components/ui/Tag";
 import { Donut } from "@/components/ui/Donut";
 import { AssetTree } from "@/components/catalog/AssetTree";
 import { AddAssetButton } from "@/components/catalog/AddAssetButton";
-import { NewTermModal } from "@/components/glossary/NewTermModal";
+import { AddAssetModal } from "@/components/catalog/AddAssetModal";
 import { IconBook } from "@/components/layout/icons";
 import { fmtNumber } from "@/lib/utils";
 import { useLang } from "@/lib/lang-context";
@@ -402,7 +402,7 @@ export function CatalogPageClient({
       </section>
 
       {showNewTerm && (
-        <NewTermModal domains={glossaries} onClose={() => setShowNewTerm(false)} />
+        <AddAssetModal initialKind="BUSINESS_TERM" onClose={() => setShowNewTerm(false)} />
       )}
     </main>
   );
