@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { CertifyAssetModal } from "./CertifyAssetModal";
+import { IconHistory, IconCollaborate } from "@/components/layout/icons";
 
 export function TablePageActions({
   entityId,
@@ -42,20 +44,40 @@ export function TablePageActions({
       <div className="flex items-center gap-2">
         <button className="btn btn-sm">★ Follow</button>
         <button className="btn btn-sm">Request Access</button>
-        <button onClick={() => setShowHistory(true)} className="btn btn-sm">
-          History
-        </button>
         {canEdit && (
           <button onClick={suggestColumnTypes} disabled={classifying} className="btn btn-sm disabled:opacity-50" title={result ?? undefined}>
             {classifying ? "Suggesting…" : "Suggest Column Types"}
           </button>
         )}
+        <button className="btn btn-primary btn-sm">+ Custom Attribute</button>
+
+        <div className="w-px h-5 bg-line mx-1" />
+
         {canEdit && (
-          <button onClick={() => setShowCertify(true)} className="btn btn-sm">
-            Certify
+          <button
+            onClick={() => setShowCertify(true)}
+            className="w-8 h-8 grid place-items-center rounded-lg text-ink-soft hover:bg-canvas-soft hover:text-amber-600 transition-colors"
+            title="Certify table"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
           </button>
         )}
-        <button className="btn btn-primary btn-sm">+ Custom Attribute</button>
+        <button
+          onClick={() => setShowHistory(true)}
+          className="w-8 h-8 grid place-items-center rounded-lg text-ink-soft hover:bg-canvas-soft hover:text-brand-purple transition-colors"
+          title="Change history"
+        >
+          <IconHistory className="w-4 h-4" />
+        </button>
+        <Link
+          href={`/collaboration?newTitle=${encodeURIComponent(`Discussion: ${entityName}`)}`}
+          className="w-8 h-8 grid place-items-center rounded-lg text-ink-soft hover:bg-canvas-soft hover:text-brand-purple transition-colors"
+          title="Collaboration threads"
+        >
+          <IconCollaborate className="w-4 h-4" />
+        </Link>
       </div>
       {result && <div className="text-[11px] text-muted mt-1.5 text-right">{result}</div>}
 
