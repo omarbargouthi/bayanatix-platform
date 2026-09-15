@@ -6,6 +6,7 @@ import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
 import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
+import { SampleDataConfigSection } from "./SampleDataConfigSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -40,6 +41,7 @@ export default function ConfigurationPage() {
   const [showDataCategories, setShowDataCategories]     = useState(false);
   const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
   const [showCustomAttributes, setShowCustomAttributes] = useState(false);
+  const [showSampleData, setShowSampleData] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -76,6 +78,7 @@ export default function ConfigurationPage() {
     setShowDataCategories(false);
     setShowEnrichmentSettings(false);
     setShowCustomAttributes(false);
+    setShowSampleData(false);
     setAdding(false);
   }
 
@@ -155,7 +158,7 @@ export default function ConfigurationPage() {
   }
 
   const isNothingSelected =
-    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings && !showCustomAttributes;
+    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings && !showCustomAttributes && !showSampleData;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -213,6 +216,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Custom Attributes</div>
             <div className="text-[10px] text-muted mt-0.5">Source · Schema · Table · Column · Term</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowSampleData(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showSampleData ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Sample Data</div>
+            <div className="text-[10px] text-muted mt-0.5">Record count shown on table pages</div>
+          </button>
 
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
@@ -251,6 +261,9 @@ export default function ConfigurationPage() {
 
         {/* ── Custom Attributes panel ── */}
         {showCustomAttributes && <CustomAttributesConfigSection />}
+
+        {/* ── Sample Data panel ── */}
+        {showSampleData && <SampleDataConfigSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (

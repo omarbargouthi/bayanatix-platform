@@ -239,6 +239,7 @@ export type Role = {
   metadataWrite:  boolean;
   metadataDelete: boolean;
   dataRead:       boolean;
+  piClearTextAllowed: boolean;
   isAdmin:        boolean;
   createdAt:      string;
   userCount:      number;
@@ -270,6 +271,7 @@ export type RoleAssignment = {
   metadataWrite: boolean;
   metadataDelete:boolean;
   dataRead:      boolean;
+  piClearTextAllowed: boolean;
   isAdmin:       boolean;
   userId:        string | null;
   userFullName:  string | null;

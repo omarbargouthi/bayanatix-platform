@@ -108,7 +108,7 @@ export async function POST(req: Request) {
 
   const { requestTypeCode, title, descriptionText, priorityCode, targets } = await req.json();
 
-  const VALID_TYPES = ["FIX_DATA_ISSUE", "UPDATE_DEFINITION", "CERTIFY_ASSET", "GRANT_ACCESS", "REMOVE_ACCESS", "OTHER"];
+  const VALID_TYPES = ["FIX_DATA_ISSUE", "UPDATE_DEFINITION", "CERTIFY_ASSET", "GRANT_ACCESS", "REMOVE_ACCESS", "OTHER", "PI_CLEAR_TEXT_ACCESS"];
   if (!VALID_TYPES.includes(requestTypeCode))
     return NextResponse.json({ error: "Invalid request type" }, { status: 400 });
   if (!title?.trim())

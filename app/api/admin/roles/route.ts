@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     metadataWrite:  body.metadataWrite  ?? false,
     metadataDelete: body.metadataDelete ?? false,
     dataRead:       body.dataRead       ?? false,
+    piClearTextAllowed: body.piClearTextAllowed ?? false,
     isAdmin:        body.isAdmin        ?? false,
   });
   return NextResponse.json({ roleId }, { status: 201 });

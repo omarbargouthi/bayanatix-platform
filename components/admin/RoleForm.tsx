@@ -8,7 +8,7 @@ type Props = { role?: Role; onClose?: () => void };
 
 type Privs = {
   metadataRead: boolean; metadataWrite: boolean; metadataDelete: boolean;
-  dataRead: boolean; isAdmin: boolean;
+  dataRead: boolean; piClearTextAllowed: boolean; isAdmin: boolean;
 };
 
 export function RoleForm({ role, onClose }: Props) {
@@ -21,6 +21,7 @@ export function RoleForm({ role, onClose }: Props) {
     metadataWrite:  role?.metadataWrite  ?? false,
     metadataDelete: role?.metadataDelete ?? false,
     dataRead:       role?.dataRead       ?? false,
+    piClearTextAllowed: role?.piClearTextAllowed ?? false,
     isAdmin:        role?.isAdmin        ?? false,
   });
   const [saving, setSaving] = useState(false);
@@ -56,6 +57,7 @@ export function RoleForm({ role, onClose }: Props) {
     { key: "metadataWrite",  label: "Metadata Write",  sublabel: "Edit descriptions, tags, add glossary links, stewards", color: "blue" },
     { key: "metadataDelete", label: "Metadata Delete", sublabel: "Remove metadata records, deprecate assets", color: "red" },
     { key: "dataRead",       label: "Data Read",       sublabel: "Preview table rows (tables only)", color: "emerald" },
+    { key: "piClearTextAllowed", label: "PI Clear-Text Access", sublabel: "Eligible to request viewing PI/PII columns unmasked in Sample Data", color: "amber" },
     { key: "isAdmin",        label: "Platform Admin",  sublabel: "Full access — create users, roles, manage all assets", color: "purple" },
   ];
 
@@ -64,6 +66,7 @@ export function RoleForm({ role, onClose }: Props) {
     red:     "border-red-300  bg-red-50  text-red-700",
     emerald: "border-emerald-300 bg-emerald-50 text-emerald-700",
     purple:  "border-purple-300 bg-purple-50 text-purple-700",
+    amber:   "border-amber-300 bg-amber-50 text-amber-700",
   };
 
   return (

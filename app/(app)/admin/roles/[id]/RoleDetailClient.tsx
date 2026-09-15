@@ -18,6 +18,7 @@ const PRIV_ROWS = [
   { key: "metadataWrite"  as const, label: "Metadata Write",  sublabel: "Edit descriptions, tags, stewards",  color: "blue" },
   { key: "metadataDelete" as const, label: "Metadata Delete", sublabel: "Remove metadata and deprecate assets",color: "red" },
   { key: "dataRead"       as const, label: "Data Read",       sublabel: "Preview table row data",              color: "emerald" },
+  { key: "piClearTextAllowed" as const, label: "PI Clear-Text Access", sublabel: "Eligible to request PI/PII columns unmasked", color: "amber" },
   { key: "isAdmin"        as const, label: "Platform Admin",  sublabel: "Full platform administration",        color: "purple" },
 ];
 
@@ -26,6 +27,7 @@ const PRIV_COLORS: Record<string, { on: string; off: string }> = {
   red:     { on: "bg-red-100 text-red-700 border-red-300",         off: "bg-canvas border-line text-muted" },
   emerald: { on: "bg-emerald-100 text-emerald-700 border-emerald-300", off: "bg-canvas border-line text-muted" },
   purple:  { on: "bg-purple-100 text-purple-700 border-purple-300", off: "bg-canvas border-line text-muted" },
+  amber:   { on: "bg-amber-100 text-amber-700 border-amber-300",   off: "bg-canvas border-line text-muted" },
 };
 
 export function RoleDetailClient({ role, assignments }: { role: Role; assignments: RoleAssignment[] }) {

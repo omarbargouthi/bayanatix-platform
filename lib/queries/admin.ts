@@ -78,6 +78,7 @@ export async function listRoles(): Promise<Role[]> {
       r.metadata_write  AS "metadataWrite",
       r.metadata_delete AS "metadataDelete",
       r.data_read       AS "dataRead",
+      r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.is_admin        AS "isAdmin",
       r.created_at      AS "createdAt",
       (SELECT COUNT(DISTINCT user_id)::int FROM bayanat.role_assignments ra
@@ -99,6 +100,7 @@ export async function getRoleById(roleId: number): Promise<Role | null> {
       r.metadata_write  AS "metadataWrite",
       r.metadata_delete AS "metadataDelete",
       r.data_read       AS "dataRead",
+      r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.is_admin        AS "isAdmin",
       r.created_at      AS "createdAt",
       (SELECT COUNT(DISTINCT user_id)::int FROM bayanat.role_assignments ra
@@ -113,14 +115,14 @@ export async function getRoleById(roleId: number): Promise<Role | null> {
 export async function createRole(data: {
   roleName: string; description: string;
   metadataRead: boolean; metadataWrite: boolean; metadataDelete: boolean;
-  dataRead: boolean; isAdmin: boolean;
+  dataRead: boolean; piClearTextAllowed?: boolean; isAdmin: boolean;
 }): Promise<number> {
   const rows = await sql<{ roleId: number }[]>`
     INSERT INTO bayanat.roles
-      (role_name, description, metadata_read, metadata_write, metadata_delete, data_read, is_admin)
+      (role_name, description, metadata_read, metadata_write, metadata_delete, data_read, pii_clear_text_allowed, is_admin)
     VALUES
       (${data.roleName}, ${data.description}, ${data.metadataRead},
-       ${data.metadataWrite}, ${data.metadataDelete}, ${data.dataRead}, ${data.isAdmin})
+       ${data.metadataWrite}, ${data.metadataDelete}, ${data.dataRead}, ${data.piClearTextAllowed ?? false}, ${data.isAdmin})
     RETURNING role_id AS "roleId"
   `;
   return rows[0].roleId;
@@ -129,7 +131,7 @@ export async function createRole(data: {
 export async function updateRole(roleId: number, data: {
   roleName?: string; description?: string;
   metadataRead?: boolean; metadataWrite?: boolean; metadataDelete?: boolean;
-  dataRead?: boolean; isAdmin?: boolean;
+  dataRead?: boolean; piClearTextAllowed?: boolean; isAdmin?: boolean;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.roles SET
@@ -139,6 +141,7 @@ export async function updateRole(roleId: number, data: {
       metadata_write   = COALESCE(${data.metadataWrite ?? null},   metadata_write),
       metadata_delete  = COALESCE(${data.metadataDelete ?? null},  metadata_delete),
       data_read        = COALESCE(${data.dataRead ?? null},        data_read),
+      pii_clear_text_allowed = COALESCE(${data.piClearTextAllowed ?? null}, pii_clear_text_allowed),
       is_admin         = COALESCE(${data.isAdmin ?? null},         is_admin)
     WHERE role_id = ${roleId}
   `;
@@ -239,6 +242,7 @@ export async function getAssignmentsForUser(userId: string): Promise<RoleAssignm
       r.metadata_write  AS "metadataWrite",
       r.metadata_delete AS "metadataDelete",
       r.data_read       AS "dataRead",
+      r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.is_admin        AS "isAdmin",
       ra.user_id        AS "userId",
       u.full_name       AS "userFullName",
@@ -266,6 +270,7 @@ export async function getAssignmentsForTeam(teamId: number): Promise<RoleAssignm
       r.metadata_write  AS "metadataWrite",
       r.metadata_delete AS "metadataDelete",
       r.data_read       AS "dataRead",
+      r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.is_admin        AS "isAdmin",
       ra.user_id        AS "userId",
       NULL              AS "userFullName",
@@ -293,6 +298,7 @@ export async function getAssignmentsForRole(roleId: number): Promise<RoleAssignm
       r.metadata_write  AS "metadataWrite",
       r.metadata_delete AS "metadataDelete",
       r.data_read       AS "dataRead",
+      r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.is_admin        AS "isAdmin",
       ra.user_id        AS "userId",
       u.full_name       AS "userFullName",

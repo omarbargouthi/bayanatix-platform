@@ -169,6 +169,27 @@ async function applyApprovalOutcome(requestId: number, requestTypeCode: string, 
       // getComplianceWorkflowStatus in lib/queries/gov-compliance.ts) —
       // nothing extra to persist.
       return;
+    case "PI_CLEAR_TEXT_ACCESS": {
+      if (!approved) return; // rejected — no grant, request just closes
+      const [req] = await sql<{ userId: string; purpose: string | null }[]>`
+        SELECT raised_by_user_id AS "userId", description_text AS "purpose"
+        FROM bayanat.asset_requests WHERE request_id = ${requestId}
+      `;
+      const targets = await sql<{ assetTypeCode: string; assetId: number }[]>`
+        SELECT asset_type_code AS "assetTypeCode", asset_id AS "assetId"
+        FROM bayanat.asset_request_targets
+        WHERE request_id = ${requestId} AND asset_id IS NOT NULL
+      `;
+      if (!req) return;
+      for (const t of targets) {
+        await sql`
+          INSERT INTO bayanat.pi_access_grants
+            (user_id, asset_type_code, asset_id, request_id, purpose_text)
+          VALUES (${req.userId}, ${t.assetTypeCode}, ${t.assetId}, ${requestId}, ${req.purpose})
+        `;
+      }
+      return;
+    }
     default:
       return; // FIX_DATA_ISSUE, UPDATE_DEFINITION, CERTIFY_ASSET, GRANT_ACCESS, REMOVE_ACCESS, OTHER
   }

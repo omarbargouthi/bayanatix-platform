@@ -26,6 +26,7 @@ import { TableTypeBadge } from "@/components/catalog/TableTypeBadge";
 import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
+import { SampleDataTab } from "@/components/catalog/SampleDataTab";
 
 export const dynamic = "force-dynamic";
 
@@ -246,13 +247,7 @@ export default async function TablePage({
 
         {/* ── Sample Data tab ──────────────────────────────────────────── */}
         {activeTab === "Sample Data" && (
-          <div className="card p-10 text-center">
-            <div className="text-4xl mb-3">🔬</div>
-            <h3 className="font-semibold text-ink mb-1">Sample Data</h3>
-            <p className="text-sm text-muted max-w-sm mx-auto">
-              Live sample data preview requires a direct connection to the source database. Enable this feature from the Data Sources connection settings.
-            </p>
-          </div>
+          <SampleDataTab entityId={entity.entityId} entityName={entity.entityName} />
         )}
 
         {/* ── Custom Properties tab ────────────────────────────────────── */}
