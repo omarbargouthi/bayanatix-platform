@@ -9,7 +9,7 @@ type ApiResponse =
   | {
       authorized: true; live: true; sampleRecordCount: number;
       columns: string[]; rows: Record<string, unknown>[];
-      piColumns: string[]; canViewClearText: boolean;
+      piColumns: string[]; canViewClearText: boolean; isAdminOverride: boolean;
       piEligible: boolean; piGranted: boolean; pendingRequestId: number | null;
     };
 
@@ -61,7 +61,7 @@ export function SampleDataTab({ entityId, entityName }: { entityId: number; enti
     );
   }
 
-  const { columns, rows, piColumns, canViewClearText, piEligible, piGranted, pendingRequestId, sampleRecordCount } = data;
+  const { columns, rows, piColumns, canViewClearText, isAdminOverride, piEligible, pendingRequestId, sampleRecordCount } = data;
   const hasPiColumns = piColumns.length > 0;
 
   return (
@@ -97,7 +97,7 @@ export function SampleDataTab({ entityId, entityName }: { entityId: number; enti
         )}
         {hasPiColumns && canViewClearText && (
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-            🔓 PI clear-text access granted
+            {isAdminOverride ? "🛡 Platform Admin — full access" : "🔓 PI clear-text access granted"}
           </span>
         )}
       </div>

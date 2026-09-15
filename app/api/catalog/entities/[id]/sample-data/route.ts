@@ -43,7 +43,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       ORDER BY ar.created_at DESC LIMIT 1
     `,
   ]);
-  const canViewClearText = session.role === "ADMIN" || (piEligible && piGranted);
+  const isAdminOverride = session.role === "ADMIN";
+  const canViewClearText = isAdminOverride || (piEligible && piGranted);
 
   const rows = live.rows.map((row) => {
     if (canViewClearText) return row;
@@ -62,6 +63,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     sampleRecordCount,
     piColumns: [...piColumns],
     canViewClearText,
+    isAdminOverride,
     piEligible,
     piGranted,
     pendingRequestId: pendingRequest?.requestId ?? null,
