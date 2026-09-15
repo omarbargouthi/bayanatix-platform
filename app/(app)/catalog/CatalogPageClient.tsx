@@ -57,7 +57,7 @@ export function CatalogPageClient({
   const [showNewTerm, setShowNewTerm] = useState(false);
 
   // Source filter — narrows the Data Assets tree below to any number of sources
-  // (multi-select); "KSA · ..." reflects the current selection (empty = All
+  // (multi-select); the tag label reflects the current selection (empty = All
   // sources). Every analysis card below (stat tiles, CDEs Coverage, Data
   // Classification, Metadata Quality, Data Quality) re-fetches scoped to this
   // same selection via GET /api/catalog/stats — see the effect below.
@@ -156,7 +156,7 @@ export function CatalogPageClient({
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
-                  KSA · {scopeLabel}
+                  {scopeLabel}
                 </Tag>
               </h1>
               <div className="flex items-center gap-2">
