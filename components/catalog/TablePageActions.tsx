@@ -49,8 +49,6 @@ export function TablePageActions({
             {classifying ? "Suggesting…" : "Suggest Column Types"}
           </button>
         )}
-        <button className="btn btn-primary btn-sm">+ Custom Attribute</button>
-
         <div className="w-px h-5 bg-line mx-1" />
 
         {canEdit && (
