@@ -5,6 +5,7 @@ import Link from "next/link";
 import { IconDB, IconChevron } from "@/components/layout/icons";
 import type { DataSource, DataSchema } from "@/lib/types";
 import { DataSourceEditModal } from "./DataSourceEditModal";
+import { FollowButton } from "./FollowButton";
 import { useLang } from "@/lib/lang-context";
 
 export function AssetTree({
@@ -56,6 +57,7 @@ function SourceRow({
             {src.schemas.length} schemas · {tableTotal.toLocaleString()} tables
           </span>
         </button>
+        <FollowButton assetType="DATA_SOURCES" assetId={src.dataSourceId} iconOnly size="sm" />
         {canEdit && (
           <button
             onClick={() => setEditing(true)}

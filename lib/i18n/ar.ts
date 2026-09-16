@@ -1457,6 +1457,10 @@ export const ar: I18nStrings = {
       quickLinks:     "روابط سريعة",
       savedSearches:  "عمليات البحث المحفوظة",
       recentAssets:   "الأصول الأخيرة",
+      followedActivity: "نشاط المتابَعين",
+    },
+    followedActivity: {
+      empty: "تابع جدولاً أو مخططاً أو مصدر بيانات لترى نشاطه هنا.",
     },
     needsAction: {
       empty: "أنت على اطلاع كامل — لا يوجد ما يتطلب إجراءك.",

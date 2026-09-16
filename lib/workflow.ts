@@ -4,7 +4,7 @@ type StageRow = {
   stageId:        number;
   stageName:      string;
   stageOrder:     number;
-  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER";
+  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER" | "ASSET_OWNER";
   assigneeRoleId: number | null;
   assigneeTeamId: number | null;
   assigneeUserId: string | null;
@@ -12,10 +12,58 @@ type StageRow = {
   isFinal:        boolean;
 };
 
+// Resolves the real, per-asset governance Owner (bayanat.asset_stakeholders,
+// role_code='OWNER') for one request target, walking the same column ->
+// table -> schema -> source inheritance chain GovernancePanel shows (db/046,
+// db/097). DATA_SOURCES is the root of that chain — no resolver function for
+// it, just a direct lookup. Any other asset type (custom assets, open
+// datasets, governance domains, ...) has no owner concept, so returns [].
+async function resolveAssetOwner(assetTypeCode: string, assetId: number): Promise<string[]> {
+  if (assetTypeCode === "DATA_ATTRIBUTES") {
+    const rows = await sql<{ userId: string }[]>`
+      SELECT user_id AS "userId" FROM bayanat.fn_resolve_effective_stakeholder(${assetId}, 'OWNER')
+    `;
+    return rows.map((r) => r.userId);
+  }
+  if (assetTypeCode === "DATA_ENTITIES") {
+    const rows = await sql<{ userId: string }[]>`
+      SELECT user_id AS "userId" FROM bayanat.fn_resolve_entity_stakeholder(${assetId}, 'OWNER')
+    `;
+    return rows.map((r) => r.userId);
+  }
+  if (assetTypeCode === "DATA_SCHEMAS") {
+    const rows = await sql<{ userId: string }[]>`
+      SELECT user_id AS "userId" FROM bayanat.fn_resolve_schema_stakeholder(${assetId}, 'OWNER')
+    `;
+    return rows.map((r) => r.userId);
+  }
+  if (assetTypeCode === "DATA_SOURCES") {
+    const rows = await sql<{ userId: string }[]>`
+      SELECT user_id AS "userId" FROM bayanat.asset_stakeholders
+      WHERE asset_type_code = 'DATA_SOURCES' AND asset_id = ${assetId} AND role_code = 'OWNER'
+    `;
+    return rows.map((r) => r.userId);
+  }
+  return [];
+}
+
 async function resolveAssignees(stage: StageRow, requestId: number): Promise<string[]> {
   switch (stage.assigneeType) {
     case "USER":
       return stage.assigneeUserId ? [stage.assigneeUserId] : [];
+
+    case "ASSET_OWNER": {
+      const targets = await sql<{ assetTypeCode: string; assetId: number }[]>`
+        SELECT asset_type_code AS "assetTypeCode", asset_id AS "assetId"
+        FROM bayanat.asset_request_targets
+        WHERE request_id = ${requestId} AND asset_id IS NOT NULL
+      `;
+      const owners = new Set<string>();
+      for (const t of targets) {
+        for (const userId of await resolveAssetOwner(t.assetTypeCode, t.assetId)) owners.add(userId);
+      }
+      return [...owners];
+    }
 
     case "REQUESTER": {
       const rows = await sql<{ userId: string }[]>`

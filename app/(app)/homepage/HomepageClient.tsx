@@ -11,10 +11,12 @@ import { StewardDomainsWidget } from "@/components/homepage/StewardDomainsWidget
 import { QuickLinksWidget } from "@/components/homepage/QuickLinksWidget";
 import { SavedSearchesWidget } from "@/components/homepage/SavedSearchesWidget";
 import { RecentAssetsWidget } from "@/components/homepage/RecentAssetsWidget";
+import { FollowedActivityWidget } from "@/components/homepage/FollowedActivityWidget";
 import type { Notification } from "@/lib/types";
 import type { RecentAsset } from "@/lib/types";
 import type { MyRequestsSummary, StewardDomain } from "@/lib/queries/homepage";
 import type { SavedSearch } from "@/lib/queries/saved-searches";
+import type { FollowedActivityItem } from "@/lib/queries/follows";
 
 type Props = {
   firstName: string;
@@ -30,6 +32,7 @@ function renderWidgetBody(key: string, data: unknown) {
     case "quick_links":     return <QuickLinksWidget isAdmin={(data as { isAdmin: boolean }).isAdmin} />;
     case "saved_searches":  return <SavedSearchesWidget searches={data as SavedSearch[]} />;
     case "recent_assets":   return <RecentAssetsWidget assets={data as RecentAsset[]} />;
+    case "followed_activity": return <FollowedActivityWidget items={data as FollowedActivityItem[]} />;
     default: return null;
   }
 }

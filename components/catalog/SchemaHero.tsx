@@ -11,6 +11,7 @@ import { TermMultiPicker } from "./TermMultiPicker";
 import { StarRatingWidget } from "./StarRatingWidget";
 import { CertifyAssetModal } from "./CertifyAssetModal";
 import { GovernancePanel } from "./GovernancePanel";
+import { FollowButton } from "./FollowButton";
 import { useLang } from "@/lib/lang-context";
 import type { DataSchema, DataSource } from "@/lib/types";
 
@@ -78,6 +79,7 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
 
           {/* Action icons */}
           <div className="flex items-center gap-1">
+            <FollowButton assetType="DATA_SCHEMAS" assetId={schema.schemaId} iconOnly />
             {canEdit && (
               <button
                 onClick={() => setShowCertify(true)}

@@ -6,7 +6,7 @@ export type WorkflowStage = {
   stageOrder:     number;
   stageName:      string;
   description:    string | null;
-  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER";
+  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER" | "ASSET_OWNER";
   assigneeRoleId: number | null;
   assigneeTeamId: number | null;
   assigneeUserId: string | null;
@@ -70,10 +70,11 @@ const STAGE_COLS = `
   ws.assignee_team_id  AS "assigneeTeamId",
   ws.assignee_user_id  AS "assigneeUserId",
   CASE ws.assignee_type
-    WHEN 'ROLE'      THEN role_r.role_name
-    WHEN 'TEAM'       THEN team_t.team_name
-    WHEN 'USER'       THEN user_u.full_name
-    WHEN 'REQUESTER'  THEN 'Requester'
+    WHEN 'ROLE'        THEN role_r.role_name
+    WHEN 'TEAM'        THEN team_t.team_name
+    WHEN 'USER'        THEN user_u.full_name
+    WHEN 'REQUESTER'   THEN 'Requester'
+    WHEN 'ASSET_OWNER' THEN 'Asset Owner'
   END                  AS "assigneeLabel",
   ws.sla_days_count    AS "slaValue",
   ws.is_final          AS "isFinal"

@@ -12,7 +12,7 @@ export async function POST(req: Request, { params }: Params) {
   const { stageName, description, assigneeType, assigneeRoleId, assigneeTeamId, assigneeUserId, slaHours, isFinal } = await req.json();
   if (!stageName?.trim()) return NextResponse.json({ error: "stageName required" }, { status: 400 });
 
-  const VALID_TYPES = ["ROLE", "TEAM", "USER", "REQUESTER"];
+  const VALID_TYPES = ["ROLE", "TEAM", "USER", "REQUESTER", "ASSET_OWNER"];
   if (!VALID_TYPES.includes(assigneeType))
     return NextResponse.json({ error: "Invalid assigneeType" }, { status: 400 });
   if (assigneeType === "ROLE" && !assigneeRoleId)

@@ -7,6 +7,7 @@ import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
 import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
 import { SampleDataConfigSection } from "./SampleDataConfigSection";
+import { FollowSettingsSection } from "./FollowSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -42,6 +43,7 @@ export default function ConfigurationPage() {
   const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
   const [showCustomAttributes, setShowCustomAttributes] = useState(false);
   const [showSampleData, setShowSampleData] = useState(false);
+  const [showFollowSettings, setShowFollowSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -79,6 +81,7 @@ export default function ConfigurationPage() {
     setShowEnrichmentSettings(false);
     setShowCustomAttributes(false);
     setShowSampleData(false);
+    setShowFollowSettings(false);
     setAdding(false);
   }
 
@@ -158,7 +161,8 @@ export default function ConfigurationPage() {
   }
 
   const isNothingSelected =
-    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings && !showCustomAttributes && !showSampleData;
+    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
+    && !showCustomAttributes && !showSampleData && !showFollowSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -223,6 +227,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Sample Data</div>
             <div className="text-[10px] text-muted mt-0.5">Record count shown on table pages</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowFollowSettings(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showFollowSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Follow Settings</div>
+            <div className="text-[10px] text-muted mt-0.5">Enable following at Schema / Data Source level</div>
+          </button>
 
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
@@ -264,6 +275,9 @@ export default function ConfigurationPage() {
 
         {/* ── Sample Data panel ── */}
         {showSampleData && <SampleDataConfigSection />}
+
+        {/* ── Follow Settings panel ── */}
+        {showFollowSettings && <FollowSettingsSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (

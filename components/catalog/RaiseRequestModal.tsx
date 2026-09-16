@@ -27,17 +27,21 @@ const PRIORITY_OPTIONS: { code: RequestPriority; label: string; desc: string; co
 export function RaiseRequestModal({
   prefilledTarget,
   entities,
+  initialRequestType,
   onClose,
   onSaved,
 }: {
-  prefilledTarget?: Target;
-  entities?:        { entityId: number; entityName: string }[];
-  onClose:          () => void;
-  onSaved:          () => void;
+  prefilledTarget?:     Target;
+  entities?:            { entityId: number; entityName: string }[];
+  initialRequestType?:  RequestTypeCode;
+  onClose:              () => void;
+  onSaved:              () => void;
 }) {
-  const [requestType,  setRequestType]  = useState<RequestTypeCode | "">("");
+  const [requestType,  setRequestType]  = useState<RequestTypeCode | "">(initialRequestType ?? "");
   const [priority,     setPriority]     = useState<RequestPriority>("MEDIUM");
-  const [title,        setTitle]        = useState("");
+  const [title,        setTitle]        = useState(
+    initialRequestType ? REQUEST_TYPES.find((t) => t.code === initialRequestType)?.label ?? "" : ""
+  );
   const [description,  setDescription]  = useState("");
   const [targets,      setTargets]      = useState<Target[]>(prefilledTarget ? [prefilledTarget] : []);
   const [saving,       setSaving]       = useState(false);

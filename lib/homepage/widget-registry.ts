@@ -3,6 +3,7 @@ import { getNotifications } from "../queries/notifications";
 import { listSavedSearches } from "../queries/saved-searches";
 import { getRecentAssets } from "../queries/dashboard";
 import { getMyRequestsSummary, getMyStewardDomains } from "../queries/homepage";
+import { getFollowedActivity } from "../queries/follows";
 import { WIDGET_META } from "./widget-meta";
 
 export { DEFAULT_WIDGET_KEYS, ALL_WIDGET_KEYS, resolveWidgetKeys, WIDGET_META } from "./widget-meta";
@@ -17,6 +18,7 @@ const FETCHERS: Record<string, (userId: string, session: SessionUser) => Promise
   quick_links: async (_userId, session) => ({ isAdmin: session.role === "ADMIN" }),
   saved_searches: (userId) => listSavedSearches(userId),
   recent_assets: (userId) => getRecentAssets(userId, 5),
+  followed_activity: (userId) => getFollowedActivity(userId, 15),
 };
 
 export async function fetchWidgetData(key: string, userId: string, session: SessionUser): Promise<unknown> {

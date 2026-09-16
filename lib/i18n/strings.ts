@@ -1567,6 +1567,10 @@ export type I18nStrings = {
       quickLinks:     string;
       savedSearches:  string;
       recentAssets:   string;
+      followedActivity: string;
+    };
+    followedActivity: {
+      empty: string;
     };
     needsAction: {
       empty: string;

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { CertifyAssetModal } from "./CertifyAssetModal";
+import { FollowButton } from "./FollowButton";
+import { RaiseRequestModal } from "./RaiseRequestModal";
 import { IconHistory, IconCollaborate } from "@/components/layout/icons";
 
 export function TablePageActions({
@@ -19,6 +21,7 @@ export function TablePageActions({
   const router = useRouter();
   const [showHistory, setShowHistory] = useState(false);
   const [showCertify, setShowCertify] = useState(false);
+  const [showRequestAccess, setShowRequestAccess] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -42,8 +45,8 @@ export function TablePageActions({
   return (
     <>
       <div className="flex items-center gap-2">
-        <button className="btn btn-sm">★ Follow</button>
-        <button className="btn btn-sm">Request Access</button>
+        <FollowButton assetType="DATA_ENTITIES" assetId={entityId} />
+        <button onClick={() => setShowRequestAccess(true)} className="btn btn-sm">Request Access</button>
         {canEdit && (
           <button onClick={suggestColumnTypes} disabled={classifying} className="btn btn-sm disabled:opacity-50" title={result ?? undefined}>
             {classifying ? "Suggesting…" : "Suggest Column Types"}
@@ -94,6 +97,14 @@ export function TablePageActions({
           assetName={entityName}
           onClose={() => setShowCertify(false)}
           onSaved={() => router.refresh()}
+        />
+      )}
+      {showRequestAccess && (
+        <RaiseRequestModal
+          initialRequestType="GRANT_ACCESS"
+          prefilledTarget={{ assetTypeCode: "DATA_ENTITIES", assetId: entityId, assetName: entityName }}
+          onClose={() => setShowRequestAccess(false)}
+          onSaved={() => { setShowRequestAccess(false); router.refresh(); }}
         />
       )}
     </>

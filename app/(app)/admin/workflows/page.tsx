@@ -15,20 +15,23 @@ const ALL_TYPES = [
   { code: "COMPLIANCE_REVIEW",    label: "Compliance Review" },
   { code: "PUBLISH_OPEN_DATA",    label: "Publish Open Data" },
   { code: "PUBLISH_OPEN_DATA_PI", label: "Publish Open Data (PI)" },
+  { code: "PI_CLEAR_TEXT_ACCESS", label: "PI Clear-Text Access" },
 ];
 
 const ASSIGNEE_TYPE_OPTIONS = [
-  { value: "ROLE",      label: "A Role" },
-  { value: "TEAM",      label: "A Team" },
-  { value: "USER",      label: "A Specific User" },
-  { value: "REQUESTER", label: "Whoever Raised the Request" },
+  { value: "ROLE",        label: "A Role" },
+  { value: "TEAM",        label: "A Team" },
+  { value: "USER",        label: "A Specific User" },
+  { value: "REQUESTER",   label: "Whoever Raised the Request" },
+  { value: "ASSET_OWNER", label: "The Asset's Governance Owner" },
 ];
 
 const ASSIGNEE_TYPE_COLOR: Record<string, string> = {
-  ROLE:      "bg-blue-50 text-blue-700",
-  TEAM:      "bg-purple-50 text-purple-700",
-  USER:      "bg-gray-50 text-gray-600",
-  REQUESTER: "bg-emerald-50 text-emerald-700",
+  ROLE:        "bg-blue-50 text-blue-700",
+  TEAM:        "bg-purple-50 text-purple-700",
+  USER:        "bg-gray-50 text-gray-600",
+  REQUESTER:   "bg-emerald-50 text-emerald-700",
+  ASSET_OWNER: "bg-amber-50 text-amber-700",
 };
 
 const TYPE_COLOR: Record<string, string> = {

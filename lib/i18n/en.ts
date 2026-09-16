@@ -1457,6 +1457,10 @@ export const en: I18nStrings = {
       quickLinks:     "Quick Links",
       savedSearches:  "Saved Searches",
       recentAssets:   "Recent Assets",
+      followedActivity: "Followed Activity",
+    },
+    followedActivity: {
+      empty: "Follow a table, schema, or data source to see its activity here.",
     },
     needsAction: {
       empty: "You're all caught up — nothing needs your action.",
