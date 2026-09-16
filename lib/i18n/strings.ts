@@ -442,8 +442,6 @@ export type I18nStrings = {
     colAssetName:     string;
     colType:          string;
     colCertification: string;
-    colStewards:      string;
-    colTrust:         string;
     colRating:        string;
     // Expanded row sections
     description:      string;
@@ -459,7 +457,6 @@ export type I18nStrings = {
     friendlyName:     string;
     metadataCert:     string;
     dataCert:         string;
-    stewards:         string;
     usageAutomated:   string;
     rowCount:         string;
     columns:          string;

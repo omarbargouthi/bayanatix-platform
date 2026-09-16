@@ -6,8 +6,6 @@ import Link from "next/link";
 import type { DataEntity } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 import { CertTag, Tag } from "@/components/ui/Tag";
-import { AvatarStack } from "@/components/ui/Avatar";
-import { ProgressBar } from "@/components/ui/ProgressBar";
 import {
   IconTable,
   IconHistory,
@@ -293,13 +291,11 @@ export function SchemaTableList({
       {/* ── Table list ── */}
       <div className="card overflow-hidden">
         {/* Column header */}
-        <div className="grid grid-cols-[32px_2fr_1fr_160px_140px_88px_90px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
+        <div className="grid grid-cols-[32px_2fr_1fr_160px_90px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
           <div />
           <div>{c.colAssetName}</div>
           <div>{c.colType}</div>
           <div>{c.colCertification}</div>
-          <div>{c.colStewards}</div>
-          <div>{c.colTrust}</div>
           <div>{c.colRating}</div>
         </div>
 
@@ -319,7 +315,7 @@ export function SchemaTableList({
 
               {/* ── Summary row ── */}
               <div
-                className="grid grid-cols-[32px_2fr_1fr_160px_140px_88px_90px] gap-3 px-5 py-3.5 items-center hover:bg-canvas-soft transition-colors cursor-pointer"
+                className="grid grid-cols-[32px_2fr_1fr_160px_90px] gap-3 px-5 py-3.5 items-center hover:bg-canvas-soft transition-colors cursor-pointer"
                 onClick={() => toggleExpand(entity.entityId)}
               >
                 {/* Chevron */}
@@ -424,17 +420,6 @@ export function SchemaTableList({
                     <span className="text-[9px] uppercase tracking-wider text-muted w-6 shrink-0">D</span>
                     <CertTag code={entity.dataCertCode} />
                   </div>
-                </div>
-
-                <div><AvatarStack users={entity.stewards ?? []} /></div>
-
-                <div>
-                  {trust != null ? (
-                    <>
-                      <div className="font-bold text-brand-deep text-sm">{trust}%</div>
-                      <div className="mt-1"><ProgressBar value={trust} height={4} /></div>
-                    </>
-                  ) : <span className="text-muted">—</span>}
                 </div>
 
                 <div>
@@ -544,7 +529,7 @@ export function SchemaTableList({
                       {/* Rating */}
                       <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">{c.assetRating}</h4>
                       <div className="bg-white border border-line rounded-lg px-4 py-3 mb-4">
-                        <StarRatingWidget assetType="DATA_ENTITIES" assetId={entity.entityId} />
+                        <StarRatingWidget assetType="DATA_ENTITIES" assetId={entity.entityId} onRated={() => router.refresh()} />
                       </div>
 
                       <Link
@@ -590,11 +575,6 @@ export function SchemaTableList({
                           <PropRow label={c.dataCert}>
                             <CertTag code={entity.dataCertCode} />
                           </PropRow>
-                          <PropRow label={c.stewards}>
-                            {(entity.stewards ?? []).length > 0
-                              ? <AvatarStack users={entity.stewards ?? []} />
-                              : <span className="text-muted">—</span>}
-                          </PropRow>
 
                           <div className="py-1.5">
                             <div className="flex items-center gap-2">
@@ -609,14 +589,6 @@ export function SchemaTableList({
                           </PropRow>
                           <PropRow label={c.columns} automated>
                             <span className="font-mono text-[12px]">{entity.columnCount ?? "—"}</span>
-                          </PropRow>
-                          <PropRow label={c.trustScore} automated>
-                            {trust != null ? (
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-brand-deep text-[12px]">{trust}%</span>
-                                <div className="flex-1 max-w-[60px]"><ProgressBar value={trust} height={4} /></div>
-                              </div>
-                            ) : <span className="text-muted">—</span>}
                           </PropRow>
                           <PropRow label={c.assetKind} automated>
                             <span className="text-[12px]">{entity.isView ? c.viewsLabel : c.tables}</span>

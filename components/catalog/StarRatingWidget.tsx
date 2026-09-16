@@ -12,7 +12,7 @@ function Star({ filled, half, onClick, onHover }: { filled: boolean; half?: bool
   );
 }
 
-export function StarRatingWidget({ assetType, assetId }: { assetType: string; assetId: number }) {
+export function StarRatingWidget({ assetType, assetId, onRated }: { assetType: string; assetId: number; onRated?: () => void }) {
   const { t } = useLang();
   const c = t.catalog;
   const [data,    setData]    = useState<AssetRating | null>(null);
@@ -40,6 +40,7 @@ export function StarRatingWidget({ assetType, assetId }: { assetType: string; as
     setSaving(false);
     setShowModal(false);
     setComment("");
+    onRated?.();
   }
 
   const avg      = data?.average ? Number(data.average) : 0;
