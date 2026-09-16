@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { UserSearchPicker } from "./UserSearchPicker";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
-export type GovernanceRoleLabels = {
-  OWNER:       { name: string; description: string | null; nameTranslations: Record<string, string> | null };
-  BIZ_STEWARD: { name: string; description: string | null; nameTranslations: Record<string, string> | null };
-  TECH_STEWARD:{ name: string; description: string | null; nameTranslations: Record<string, string> | null };
-};
+export type GovernanceRoleLabel = { roleCode: string; name: string; description: string | null; nameTranslations: Record<string, string> | null };
 
 export type Stakeholder = {
   assignmentId: number;
@@ -21,6 +17,15 @@ export type Stakeholder = {
   assignedAt:   string;
 };
 
+export type EffectiveStakeholder = {
+  userId:       string;
+  fullName:     string | null;
+  email:        string | null;
+  roleCode:     string;
+  roleName:     string | null;
+  resolvedFrom: "COLUMN" | "TABLE" | "SCHEMA" | "SOURCE";
+};
+
 type UserResult = { userId: string; fullName: string | null; email: string };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -29,34 +34,83 @@ const ROLE_BADGE: Record<string, string> = {
   TECH_STEWARD: "bg-violet-100 text-violet-700",
 };
 
-function initials(s: Stakeholder) {
+// Which asset type this level's stakeholders live under, and the label used to
+// describe where an inherited value actually came from (matches the SQL
+// resolver functions' RETURN VALUES — db/046_governance_ownership.sql,
+// db/097_schema_governance_resolver.sql).
+const LEVEL_BY_ASSET_TYPE: Record<string, "SOURCE" | "SCHEMA" | "TABLE" | "COLUMN"> = {
+  DATA_SOURCES:   "SOURCE",
+  DATA_SCHEMAS:   "SCHEMA",
+  DATA_ENTITIES:  "TABLE",
+  DATA_ATTRIBUTES:"COLUMN",
+};
+
+const LEVEL_LABEL: Record<string, string> = {
+  SOURCE: "Source", SCHEMA: "Schema", TABLE: "Table", COLUMN: "Column",
+};
+
+// Only these asset types have a resolver behind ?effective=true (see
+// app/api/catalog/stakeholders/route.ts) — anything else (DATA_SOURCES itself,
+// the root of the hierarchy, or a CUSTOM:* asset type) has no parent to
+// inherit from, so skip that fetch rather than misreading its raw-list fallback.
+const EFFECTIVE_SUPPORTED = new Set(["DATA_SCHEMAS", "DATA_ENTITIES", "DATA_ATTRIBUTES"]);
+
+function initials(s: { fullName: string | null; userId: string }) {
   if (!s.fullName) return s.userId.slice(0, 2).toUpperCase();
   const parts = s.fullName.trim().split(" ");
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
 type Props = {
-  assetTypeCode:       string;
-  assetId:             number;
-  initialStakeholders: Stakeholder[];
-  canEdit:             boolean;
-  roleLabels:          GovernanceRoleLabels;
+  assetType: string;
+  assetId:   number;
+  canEdit:   boolean;
 };
 
-export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, canEdit, roleLabels }: Props) {
+export function GovernancePanel({ assetType, assetId, canEdit }: Props) {
   const { lookupLabel, t, lang } = useLang();
   const g = t.catalog;
-  const [stakeholders, setStakeholders] = useState<Stakeholder[]>(initialStakeholders);
+  const thisLevel = LEVEL_BY_ASSET_TYPE[assetType] ?? "TABLE";
+
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [effective,    setEffective]    = useState<EffectiveStakeholder[]>([]);
+  const [roleLabels,   setRoleLabels]   = useState<GovernanceRoleLabel[]>([]);
+  const [loading,      setLoading]      = useState(true);
   const [editing,      setEditing]      = useState(false);
   const [addingCode,   setAddingCode]   = useState<string | null>(null);
   const [busy,         setBusy]         = useState(false);
   const [error,        setError]        = useState<string | null>(null);
 
-  // Role labels from lookup cache (with server-fetched fallback until cache loads)
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const ownP  = fetch(`/api/catalog/stakeholders?assetType=${assetType}&assetId=${assetId}`).then((r) => r.ok ? r.json() : []);
+      const effP  = EFFECTIVE_SUPPORTED.has(assetType)
+        ? fetch(`/api/catalog/stakeholders?assetType=${assetType}&assetId=${assetId}&effective=true`).then((r) => r.ok ? r.json() : [])
+        : Promise.resolve<EffectiveStakeholder[]>([]);
+      const rolesP = fetch("/api/admin/governance-roles").then((r) => r.ok ? r.json() : []);
+      const [own, eff, roles] = await Promise.all([ownP, effP, rolesP]);
+      setStakeholders(own);
+      setEffective(eff);
+      setRoleLabels(roles);
+    } finally {
+      setLoading(false);
+    }
+  }, [assetType, assetId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const roleLabel = (roleCode: string, fallbackName: string) =>
+    lookupLabel("GOVERNANCE_ROLE", roleCode) ||
+    (() => {
+      const r = roleLabels.find((rl) => rl.roleCode === roleCode);
+      return r ? pickTranslation(r.name, r.nameTranslations, lang) : fallbackName;
+    })();
+
   const GROUPS = [
-    { roleCode: "OWNER",        label: lookupLabel("GOVERNANCE_ROLE", "OWNER")        || pickTranslation(roleLabels.OWNER.name, roleLabels.OWNER.nameTranslations, lang),        singular: true  },
-    { roleCode: "BIZ_STEWARD",  label: lookupLabel("GOVERNANCE_ROLE", "BIZ_STEWARD")  || pickTranslation(roleLabels.BIZ_STEWARD.name, roleLabels.BIZ_STEWARD.nameTranslations, lang),  singular: false },
-    { roleCode: "TECH_STEWARD", label: lookupLabel("GOVERNANCE_ROLE", "TECH_STEWARD") || pickTranslation(roleLabels.TECH_STEWARD.name, roleLabels.TECH_STEWARD.nameTranslations, lang), singular: false },
+    { roleCode: "OWNER",        label: roleLabel("OWNER", "Owner"),                   singular: true  },
+    { roleCode: "BIZ_STEWARD",  label: roleLabel("BIZ_STEWARD", "Business Steward"),  singular: false },
+    { roleCode: "TECH_STEWARD", label: roleLabel("TECH_STEWARD", "Technical Steward"),singular: false },
   ];
 
   async function handleAdd(roleCode: string, user: UserResult) {
@@ -65,26 +119,11 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
       const r = await fetch("/api/catalog/stakeholders", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ assetTypeCode, assetId, userId: user.userId, roleCode }),
+        body:    JSON.stringify({ assetTypeCode: assetType, assetId, userId: user.userId, roleCode }),
       });
       if (!r.ok) { const d = await r.json(); setError(d.error ?? "Failed"); return; }
-      const { assignmentId } = await r.json();
-
-      if (roleCode === "OWNER") {
-        setStakeholders((prev) => prev.filter((s) => s.roleCode !== "OWNER"));
-      }
-
-      const newEntry: Stakeholder = {
-        assignmentId,
-        userId:    user.userId,
-        fullName:  user.fullName,
-        email:     user.email,
-        roleCode,
-        roleName:  null,
-        assignedAt: new Date().toISOString(),
-      };
-      setStakeholders((prev) => [...prev.filter((s) => !(s.userId === user.userId && s.roleCode === roleCode)), newEntry]);
       setAddingCode(null);
+      await load();
     } finally {
       setBusy(false);
     }
@@ -95,13 +134,24 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
     try {
       const r = await fetch(`/api/catalog/stakeholders/${s.assignmentId}`, { method: "DELETE" });
       if (!r.ok) { setError("Failed to remove"); return; }
-      setStakeholders((prev) => prev.filter((x) => x.assignmentId !== s.assignmentId));
+      await load();
     } finally {
       setBusy(false);
     }
   }
 
-  const hasAny = stakeholders.length > 0;
+  if (loading) {
+    return (
+      <div className="card p-5 mt-5">
+        <h3 className="font-bold text-sm mb-3">{g.governanceRoles}</h3>
+        <div className="text-[13px] text-muted">Loading…</div>
+      </div>
+    );
+  }
+
+  const hasAnyOwn       = stakeholders.length > 0;
+  const hasAnyInherited = effective.length > 0;
+  const hasAny          = hasAnyOwn || hasAnyInherited;
 
   return (
     <div className="card p-5 mt-5">
@@ -127,11 +177,14 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
         <p className="text-[13px] text-muted italic">{g.noRolesAssigned}</p>
       )}
 
-      <div className={`grid gap-5 ${editing ? "grid-cols-3" : "grid-cols-3"}`}>
+      <div className="grid gap-5 grid-cols-3">
         {GROUPS.map((group) => {
-          const members    = stakeholders.filter((s) => s.roleCode === group.roleCode);
-          const isAdding   = addingCode === group.roleCode;
-          const canAddMore = !group.singular || members.length === 0;
+          const members        = stakeholders.filter((s) => s.roleCode === group.roleCode);
+          const inheritedMembers = members.length === 0
+            ? effective.filter((e) => e.roleCode === group.roleCode)
+            : [];
+          const isAdding    = addingCode === group.roleCode;
+          const canAddMore  = !group.singular || members.length === 0;
 
           return (
             <div key={group.roleCode}>
@@ -145,13 +198,13 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
                     onClick={() => setAddingCode(isAdding ? null : group.roleCode)}
                     className="text-[11px] text-brand-purple hover:underline font-medium"
                   >
-                    {isAdding ? "Cancel" : "+ Add"}
+                    {isAdding ? "Cancel" : inheritedMembers.length > 0 ? "Override" : "+ Add"}
                   </button>
                 )}
               </div>
 
               {/* Members */}
-              {members.length === 0 && !isAdding && (
+              {members.length === 0 && inheritedMembers.length === 0 && !isAdding && (
                 <div className="text-[12px] text-muted italic">{g.noneAssigned}</div>
               )}
 
@@ -179,6 +232,21 @@ export function GovernancePanel({ assetTypeCode, assetId, initialStakeholders, c
                         ✕
                       </button>
                     )}
+                  </div>
+                ))}
+
+                {/* Inherited (no own-level assignment at this level) */}
+                {inheritedMembers.map((s) => (
+                  <div key={`inherited-${s.userId}`} className="flex items-center gap-2 opacity-70" title={`Inherited from ${LEVEL_LABEL[s.resolvedFrom]} — not explicitly set at ${LEVEL_LABEL[thisLevel]} level`}>
+                    <div className={`w-7 h-7 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 border-2 border-dashed border-current ${ROLE_BADGE[s.roleCode] ?? "bg-gray-100 text-gray-600"}`}>
+                      {initials(s)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-medium text-ink leading-tight truncate">
+                        {s.fullName ?? s.userId}
+                      </div>
+                      <div className="text-[10px] text-muted truncate italic">Inherited from {LEVEL_LABEL[s.resolvedFrom]}</div>
+                    </div>
                   </div>
                 ))}
 

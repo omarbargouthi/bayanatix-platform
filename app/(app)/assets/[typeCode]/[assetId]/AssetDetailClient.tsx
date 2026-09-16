@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AttributeForm, type AttributeDef } from "@/components/custom-assets/AttributeForm";
 import { EndpointPicker, type EndpointHit } from "@/components/custom-assets/EndpointPicker";
 import { TagPicker } from "@/components/catalog/TagPicker";
-import { GovernancePanel, type Stakeholder, type GovernanceRoleLabels } from "@/components/catalog/GovernancePanel";
+import { GovernancePanel } from "@/components/catalog/GovernancePanel";
 import { AssetRequestsDrawer } from "@/components/catalog/AssetRequestsDrawer";
 import { RelationshipGraphTab } from "@/components/custom-assets/RelationshipGraphTab";
 
@@ -143,13 +143,13 @@ export function AssetDetailClient({
   typeCode, typeName, assetTypeCode, assetId,
   assetNameText: initialName, nameArText: initialNameAr, descriptionText: initialDesc, statusCode: initialStatus,
   attributes, initialValues, links: initialLinks, relationshipTypes,
-  initialStakeholders, roleLabels, canWrite,
+  canWrite,
 }: {
   typeCode: string; typeName: string; assetTypeCode: string; assetId: number;
   assetNameText: string; nameArText: string | null; descriptionText: string | null; statusCode: "ACTIVE" | "DEPRECATED";
   attributes: AttributeDef[]; initialValues: Record<string, unknown>;
   links: ResolvedLink[]; relationshipTypes: RelationshipType[];
-  initialStakeholders: Stakeholder[]; roleLabels: GovernanceRoleLabels; canWrite: boolean;
+  canWrite: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -287,11 +287,9 @@ export function AssetDetailClient({
       </div>
 
       <GovernancePanel
-        assetTypeCode={assetTypeCode}
+        assetType={assetTypeCode}
         assetId={assetId}
-        initialStakeholders={initialStakeholders}
         canEdit={canWrite}
-        roleLabels={roleLabels}
       />
 
       {showRequests && (

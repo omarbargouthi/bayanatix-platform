@@ -12,6 +12,7 @@ import { ColumnTypeBadge } from "./ColumnTypeBadge";
 import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
 import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPanel";
 import { CustomAttributesPanel } from "./CustomAttributesPanel";
+import { GovernancePanel } from "./GovernancePanel";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { useLang } from "@/lib/lang-context";
@@ -381,7 +382,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
 
 // ── Attribute edit modal ────────────────────────────────────────────────────
 
-function AttributeEditModal({ attr, onClose }: { attr: DataAttribute; onClose: () => void }) {
+function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; onClose: () => void; canEdit: boolean }) {
   const router = useRouter();
   const { t } = useLang();
   const c = t.catalog;
@@ -470,6 +471,8 @@ function AttributeEditModal({ attr, onClose }: { attr: DataAttribute; onClose: (
               <TermMultiPicker assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} dual />
             </div>
 
+            <GovernancePanel assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} canEdit={canEdit} />
+
             {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</div>}
           </div>
 
@@ -518,7 +521,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
 
   return (
     <>
-      {editing && <AttributeEditModal attr={editing} onClose={() => setEditing(null)} />}
+      {editing && <AttributeEditModal attr={editing} onClose={() => setEditing(null)} canEdit={canEdit} />}
 
       <div className="card overflow-hidden">
         {/* Card header */}

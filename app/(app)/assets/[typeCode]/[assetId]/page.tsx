@@ -4,8 +4,6 @@ import { Header } from "@/components/layout/Header";
 import {
   getCustomAssetTypeByCode, getTypeAttributes, getInstance, getLinksForAsset, getRelationshipTypesForAssetType,
 } from "@/lib/queries/custom-assets";
-import { getStakeholders } from "@/lib/queries/stakeholders";
-import { getGovernanceRoleLabels } from "@/lib/queries/governance-config";
 import { AssetActivityPanel } from "@/components/custom-assets/AssetActivityPanel";
 import { AssetDetailClient } from "./AssetDetailClient";
 
@@ -26,12 +24,10 @@ export default async function AssetDetailPage({ params }: { params: { typeCode: 
 
   const assetTypeCode = `CUSTOM:${type.typeCode}`;
 
-  const [attributes, links, relationshipTypes, stakeholders, roleLabels] = await Promise.all([
+  const [attributes, links, relationshipTypes] = await Promise.all([
     getTypeAttributes(type.typeId),
     getLinksForAsset(assetTypeCode, assetId),
     getRelationshipTypesForAssetType(assetTypeCode),
-    getStakeholders(assetTypeCode, assetId),
-    getGovernanceRoleLabels(),
   ]);
 
   const canWrite = user.role === "ADMIN" || user.role === "STEWARD";
@@ -60,12 +56,6 @@ export default async function AssetDetailPage({ params }: { params: { typeCode: 
         initialValues={instance.attributes}
         links={links}
         relationshipTypes={relationshipTypes}
-        initialStakeholders={stakeholders}
-        roleLabels={{
-          OWNER:        roleLabels.OWNER        ?? { name: "Owner",            description: null },
-          BIZ_STEWARD:  roleLabels.BIZ_STEWARD  ?? { name: "Business Steward", description: null },
-          TECH_STEWARD: roleLabels.TECH_STEWARD ?? { name: "Technical Steward",description: null },
-        }}
         canWrite={canWrite}
       />
       <div className="px-6 max-w-4xl mx-auto pb-10">

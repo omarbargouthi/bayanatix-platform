@@ -134,6 +134,30 @@ export async function resolveEffectiveGovernance(attributeId: number): Promise<E
   `;
 }
 
+// Resolve effective governance for a schema, walking schema → source
+export async function resolveEffectiveSchemaGovernance(schemaId: number): Promise<EffectiveStakeholder[]> {
+  return sql<EffectiveStakeholder[]>`
+    WITH roles(role_code) AS (VALUES ('OWNER'), ('BIZ_STEWARD'), ('TECH_STEWARD')),
+    resolved AS (
+      SELECT r.role_code, eff.user_id, eff.resolved_from
+      FROM roles r
+      CROSS JOIN LATERAL bayanat.fn_resolve_schema_stakeholder(${schemaId}, r.role_code) eff
+      WHERE eff.user_id IS NOT NULL
+    )
+    SELECT
+      res.user_id       AS "userId",
+      u.full_name       AS "fullName",
+      u.email,
+      res.role_code     AS "roleCode",
+      sr.role_name_text AS "roleName",
+      res.resolved_from AS "resolvedFrom"
+    FROM resolved res
+    JOIN bayanat.users          u  ON u.user_id  = res.user_id
+    JOIN bayanat.stakeholder_roles sr ON sr.role_code = res.role_code
+    ORDER BY res.role_code, u.full_name
+  `;
+}
+
 // Resolve effective governance for an entity (table) walking table → schema → source
 export async function resolveEffectiveEntityGovernance(entityId: number): Promise<EffectiveStakeholder[]> {
   return sql<EffectiveStakeholder[]>`

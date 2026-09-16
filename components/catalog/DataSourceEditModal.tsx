@@ -6,6 +6,7 @@ import type { DataSource } from "@/lib/types";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
+import { GovernancePanel } from "./GovernancePanel";
 
 export function DataSourceEditModal({
   source,
@@ -99,6 +100,7 @@ export function DataSourceEditModal({
               <label className="field-label">Business Terms</label>
               <TermMultiPicker assetType="DATA_SOURCES" assetId={source.dataSourceId} />
             </div>
+            <GovernancePanel assetType="DATA_SOURCES" assetId={source.dataSourceId} canEdit />
             {error && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                 {error}

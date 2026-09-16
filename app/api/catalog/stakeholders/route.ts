@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getStakeholders, assignStakeholder, resolveEffectiveGovernance, resolveEffectiveEntityGovernance } from "@/lib/queries/stakeholders";
+import { getStakeholders, assignStakeholder, resolveEffectiveGovernance, resolveEffectiveEntityGovernance, resolveEffectiveSchemaGovernance } from "@/lib/queries/stakeholders";
 import { sql } from "@/lib/db";
 
 export async function GET(req: Request) {
@@ -21,6 +21,9 @@ export async function GET(req: Request) {
     }
     if (assetTypeCode === "DATA_ENTITIES") {
       return NextResponse.json(await resolveEffectiveEntityGovernance(assetId));
+    }
+    if (assetTypeCode === "DATA_SCHEMAS") {
+      return NextResponse.json(await resolveEffectiveSchemaGovernance(assetId));
     }
   }
 

@@ -18,8 +18,6 @@ import { TableDqTab } from "@/components/catalog/TableDqTab";
 import { getDqRules } from "@/lib/queries/dq";
 import { fmtNumber } from "@/lib/utils";
 import { trackAssetVisit } from "@/lib/queries/dashboard";
-import { getStakeholders } from "@/lib/queries/stakeholders";
-import { getGovernanceRoleLabels } from "@/lib/queries/governance-config";
 import { GovernancePanel } from "@/components/catalog/GovernancePanel";
 import { MindMapTab } from "@/components/catalog/MindMapTab";
 import { TableTypeBadge } from "@/components/catalog/TableTypeBadge";
@@ -52,13 +50,11 @@ export default async function TablePage({
 
   const activeTab: Tab = isValidTab(searchParams.tab) ? searchParams.tab : "Schema";
 
-  // Always fetch entity; only fetch profile, DQ rules, and stakeholders on Schema tab
-  const [entity, profile, schemaTabDqRules, stakeholders, roleLabels] = await Promise.all([
+  // Always fetch entity; only fetch profile and DQ rules on Schema tab
+  const [entity, profile, schemaTabDqRules] = await Promise.all([
     getEntityById(id),
     activeTab === "Schema" ? getEntityProfile(id)   : Promise.resolve(null),
     activeTab === "Schema" ? getDqRules({ assetTypeCode: "DATA_ENTITIES", assetId: id }) : Promise.resolve([]),
-    activeTab === "Schema" ? getStakeholders("DATA_ENTITIES", id) : Promise.resolve([]),
-    activeTab === "Schema" ? getGovernanceRoleLabels() : Promise.resolve({} as Record<string, { name: string; description: string | null; nameTranslations: Record<string, string> | null }>),
   ]);
   if (!entity) notFound();
 
@@ -204,15 +200,9 @@ export default async function TablePage({
             </section>
 
             <GovernancePanel
-              assetTypeCode="DATA_ENTITIES"
+              assetType="DATA_ENTITIES"
               assetId={entity.entityId}
-              initialStakeholders={stakeholders}
               canEdit={canEdit}
-              roleLabels={{
-                OWNER:        roleLabels.OWNER        ?? { name: "Owner",            description: null, nameTranslations: null },
-                BIZ_STEWARD:  roleLabels.BIZ_STEWARD  ?? { name: "Business Steward", description: null, nameTranslations: null },
-                TECH_STEWARD: roleLabels.TECH_STEWARD ?? { name: "Technical Steward",description: null, nameTranslations: null },
-              }}
             />
 
             <RelatedAssetsPanel assetTypeCode="DATA_ENTITIES" assetId={entity.entityId} />

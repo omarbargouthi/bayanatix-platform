@@ -10,6 +10,7 @@ import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
 import { StarRatingWidget } from "./StarRatingWidget";
 import { CertifyAssetModal } from "./CertifyAssetModal";
+import { GovernancePanel } from "./GovernancePanel";
 import { useLang } from "@/lib/lang-context";
 import type { DataSchema, DataSource } from "@/lib/types";
 
@@ -215,6 +216,8 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
           <StarRatingWidget assetType="DATA_SCHEMAS" assetId={schema.schemaId} />
         </div>
       </div>
+
+      <GovernancePanel assetType="DATA_SCHEMAS" assetId={schema.schemaId} canEdit={canEdit} />
 
       {showHistory && (
         <AssetHistoryDrawer
