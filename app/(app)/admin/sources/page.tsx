@@ -633,7 +633,7 @@ export default function DataSourcesPage() {
                     <div className="border-t border-line pt-4 space-y-3">
                       <div>
                         <div className="text-xs font-semibold text-ink mb-0.5">Default Governance Roles</div>
-                        <p className="text-[11px] text-muted mb-3">Assigned automatically to every table discovered during crawl. Leave blank to skip.</p>
+                        <p className="text-[11px] text-muted mb-3">Assigned once to this data source when crawled, then inherited by every schema, table, and column under it — a steward can override it at any level as needed. Leave blank to skip.</p>
                         <div className="grid grid-cols-2 gap-3">
                           {[
                             { label: "Default Owner",            field: "defaultOwnerUserId"   as keyof CrawlCfg },

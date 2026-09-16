@@ -197,22 +197,38 @@ export async function getSourcesForUser(userId: string): Promise<{ sourceId: num
   `;
 }
 
-// Bulk-assign governance defaults to a newly discovered entity (called during crawl)
+// Apply crawl-config governance defaults to an asset — called once per crawl at
+// the DATA_SOURCES level (see lib/crawler.ts), not per table: the column ->
+// table -> schema -> source resolver (db/046, db/097) inherits it down from
+// there, and a steward/owner can still override at any level. OWNER is kept
+// singular here the same way assignStakeholder() enforces it for manual
+// assignments — skip the default rather than inserting a second OWNER row
+// alongside one an admin already set explicitly at this exact asset.
 export async function applyGovernanceDefaults(
-  entityId:             number,
+  assetTypeCode:        string,
+  assetId:              number,
   defaultOwnerId:       string | null,
   defaultBizStewardId:  string | null,
   defaultTechStewardId: string | null,
 ): Promise<void> {
-  const assignments: { userId: string; roleCode: string }[] = [
-    ...(defaultOwnerId       ? [{ userId: defaultOwnerId,       roleCode: "OWNER" }]       : []),
+  if (defaultOwnerId) {
+    await sql`
+      INSERT INTO bayanat.asset_stakeholders (asset_type_code, asset_id, user_id, role_code)
+      SELECT ${assetTypeCode}, ${assetId}, ${defaultOwnerId}, 'OWNER'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM bayanat.asset_stakeholders
+        WHERE asset_type_code = ${assetTypeCode} AND asset_id = ${assetId} AND role_code = 'OWNER'
+      )
+    `;
+  }
+  const stewardAssignments: { userId: string; roleCode: string }[] = [
     ...(defaultBizStewardId  ? [{ userId: defaultBizStewardId,  roleCode: "BIZ_STEWARD" }] : []),
     ...(defaultTechStewardId ? [{ userId: defaultTechStewardId, roleCode: "TECH_STEWARD" }]: []),
   ];
-  for (const a of assignments) {
+  for (const a of stewardAssignments) {
     await sql`
       INSERT INTO bayanat.asset_stakeholders (asset_type_code, asset_id, user_id, role_code)
-      VALUES ('DATA_ENTITIES', ${entityId}, ${a.userId}, ${a.roleCode})
+      VALUES (${assetTypeCode}, ${assetId}, ${a.userId}, ${a.roleCode})
       ON CONFLICT (asset_type_code, asset_id, user_id, role_code) DO NOTHING
     `;
   }

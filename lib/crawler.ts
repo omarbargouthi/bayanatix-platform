@@ -944,6 +944,16 @@ async function saveCrawlResults(
     sourceId = row.id;
   }
 
+  // Governance defaults are applied once, here, at the source itself — the
+  // column -> table -> schema -> source resolver inherits them down to every
+  // schema/table/column discovered under it (see lib/queries/stakeholders.ts).
+  void applyGovernanceDefaults(
+    "DATA_SOURCES", sourceId,
+    govDefaults.defaultOwnerUserId,
+    govDefaults.defaultBizStewardId,
+    govDefaults.defaultTechStewardId,
+  ).catch(() => {});
+
   const touchedSchemaIds: number[] = [];
   const touchedEntityIds: number[] = [];
   const touchedAttributeIds: number[] = [];
@@ -1008,14 +1018,6 @@ async function saveCrawlResults(
         ]);
       }
       touchedEntityIds.push(entityId);
-
-      // Apply default governance roles from crawl config (fire-and-forget — non-blocking)
-      void applyGovernanceDefaults(
-        entityId,
-        govDefaults.defaultOwnerUserId,
-        govDefaults.defaultBizStewardId,
-        govDefaults.defaultTechStewardId,
-      ).catch(() => {});
 
       // Save profiling metadata if collected
       let profileId: number | null = null;

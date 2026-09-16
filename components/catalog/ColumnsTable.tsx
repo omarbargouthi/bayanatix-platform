@@ -419,8 +419,8 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={onClose}>
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-line" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-line max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
             <div>
               <h2 className="font-bold text-brand-deep">{attr.physicalName}</h2>
               <p className="text-[11px] text-muted font-mono">{attr.dataType}</p>
@@ -431,7 +431,7 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
             </div>
           </div>
 
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
             <div>
               <label className="field-label">{t.common.description}</label>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="input-field resize-none" placeholder="Describe this column…" />
@@ -476,7 +476,7 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
             {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</div>}
           </div>
 
-          <div className="flex justify-end gap-2 px-6 py-4 border-t border-line">
+          <div className="flex justify-end gap-2 px-6 py-4 border-t border-line shrink-0">
             <button onClick={onClose} className="btn">{t.common.cancel}</button>
             <button onClick={save} disabled={saving} className="btn btn-primary">{saving ? t.common.saving : c.saveChanges}</button>
           </div>
