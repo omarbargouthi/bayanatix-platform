@@ -543,11 +543,12 @@ export const en: I18nStrings = {
     sampled:          "Sampled",
     colsProfiled:     "Columns profiled",
     noProfilingData:  "No column-level profiling data recorded.",
-    complianceScore:     "Compliance Score",
-    piiColumns:          "PII columns",
-    classificationLabel: "Classification",
-    retentionLabel:      "Retention",
-    pdplStatus:          "PDPL Status",
+    tableHealth:              "Table Health",
+    overallCdes:              "Overall CDEs",
+    metadataCompletion:       "Metadata Completion",
+    columnTypeClassification: "Column Type Classification",
+    overallQualityScore:      "Overall Quality Score",
+    noRulesScored:            "No DQ rules scored yet",
   },
 
   dq: {

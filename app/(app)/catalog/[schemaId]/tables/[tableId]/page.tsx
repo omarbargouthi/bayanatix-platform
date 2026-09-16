@@ -3,10 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
-import { getEntityById, getEntityProfile } from "@/lib/queries/catalog";
+import { getEntityById, getEntityProfile, CDE_CLASSIFICATION_CODES } from "@/lib/queries/catalog";
 import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
 import { IconTable } from "@/components/layout/icons";
-import { ComplianceScorePanel } from "@/components/catalog/ComplianceScorePanel";
+import { TableHealthPanel } from "@/components/catalog/TableHealthPanel";
 import { TableTabs } from "@/components/catalog/TableTabs";
 import { TableEditPanel } from "@/components/catalog/TableEditPanel";
 import { ColumnsTable } from "@/components/catalog/ColumnsTable";
@@ -15,7 +15,7 @@ import { ProfilingPanel } from "@/components/catalog/ProfilingPanel";
 import { ActivityTab } from "@/components/catalog/ActivityTab";
 import { LineageTab } from "@/components/catalog/LineageTab";
 import { TableDqTab } from "@/components/catalog/TableDqTab";
-import { getDqRules } from "@/lib/queries/dq";
+import { getDqRules, getTableDqDimensions } from "@/lib/queries/dq";
 import { fmtNumber } from "@/lib/utils";
 import { trackAssetVisit } from "@/lib/queries/dashboard";
 import { GovernancePanel } from "@/components/catalog/GovernancePanel";
@@ -50,16 +50,25 @@ export default async function TablePage({
 
   const activeTab: Tab = isValidTab(searchParams.tab) ? searchParams.tab : "Schema";
 
-  // Always fetch entity; only fetch profile and DQ rules on Schema tab
-  const [entity, profile, schemaTabDqRules] = await Promise.all([
+  // Always fetch entity; only fetch profile and DQ data on Schema tab
+  const [entity, profile, schemaTabDqRules, tableDq] = await Promise.all([
     getEntityById(id),
     activeTab === "Schema" ? getEntityProfile(id)   : Promise.resolve(null),
-    activeTab === "Schema" ? getDqRules({ assetTypeCode: "DATA_ENTITIES", assetId: id }) : Promise.resolve([]),
+    activeTab === "Schema" ? getDqRules({ entityId: id }) : Promise.resolve([]),
+    activeTab === "Schema" ? getTableDqDimensions(id) : Promise.resolve(null),
   ]);
   if (!entity) notFound();
 
   const canEdit = await canEditMetadata(user);
-  const dq = computeDqAggregates(entity.attributes);
+
+  const cdeCount = entity.attributes.filter(
+    (a) => a.classTermClassCode && CDE_CLASSIFICATION_CODES.includes(a.classTermClassCode)
+  ).length;
+  const totalCols = entity.attributes.length;
+  const withDescription = entity.attributes.filter((a) => a.description && a.description.trim() !== "").length;
+  const withColumnType  = entity.attributes.filter((a) => a.columnType != null).length;
+  const metadataCompletionPct         = totalCols > 0 ? Math.round((withDescription / totalCols) * 100) : 0;
+  const columnTypeClassificationPct   = totalCols > 0 ? Math.round((withColumnType  / totalCols) * 100) : 0;
 
   // Fire-and-forget — don't block page render
   void trackAssetVisit(
@@ -151,51 +160,19 @@ export default async function TablePage({
                     {schemaTabDqRules.length} rule{schemaTabDqRules.length !== 1 ? "s" : ""} → manage
                   </a>
                 </div>
-                {schemaTabDqRules.length > 0 ? (
-                  <div className="space-y-2">
-                    {schemaTabDqRules.slice(0, 4).map((r) => (
-                      <div key={r.ruleId} className="flex items-center justify-between bg-canvas-soft rounded-md px-3 py-2">
-                        <div className="text-[12px] font-medium text-ink truncate">{r.ruleName}</div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {r.lastScore != null && (
-                            <span className={`text-[11px] font-bold ${Number(r.lastScore) >= 90 ? "text-emerald-600" : Number(r.lastScore) >= 70 ? "text-amber-600" : "text-red-600"}`}>
-                              {Number(r.lastScore).toFixed(1)}%
-                            </span>
-                          )}
-                          {r.lastStatusCode ? (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                              r.lastStatusCode === "PASSED" ? "bg-emerald-100 text-emerald-700" :
-                              r.lastStatusCode === "FAILED" ? "bg-red-100 text-red-700" :
-                              r.lastStatusCode === "WARNING" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
-                            }`}>{r.lastStatusCode}</span>
-                          ) : <span className="text-[10px] text-muted">Not run</span>}
-                        </div>
-                      </div>
-                    ))}
-                    {schemaTabDqRules.length > 4 && (
-                      <div className="text-[11px] text-muted text-center">+{schemaTabDqRules.length - 4} more rules</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-3.5">
-                    <DqItem label="Completeness"    value={dq.completeness} />
-                    <DqItem label="Validity"         value={dq.validity} />
-                    <DqItem label="Uniqueness (PK)"  value={dq.uniqueness} />
-                    <DqItem label="Timeliness"       value={82.4} />
-                    <DqItem label="Consistency"      value={100} />
-                    <DqItem label="Accuracy"         value={88.6} />
-                  </div>
-                )}
+                <div className="grid grid-cols-3 gap-3.5">
+                  {(tableDq?.dimensions ?? []).map((d) => (
+                    <DqItem key={d.dimensionCode} label={d.label} value={d.score} ruleCount={d.ruleCount} />
+                  ))}
+                </div>
               </div>
 
-              {/* Compliance gauge */}
-              <ComplianceScorePanel
-                trustScore={entity.trustScore ?? 0}
-                piiCount={entity.attributes.filter((a) => a.classificationCode === "PII").length}
-                classificationValue="Restricted"
-                retentionValue="7 yrs"
-                pdplValue="Compliant"
-                pdplClass="text-emerald-600"
+              {/* Table health gauge */}
+              <TableHealthPanel
+                cdeCount={cdeCount}
+                metadataCompletionPct={metadataCompletionPct}
+                columnTypeClassificationPct={columnTypeClassificationPct}
+                overallQualityScore={tableDq?.overallScore ?? null}
               />
             </section>
 
@@ -251,29 +228,20 @@ export default async function TablePage({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function DqItem({ label, value }: { label: string; value: number }) {
+function DqItem({ label, value, ruleCount }: { label: string; value: number | null; ruleCount: number }) {
   return (
     <div className="bg-canvas-soft rounded-md px-3.5 py-2.5">
-      <div className="text-base font-bold text-ink">{value.toFixed(1)}%</div>
+      <div className="text-base font-bold text-ink">{value != null ? `${value.toFixed(1)}%` : "—"}</div>
       <div className="text-[11px] text-muted">{label}</div>
-      <div className="h-1 mt-1.5 rounded-full bg-line">
-        <div className="h-full rounded-full bg-brand-purple" style={{ width: `${value}%` }} />
-      </div>
+      {value != null ? (
+        <div className="h-1 mt-1.5 rounded-full bg-line">
+          <div className="h-full rounded-full bg-brand-purple" style={{ width: `${value}%` }} />
+        </div>
+      ) : (
+        <div className="text-[10px] text-muted italic mt-1.5">
+          {ruleCount > 0 ? "Not run yet" : "No rules assigned"}
+        </div>
+      )}
     </div>
   );
-}
-
-function computeDqAggregates(attrs: { qualityScore?: number | null; nullPercentage?: number | null; isPrimaryKey: boolean }[]) {
-  const scores = attrs.map((a) => Number(a.qualityScore ?? 0)).filter((n) => !!n);
-  const completeness =
-    100 - (attrs.length === 0
-      ? 0
-      : attrs.reduce((s, a) => s + Number(a.nullPercentage ?? 0), 0) / attrs.length);
-  const validity = scores.length === 0 ? 0 : scores.reduce((a, b) => a + b, 0) / scores.length;
-  const uniqueness = attrs.find((a) => a.isPrimaryKey) ? 99.1 : 0;
-  return {
-    completeness: Math.max(0, Math.min(100, completeness)),
-    validity:     Math.max(0, Math.min(100, validity)),
-    uniqueness,
-  };
 }

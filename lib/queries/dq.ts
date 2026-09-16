@@ -194,6 +194,68 @@ export async function getDqRules(filters?: {
   }));
 }
 
+// ── Per-table dimension rollup ───────────────────────────────────────────────
+// Table page's "Data Quality" summary — each dimension's score is the average
+// last_score of active rules assigned to this table (asset_type_code=
+// DATA_ENTITIES) or any of its columns (DATA_ATTRIBUTES), mirroring the same
+// dq_rules-driven approach getCdeDataQuality() already uses for the Data
+// Catalog page's CDE rollup, just scoped to one table instead of a whole
+// source and without that feature's configurable per-dimension weights.
+// CONFORMITY exists as a dimension but has no tile here (matches the
+// long-standing 6-tile layout) — a dimension with no rules assigned shows
+// score:null so the UI can render "No rules assigned" rather than a fake number.
+
+const TABLE_DQ_DIMENSIONS: { code: string; label: string }[] = [
+  { code: "COMP",        label: "Completeness" },
+  { code: "VALIDITY",    label: "Validity" },
+  { code: "UNIQUENESS",  label: "Uniqueness" },
+  { code: "FRESHNESS",   label: "Freshness" },
+  { code: "CONSISTENCY", label: "Consistency" },
+  { code: "ACCURACY",    label: "Accuracy" },
+];
+
+// ruleCount = total active rules assigned to this dimension (whether or not
+// they've run yet); scoredCount = how many of those have a last_score, which
+// is what avgScore is actually averaged over. Keeping both lets the UI tell
+// "no rules assigned" apart from "assigned but not run yet".
+export type TableDqDimensionResult = { dimensionCode: string; label: string; score: number | null; ruleCount: number };
+export type TableDqResult = { overallScore: number | null; dimensions: TableDqDimensionResult[] };
+
+export async function getTableDqDimensions(entityId: number): Promise<TableDqResult> {
+  const scoreRows = await sql<{ dimensionCode: string; avgScore: number | null; ruleCount: number }[]>`
+    SELECT r.dimension_code AS "dimensionCode",
+           AVG(r.last_score)::float8 AS "avgScore",
+           COUNT(*)::int AS "ruleCount"
+    FROM bayanat.dq_rules r
+    LEFT JOIN bayanat.data_attributes a ON r.asset_type_code = 'DATA_ATTRIBUTES' AND a.attribute_id = r.asset_id
+    WHERE r.is_active_indicator = true
+      AND r.dimension_code IS NOT NULL
+      AND (
+        (r.asset_type_code = 'DATA_ENTITIES'   AND r.asset_id = ${entityId})
+        OR (r.asset_type_code = 'DATA_ATTRIBUTES' AND a.entity_id = ${entityId})
+      )
+    GROUP BY r.dimension_code
+  `;
+  const scoreMap = new Map(scoreRows.map((s) => [s.dimensionCode, s]));
+
+  const dimensions: TableDqDimensionResult[] = TABLE_DQ_DIMENSIONS.map(({ code, label }) => {
+    const s = scoreMap.get(code);
+    return {
+      dimensionCode: code,
+      label,
+      score: s?.avgScore != null ? Number(s.avgScore) : null,
+      ruleCount: Number(s?.ruleCount ?? 0),
+    };
+  });
+
+  const withData = dimensions.filter((d) => d.score != null);
+  const overallScore = withData.length > 0
+    ? Math.round(withData.reduce((sum, d) => sum + d.score!, 0) / withData.length)
+    : null;
+
+  return { overallScore, dimensions };
+}
+
 export async function getDqRuleById(ruleId: number): Promise<DqRule | null> {
   const rules = await getDqRules();
   return rules.find((r) => r.ruleId === ruleId) ?? null;

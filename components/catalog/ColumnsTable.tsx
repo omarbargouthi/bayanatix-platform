@@ -419,7 +419,7 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={onClose}>
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-line max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-line max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
             <div>
               <h2 className="font-bold text-brand-deep">{attr.physicalName}</h2>

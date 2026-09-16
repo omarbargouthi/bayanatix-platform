@@ -950,7 +950,7 @@ export async function getClassificationStatsScoped(scope?: { schemaId?: number; 
 // getClassificationStats()/app/api/classification/columns: a column whose governed
 // CLASSIFICATION-role glossary term carries CONFIDENTIAL/SECRET/TOP_SECRET sensitivity.
 // Scoped to attribute_class_code='BUSINESS' since CDEs are by definition business columns.
-const CDE_CLASSIFICATION_CODES = ["CONFIDENTIAL", "SECRET", "TOP_SECRET"];
+export const CDE_CLASSIFICATION_CODES = ["CONFIDENTIAL", "SECRET", "TOP_SECRET"];
 
 export type CdeCoverage = { businessColumns: number; cdeColumns: number };
 

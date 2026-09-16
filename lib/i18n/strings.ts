@@ -595,11 +595,12 @@ export type I18nStrings = {
     colsProfiled:      string;
     noProfilingData:   string;
     // Table page — compliance gauge
-    complianceScore:      string;
-    piiColumns:           string;
-    classificationLabel:  string;
-    retentionLabel:       string;
-    pdplStatus:           string;
+    tableHealth:               string;
+    overallCdes:               string;
+    metadataCompletion:        string;
+    columnTypeClassification:  string;
+    overallQualityScore:       string;
+    noRulesScored:             string;
   };
 
   // ── Data Quality ─────────────────────────────────────────────────────────────

@@ -543,11 +543,12 @@ export const ar: I18nStrings = {
     sampled:          "العينة",
     colsProfiled:     "الأعمدة المحللة",
     noProfilingData:  "لا توجد بيانات تحليل على مستوى الأعمدة.",
-    complianceScore:     "درجة الامتثال",
-    piiColumns:          "أعمدة البيانات الشخصية",
-    classificationLabel: "التصنيف",
-    retentionLabel:      "الاحتفاظ",
-    pdplStatus:          "حالة PDPL",
+    tableHealth:              "سلامة الجدول",
+    overallCdes:              "إجمالي عناصر البيانات الحرجة",
+    metadataCompletion:       "اكتمال البيانات الوصفية",
+    columnTypeClassification: "تصنيف نوع العمود",
+    overallQualityScore:      "درجة الجودة الإجمالية",
+    noRulesScored:            "لا توجد قواعد جودة تم تقييمها بعد",
   },
 
   dq: {
