@@ -219,9 +219,12 @@ async function applyApprovalOutcome(requestId: number, requestTypeCode: string, 
       return;
     case "PI_CLEAR_TEXT_ACCESS": {
       if (!approved) return; // rejected — no grant, request just closes
-      const [req] = await sql<{ userId: string; purpose: string | null }[]>`
-        SELECT raised_by_user_id AS "userId", description_text AS "purpose"
-        FROM bayanat.asset_requests WHERE request_id = ${requestId}
+      const [req] = await sql<{ userId: string; purpose: string | null; legalBasis: string | null }[]>`
+        SELECT ar.raised_by_user_id AS "userId", ar.description_text AS "purpose",
+               pr.legal_basis_text  AS "legalBasis"
+        FROM bayanat.asset_requests ar
+        LEFT JOIN bayanat.pi_access_requests pr ON pr.request_id = ar.request_id
+        WHERE ar.request_id = ${requestId}
       `;
       const targets = await sql<{ assetTypeCode: string; assetId: number }[]>`
         SELECT asset_type_code AS "assetTypeCode", asset_id AS "assetId"
@@ -232,8 +235,8 @@ async function applyApprovalOutcome(requestId: number, requestTypeCode: string, 
       for (const t of targets) {
         await sql`
           INSERT INTO bayanat.pi_access_grants
-            (user_id, asset_type_code, asset_id, request_id, purpose_text)
-          VALUES (${req.userId}, ${t.assetTypeCode}, ${t.assetId}, ${requestId}, ${req.purpose})
+            (user_id, asset_type_code, asset_id, request_id, purpose_text, legal_basis_text)
+          VALUES (${req.userId}, ${t.assetTypeCode}, ${t.assetId}, ${requestId}, ${req.purpose}, ${req.legalBasis})
         `;
       }
       return;

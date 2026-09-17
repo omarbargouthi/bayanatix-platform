@@ -10,24 +10,24 @@ interface Props {
 }
 
 export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitted }: Props) {
-  const [purpose, setPurpose] = useState("");
+  const [purpose,    setPurpose]    = useState("");
+  const [legalBasis, setLegalBasis] = useState("");
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
   async function submit() {
     if (!purpose.trim()) { setError("Purpose of use is required."); return; }
+    if (!legalBasis.trim()) { setError("Legal basis is required."); return; }
     setSaving(true);
     setError(null);
     try {
-      const r = await fetch("/api/requests", {
+      const r = await fetch("/api/pi-access/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requestTypeCode: "PI_CLEAR_TEXT_ACCESS",
-          title: `PI clear-text access: ${entityName}`,
-          descriptionText: purpose.trim(),
-          priorityCode: "MEDIUM",
-          targets: [{ assetTypeCode: "DATA_ENTITIES", assetId: entityId, assetName: entityName }],
+          entityId, entityName,
+          purpose: purpose.trim(),
+          legalBasis: legalBasis.trim(),
         }),
       });
       if (!r.ok) {
@@ -58,17 +58,27 @@ export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitte
         <div className="px-6 py-5 space-y-4">
           <p className="text-[12px] text-muted">
             Viewing PI/PII columns as clear text requires approval from Admin, the Data Privacy Officer, and DMO
-            Manager. State the business purpose for this request.
+            Manager. State the business purpose and the legal basis for this request.
           </p>
           <div>
             <label className="field-label">Purpose of Use <span className="text-red-500">*</span></label>
             <textarea
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              rows={4}
+              rows={3}
               autoFocus
               className="input-field resize-none"
               placeholder="Why do you need to see this table's PI/PII columns unmasked?"
+            />
+          </div>
+          <div>
+            <label className="field-label">Legal Basis <span className="text-red-500">*</span></label>
+            <textarea
+              value={legalBasis}
+              onChange={(e) => setLegalBasis(e.target.value)}
+              rows={2}
+              className="input-field resize-none"
+              placeholder="Statute, mandate, or consent basis under PDPL for this access…"
             />
           </div>
           {error && (

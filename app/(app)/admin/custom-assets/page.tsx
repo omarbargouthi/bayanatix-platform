@@ -429,7 +429,7 @@ export default function CustomAssetsAdminPage() {
       {tab === "templates" && (
         <div className="space-y-4">
           <p className="text-xs text-muted">
-            One-click starter packs (spec §7) — each installs a custom type and its relationship type(s) via the same
+            One-click starter packs — each installs a custom type and its relationship type(s) via the same
             admin actions above. Everything they create stays fully editable afterward; installing twice is a safe no-op.
           </p>
           {templateMessage && <div className="text-xs bg-brand-purple/5 border border-brand-purple/20 rounded-md px-3 py-2 text-brand-deep">{templateMessage}</div>}
