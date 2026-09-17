@@ -36,7 +36,7 @@ export default async function GlossaryTermPage({
         ]}
         user={user}
       />
-      <GlossaryTermPageClient term={term} canEdit={canEdit} />
+      <GlossaryTermPageClient term={term} canEdit={canEdit} canEditGovernance={user.role === "ADMIN"} />
     </>
   );
 }

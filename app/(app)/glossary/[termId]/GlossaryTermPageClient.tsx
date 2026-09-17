@@ -24,9 +24,10 @@ const CLASS_STYLE: Record<string, string> = {
 interface Props {
   term:    GlossaryTermDetail;
   canEdit: boolean;
+  canEditGovernance: boolean;
 }
 
-export function GlossaryTermPageClient({ term, canEdit }: Props) {
+export function GlossaryTermPageClient({ term, canEdit, canEditGovernance }: Props) {
   const { t } = useLang();
   const g = t.glossary;
   const c = t.catalog;
@@ -323,7 +324,7 @@ export function GlossaryTermPageClient({ term, canEdit }: Props) {
           <GlossaryGovernancePanel
             glossaryId={term.glossaryId}
             kind={term.domainId ? "term" : "domain"}
-            canEdit={canEdit}
+            canEdit={canEditGovernance}
           />
         </aside>
       </div>

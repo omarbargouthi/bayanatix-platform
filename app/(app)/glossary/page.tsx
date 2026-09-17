@@ -39,6 +39,7 @@ export default async function GlossaryPage({
         terms={terms}
         domainFilter={domainFilter}
         canEdit={canEdit}
+        canEditGovernance={user.role === "ADMIN"}
       />
     </>
   );

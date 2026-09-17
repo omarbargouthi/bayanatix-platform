@@ -73,9 +73,10 @@ interface Props {
   terms:        GlossaryTerm[];
   domainFilter: number | null;
   canEdit:      boolean;
+  canEditGovernance: boolean;
 }
 
-export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdit }: Props) {
+export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdit, canEditGovernance }: Props) {
   const { t } = useLang();
   const g = t.glossary;
   const [showNewTerm, setShowNewTerm] = useState(false);
@@ -200,7 +201,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
               </div>
 
               <div className="mb-5">
-                <GlossaryGovernancePanel glossaryId={activeDomain.glossaryId} kind="domain" canEdit={canEdit} />
+                <GlossaryGovernancePanel glossaryId={activeDomain.glossaryId} kind="domain" canEdit={canEditGovernance} />
               </div>
             </>
           )}

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { startWorkflow } from "@/lib/workflow";
 
-const CAN_EDIT_ROLES = new Set(["ADMIN", "STEWARD", "OFFICER"]);
+// Setting or overwriting a Domain's governance roles (owner/stewards) — directly at the
+// root, or by proposing an override lower in the hierarchy — is Admin-only.
+const CAN_EDIT_ROLES = new Set(["ADMIN"]);
 
 async function isRootDomain(glossaryId: number): Promise<boolean> {
   const [row] = await sql<{ parentId: number | null }[]>`
