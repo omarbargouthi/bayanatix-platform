@@ -12,13 +12,14 @@ export type GlossaryStats = {
 export async function getGlossaryStats(): Promise<GlossaryStats> {
   const rows = await sql<{ totalTerms: string; domains: string; linkedAttrs: string; piiTerms: string }[]>`
     SELECT
-      (SELECT COUNT(*)::int FROM bayanat.business_glossaries WHERE parent_glossary_id IS NOT NULL) AS "totalTerms",
+      (SELECT COUNT(*)::int FROM bayanat.business_glossaries
+         WHERE term_type IN ('TERM', 'KPI_METRIC'))                                                AS "totalTerms",
       (SELECT COUNT(*)::int FROM bayanat.business_glossaries WHERE parent_glossary_id IS NULL)     AS "domains",
       (SELECT COUNT(DISTINCT a.glossary_term_text)
          FROM bayanat.data_attributes a
          WHERE a.glossary_term_text IS NOT NULL)                                                   AS "linkedAttrs",
       (SELECT COUNT(*)::int FROM bayanat.business_glossaries
-         WHERE parent_glossary_id IS NOT NULL AND is_pii_indicator = TRUE)                        AS "piiTerms"
+         WHERE term_type IN ('TERM', 'KPI_METRIC') AND is_pii_indicator = TRUE)                    AS "piiTerms"
   `;
   const r = rows[0];
   return {
@@ -37,11 +38,51 @@ export async function getGlossaryDomains(): Promise<GlossaryDomain[]> {
       g.definition_text AS "description",
       g.classification_code AS "classCode",
       (SELECT COUNT(*)::int FROM bayanat.business_glossaries c
-         WHERE c.parent_glossary_id = g.glossary_id) AS "termCount"
+         WHERE c.parent_glossary_id = g.glossary_id AND c.term_type IN ('TERM', 'KPI_METRIC')) AS "termCount"
     FROM bayanat.business_glossaries g
     WHERE g.parent_glossary_id IS NULL
     ORDER BY g.term_name_text
   `;
+}
+
+export async function getGlossarySubDomains(domainId: number): Promise<GlossaryDomain[]> {
+  return sql<GlossaryDomain[]>`
+    SELECT
+      g.glossary_id    AS "glossaryId",
+      g.term_name_text AS "termName",
+      g.definition_text AS "description",
+      g.classification_code AS "classCode",
+      (SELECT COUNT(*)::int FROM bayanat.business_glossaries c
+         WHERE c.parent_glossary_id = g.glossary_id AND c.term_type IN ('TERM', 'KPI_METRIC')) AS "termCount"
+    FROM bayanat.business_glossaries g
+    WHERE g.parent_glossary_id = ${domainId} AND g.term_type = 'SUBDOMAIN'
+    ORDER BY g.term_name_text
+  `;
+}
+
+export async function updateGlossaryDomain(
+  glossaryId: number,
+  userId: string,
+  patch: { termName: string; description: string; classCode: string | null },
+): Promise<void> {
+  const [old] = await sql<{
+    term_name_text: string; definition_text: string | null; classification_code: string | null;
+  }[]>`
+    SELECT term_name_text, definition_text, classification_code
+    FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
+  `;
+  await sql`
+    UPDATE bayanat.business_glossaries
+    SET term_name_text = ${patch.termName}, definition_text = ${patch.description}, classification_code = ${patch.classCode}
+    WHERE glossary_id = ${glossaryId}
+  `;
+  if (old) {
+    await logUpdate("BUSINESS_GLOSSARIES", glossaryId, userId, [
+      { field: "term_name_text",      oldVal: old.term_name_text,      newVal: patch.termName },
+      { field: "definition_text",     oldVal: old.definition_text,     newVal: patch.description },
+      { field: "classification_code", oldVal: old.classification_code, newVal: patch.classCode },
+    ]);
+  }
 }
 
 export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[]> {
@@ -60,6 +101,7 @@ export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[
     FROM bayanat.business_glossaries g
     LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
     WHERE g.parent_glossary_id IS NOT NULL
+      AND g.term_type IN ('TERM', 'KPI_METRIC')
       ${domainId ? sql`AND g.parent_glossary_id = ${domainId}` : sql``}
     ORDER BY p.term_name_text, g.term_name_text
   `;

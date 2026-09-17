@@ -12,7 +12,7 @@ type Ctx = { params: { id: string } };
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return handleOwnershipGET(Number(params.id));
+  return handleOwnershipGET(Number(params.id), session.userId);
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {

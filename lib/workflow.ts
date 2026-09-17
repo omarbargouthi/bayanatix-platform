@@ -238,6 +238,33 @@ async function applyApprovalOutcome(requestId: number, requestTypeCode: string, 
       }
       return;
     }
+    case "OVERRIDE_GLOSSARY_GOVERNANCE": {
+      if (!approved) return; // rejected — inherited value stands, nothing to apply
+      const [change] = await sql<{
+        glossaryId: number; proposedOwnerId: string | null; proposedStewardIds: string[]; raisedBy: string;
+      }[]>`
+        SELECT gc.glossary_id AS "glossaryId", gc.proposed_owner_user_id AS "proposedOwnerId",
+               gc.proposed_steward_ids AS "proposedStewardIds", ar.raised_by_user_id AS "raisedBy"
+        FROM bayanat.glossary_governance_change_requests gc
+        JOIN bayanat.asset_requests ar ON ar.request_id = gc.request_id
+        WHERE gc.request_id = ${requestId}
+      `;
+      if (!change) return;
+      if (change.proposedOwnerId) {
+        await sql`UPDATE bayanat.business_glossaries SET owner_user_id = ${change.proposedOwnerId} WHERE glossary_id = ${change.glossaryId}`;
+      }
+      if (change.proposedStewardIds.length > 0) {
+        await sql`DELETE FROM bayanat.glossary_stewards WHERE glossary_id = ${change.glossaryId}`;
+        for (const userId of change.proposedStewardIds) {
+          await sql`
+            INSERT INTO bayanat.glossary_stewards (glossary_id, user_id, assigned_by)
+            VALUES (${change.glossaryId}, ${userId}, ${change.raisedBy})
+            ON CONFLICT (glossary_id, user_id) DO NOTHING
+          `;
+        }
+      }
+      return;
+    }
     default:
       return; // FIX_DATA_ISSUE, UPDATE_DEFINITION, CERTIFY_ASSET, GRANT_ACCESS, REMOVE_ACCESS, OTHER
   }

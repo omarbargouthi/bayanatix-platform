@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui/Tag";
 import { IconGlossary, IconTable, IconLines } from "@/components/layout/icons";
 import { TermEditButton } from "@/components/glossary/TermEditButton";
 import { TermHistoryButton } from "@/components/glossary/TermHistoryButton";
+import { DomainEditModal } from "@/components/glossary/DomainEditModal";
+import { GlossaryGovernancePanel } from "@/components/glossary/GlossaryGovernancePanel";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { useLang } from "@/lib/lang-context";
 import type { GlossaryTermDetail } from "@/lib/types";
@@ -27,10 +30,15 @@ export function GlossaryTermPageClient({ term, canEdit }: Props) {
   const { t } = useLang();
   const g = t.glossary;
   const c = t.catalog;
+  const [showEditDomain, setShowEditDomain] = useState(false);
+
+  const isDomainLike = term.termType === "DOMAIN" || term.termType === "SUBDOMAIN";
 
   const TERM_TYPE_LABEL: Record<string, string> = {
     TERM:       g.termTypeTerm,
     KPI_METRIC: g.termTypeKpi,
+    DOMAIN:     "Domain",
+    SUBDOMAIN:  "Sub-domain",
   };
 
   const CLASS_LABEL: Record<string, string> = {
@@ -120,7 +128,9 @@ export function GlossaryTermPageClient({ term, canEdit }: Props) {
           <div className="flex items-center gap-2 shrink-0">
             <button className="btn btn-sm">{g.follow}</button>
             <TermHistoryButton glossaryId={term.glossaryId} termName={term.termName} />
-            {canEdit && <TermEditButton term={term} />}
+            {canEdit && (isDomainLike
+              ? <button onClick={() => setShowEditDomain(true)} className="btn btn-sm">Edit</button>
+              : <TermEditButton term={term} />)}
             <button className="btn btn-primary btn-sm">{g.requestChange}</button>
           </div>
         </div>
@@ -309,8 +319,25 @@ export function GlossaryTermPageClient({ term, canEdit }: Props) {
               </div>
             </Section>
           )}
+
+          <GlossaryGovernancePanel
+            glossaryId={term.glossaryId}
+            kind={term.domainId ? "term" : "domain"}
+            canEdit={canEdit}
+          />
         </aside>
       </div>
+
+      {showEditDomain && isDomainLike && (
+        <DomainEditModal
+          glossaryId={term.glossaryId}
+          kindLabel={term.termType === "DOMAIN" ? "Domain" : "Sub-domain"}
+          termName={term.termName}
+          description={term.definition}
+          classCode={term.classCode}
+          onClose={() => setShowEditDomain(false)}
+        />
+      )}
     </main>
   );
 }
