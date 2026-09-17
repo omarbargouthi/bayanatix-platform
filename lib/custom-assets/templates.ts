@@ -90,8 +90,8 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
       typeCode: "ACTIVITY", typeNameText: "Activity", nameArText: "نشاط",
       descriptionText: "A data-processing activity performed by a role.", iconCode: "activity", colorHex: "#d97706",
       attributes: [
-        { attr_code: "PURPOSE", attr_name_text: "Purpose", name_ar_text: "الغرض", data_type_code: "TEXT" },
-        { attr_code: "LEGAL_BASIS", attr_name_text: "Legal Basis", name_ar_text: "الأساس القانوني", data_type_code: "ENUM", enum_values_json: ["CONSENT", "CONTRACT", "LEGAL_OBLIGATION", "LEGITIMATE_INTEREST"] },
+        { attr_code: "PURPOSE", attr_name_text: "Purpose", name_ar_text: "الغرض", data_type_code: "TEXT", is_required_indicator: true },
+        { attr_code: "LEGAL_BASIS", attr_name_text: "Legal Basis", name_ar_text: "الأساس القانوني", data_type_code: "ENUM", enum_values_json: ["CONSENT", "CONTRACT", "LEGAL_OBLIGATION", "LEGITIMATE_INTEREST"], is_required_indicator: true },
         { attr_code: "FREQUENCY", attr_name_text: "Frequency", name_ar_text: "التكرار", data_type_code: "TEXT" },
       ],
     }],
