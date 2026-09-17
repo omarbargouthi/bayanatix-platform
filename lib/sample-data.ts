@@ -63,6 +63,53 @@ export async function getPiColumnNames(entityId: number): Promise<Set<string>> {
   return new Set(rows.map((r) => r.physicalName));
 }
 
+export type AffectedRowEstimate =
+  | { available: true; count: number }
+  | { available: false; reason: string };
+
+// Live COUNT(*) under an OR'd set of column=value conditions — used by Legal
+// Hold's driving-table conditions to show an estimated affected-record count.
+// Same live-connection limitation as getLiveSampleRows (POSTGRES + a real
+// connection_registry row only). Column names come from our own catalog
+// (data_attributes.physical_name_text, not user input) so they're quoted as
+// identifiers; condition values are user-entered and passed as bound
+// parameters, never string-interpolated into the query.
+export async function estimateAffectedRowCount(
+  entityId: number,
+  conditions: { attributeName: string; valueText: string }[],
+): Promise<AffectedRowEstimate> {
+  if (conditions.length === 0) return { available: true, count: 0 };
+
+  const conn = await getEntityConnectionInfo(entityId);
+  if (!isLiveQueryable(conn)) {
+    return { available: false, reason: "This source has no live database connection — no estimate available." };
+  }
+
+  const qs = `"${conn.schemaName.replace(/"/g, '""')}"."${conn.entityName.replace(/"/g, '""')}"`;
+  const whereSql = conditions
+    .map((c, i) => `"${c.attributeName.replace(/"/g, '""')}" = $${i + 1}`)
+    .join(" OR ");
+  const values = conditions.map((c) => c.valueText);
+
+  const pg = postgres({
+    host: conn.hostAddress, port: conn.portNumber,
+    database: conn.databaseName || "postgres",
+    username: conn.usernameText || undefined,
+    password: conn.passwordText || undefined,
+    ssl: conn.sslEnabled ? "require" : false,
+    max: 1, connect_timeout: 10, idle_timeout: 5,
+  });
+  try {
+    const rows = await pg.unsafe(`SELECT COUNT(*)::int AS cnt FROM ${qs} WHERE ${whereSql}`, values);
+    const first = rows[0] as unknown as { cnt: number } | undefined;
+    return { available: true, count: first?.cnt ?? 0 };
+  } catch (e) {
+    return { available: false, reason: `Could not reach the live source: ${(e as Error).message}` };
+  } finally {
+    await pg.end({ timeout: 5 });
+  }
+}
+
 export async function getLiveSampleRows(entityId: number, limit: number): Promise<SampleDataResult> {
   const conn = await getEntityConnectionInfo(entityId);
   if (!isLiveQueryable(conn)) {

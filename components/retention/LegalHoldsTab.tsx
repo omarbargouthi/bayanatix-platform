@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLang } from "@/lib/lang-context";
 import type { LegalHold, DataCategory } from "@/lib/types";
+import { LegalHoldEntitiesPanel } from "./LegalHoldEntitiesPanel";
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE:   "bg-red-100 text-red-700",
@@ -265,6 +266,7 @@ export function LegalHoldsTab() {
                     </button>
                   )}
                 </div>
+                {hold.holdScopeType === "ENTITY" && <LegalHoldEntitiesPanel holdId={hold.holdId} />}
               </div>
             ))}
           </div>
