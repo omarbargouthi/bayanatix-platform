@@ -1,31 +1,45 @@
 import { cn } from "@/lib/utils";
 
-const PALETTE = [
-  "from-brand-light to-brand-purple",
-  "from-brand-purple to-brand-violet",
-  "from-brand-sky to-brand-navy",
-  "from-brand-violet to-brand-deep",
-];
+// Named presets (not just an array) so a user's chosen preset survives being
+// stored as a stable code (users.avatar_color_code) rather than an array index.
+const AVATAR_PALETTE: Record<string, string> = {
+  lavender: "from-brand-light to-brand-purple",
+  purple:   "from-brand-purple to-brand-violet",
+  sky:      "from-brand-sky to-brand-navy",
+  violet:   "from-brand-violet to-brand-deep",
+  navy:     "from-brand-navy to-brand-purple",
+  deep:     "from-brand-deep to-brand-sky",
+};
+
+export const AVATAR_COLOR_CODES = Object.keys(AVATAR_PALETTE);
 
 function colorFor(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  return PALETTE[Math.abs(hash) % PALETTE.length];
+  const codes = AVATAR_COLOR_CODES;
+  return AVATAR_PALETTE[codes[Math.abs(hash) % codes.length]];
+}
+
+export function avatarGradientFor(colorCode: string | null | undefined, seed: string) {
+  if (colorCode && AVATAR_PALETTE[colorCode]) return AVATAR_PALETTE[colorCode];
+  return colorFor(seed);
 }
 
 export function Avatar({
   initials,
   size = 32,
   seed,
+  colorCode,
   className,
 }: {
   initials: string;
   size?: number;
   seed?: string;
+  colorCode?: string | null;
   className?: string;
 }) {
   const safeInitials = initials?.trim() || "?";
-  const grad = colorFor(seed ?? safeInitials);
+  const grad = avatarGradientFor(colorCode, seed ?? safeInitials);
   return (
     <span
       className={cn(

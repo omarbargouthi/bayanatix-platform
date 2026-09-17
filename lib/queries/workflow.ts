@@ -175,7 +175,11 @@ export async function listWorkflows(): Promise<WorkflowDefinition[]> {
 
 export async function getUnreadCount(userId: string): Promise<number> {
   const [row] = await sql<{ cnt: number }[]>`
-    SELECT count(*)::int AS cnt FROM bayanat.notifications WHERE user_id = ${userId} AND is_read = false
+    SELECT count(*)::int AS cnt
+    FROM bayanat.notifications n
+    JOIN bayanat.users u ON u.user_id = n.user_id
+    WHERE n.user_id = ${userId} AND n.is_read = false
+      AND NOT (n.type = ANY(u.disabled_notification_types))
   `;
   return row?.cnt ?? 0;
 }

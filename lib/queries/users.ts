@@ -8,11 +8,14 @@ type UserRow = {
   role: SessionUser["role"];
   password_hash: string;
   preferred_language_code: string | null;
+  avatar_color_code: string | null;
+  disabled_notification_types: string[];
 };
 
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
   const rows = await sql<UserRow[]>`
-    select user_id, email, full_name, role, password_hash, preferred_language_code
+    select user_id, email, full_name, role, password_hash, preferred_language_code,
+           avatar_color_code, disabled_notification_types
     from bayanat.users
     where lower(email) = lower(${email})
     limit 1
@@ -22,7 +25,8 @@ export async function findUserByEmail(email: string): Promise<UserRow | null> {
 
 export async function findUserById(userId: string) {
   const rows = await sql<UserRow[]>`
-    select user_id, email, full_name, role, password_hash, preferred_language_code
+    select user_id, email, full_name, role, password_hash, preferred_language_code,
+           avatar_color_code, disabled_notification_types
     from bayanat.users
     where user_id = ${userId}
     limit 1
@@ -32,4 +36,16 @@ export async function findUserById(userId: string) {
 
 export async function setPreferredLanguage(userId: string, languageCode: string | null): Promise<void> {
   await sql`update bayanat.users set preferred_language_code = ${languageCode} where user_id = ${userId}`;
+}
+
+export async function setAvatarColor(userId: string, colorCode: string | null): Promise<void> {
+  await sql`update bayanat.users set avatar_color_code = ${colorCode} where user_id = ${userId}`;
+}
+
+export async function setDisabledNotificationTypes(userId: string, types: string[]): Promise<void> {
+  await sql`update bayanat.users set disabled_notification_types = ${types} where user_id = ${userId}`;
+}
+
+export async function updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+  await sql`update bayanat.users set password_hash = ${passwordHash} where user_id = ${userId}`;
 }

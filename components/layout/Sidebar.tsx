@@ -81,7 +81,7 @@ export function Sidebar({ user }: { user: SessionUser }) {
 
       {/* User section */}
       <div className={`flex items-center border-b border-line py-4 ${collapsed ? "justify-center px-2" : "gap-3 px-4"}`}>
-        <Avatar initials={initials(user.fullName)} seed={user.userId} size={36} />
+        <Avatar initials={initials(user.fullName)} seed={user.userId} colorCode={user.avatarColorCode} size={36} />
         {!collapsed && (
           <div className="min-w-0">
             <div className="font-semibold text-brand-deep text-sm truncate">{user.fullName}</div>

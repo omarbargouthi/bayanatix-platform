@@ -344,7 +344,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
             onClick={() => setMenuOpen((v) => !v)}
             onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
           >
-            <Avatar initials={initials(user.fullName)} seed={user.userId} size={34} className="cursor-pointer" />
+            <Avatar initials={initials(user.fullName)} seed={user.userId} colorCode={user.avatarColorCode} size={34} className="cursor-pointer" />
           </button>
           {menuOpen && (
             <div className="absolute right-0 mt-2 w-56 bg-white border border-line rounded-md shadow-md py-1 z-50">

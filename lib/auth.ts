@@ -41,6 +41,7 @@ export async function readSession(token: string | undefined): Promise<SessionUse
       fullName: String(payload.fullName),
       role: payload.role as SessionUser["role"],
       preferredLanguageCode: payload.preferredLanguageCode ? String(payload.preferredLanguageCode) : null,
+      avatarColorCode: payload.avatarColorCode ? String(payload.avatarColorCode) : null,
     };
   } catch {
     return null;

@@ -7,6 +7,7 @@ export type SessionUser = {
   fullName: string;
   role: "ADMIN" | "STEWARD" | "OFFICER" | "VIEWER";
   preferredLanguageCode: string | null;
+  avatarColorCode: string | null;
 };
 
 export type DataSource = {

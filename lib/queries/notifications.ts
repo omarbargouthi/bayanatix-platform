@@ -28,7 +28,9 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
         ELSE false
       END AS "actioned"
     FROM bayanat.notifications n
+    JOIN bayanat.users u ON u.user_id = n.user_id
     WHERE n.user_id = ${userId}
+      AND NOT (n.type = ANY(u.disabled_notification_types))
     ORDER BY n.created_at DESC
     LIMIT 50
   `;
