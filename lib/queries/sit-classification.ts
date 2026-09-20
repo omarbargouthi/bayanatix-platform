@@ -211,6 +211,80 @@ export async function getSitRegions(): Promise<SitRegion[]> {
   return sql<SitRegion[]>`SELECT region_code AS "regionCode", region_name_text AS "regionNameText" FROM bayanat.sit_regions ORDER BY region_code`;
 }
 
+// All SIT-flagged terms regardless of whether they have any pattern yet — used by
+// the admin pattern-management UI (a freshly-flagged term with zero patterns must
+// still show up there so an admin can add its first one). Contrast with
+// getSitTermsForRegion() below, which is deliberately filtered to terms that
+// already have >=1 enabled pattern for a region — that one backs the steward
+// "reassign" dropdown, where an unpattern-ed term wouldn't be a meaningful pick.
+export type SitTermSummary = { glossaryId: number; termName: string; classificationCode: string | null; domainName: string | null; patternCount: number };
+
+export async function getAllSitTerms(): Promise<SitTermSummary[]> {
+  return sql<SitTermSummary[]>`
+    SELECT g.glossary_id AS "glossaryId", g.term_name_text AS "termName", g.classification_code AS "classificationCode",
+           p.term_name_text AS "domainName", count(sp.pattern_id)::int AS "patternCount"
+    FROM bayanat.business_glossaries g
+    LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
+    LEFT JOIN bayanat.sit_patterns sp ON sp.glossary_id = g.glossary_id
+    WHERE g.is_sit_indicator = true
+    GROUP BY g.glossary_id, g.term_name_text, g.classification_code, p.term_name_text
+    ORDER BY g.term_name_text
+  `;
+}
+
+export type SitPatternRow = {
+  patternId: number;
+  glossaryId: number;
+  regionCode: string;
+  patternType: "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
+  patternText: string;
+  confidenceWeight: number;
+  isEnabled: boolean;
+  notesText: string | null;
+};
+
+export async function getSitPatternsForTerm(glossaryId: number): Promise<SitPatternRow[]> {
+  const rows = await sql<(Omit<SitPatternRow, "confidenceWeight"> & { confidenceWeight: string })[]>`
+    SELECT pattern_id AS "patternId", glossary_id AS "glossaryId", region_code AS "regionCode",
+           pattern_type AS "patternType", pattern_text AS "patternText", confidence_weight AS "confidenceWeight",
+           is_enabled AS "isEnabled", notes_text AS "notesText"
+    FROM bayanat.sit_patterns WHERE glossary_id = ${glossaryId} ORDER BY region_code, pattern_type
+  `;
+  return rows.map((r) => ({ ...r, confidenceWeight: Number(r.confidenceWeight) }));
+}
+
+export async function createSitPattern(input: {
+  glossaryId: number; regionCode: string; patternType: "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
+  patternText: string; confidenceWeight: number; notesText: string | null;
+}): Promise<number> {
+  const [row] = await sql<{ id: number }[]>`
+    INSERT INTO bayanat.sit_patterns (glossary_id, region_code, pattern_type, pattern_text, confidence_weight, notes_text)
+    VALUES (${input.glossaryId}, ${input.regionCode}, ${input.patternType}, ${input.patternText}, ${input.confidenceWeight}, ${input.notesText})
+    RETURNING pattern_id AS id
+  `;
+  return row.id;
+}
+
+export async function updateSitPattern(patternId: number, patch: {
+  regionCode?: string; patternType?: "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
+  patternText?: string; confidenceWeight?: number; isEnabled?: boolean; notesText?: string | null;
+}): Promise<void> {
+  await sql`
+    UPDATE bayanat.sit_patterns SET
+      region_code       = coalesce(${patch.regionCode ?? null}, region_code),
+      pattern_type      = coalesce(${patch.patternType ?? null}, pattern_type),
+      pattern_text      = coalesce(${patch.patternText ?? null}, pattern_text),
+      confidence_weight = coalesce(${patch.confidenceWeight ?? null}, confidence_weight),
+      is_enabled        = coalesce(${patch.isEnabled ?? null}, is_enabled),
+      notes_text        = CASE WHEN ${patch.notesText !== undefined} THEN ${patch.notesText ?? null} ELSE notes_text END
+    WHERE pattern_id = ${patternId}
+  `;
+}
+
+export async function deleteSitPattern(patternId: number): Promise<void> {
+  await sql`DELETE FROM bayanat.sit_patterns WHERE pattern_id = ${patternId}`;
+}
+
 export type SitTermOption = { glossaryId: number; termName: string; classificationCode: string | null; patternCount: number };
 
 // Terms eligible for the steward "reassign" dropdown / the settings-page pattern
