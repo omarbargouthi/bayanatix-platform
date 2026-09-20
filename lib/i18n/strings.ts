@@ -722,6 +722,7 @@ export type I18nStrings = {
     colDefinition:      string;
     colClassification:  string;
     colPii:             string;
+    colSit:             string;
     colAliases:         string;
     colLinked:          string;
     noTermsFound:       string;

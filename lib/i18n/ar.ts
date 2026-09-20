@@ -657,6 +657,7 @@ export const ar: I18nStrings = {
     colDefinition:      "التعريف",
     colClassification:  "التصنيف",
     colPii:             "شخصي",
+    colSit:             "معلومة حساسة",
     colAliases:         "الأسماء البديلة",
     colLinked:          "المرتبطة",
     noTermsFound:       "لا توجد مصطلحات.",

@@ -46,6 +46,19 @@ function PiiBadge({ isPii }: { isPii: boolean }) {
   );
 }
 
+function SitBadges({ names }: { names: string[] }) {
+  if (names.length === 0) return <span className="text-muted text-xs">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {names.map((name) => (
+        <span key={name} title={name} className="inline-flex items-center max-w-full px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200 truncate">
+          {name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StatCard({ label, value, color }: { label: string; value: number; color: "purple" | "blue" | "green" | "red" }) {
   const ring = {
     purple: "border-l-brand-purple  bg-brand-purple/5",
@@ -219,12 +232,13 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
             </div>
 
             {/* Table header */}
-            <div className="grid grid-cols-[2fr_1fr_2.5fr_1fr_0.8fr_0.8fr_0.7fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
+            <div className="grid grid-cols-[2fr_1fr_2fr_1fr_0.7fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
               <div>{g.colTerm}</div>
               <div>{g.colDomain}</div>
               <div>{g.colDefinition}</div>
               <div>{g.colClassification}</div>
               <div>{g.colPii}</div>
+              <div>{g.colSit}</div>
               <div>{g.colAliases}</div>
               <div>{g.colLinked}</div>
             </div>
@@ -237,7 +251,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
               <Link
                 key={term.glossaryId}
                 href={`/glossary/${term.glossaryId}`}
-                className="grid grid-cols-[2fr_1fr_2.5fr_1fr_0.8fr_0.8fr_0.7fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors"
+                className="grid grid-cols-[2fr_1fr_2fr_1fr_0.7fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors"
               >
                 <div>
                   <div className="font-semibold text-brand-deep flex items-center gap-1.5">
@@ -256,6 +270,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
                 <div className="text-ink-soft text-[13px] line-clamp-2 leading-snug">{term.definition}</div>
                 <div><ClassBadge code={term.classCode} /></div>
                 <div><PiiBadge isPii={term.isPii} /></div>
+                <div><SitBadges names={term.sitTypeNames} /></div>
                 <div className="text-ink-soft text-xs">{term.aliasCount || "—"}</div>
                 <div>
                   {term.linkedAttrCount > 0

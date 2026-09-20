@@ -325,6 +325,7 @@ export type GlossaryTerm = {
   aliasCount:         number;
   linkedAttrCount:    number;
   createdAt:          string;
+  sitTypeNames:       string[];
 };
 
 export type GlossaryAlias = {
@@ -353,6 +354,7 @@ export type GlossaryTermDetail = {
   ownerName:             string | null;
   stewards:              GlossarySteward[];
   aliases:               GlossaryAlias[];
+  sitTypes:              { sitTypeId: number; sitName: string }[];
   linkedAttributes: {
     attributeId:  number;
     physicalName: string;

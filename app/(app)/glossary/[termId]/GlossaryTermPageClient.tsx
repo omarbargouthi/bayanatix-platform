@@ -109,6 +109,12 @@ export function GlossaryTermPageClient({ term, canEdit, canEditGovernance }: Pro
                   PII
                 </span>
               )}
+              {term.sitTypes.map((s) => (
+                <span key={s.sitTypeId} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[12px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  SIT: {s.sitName}
+                </span>
+              ))}
             </div>
 
             <h1 className="text-3xl font-extrabold text-brand-deep flex items-center gap-3">
@@ -249,6 +255,19 @@ export function GlossaryTermPageClient({ term, canEdit, canEditGovernance }: Pro
                 {term.isPii
                   ? <span className="text-red-600 font-semibold text-[12px]">{g.yesPersonalData}</span>
                   : <span className="text-emerald-600 font-semibold text-[12px]">{g.noPersonalData}</span>}
+              </PropRow>
+              <PropRow label="Sensitive Info Type">
+                {term.sitTypes.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {term.sitTypes.map((s) => (
+                      <span key={s.sitTypeId} className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                        {s.sitName}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted text-[12px]">—</span>
+                )}
               </PropRow>
               {term.piCategory && (
                 <PropRow label={g.propPiCategory}>

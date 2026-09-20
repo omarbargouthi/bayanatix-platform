@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import { logUpdate } from "../audit";
 import type { GlossaryDomain, GlossaryTerm, GlossaryTermDetail, GlossaryAlias } from "../types";
+import { getBusinessTermSitTypes } from "./sit-classification";
 
 export type GlossaryStats = {
   totalTerms:   number;
@@ -97,7 +98,11 @@ export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[
       p.glossary_id           AS "domainId",
       (SELECT COUNT(*)::int FROM bayanat.glossary_aliases a WHERE a.glossary_id = g.glossary_id) AS "aliasCount",
       (SELECT COUNT(*)::int FROM bayanat.data_attributes da WHERE da.glossary_term_text = g.term_name_text) AS "linkedAttrCount",
-      g.created_at_timestamp  AS "createdAt"
+      g.created_at_timestamp  AS "createdAt",
+      (SELECT coalesce(array_agg(st.sit_name ORDER BY st.sit_name), '{}')
+         FROM bayanat.business_term_sit_types bts
+         JOIN bayanat.sit_types st ON st.sit_type_id = bts.sit_type_id
+         WHERE bts.glossary_id = g.glossary_id) AS "sitTypeNames"
     FROM bayanat.business_glossaries g
     LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
     WHERE g.parent_glossary_id IS NOT NULL
@@ -199,11 +204,14 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     ORDER BY e.entity_name_text, a.physical_name_text
   `;
 
+  const sitTypeRows = await getBusinessTermSitTypes(id);
+
   return {
     ...term,
     stewards:         stewardRows,
     aliases:          aliasRows.map((r): GlossaryAlias => ({ aliasId: r.aliasId, name: r.alias })),
     linkedAttributes: attrRows,
+    sitTypes:         sitTypeRows.map((r) => ({ sitTypeId: r.sitTypeId, sitName: r.sitName })),
   };
 }
 

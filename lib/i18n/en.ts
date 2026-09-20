@@ -657,6 +657,7 @@ export const en: I18nStrings = {
     colDefinition:      "Definition",
     colClassification:  "Classification",
     colPii:             "PII",
+    colSit:             "SIT",
     colAliases:         "Aliases",
     colLinked:          "Linked",
     noTermsFound:       "No terms found.",
