@@ -211,53 +211,50 @@ export async function getSitRegions(): Promise<SitRegion[]> {
   return sql<SitRegion[]>`SELECT region_code AS "regionCode", region_name_text AS "regionNameText" FROM bayanat.sit_regions ORDER BY region_code`;
 }
 
-// A term is SIT-eligible by having the "SIT" tag assigned to it (bayanat.tags +
-// bayanat.asset_tags — the same generic tagging mechanism used for columns/tables/
-// schemas/sources elsewhere), not a bespoke boolean column. Reused everywhere a
-// query needs to know "is this term a SIT."
-function sitTaggedJoin() {
-  return sql`
-    JOIN bayanat.asset_tags sit_at ON sit_at.asset_type_code = 'BUSINESS_GLOSSARIES' AND sit_at.asset_id = g.glossary_id
-    JOIN bayanat.tags sit_tag ON sit_tag.tag_id = sit_at.tag_id AND sit_tag.tag_name = 'SIT' AND sit_tag.parent_tag_id IS NULL
+// ── SIT Type catalog ────────────────────────────────────────────────────────────
+// A standalone taxonomy (National ID, Email Address, IBAN, ...), decoupled from
+// Business Glossary terms and from any tag. "Adding SIT to a business term" means
+// creating a row in business_term_sit_types below, NOT tagging with a fixed name.
+
+export type SitType = { sitTypeId: number; sitName: string; classificationCode: string | null; description: string | null; patternCount: number };
+
+export async function getSitTypes(): Promise<SitType[]> {
+  return sql<SitType[]>`
+    SELECT st.sit_type_id AS "sitTypeId", st.sit_name AS "sitName", st.classification_code AS "classificationCode",
+           st.description, count(sp.pattern_id)::int AS "patternCount"
+    FROM bayanat.sit_types st
+    LEFT JOIN bayanat.sit_patterns sp ON sp.sit_type_id = st.sit_type_id
+    GROUP BY st.sit_type_id, st.sit_name, st.classification_code, st.description
+    ORDER BY st.sit_name
   `;
 }
 
-// All SIT-flagged terms regardless of whether they have any pattern yet — used by
-// the admin pattern-management UI (a freshly-flagged term with zero patterns must
-// still show up there so an admin can add its first one). Contrast with
-// getSitTermsForRegion() below, which is deliberately filtered to terms that
-// already have >=1 enabled pattern for a region — that one backs the steward
-// "reassign" dropdown, where an unpattern-ed term wouldn't be a meaningful pick.
-export type SitTermSummary = { glossaryId: number; termName: string; classificationCode: string | null; domainName: string | null; patternCount: number };
+export async function createSitType(input: { sitName: string; classificationCode: string | null; description: string | null }): Promise<number> {
+  const [row] = await sql<{ id: number }[]>`
+    INSERT INTO bayanat.sit_types (sit_name, classification_code, description)
+    VALUES (${input.sitName}, ${input.classificationCode}, ${input.description})
+    RETURNING sit_type_id AS id
+  `;
+  return row.id;
+}
 
-export async function getAllSitTerms(): Promise<SitTermSummary[]> {
-  return sql<SitTermSummary[]>`
-    SELECT g.glossary_id AS "glossaryId", g.term_name_text AS "termName", g.classification_code AS "classificationCode",
-           p.term_name_text AS "domainName", count(sp.pattern_id)::int AS "patternCount"
-    FROM bayanat.business_glossaries g
-    ${sitTaggedJoin()}
-    LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
-    LEFT JOIN bayanat.sit_patterns sp ON sp.glossary_id = g.glossary_id
-    GROUP BY g.glossary_id, g.term_name_text, g.classification_code, p.term_name_text
-    ORDER BY g.term_name_text
+export async function updateSitType(sitTypeId: number, patch: { sitName?: string; classificationCode?: string | null; description?: string | null }): Promise<void> {
+  await sql`
+    UPDATE bayanat.sit_types SET
+      sit_name             = coalesce(${patch.sitName ?? null}, sit_name),
+      classification_code  = CASE WHEN ${patch.classificationCode !== undefined} THEN ${patch.classificationCode ?? null} ELSE classification_code END,
+      description          = CASE WHEN ${patch.description !== undefined} THEN ${patch.description ?? null} ELSE description END
+    WHERE sit_type_id = ${sitTypeId}
   `;
 }
 
-// Whether a specific term currently carries the SIT tag — used to gate pattern
-// creation (adding a pattern to a not-yet-tagged term is very likely a mistake).
-export async function isTermSitTagged(glossaryId: number): Promise<boolean> {
-  const [row] = await sql<{ cnt: number }[]>`
-    SELECT count(*)::int AS cnt
-    FROM bayanat.asset_tags at2
-    JOIN bayanat.tags t ON t.tag_id = at2.tag_id AND t.tag_name = 'SIT' AND t.parent_tag_id IS NULL
-    WHERE at2.asset_type_code = 'BUSINESS_GLOSSARIES' AND at2.asset_id = ${glossaryId}
-  `;
-  return (row?.cnt ?? 0) > 0;
+export async function deleteSitType(sitTypeId: number): Promise<void> {
+  await sql`DELETE FROM bayanat.sit_types WHERE sit_type_id = ${sitTypeId}`;
 }
 
 export type SitPatternRow = {
   patternId: number;
-  glossaryId: number;
+  sitTypeId: number;
   regionCode: string;
   patternType: "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
   patternText: string;
@@ -266,23 +263,23 @@ export type SitPatternRow = {
   notesText: string | null;
 };
 
-export async function getSitPatternsForTerm(glossaryId: number): Promise<SitPatternRow[]> {
+export async function getSitPatternsForType(sitTypeId: number): Promise<SitPatternRow[]> {
   const rows = await sql<(Omit<SitPatternRow, "confidenceWeight"> & { confidenceWeight: string })[]>`
-    SELECT pattern_id AS "patternId", glossary_id AS "glossaryId", region_code AS "regionCode",
+    SELECT pattern_id AS "patternId", sit_type_id AS "sitTypeId", region_code AS "regionCode",
            pattern_type AS "patternType", pattern_text AS "patternText", confidence_weight AS "confidenceWeight",
            is_enabled AS "isEnabled", notes_text AS "notesText"
-    FROM bayanat.sit_patterns WHERE glossary_id = ${glossaryId} ORDER BY region_code, pattern_type
+    FROM bayanat.sit_patterns WHERE sit_type_id = ${sitTypeId} ORDER BY region_code, pattern_type
   `;
   return rows.map((r) => ({ ...r, confidenceWeight: Number(r.confidenceWeight) }));
 }
 
 export async function createSitPattern(input: {
-  glossaryId: number; regionCode: string; patternType: "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
+  sitTypeId: number; regionCode: string; patternType: "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
   patternText: string; confidenceWeight: number; notesText: string | null;
 }): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.sit_patterns (glossary_id, region_code, pattern_type, pattern_text, confidence_weight, notes_text)
-    VALUES (${input.glossaryId}, ${input.regionCode}, ${input.patternType}, ${input.patternText}, ${input.confidenceWeight}, ${input.notesText})
+    INSERT INTO bayanat.sit_patterns (sit_type_id, region_code, pattern_type, pattern_text, confidence_weight, notes_text)
+    VALUES (${input.sitTypeId}, ${input.regionCode}, ${input.patternType}, ${input.patternText}, ${input.confidenceWeight}, ${input.notesText})
     RETURNING pattern_id AS id
   `;
   return row.id;
@@ -308,18 +305,101 @@ export async function deleteSitPattern(patternId: number): Promise<void> {
   await sql`DELETE FROM bayanat.sit_patterns WHERE pattern_id = ${patternId}`;
 }
 
+// ── Business term ↔ SIT type association ("adding SIT to a business term") ────
+
+export async function getBusinessTermSitTypes(glossaryId: number): Promise<SitType[]> {
+  return sql<SitType[]>`
+    SELECT st.sit_type_id AS "sitTypeId", st.sit_name AS "sitName", st.classification_code AS "classificationCode",
+           st.description, count(sp.pattern_id)::int AS "patternCount"
+    FROM bayanat.business_term_sit_types bts
+    JOIN bayanat.sit_types st ON st.sit_type_id = bts.sit_type_id
+    LEFT JOIN bayanat.sit_patterns sp ON sp.sit_type_id = st.sit_type_id
+    WHERE bts.glossary_id = ${glossaryId}
+    GROUP BY st.sit_type_id, st.sit_name, st.classification_code, st.description
+    ORDER BY st.sit_name
+  `;
+}
+
+// Picker save — delete+insert, same shape as the generic Tags PUT endpoint.
+export async function setBusinessTermSitTypes(glossaryId: number, sitTypeIds: number[], userId: string): Promise<void> {
+  await sql`DELETE FROM bayanat.business_term_sit_types WHERE glossary_id = ${glossaryId}`;
+  for (const sitTypeId of sitTypeIds) {
+    await sql`
+      INSERT INTO bayanat.business_term_sit_types (glossary_id, sit_type_id, assigned_by)
+      VALUES (${glossaryId}, ${sitTypeId}, ${userId})
+      ON CONFLICT DO NOTHING
+    `;
+  }
+}
+
+export type SitTypeSuggestion = { sitTypeId: number; sitName: string; confidence: number; evidence: string[] };
+
+// Suggests which SIT type(s) best fit a business term — a lightweight, on-demand
+// helper (no persisted suggestion/review queue; the real governance checkpoint is
+// already at the column level). Scores every catalog SIT type's NAME_REGEX
+// patterns against (a) the term's own name/definition and (b) the physical/
+// friendly names of columns already linked to this term via asset_business_terms
+// (any role) — i.e. exactly the signal the request asked for: "based on the name
+// of the term and/or based on the names of columns associated with the term."
+export async function suggestSitTypesForTerm(glossaryId: number): Promise<SitTypeSuggestion[]> {
+  const [term] = await sql<{ termName: string; definition: string | null }[]>`
+    SELECT term_name_text AS "termName", definition_text AS "definition" FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
+  `;
+  if (!term) return [];
+
+  const columnRows = await sql<{ physicalName: string; friendlyName: string | null }[]>`
+    SELECT DISTINCT a.physical_name_text AS "physicalName", a.friendly_name_text AS "friendlyName"
+    FROM bayanat.asset_business_terms abt
+    JOIN bayanat.data_attributes a ON a.attribute_id = abt.asset_id
+    WHERE abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.glossary_id = ${glossaryId}
+  `;
+
+  const nameCandidates = [
+    term.termName,
+    term.definition,
+    ...columnRows.flatMap((c) => [c.physicalName, c.friendlyName]),
+  ].filter((v): v is string => !!v);
+
+  const patternRows = await sql<{ sitTypeId: number; sitName: string; patternText: string; confidenceWeight: number }[]>`
+    SELECT sp.sit_type_id AS "sitTypeId", st.sit_name AS "sitName", sp.pattern_text AS "patternText", sp.confidence_weight AS "confidenceWeight"
+    FROM bayanat.sit_patterns sp
+    JOIN bayanat.sit_types st ON st.sit_type_id = sp.sit_type_id
+    WHERE sp.is_enabled = true AND sp.pattern_type = 'NAME_REGEX'
+  `;
+
+  const bySitType = new Map<number, { sitName: string; score: number; evidence: string[] }>();
+  for (const p of patternRows) {
+    let re: RegExp;
+    try { re = new RegExp(p.patternText, "i"); } catch { continue; }
+    for (const candidate of nameCandidates) {
+      if (re.test(candidate)) {
+        const entry = bySitType.get(p.sitTypeId) ?? { sitName: p.sitName, score: 0, evidence: [] };
+        const weight = Number(p.confidenceWeight);
+        entry.score = Math.min(1, entry.score + weight);
+        entry.evidence.push(`"${candidate}" matches /${p.patternText}/`);
+        bySitType.set(p.sitTypeId, entry);
+      }
+    }
+  }
+
+  return [...bySitType.entries()]
+    .map(([sitTypeId, v]) => ({ sitTypeId, sitName: v.sitName, confidence: Math.round(v.score * 1000) / 1000, evidence: [...new Set(v.evidence)] }))
+    .sort((a, b) => b.confidence - a.confidence);
+}
+
 export type SitTermOption = { glossaryId: number; termName: string; classificationCode: string | null; patternCount: number };
 
-// Terms eligible for the steward "reassign" dropdown / the settings-page pattern
-// list — SIT-flagged terms that actually have >=1 enabled pattern for the given
-// region (GLOBAL patterns always count), per "region controls which list of terms."
+// Business terms eligible for the steward "reassign" dropdown on a column
+// suggestion — terms associated with a SIT type that has >=1 enabled pattern for
+// the given region (GLOBAL patterns always count), per "region controls which
+// list of terms."
 export async function getSitTermsForRegion(regionCode: string): Promise<SitTermOption[]> {
   return sql<SitTermOption[]>`
     SELECT g.glossary_id AS "glossaryId", g.term_name_text AS "termName", g.classification_code AS "classificationCode",
            count(p.pattern_id)::int AS "patternCount"
     FROM bayanat.business_glossaries g
-    ${sitTaggedJoin()}
-    JOIN bayanat.sit_patterns p ON p.glossary_id = g.glossary_id AND p.is_enabled = true AND p.region_code IN (${regionCode}, 'GLOBAL')
+    JOIN bayanat.business_term_sit_types bts ON bts.glossary_id = g.glossary_id
+    JOIN bayanat.sit_patterns p ON p.sit_type_id = bts.sit_type_id AND p.is_enabled = true AND p.region_code IN (${regionCode}, 'GLOBAL')
     GROUP BY g.glossary_id, g.term_name_text, g.classification_code
     HAVING count(p.pattern_id) > 0
     ORDER BY g.term_name_text

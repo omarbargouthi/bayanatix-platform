@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { GlossaryTermDetail, GlossaryAlias, DataCategory } from "@/lib/types";
-import { TagPicker } from "@/components/catalog/TagPicker";
+import { SitTypePicker } from "@/components/glossary/SitTypePicker";
 
 const CLASSIFICATION_OPTIONS = [
   { value: "",            label: "— None —" },
@@ -248,15 +248,15 @@ export function TermEditModal({ term, onClose }: Props) {
             </div>
           </div>
 
-          {/* Tags (incl. the "SIT" tag) */}
+          {/* Sensitive Information Type association */}
           <div>
-            <label className="field-label">Tags</label>
-            <TagPicker assetType="BUSINESS_GLOSSARIES" assetId={term.glossaryId} />
+            <label className="field-label">Sensitive Information Type</label>
+            <SitTypePicker glossaryId={term.glossaryId} />
             <p className="mt-1.5 text-[11px] text-muted">
-              Tagging this term <strong>SIT</strong> makes it eligible for automatic pattern-based column
-              detection (Enrichment → Sensitive Info Types). After tagging, add at least one detection
-              pattern for it under Admin → Configuration → Sensitive Information Types — an untagged term,
-              or a SIT-tagged term with no patterns, is never suggested automatically, only assignable manually.
+              Associating this term with a SIT value makes it eligible for automatic pattern-based column
+              detection (Enrichment → Sensitive Info Types) — the column classifier will suggest this term
+              for any column whose values/name match that SIT value's detection patterns, managed under
+              Admin → Configuration → Sensitive Information Types.
             </p>
           </div>
 

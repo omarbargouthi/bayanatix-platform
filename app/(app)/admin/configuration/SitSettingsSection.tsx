@@ -10,32 +10,33 @@ type Settings = {
 };
 
 type Region = { regionCode: string; regionNameText: string };
-type TermSummary = { glossaryId: number; termName: string; classificationCode: string | null; domainName: string | null; patternCount: number };
+type SitType = { sitTypeId: number; sitName: string; classificationCode: string | null; description: string | null; patternCount: number };
 type PatternType = "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
 type Pattern = {
-  patternId: number; glossaryId: number; regionCode: string; patternType: PatternType;
+  patternId: number; sitTypeId: number; regionCode: string; patternType: PatternType;
   patternText: string; confidenceWeight: number; isEnabled: boolean; notesText: string | null;
 };
 
 const PATTERN_TYPES: PatternType[] = ["NAME_REGEX", "VALUE_REGEX", "CHECKSUM"];
 const CHECKSUM_ALGORITHMS = ["LUHN", "IBAN_MOD97", "SA_NATIONAL_ID"];
+const CLASSIFICATION_OPTIONS = ["", "PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "SECRET", "TOP_SECRET"];
 const NEW_PATTERN = { regionCode: "GLOBAL", patternType: "VALUE_REGEX" as PatternType, patternText: "", confidenceWeight: 0.5 };
 
-// Editable pattern list for one SIT term — fetches lazily on expand, PATCHes
+// Editable pattern list for one SIT type — fetches lazily on expand, PATCHes
 // individual fields inline, POSTs the add-row form. All mutating calls are
 // ADMIN-gated server-side (app/api/sit/patterns) regardless of what this
 // component lets you click.
-function TermPatternEditor({ term, regions }: { term: TermSummary; regions: Region[] }) {
+function SitTypePatternEditor({ sitType, regions }: { sitType: SitType; regions: Region[] }) {
   const [patterns, setPatterns] = useState<Pattern[] | null>(null);
   const [newPattern, setNewPattern] = useState({ ...NEW_PATTERN });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const r = await fetch(`/api/sit/patterns?glossary_id=${term.glossaryId}`);
+    const r = await fetch(`/api/sit/patterns?sit_type_id=${sitType.sitTypeId}`);
     setPatterns(await r.json());
   }
-  useEffect(() => { void load(); }, [term.glossaryId]);
+  useEffect(() => { void load(); }, [sitType.sitTypeId]);
 
   async function patch(patternId: number, body: Record<string, unknown>) {
     setError(null);
@@ -64,7 +65,7 @@ function TermPatternEditor({ term, regions }: { term: TermSummary; regions: Regi
       const r = await fetch("/api/sit/patterns", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          glossary_id: term.glossaryId, region_code: newPattern.regionCode, pattern_type: newPattern.patternType,
+          sit_type_id: sitType.sitTypeId, region_code: newPattern.regionCode, pattern_type: newPattern.patternType,
           pattern_text: newPattern.patternText.trim(), confidence_weight: newPattern.confidenceWeight,
         }),
       });
@@ -80,7 +81,7 @@ function TermPatternEditor({ term, regions }: { term: TermSummary; regions: Regi
 
   return (
     <div className="px-4 py-3 bg-canvas-soft border-t border-line-soft space-y-2">
-      {patterns.length === 0 && <div className="text-[11px] text-muted">No patterns yet — this term will never be suggested automatically until one is added below.</div>}
+      {patterns.length === 0 && <div className="text-[11px] text-muted">No patterns yet — this SIT value will never be suggested automatically until one is added below.</div>}
       {patterns.map((p) => (
         <div key={p.patternId} className="flex items-center gap-2 flex-wrap bg-white border border-line rounded-lg px-2.5 py-2">
           <select value={p.regionCode} onChange={(e) => patch(p.patternId, { region_code: e.target.value })} className="text-[11px] border border-line rounded px-1.5 py-1">
@@ -147,28 +148,33 @@ function TermPatternEditor({ term, regions }: { term: TermSummary; regions: Regi
   );
 }
 
+const BLANK_TYPE = { sitName: "", classificationCode: "", description: "" };
+
 // Structural twin of EnrichmentSettingsSection.tsx (singleton settings row, GET-any/
 // PATCH-ADMIN route, load/save/flash pattern). The active region picked here is what
 // lib/sit-classification-runner.ts loads patterns for — switching it changes which
-// SIT terms/patterns apply without any code change, per the region-scoped design
-// (patterns are region-scoped rows, not a property of the term).
+// SIT types/patterns apply without any code change, per the region-scoped design
+// (patterns are region-scoped rows, not a property of the type).
 export function SitSettingsSection() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
-  const [terms, setTerms] = useState<TermSummary[]>([]);
+  const [types, setTypes] = useState<SitType[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newType, setNewType] = useState({ ...BLANK_TYPE });
+  const [addError, setAddError] = useState<string | null>(null);
 
   async function load() {
     const [s, r, t] = await Promise.all([
       fetch("/api/sit/settings").then((res) => res.json()),
       fetch("/api/sit/regions").then((res) => res.json()),
-      fetch("/api/sit/all-terms").then((res) => res.json()),
+      fetch("/api/sit/types").then((res) => res.json()),
     ]);
     setSettings(s);
     setRegions(r);
-    setTerms(t);
+    setTypes(t);
   }
   useEffect(() => { void load(); }, []);
 
@@ -188,6 +194,25 @@ export function SitSettingsSection() {
     }
   }
 
+  async function createType() {
+    setAddError(null);
+    if (!newType.sitName.trim()) { setAddError("Name is required"); return; }
+    const r = await fetch("/api/sit/types", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sit_name: newType.sitName.trim(), classification_code: newType.classificationCode || null, description: newType.description || null }),
+    });
+    if (!r.ok) { const d = await r.json().catch(() => ({})); setAddError(d.error ?? "Failed to create"); return; }
+    setNewType({ ...BLANK_TYPE });
+    setAdding(false);
+    await load();
+  }
+
+  async function removeType(sitTypeId: number) {
+    if (!confirm("Delete this SIT type? Every business term associated with it will lose that association, and its patterns are deleted.")) return;
+    await fetch(`/api/sit/types/${sitTypeId}`, { method: "DELETE" });
+    await load();
+  }
+
   if (!settings) return <div className="text-sm text-muted">Loading…</div>;
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setSettings((s) => (s ? { ...s, [key]: value } : s));
@@ -197,10 +222,12 @@ export function SitSettingsSection() {
       <div className="mb-6">
         <h2 className="text-lg font-bold text-ink">Sensitive Information Types</h2>
         <p className="text-xs text-muted mt-1">
-          Region-scoped format/regex patterns used to suggest which SIT business-glossary term a column
-          represents, once it's confirmed as a Business asset. Switching the active region changes which
-          pattern set applies without needing new content — Canada (or any other region) is added as new
-          pattern rows against the same terms.
+          A standalone catalog of detectable sensitive-info values (National ID, Email Address, IBAN, ...),
+          independent of the Business Glossary. Business terms get associated with a catalog value from their
+          own Term Edit page — that association is what makes a term eligible for automatic pattern-based
+          column detection, once it's confirmed a Business asset. Switching the active region changes which
+          pattern set applies without touching any association — Canada (or any other region) is added as new
+          pattern rows against the same catalog values.
         </p>
       </div>
 
@@ -246,36 +273,49 @@ export function SitSettingsSection() {
       </div>
 
       <div className="mt-6 max-w-3xl">
-        <div className="text-xs font-semibold text-ink mb-2">SIT Terms &amp; Patterns ({terms.length})</div>
-        <p className="text-[11px] text-muted mb-2">
-          A term becomes SIT-eligible by adding the <strong>SIT</strong> tag to it in its Business Glossary Tags
-          picker — the same generic tagging used for columns/tables/schemas/sources elsewhere. Every SIT-tagged
-          term shows up here — expand one to add, edit, enable/disable, or delete its detection patterns. Only
-          patterns whose region matches the Active Region above (or GLOBAL) are used by a live classification
-          run, and only for terms that still carry the SIT tag.
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs font-semibold text-ink">SIT Type Catalog ({types.length})</div>
+          <button onClick={() => setAdding((v) => !v)} className="text-[11px] font-semibold text-brand-purple hover:underline">
+            {adding ? "Cancel" : "+ New SIT Type"}
+          </button>
+        </div>
+
+        {adding && (
+          <div className="bg-white border border-dashed border-line rounded-xl p-3 mb-2 flex items-center gap-2 flex-wrap">
+            <input
+              type="text" value={newType.sitName} onChange={(e) => setNewType((t) => ({ ...t, sitName: e.target.value }))}
+              placeholder="Name, e.g. Driver's License Number" className="text-[12px] border border-line rounded px-2 py-1.5 flex-1 min-w-[180px]"
+            />
+            <select value={newType.classificationCode} onChange={(e) => setNewType((t) => ({ ...t, classificationCode: e.target.value }))} className="text-[12px] border border-line rounded px-2 py-1.5">
+              {CLASSIFICATION_OPTIONS.map((c) => <option key={c} value={c}>{c || "— classification —"}</option>)}
+            </select>
+            <input
+              type="text" value={newType.description} onChange={(e) => setNewType((t) => ({ ...t, description: e.target.value }))}
+              placeholder="Description (optional)" className="text-[12px] border border-line rounded px-2 py-1.5 flex-1 min-w-[180px]"
+            />
+            <button onClick={createType} className="text-[12px] font-semibold text-white bg-brand-purple rounded px-3 py-1.5">Create</button>
+            {addError && <div className="text-[11px] text-red-600 w-full">{addError}</div>}
+          </div>
+        )}
+
         <div className="bg-white border border-line rounded-xl divide-y divide-line-soft">
-          {terms.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-muted">
-              No terms are tagged SIT yet — add the "SIT" tag to a term in the Business Glossary to add one here.
-            </div>
-          ) : terms.map((t) => (
-            <div key={t.glossaryId}>
+          {types.length === 0 ? (
+            <div className="px-4 py-3 text-xs text-muted">No SIT types defined yet — create one above.</div>
+          ) : types.map((t) => (
+            <div key={t.sitTypeId}>
               <button
-                onClick={() => setExpandedId(expandedId === t.glossaryId ? null : t.glossaryId)}
+                onClick={() => setExpandedId(expandedId === t.sitTypeId ? null : t.sitTypeId)}
                 className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-canvas-soft"
               >
-                <span className="text-sm text-ink">
-                  {t.termName}
-                  {t.domainName && <span className="text-[11px] text-muted font-normal"> · {t.domainName}</span>}
-                </span>
+                <span className="text-sm text-ink">{t.sitName}</span>
                 <div className="flex items-center gap-3">
                   {t.classificationCode && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted">{t.classificationCode}</span>}
                   <span className="text-[11px] text-muted">{t.patternCount} pattern{t.patternCount !== 1 ? "s" : ""}</span>
-                  <span className="text-muted text-[11px]">{expandedId === t.glossaryId ? "▲" : "▼"}</span>
+                  <span onClick={(e) => { e.stopPropagation(); void removeType(t.sitTypeId); }} className="text-[11px] text-red-600 hover:underline">Delete</span>
+                  <span className="text-muted text-[11px]">{expandedId === t.sitTypeId ? "▲" : "▼"}</span>
                 </div>
               </button>
-              {expandedId === t.glossaryId && <TermPatternEditor term={t} regions={regions} />}
+              {expandedId === t.sitTypeId && <SitTypePatternEditor sitType={t} regions={regions} />}
             </div>
           ))}
         </div>
