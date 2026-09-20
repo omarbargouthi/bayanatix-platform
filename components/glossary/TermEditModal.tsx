@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { GlossaryTermDetail, GlossaryAlias, DataCategory } from "@/lib/types";
+import { TagPicker } from "@/components/catalog/TagPicker";
 
 const CLASSIFICATION_OPTIONS = [
   { value: "",            label: "— None —" },
@@ -39,7 +40,6 @@ export function TermEditModal({ term, onClose }: Props) {
   const [businessRules,        setBusinessRules]        = useState(term.businessRules        ?? "");
   const [classCode,            setClassCode]            = useState(term.classCode            ?? "");
   const [isPii,                setIsPii]                = useState(term.isPii                ?? false);
-  const [isSit,                setIsSit]                = useState(term.isSit                ?? false);
   const [piCategory,           setPiCategory]           = useState(term.piCategory           ?? "");
   const [example,              setExample]              = useState(term.example              ?? "");
   const [termType,             setTermType]             = useState(term.termType             ?? "TERM");
@@ -97,7 +97,6 @@ export function TermEditModal({ term, onClose }: Props) {
           businessRules,
           classCode: classCode || null,
           isPii,
-          isSit,
           piCategory: piCategory || null,
           example,
           termType,
@@ -249,24 +248,16 @@ export function TermEditModal({ term, onClose }: Props) {
             </div>
           </div>
 
-          {/* SIT Flag */}
-          <div className="flex items-start gap-2.5">
-            <input
-              type="checkbox"
-              id="term-is-sit"
-              checked={isSit}
-              onChange={(e) => setIsSit(e.target.checked)}
-              className="w-4 h-4 rounded accent-brand-purple mt-0.5"
-            />
-            <label htmlFor="term-is-sit" className="text-sm text-ink cursor-pointer select-none">
-              Sensitive Information Type (SIT)
-              <span className="block text-[11px] text-muted font-normal mt-0.5">
-                Makes this term eligible for automatic pattern-based column detection (Enrichment → Sensitive
-                Info Types). After checking this, add at least one detection pattern for it under Admin →
-                Configuration → Sensitive Information Types — a SIT term with no patterns will never be
-                suggested automatically, only assignable manually.
-              </span>
-            </label>
+          {/* Tags (incl. the "SIT" tag) */}
+          <div>
+            <label className="field-label">Tags</label>
+            <TagPicker assetType="BUSINESS_GLOSSARIES" assetId={term.glossaryId} />
+            <p className="mt-1.5 text-[11px] text-muted">
+              Tagging this term <strong>SIT</strong> makes it eligible for automatic pattern-based column
+              detection (Enrichment → Sensitive Info Types). After tagging, add at least one detection
+              pattern for it under Admin → Configuration → Sensitive Information Types — an untagged term,
+              or a SIT-tagged term with no patterns, is never suggested automatically, only assignable manually.
+            </p>
           </div>
 
           {/* Retention Category */}

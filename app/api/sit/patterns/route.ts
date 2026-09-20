@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getSitPatternsForTerm, createSitPattern } from "@/lib/queries/sit-classification";
+import { getSitPatternsForTerm, createSitPattern, isTermSitTagged } from "@/lib/queries/sit-classification";
 
 const PATTERN_TYPES = ["NAME_REGEX", "VALUE_REGEX", "CHECKSUM"] as const;
 const CHECKSUM_ALGORITHMS = new Set(["LUHN", "IBAN_MOD97", "SA_NATIONAL_ID"]);
@@ -35,6 +35,9 @@ export async function POST(req: Request) {
   if (!PATTERN_TYPES.includes(patternType)) return NextResponse.json({ error: `pattern_type must be one of ${PATTERN_TYPES.join(", ")}` }, { status: 400 });
   if (!patternText) return NextResponse.json({ error: "pattern_text is required" }, { status: 400 });
   if (!(confidenceWeight > 0 && confidenceWeight <= 1)) return NextResponse.json({ error: "confidence_weight must be between 0 and 1" }, { status: 400 });
+  if (!(await isTermSitTagged(glossaryId))) {
+    return NextResponse.json({ error: "This term doesn't have the \"SIT\" tag yet — add it via the Tags picker on the term first." }, { status: 400 });
+  }
 
   if (patternType === "CHECKSUM" && !CHECKSUM_ALGORITHMS.has(patternText)) {
     return NextResponse.json({ error: `CHECKSUM pattern_text must be one of ${[...CHECKSUM_ALGORITHMS].join(", ")} — these are the only algorithms lib/sit-classifier.ts implements` }, { status: 400 });

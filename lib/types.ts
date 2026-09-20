@@ -341,7 +341,6 @@ export type GlossaryTermDetail = {
   example:               string | null;
   classCode:             string | null;
   isPii:                 boolean;
-  isSit:                 boolean;
   piCategory:            string | null;
   npiCategory:           string | null;
   termType:              string | null;

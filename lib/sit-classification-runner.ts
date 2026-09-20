@@ -92,10 +92,15 @@ async function loadActiveSettings() {
 }
 
 async function loadPatterns(activeRegion: string): Promise<Map<number, SitPattern[]>> {
+  // Require the term to still carry the "SIT" tag (bayanat.tags/asset_tags), not
+  // just "a pattern row happens to exist" — if a term is ever untagged, its
+  // patterns stop being used automatically without needing a separate cleanup step.
   const rows = await sql<{ glossaryId: number; patternType: SitPattern["patternType"]; patternText: string; confidenceWeight: number }[]>`
-    SELECT glossary_id AS "glossaryId", pattern_type AS "patternType", pattern_text AS "patternText", confidence_weight AS "confidenceWeight"
-    FROM bayanat.sit_patterns
-    WHERE is_enabled = true AND region_code IN (${activeRegion}, 'GLOBAL')
+    SELECT sp.glossary_id AS "glossaryId", sp.pattern_type AS "patternType", sp.pattern_text AS "patternText", sp.confidence_weight AS "confidenceWeight"
+    FROM bayanat.sit_patterns sp
+    JOIN bayanat.asset_tags at2 ON at2.asset_type_code = 'BUSINESS_GLOSSARIES' AND at2.asset_id = sp.glossary_id
+    JOIN bayanat.tags t ON t.tag_id = at2.tag_id AND t.tag_name = 'SIT' AND t.parent_tag_id IS NULL
+    WHERE sp.is_enabled = true AND sp.region_code IN (${activeRegion}, 'GLOBAL')
   `;
   const byTerm = new Map<number, SitPattern[]>();
   for (const r of rows) {

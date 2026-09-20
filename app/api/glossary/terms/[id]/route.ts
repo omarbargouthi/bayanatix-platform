@@ -13,7 +13,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (isNaN(glossaryId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
     const body = await req.json();
-    const { definition, format, businessRules, classCode, isPii, isSit, piCategory, example, termType, retentionCategoryId } = body;
+    const { definition, format, businessRules, classCode, isPii, piCategory, example, termType, retentionCategoryId } = body;
 
     if (!definition?.trim()) {
       return NextResponse.json({ error: "definition is required" }, { status: 400 });
@@ -25,7 +25,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       businessRules: typeof businessRules === "string" ? businessRules : "",
       classCode:     classCode  ?? null,
       isPii:         isPii === true,
-      isSit:         isSit === true,
       piCategory:    piCategory ?? null,
       example:       typeof example       === "string" ? example       : "",
       termType:      termType   ?? "TERM",

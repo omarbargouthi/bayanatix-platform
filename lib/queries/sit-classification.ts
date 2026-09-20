@@ -211,6 +211,17 @@ export async function getSitRegions(): Promise<SitRegion[]> {
   return sql<SitRegion[]>`SELECT region_code AS "regionCode", region_name_text AS "regionNameText" FROM bayanat.sit_regions ORDER BY region_code`;
 }
 
+// A term is SIT-eligible by having the "SIT" tag assigned to it (bayanat.tags +
+// bayanat.asset_tags — the same generic tagging mechanism used for columns/tables/
+// schemas/sources elsewhere), not a bespoke boolean column. Reused everywhere a
+// query needs to know "is this term a SIT."
+function sitTaggedJoin() {
+  return sql`
+    JOIN bayanat.asset_tags sit_at ON sit_at.asset_type_code = 'BUSINESS_GLOSSARIES' AND sit_at.asset_id = g.glossary_id
+    JOIN bayanat.tags sit_tag ON sit_tag.tag_id = sit_at.tag_id AND sit_tag.tag_name = 'SIT' AND sit_tag.parent_tag_id IS NULL
+  `;
+}
+
 // All SIT-flagged terms regardless of whether they have any pattern yet — used by
 // the admin pattern-management UI (a freshly-flagged term with zero patterns must
 // still show up there so an admin can add its first one). Contrast with
@@ -224,12 +235,24 @@ export async function getAllSitTerms(): Promise<SitTermSummary[]> {
     SELECT g.glossary_id AS "glossaryId", g.term_name_text AS "termName", g.classification_code AS "classificationCode",
            p.term_name_text AS "domainName", count(sp.pattern_id)::int AS "patternCount"
     FROM bayanat.business_glossaries g
+    ${sitTaggedJoin()}
     LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
     LEFT JOIN bayanat.sit_patterns sp ON sp.glossary_id = g.glossary_id
-    WHERE g.is_sit_indicator = true
     GROUP BY g.glossary_id, g.term_name_text, g.classification_code, p.term_name_text
     ORDER BY g.term_name_text
   `;
+}
+
+// Whether a specific term currently carries the SIT tag — used to gate pattern
+// creation (adding a pattern to a not-yet-tagged term is very likely a mistake).
+export async function isTermSitTagged(glossaryId: number): Promise<boolean> {
+  const [row] = await sql<{ cnt: number }[]>`
+    SELECT count(*)::int AS cnt
+    FROM bayanat.asset_tags at2
+    JOIN bayanat.tags t ON t.tag_id = at2.tag_id AND t.tag_name = 'SIT' AND t.parent_tag_id IS NULL
+    WHERE at2.asset_type_code = 'BUSINESS_GLOSSARIES' AND at2.asset_id = ${glossaryId}
+  `;
+  return (row?.cnt ?? 0) > 0;
 }
 
 export type SitPatternRow = {
@@ -295,8 +318,8 @@ export async function getSitTermsForRegion(regionCode: string): Promise<SitTermO
     SELECT g.glossary_id AS "glossaryId", g.term_name_text AS "termName", g.classification_code AS "classificationCode",
            count(p.pattern_id)::int AS "patternCount"
     FROM bayanat.business_glossaries g
+    ${sitTaggedJoin()}
     JOIN bayanat.sit_patterns p ON p.glossary_id = g.glossary_id AND p.is_enabled = true AND p.region_code IN (${regionCode}, 'GLOBAL')
-    WHERE g.is_sit_indicator = true
     GROUP BY g.glossary_id, g.term_name_text, g.classification_code
     HAVING count(p.pattern_id) > 0
     ORDER BY g.term_name_text

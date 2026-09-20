@@ -117,7 +117,6 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     example:               string | null;
     classCode:             string | null;
     isPii:                 boolean;
-    isSit:                 boolean;
     piCategory:            string | null;
     npiCategory:           string | null;
     termType:              string | null;
@@ -138,7 +137,6 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
       g.example_text           AS "example",
       g.classification_code    AS "classCode",
       g.is_pii_indicator       AS "isPii",
-      g.is_sit_indicator       AS "isSit",
       g.pi_category_code       AS "piCategory",
       g.npi_category_code      AS "npiCategory",
       g.term_type              AS "termType",
@@ -240,7 +238,6 @@ export async function updateGlossaryTerm(
     businessRules: string;
     classCode:     string | null;
     isPii:         boolean;
-    isSit:         boolean;
     piCategory:    string | null;
     example:       string;
     termType:      string;
@@ -252,13 +249,12 @@ export async function updateGlossaryTerm(
     business_rules_text: string | null;
     classification_code: string | null;
     is_pii_indicator:    boolean;
-    is_sit_indicator:    boolean;
     pi_category_code:    string | null;
     example_text:        string | null;
     term_type:           string | null;
   }[]>`
     SELECT definition_text, format_text, business_rules_text, classification_code,
-           is_pii_indicator, is_sit_indicator, pi_category_code, example_text, term_type
+           is_pii_indicator, pi_category_code, example_text, term_type
     FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
   `;
   await sql`
@@ -269,7 +265,6 @@ export async function updateGlossaryTerm(
       business_rules_text = ${patch.businessRules || null},
       classification_code = ${patch.classCode},
       is_pii_indicator    = ${patch.isPii},
-      is_sit_indicator    = ${patch.isSit},
       pi_category_code    = ${patch.piCategory},
       example_text        = ${patch.example       || null},
       term_type           = ${patch.termType}
@@ -282,7 +277,6 @@ export async function updateGlossaryTerm(
       { field: "business_rules_text", oldVal: old.business_rules_text,      newVal: patch.businessRules || null },
       { field: "classification_code", oldVal: old.classification_code,      newVal: patch.classCode },
       { field: "is_pii_indicator",    oldVal: String(old.is_pii_indicator), newVal: String(patch.isPii) },
-      { field: "is_sit_indicator",    oldVal: String(old.is_sit_indicator), newVal: String(patch.isSit) },
       { field: "pi_category_code",    oldVal: old.pi_category_code,         newVal: patch.piCategory },
       { field: "example_text",        oldVal: old.example_text,             newVal: patch.example       || null },
       { field: "term_type",           oldVal: old.term_type,                newVal: patch.termType },

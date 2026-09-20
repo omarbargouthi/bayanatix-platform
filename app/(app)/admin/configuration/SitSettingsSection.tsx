@@ -248,15 +248,16 @@ export function SitSettingsSection() {
       <div className="mt-6 max-w-3xl">
         <div className="text-xs font-semibold text-ink mb-2">SIT Terms &amp; Patterns ({terms.length})</div>
         <p className="text-[11px] text-muted mb-2">
-          A term becomes SIT-eligible via its own "Sensitive Information Type" checkbox in the Business Glossary
-          term editor. Every SIT-flagged term shows up here — expand one to add, edit, enable/disable, or delete
-          its detection patterns. Only patterns whose region matches the Active Region above (or GLOBAL) are used
-          by a live classification run.
+          A term becomes SIT-eligible by adding the <strong>SIT</strong> tag to it in its Business Glossary Tags
+          picker — the same generic tagging used for columns/tables/schemas/sources elsewhere. Every SIT-tagged
+          term shows up here — expand one to add, edit, enable/disable, or delete its detection patterns. Only
+          patterns whose region matches the Active Region above (or GLOBAL) are used by a live classification
+          run, and only for terms that still carry the SIT tag.
         </p>
         <div className="bg-white border border-line rounded-xl divide-y divide-line-soft">
           {terms.length === 0 ? (
             <div className="px-4 py-3 text-xs text-muted">
-              No terms are flagged as SIT yet — check "Sensitive Information Type" on a term in the Business Glossary to add one here.
+              No terms are tagged SIT yet — add the "SIT" tag to a term in the Business Glossary to add one here.
             </div>
           ) : terms.map((t) => (
             <div key={t.glossaryId}>
