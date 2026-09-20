@@ -24,6 +24,8 @@ export function TablePageActions({
   const [showRequestAccess, setShowRequestAccess] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [classifyingSit, setClassifyingSit] = useState(false);
+  const [sitResult, setSitResult] = useState<string | null>(null);
 
   async function suggestColumnTypes() {
     setClassifying(true);
@@ -42,6 +44,23 @@ export function TablePageActions({
     }
   }
 
+  async function suggestSensitiveInfoTypes() {
+    setClassifyingSit(true);
+    setSitResult(null);
+    try {
+      const res = await fetch(`/api/catalog/entities/${entityId}/classify-sit`, { method: "POST" });
+      if (res.ok) {
+        const summary = await res.json();
+        setSitResult(`${summary.attributesEvaluated} column(s) evaluated, ${summary.suggestionsChanged} suggestion(s) changed`);
+        router.refresh();
+      } else {
+        setSitResult("Failed to run classification");
+      }
+    } finally {
+      setClassifyingSit(false);
+    }
+  }
+
   return (
     <>
       <div className="flex items-center gap-2">
@@ -50,6 +69,11 @@ export function TablePageActions({
         {canEdit && (
           <button onClick={suggestColumnTypes} disabled={classifying} className="btn btn-sm disabled:opacity-50" title={result ?? undefined}>
             {classifying ? "Suggesting…" : "Suggest Column Types"}
+          </button>
+        )}
+        {canEdit && (
+          <button onClick={suggestSensitiveInfoTypes} disabled={classifyingSit} className="btn btn-sm disabled:opacity-50" title={sitResult ?? undefined}>
+            {classifyingSit ? "Suggesting…" : "Suggest Sensitive Info Types"}
           </button>
         )}
         <div className="w-px h-5 bg-line mx-1" />
@@ -81,6 +105,7 @@ export function TablePageActions({
         </Link>
       </div>
       {result && <div className="text-[11px] text-muted mt-1.5 text-right">{result}</div>}
+      {sitResult && <div className="text-[11px] text-muted mt-1.5 text-right">{sitResult}</div>}
 
       {showHistory && (
         <AssetHistoryDrawer

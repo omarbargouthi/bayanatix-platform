@@ -5,8 +5,9 @@ import { useLang } from "@/lib/lang-context";
 import { EnrichmentReviewClient } from "./EnrichmentReviewClient";
 import { ColumnTypeReviewClient } from "./ColumnTypeReviewClient";
 import { TableTypeReviewClient } from "./TableTypeReviewClient";
+import { ColumnSitReviewClient } from "./ColumnSitReviewClient";
 
-type HubTab = "descriptions" | "dq" | "columnTypes" | "tableTypes";
+type HubTab = "descriptions" | "dq" | "columnTypes" | "tableTypes" | "sitTypes";
 
 // Single landing page for everything AI-suggests across the catalog — description,
 // DQ rule, column type (Business/Technical), and table type (Master/Transactional/...)
@@ -22,6 +23,7 @@ export function EnrichmentHubClient({ canEdit }: { canEdit: boolean }) {
     { key: "dq",           label: e.tabDqRules },
     { key: "columnTypes",  label: e.tabColumnTypes },
     { key: "tableTypes",   label: e.tabTableTypes },
+    { key: "sitTypes",     label: e.tabSitTypes },
   ];
 
   return (
@@ -42,6 +44,7 @@ export function EnrichmentHubClient({ canEdit }: { canEdit: boolean }) {
       {tab === "dq"           && <EnrichmentReviewClient canEdit={canEdit} fixedTab="dq" />}
       {tab === "columnTypes"  && <ColumnTypeReviewClient canEdit={canEdit} />}
       {tab === "tableTypes"   && <TableTypeReviewClient canEdit={canEdit} />}
+      {tab === "sitTypes"     && <ColumnSitReviewClient canEdit={canEdit} />}
     </div>
   );
 }

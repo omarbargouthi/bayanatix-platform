@@ -1635,6 +1635,7 @@ export type I18nStrings = {
     tabDescriptionsAndDq:      string;
     tabColumnTypes:            string;
     tabTableTypes:             string;
+    tabSitTypes:               string;
     bulkAccept:                 string;
     driftWarning:                string;
     langLabel:                   string;

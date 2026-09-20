@@ -1524,6 +1524,7 @@ export const ar: I18nStrings = {
     tabDescriptionsAndDq:      "الأوصاف وقواعد الجودة",
     tabColumnTypes:            "أنواع الأعمدة",
     tabTableTypes:             "أنواع الجداول",
+    tabSitTypes:               "أنواع المعلومات الحساسة",
     bulkAccept:                 "قبول جماعي",
     driftWarning:                "تم تغييره منذ الاقتراح — يتطلب مراجعة فردية",
     langLabel:                   "اللغة",

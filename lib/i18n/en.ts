@@ -1524,6 +1524,7 @@ export const en: I18nStrings = {
     tabDescriptionsAndDq:      "Descriptions & DQ Rules",
     tabColumnTypes:            "Column Types",
     tabTableTypes:             "Table Types",
+    tabSitTypes:               "Sensitive Info Types",
     bulkAccept:                 "Bulk Accept",
     driftWarning:                "Changed since suggested — review individually",
     langLabel:                   "Language",

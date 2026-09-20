@@ -8,6 +8,7 @@ import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
 import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
 import { SampleDataConfigSection } from "./SampleDataConfigSection";
 import { FollowSettingsSection } from "./FollowSettingsSection";
+import { SitSettingsSection } from "./SitSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -44,6 +45,7 @@ export default function ConfigurationPage() {
   const [showCustomAttributes, setShowCustomAttributes] = useState(false);
   const [showSampleData, setShowSampleData] = useState(false);
   const [showFollowSettings, setShowFollowSettings] = useState(false);
+  const [showSitSettings, setShowSitSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -82,6 +84,7 @@ export default function ConfigurationPage() {
     setShowCustomAttributes(false);
     setShowSampleData(false);
     setShowFollowSettings(false);
+    setShowSitSettings(false);
     setAdding(false);
   }
 
@@ -162,7 +165,7 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
-    && !showCustomAttributes && !showSampleData && !showFollowSettings;
+    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -234,6 +237,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Follow Settings</div>
             <div className="text-[10px] text-muted mt-0.5">Enable following at Schema / Data Source level</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowSitSettings(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showSitSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Sensitive Information Types</div>
+            <div className="text-[10px] text-muted mt-0.5">Active region · SIT patterns</div>
+          </button>
 
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
@@ -278,6 +288,9 @@ export default function ConfigurationPage() {
 
         {/* ── Follow Settings panel ── */}
         {showFollowSettings && <FollowSettingsSection />}
+
+        {/* ── Sensitive Information Types panel ── */}
+        {showSitSettings && <SitSettingsSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (
