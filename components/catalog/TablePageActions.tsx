@@ -7,6 +7,7 @@ import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { CertifyAssetModal } from "./CertifyAssetModal";
 import { FollowButton } from "./FollowButton";
 import { RaiseRequestModal } from "./RaiseRequestModal";
+import { EntityBulkExportImportModal } from "@/components/bulk/EntityBulkExportImportModal";
 import { IconHistory, IconCollaborate } from "@/components/layout/icons";
 
 export function TablePageActions({
@@ -22,6 +23,7 @@ export function TablePageActions({
   const [showHistory, setShowHistory] = useState(false);
   const [showCertify, setShowCertify] = useState(false);
   const [showRequestAccess, setShowRequestAccess] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [classifyingSit, setClassifyingSit] = useState(false);
@@ -75,6 +77,9 @@ export function TablePageActions({
           <button onClick={suggestSensitiveInfoTypes} disabled={classifyingSit} className="btn btn-sm disabled:opacity-50" title={sitResult ?? undefined}>
             {classifyingSit ? "Suggesting…" : "Suggest Sensitive Info Types"}
           </button>
+        )}
+        {canEdit && (
+          <button onClick={() => setShowBulk(true)} className="btn btn-sm">Export / Import</button>
         )}
         <div className="w-px h-5 bg-line mx-1" />
 
@@ -130,6 +135,13 @@ export function TablePageActions({
           prefilledTarget={{ assetTypeCode: "DATA_ENTITIES", assetId: entityId, assetName: entityName }}
           onClose={() => setShowRequestAccess(false)}
           onSaved={() => { setShowRequestAccess(false); router.refresh(); }}
+        />
+      )}
+      {showBulk && (
+        <EntityBulkExportImportModal
+          entityIds={[entityId]}
+          title={entityName}
+          onClose={() => { setShowBulk(false); router.refresh(); }}
         />
       )}
     </>

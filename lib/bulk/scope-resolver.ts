@@ -17,7 +17,7 @@ export type CreatableSheetName = "DataSources" | "BusinessTerms" | "CustomAssets
 
 export type DownloadScope =
   | { type: "DATA_SOURCE"; dataSourceId: number; includeTables?: boolean; includeColumns?: boolean }
-  | { type: "SELECTED"; entityIds?: number[]; attributeIds?: number[] }
+  | { type: "SELECTED"; entityIds?: number[]; attributeIds?: number[]; includeColumns?: boolean }
   | { type: "SEARCH_RESULTS"; refs: { assetType: string; assetId: number }[] }
   | { type: "BUSINESS_TERMS_ALL" }
   | { type: "BUSINESS_TERMS_DOMAIN"; domainId: number }
@@ -197,8 +197,18 @@ export async function resolveDownloadScope(scope: DownloadScope, opts?: { includ
       }
     }
   } else if (scope.type === "SELECTED") {
-    if (scope.entityIds?.length) result.Tables = await fetchTableRows(scope.entityIds);
-    if (scope.attributeIds?.length) result.Columns = await fetchColumnRows(scope.attributeIds);
+    // entityIds implicitly pulls in their columns too (includeColumns defaults on)
+    // — this is what makes "export this table" mean "table row + all its columns"
+    // without the caller having to separately enumerate attribute ids.
+    if (scope.entityIds?.length) {
+      result.Tables = await fetchTableRows(scope.entityIds);
+      if (scope.includeColumns !== false) {
+        const attrIds = scope.attributeIds?.length ? scope.attributeIds : await resolveAttributeIdsForEntities(scope.entityIds);
+        result.Columns = await fetchColumnRows(attrIds);
+      }
+    } else if (scope.attributeIds?.length) {
+      result.Columns = await fetchColumnRows(scope.attributeIds);
+    }
   } else if (scope.type === "SEARCH_RESULTS") {
     const entityIds = scope.refs.filter((r) => r.assetType === "DATA_ENTITIES").map((r) => r.assetId);
     const attrIds = scope.refs.filter((r) => r.assetType === "DATA_ATTRIBUTES").map((r) => r.assetId);

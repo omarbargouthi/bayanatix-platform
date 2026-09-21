@@ -14,6 +14,7 @@ import {
   IconSearch,
 } from "@/components/layout/icons";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
+import { EntityBulkExportImportModal } from "@/components/bulk/EntityBulkExportImportModal";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
 import { StarRatingWidget } from "./StarRatingWidget";
@@ -225,6 +226,8 @@ export function SchemaTableList({
   const [historyEntity,  setHistoryEntity]  = useState<DataEntity | null>(null);
   const [certifyEntity,  setCertifyEntity]  = useState<DataEntity | null>(null);
   const [requestsEntity, setRequestsEntity] = useState<DataEntity | null>(null);
+  const [selectedIds,   setSelectedIds]   = useState<Set<number>>(new Set());
+  const [showBulk,      setShowBulk]      = useState(false);
 
   const tables = useMemo(() => entities.filter((e) => !e.isView), [entities]);
 
@@ -237,6 +240,33 @@ export function SchemaTableList({
       return true;
     });
   }, [tables, search, filterType, filterCert]);
+
+  // Selection tracks against the currently-filtered set — a table scrolled out of
+  // view by a filter change is deselected too, so "Export Selected" always means
+  // exactly what's checked among what's currently visible.
+  const filteredIds = useMemo(() => new Set(filtered.map((e) => e.entityId)), [filtered]);
+  const visibleSelectedIds = useMemo(() => [...selectedIds].filter((id) => filteredIds.has(id)), [selectedIds, filteredIds]);
+  const allFilteredSelected = filtered.length > 0 && visibleSelectedIds.length === filtered.length;
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllFiltered() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        for (const id of filteredIds) next.delete(id);
+      } else {
+        for (const id of filteredIds) next.add(id);
+      }
+      return next;
+    });
+  }
 
   function toggleExpand(id: number) {
     setExpandedIds((prev) => {
@@ -283,6 +313,14 @@ export function SchemaTableList({
           <option value="BRONZE">{c.certBronze}</option>
         </select>
 
+        {visibleSelectedIds.length > 0 && canEdit && (
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-semibold text-brand-purple">{visibleSelectedIds.length} selected</span>
+            <button onClick={() => setShowBulk(true)} className="btn btn-sm">Export / Import Selected</button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-[12px] text-muted hover:text-ink">Clear</button>
+          </div>
+        )}
+
         <span className="text-sm text-muted ml-auto">
           <strong className="text-ink">{filtered.length}</strong> {c.ofTables.replace("{n}", String(tables.length))}
         </span>
@@ -291,7 +329,18 @@ export function SchemaTableList({
       {/* ── Table list ── */}
       <div className="card overflow-hidden">
         {/* Column header */}
-        <div className="grid grid-cols-[32px_2fr_1fr_160px_90px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
+        <div className="grid grid-cols-[28px_32px_2fr_1fr_160px_90px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold items-center">
+          <div>
+            {canEdit && (
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleSelectAllFiltered}
+                className="w-3.5 h-3.5 accent-brand-purple"
+                title="Select all filtered tables"
+              />
+            )}
+          </div>
           <div />
           <div>{c.colAssetName}</div>
           <div>{c.colType}</div>
@@ -315,9 +364,21 @@ export function SchemaTableList({
 
               {/* ── Summary row ── */}
               <div
-                className="grid grid-cols-[32px_2fr_1fr_160px_90px] gap-3 px-5 py-3.5 items-center hover:bg-canvas-soft transition-colors cursor-pointer"
+                className="grid grid-cols-[28px_32px_2fr_1fr_160px_90px] gap-3 px-5 py-3.5 items-center hover:bg-canvas-soft transition-colors cursor-pointer"
                 onClick={() => toggleExpand(entity.entityId)}
               >
+                {/* Selection checkbox */}
+                <div onClick={(e) => e.stopPropagation()}>
+                  {canEdit && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(entity.entityId)}
+                      onChange={() => toggleSelect(entity.entityId)}
+                      className="w-3.5 h-3.5 accent-brand-purple"
+                    />
+                  )}
+                </div>
+
                 {/* Chevron */}
                 <div className="flex justify-center">
                   <IconChevron
@@ -632,6 +693,13 @@ export function SchemaTableList({
           assetName={requestsEntity.entityName}
           entities={entities.map((e) => ({ entityId: e.entityId, entityName: e.entityName }))}
           onClose={() => setRequestsEntity(null)}
+        />
+      )}
+      {showBulk && visibleSelectedIds.length > 0 && (
+        <EntityBulkExportImportModal
+          entityIds={visibleSelectedIds}
+          title={`${visibleSelectedIds.length} selected table${visibleSelectedIds.length !== 1 ? "s" : ""}`}
+          onClose={() => { setShowBulk(false); router.refresh(); }}
         />
       )}
     </>
