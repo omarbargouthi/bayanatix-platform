@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui/Tag";
-import { IconGlossary, IconBook } from "@/components/layout/icons";
+import { IconGlossary, IconBook, IconChevron } from "@/components/layout/icons";
 import { AddAssetModal } from "@/components/catalog/AddAssetModal";
 import { DomainEditModal } from "@/components/glossary/DomainEditModal";
 import { GlossaryGovernancePanel } from "@/components/glossary/GlossaryGovernancePanel";
@@ -85,30 +85,58 @@ interface Props {
   domains:      GlossaryDomain[];
   terms:        GlossaryTerm[];
   domainFilter: number | null;
+  subDomainFilter: number | null;
   canEdit:      boolean;
   canEditGovernance: boolean;
 }
 
-export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdit, canEditGovernance }: Props) {
+export function GlossaryPageClient({ stats, domains, terms, domainFilter, subDomainFilter, canEdit, canEditGovernance }: Props) {
   const { t } = useLang();
   const g = t.glossary;
   const [showNewTerm, setShowNewTerm] = useState(false);
   const [showEditDomain, setShowEditDomain] = useState(false);
-  const [subDomains, setSubDomains] = useState<GlossaryDomain[]>([]);
+  // One shared cache powers both the sidebar tree and the hero's sub-domain
+  // display — a domain's sub-domains are fetched once (on sidebar expand, or on
+  // navigating straight to a domain/sub-domain URL) and reused for both.
+  const [subDomainsByDomain, setSubDomainsByDomain] = useState<Record<number, GlossaryDomain[]>>({});
+  const [loadingDomainIds, setLoadingDomainIds] = useState<Set<number>>(new Set());
+  const [expandedDomainIds, setExpandedDomainIds] = useState<Set<number>>(new Set());
 
   const activeDomain = domainFilter
     ? domains.find((d) => d.glossaryId === domainFilter) ?? null
     : null;
+  const activeSubDomain = subDomainFilter && activeDomain
+    ? subDomainsByDomain[activeDomain.glossaryId]?.find((sd) => sd.glossaryId === subDomainFilter) ?? null
+    : null;
+  const subDomains = activeDomain ? subDomainsByDomain[activeDomain.glossaryId] ?? [] : [];
 
-  useEffect(() => {
-    if (!activeDomain) { setSubDomains([]); return; }
-    let cancelled = false;
-    fetch(`/api/glossary/domains/${activeDomain.glossaryId}`)
+  function loadSubDomains(domainId: number, force = false) {
+    if (!force && (subDomainsByDomain[domainId] || loadingDomainIds.has(domainId))) return;
+    setLoadingDomainIds((prev) => new Set(prev).add(domainId));
+    fetch(`/api/glossary/domains/${domainId}`)
       .then((r) => r.ok ? r.json() : { subDomains: [] })
-      .then((d) => { if (!cancelled) setSubDomains(d.subDomains ?? []); })
-      .catch(() => { if (!cancelled) setSubDomains([]); });
-    return () => { cancelled = true; };
-  }, [activeDomain?.glossaryId]);
+      .then((d) => setSubDomainsByDomain((prev) => ({ ...prev, [domainId]: d.subDomains ?? [] })))
+      .catch(() => setSubDomainsByDomain((prev) => ({ ...prev, [domainId]: [] })))
+      .finally(() => setLoadingDomainIds((prev) => { const next = new Set(prev); next.delete(domainId); return next; }));
+  }
+
+  function toggleExpand(domainId: number) {
+    setExpandedDomainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(domainId)) next.delete(domainId); else next.add(domainId);
+      return next;
+    });
+    loadSubDomains(domainId);
+  }
+
+  // Landing directly on a domain/sub-domain URL (e.g. a term's breadcrumb link)
+  // should show the tree already expanded to that point, not collapsed.
+  useEffect(() => {
+    if (!domainFilter) return;
+    setExpandedDomainIds((prev) => new Set(prev).add(domainFilter));
+    loadSubDomains(domainFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainFilter]);
 
   return (
     <main className="px-8 py-7 pb-14">
@@ -156,24 +184,63 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
             <span className="flex-1">{g.allTerms}</span>
             <span className="text-[11px] text-muted">{stats.totalTerms}</span>
           </Link>
-          {domains.map((d) => (
-            <Link
-              key={d.glossaryId}
-              href={`/glossary?domain=${d.glossaryId}`}
-              className={[
-                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
-                domainFilter === d.glossaryId
-                  ? "bg-brand-purple/10 text-brand-deep font-semibold shadow-[inset_3px_0_0_#6058A0]"
-                  : "text-ink-soft hover:bg-canvas hover:text-ink",
-              ].join(" ")}
-            >
-              <span className="w-2 h-2 rounded-full bg-brand-purple/50 shrink-0" />
-              <span className="flex-1 truncate">{d.termName}</span>
-              {d.termCount > 0 && (
-                <span className="text-[11px] text-muted">{d.termCount}</span>
-              )}
-            </Link>
-          ))}
+          {domains.map((d) => {
+            const isExpanded = expandedDomainIds.has(d.glossaryId);
+            const isDomainActive = domainFilter === d.glossaryId && !subDomainFilter;
+            const children = subDomainsByDomain[d.glossaryId];
+            return (
+              <div key={d.glossaryId}>
+                <div
+                  className={[
+                    "flex items-center gap-1 rounded-md text-sm transition-colors",
+                    isDomainActive
+                      ? "bg-brand-purple/10 text-brand-deep font-semibold shadow-[inset_3px_0_0_#6058A0]"
+                      : "text-ink-soft hover:bg-canvas hover:text-ink",
+                  ].join(" ")}
+                >
+                  <button
+                    onClick={() => toggleExpand(d.glossaryId)}
+                    className="w-7 h-8 grid place-items-center shrink-0 text-muted hover:text-ink"
+                    title={isExpanded ? "Collapse" : "Expand"}
+                  >
+                    <IconChevron className={`w-3 h-3 transition-transform duration-150 ${isExpanded ? "" : "-rotate-90"}`} />
+                  </button>
+                  <Link href={`/glossary?domain=${d.glossaryId}`} className="flex items-center gap-2.5 flex-1 min-w-0 py-2 pr-3">
+                    <span className="w-2 h-2 rounded-full bg-brand-purple/50 shrink-0" />
+                    <span className="flex-1 truncate">{d.termName}</span>
+                    {d.termCount > 0 && <span className="text-[11px] text-muted shrink-0">{d.termCount}</span>}
+                  </Link>
+                </div>
+                {isExpanded && (
+                  <div className="pl-7 border-l border-line-soft ml-[15px]">
+                    {children == null ? (
+                      <div className="px-3 py-1.5 text-[11px] text-muted">Loading…</div>
+                    ) : children.length === 0 ? (
+                      <div className="px-3 py-1.5 text-[11px] text-muted">No sub-domains</div>
+                    ) : children.map((sd) => {
+                      const isSubActive = subDomainFilter === sd.glossaryId;
+                      return (
+                        <Link
+                          key={sd.glossaryId}
+                          href={`/glossary?domain=${d.glossaryId}&subdomain=${sd.glossaryId}`}
+                          className={[
+                            "flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] transition-colors",
+                            isSubActive
+                              ? "bg-brand-purple/10 text-brand-deep font-semibold"
+                              : "text-ink-soft hover:bg-canvas hover:text-ink",
+                          ].join(" ")}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand-purple/30 shrink-0" />
+                          <span className="flex-1 truncate">{sd.termName}</span>
+                          {sd.termCount > 0 && <span className="text-[11px] text-muted shrink-0">{sd.termCount}</span>}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </aside>
 
         {/* Right: terms table */}
@@ -183,16 +250,21 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
               <div className="rounded-lg border border-line bg-gradient-to-br from-[#f5f5ff] to-[#ecedf9] p-5 mb-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-brand-deep mb-1">{activeDomain.termName}</h2>
-                    <p className="text-sm text-ink-soft">{activeDomain.description}</p>
+                    {activeSubDomain && (
+                      <Link href={`/glossary?domain=${activeDomain.glossaryId}`} className="text-[11px] uppercase tracking-wider text-brand-purple hover:underline font-semibold">
+                        {activeDomain.termName}
+                      </Link>
+                    )}
+                    <h2 className="text-lg font-bold text-brand-deep mb-1">{activeSubDomain ? activeSubDomain.termName : activeDomain.termName}</h2>
+                    <p className="text-sm text-ink-soft">{activeSubDomain ? activeSubDomain.description : activeDomain.description}</p>
                   </div>
                   {canEdit && (
                     <button onClick={() => setShowEditDomain(true)} className="btn btn-sm shrink-0">Edit</button>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-3">
-                  <ClassBadge code={activeDomain.classCode} />
-                  <Tag variant="purple">{activeDomain.termCount} {g.colTerm.toLowerCase()}</Tag>
+                  <ClassBadge code={activeSubDomain ? activeSubDomain.classCode : activeDomain.classCode} />
+                  <Tag variant="purple">{activeSubDomain ? activeSubDomain.termCount : activeDomain.termCount} {g.colTerm.toLowerCase()}</Tag>
                 </div>
                 {subDomains.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-line/60">
@@ -201,11 +273,16 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
                       {subDomains.map((sd) => (
                         <Link
                           key={sd.glossaryId}
-                          href={`/glossary/${sd.glossaryId}`}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-white border border-line text-ink-soft hover:border-brand-purple hover:text-brand-deep transition-colors"
+                          href={`/glossary?domain=${activeDomain.glossaryId}&subdomain=${sd.glossaryId}`}
+                          className={[
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border transition-colors",
+                            activeSubDomain?.glossaryId === sd.glossaryId
+                              ? "bg-brand-purple text-white border-brand-purple"
+                              : "bg-white border-line text-ink-soft hover:border-brand-purple hover:text-brand-deep",
+                          ].join(" ")}
                         >
                           {sd.termName}
-                          {sd.termCount > 0 && <span className="text-[10px] text-muted">({sd.termCount})</span>}
+                          {sd.termCount > 0 && <span className="text-[10px] opacity-80">({sd.termCount})</span>}
                         </Link>
                       ))}
                     </div>
@@ -214,7 +291,11 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
               </div>
 
               <div className="mb-5">
-                <GlossaryGovernancePanel glossaryId={activeDomain.glossaryId} kind="domain" canEdit={canEditGovernance} />
+                <GlossaryGovernancePanel
+                  glossaryId={activeSubDomain ? activeSubDomain.glossaryId : activeDomain.glossaryId}
+                  kind={activeSubDomain ? "term" : "domain"}
+                  canEdit={canEditGovernance}
+                />
               </div>
             </>
           )}
@@ -222,7 +303,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-line-soft">
               <h3 className="font-bold text-sm">
-                {activeDomain ? activeDomain.termName : g.allTerms}
+                {activeSubDomain ? activeSubDomain.termName : activeDomain ? activeDomain.termName : g.allTerms}
                 <span className="text-muted text-xs font-normal ml-2">{terms.length} {g.colTerm.toLowerCase()}</span>
               </h3>
               <div className="flex items-center gap-2">
@@ -292,12 +373,17 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
 
       {showEditDomain && activeDomain && (
         <DomainEditModal
-          glossaryId={activeDomain.glossaryId}
-          kindLabel="Domain"
-          termName={activeDomain.termName}
-          description={activeDomain.description}
-          classCode={activeDomain.classCode}
-          onClose={() => setShowEditDomain(false)}
+          glossaryId={activeSubDomain ? activeSubDomain.glossaryId : activeDomain.glossaryId}
+          kindLabel={activeSubDomain ? "Sub-domain" : "Domain"}
+          termName={activeSubDomain ? activeSubDomain.termName : activeDomain.termName}
+          description={activeSubDomain ? activeSubDomain.description : activeDomain.description}
+          classCode={activeSubDomain ? activeSubDomain.classCode : activeDomain.classCode}
+          onClose={() => {
+            setShowEditDomain(false);
+            // The cached sub-domain list may now have a stale name/description —
+            // force a refetch so the sidebar/hero pick up the change without a full reload.
+            loadSubDomains(activeDomain.glossaryId, true);
+          }}
         />
       )}
     </main>

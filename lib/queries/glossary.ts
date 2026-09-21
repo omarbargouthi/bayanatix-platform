@@ -106,7 +106,9 @@ export async function updateGlossaryDomain(
 // sidebar's ?domain= links and filter expect. The immediate parent is exposed
 // separately as "subDomainName" only when it's a real subdomain (not the domain
 // itself), so a term list can still show the fuller "Domain / Subdomain" path.
-export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[]> {
+export async function getGlossaryTerms(filter?: { domainId?: number; subDomainId?: number }): Promise<GlossaryTerm[]> {
+  const domainId = filter?.domainId;
+  const subDomainId = filter?.subDomainId;
   return sql<GlossaryTerm[]>`
     WITH RECURSIVE ancestry AS (
       SELECT glossary_id, glossary_id AS root_id, term_name_text AS root_name
@@ -136,7 +138,7 @@ export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[
     JOIN ancestry anc ON anc.glossary_id = g.glossary_id
     WHERE g.parent_glossary_id IS NOT NULL
       AND g.term_type IN ('TERM', 'KPI_METRIC')
-      ${domainId ? sql`AND anc.root_id = ${domainId}` : sql``}
+      ${subDomainId ? sql`AND g.parent_glossary_id = ${subDomainId}` : domainId ? sql`AND anc.root_id = ${domainId}` : sql``}
     ORDER BY anc.root_name, g.term_name_text
   `;
 }

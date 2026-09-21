@@ -10,17 +10,18 @@ export const dynamic = "force-dynamic";
 export default async function GlossaryPage({
   searchParams,
 }: {
-  searchParams: { domain?: string };
+  searchParams: { domain?: string; subdomain?: string };
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
   const domainFilter = searchParams.domain ? Number(searchParams.domain) : null;
+  const subDomainFilter = searchParams.subdomain ? Number(searchParams.subdomain) : null;
 
   const [stats, domains, terms, canEdit] = await Promise.all([
     getGlossaryStats(),
     getGlossaryDomains(),
-    getGlossaryTerms(domainFilter ?? undefined),
+    getGlossaryTerms({ domainId: domainFilter ?? undefined, subDomainId: subDomainFilter ?? undefined }),
     canEditMetadata(user),
   ]);
 
@@ -38,6 +39,7 @@ export default async function GlossaryPage({
         domains={domains}
         terms={terms}
         domainFilter={domainFilter}
+        subDomainFilter={subDomainFilter}
         canEdit={canEdit}
         canEditGovernance={user.role === "ADMIN"}
       />
