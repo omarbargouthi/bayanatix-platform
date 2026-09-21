@@ -75,7 +75,7 @@ export function TablePageActions({
         )}
         {canEdit && (
           <button onClick={suggestSensitiveInfoTypes} disabled={classifyingSit} className="btn btn-sm disabled:opacity-50" title={sitResult ?? undefined}>
-            {classifyingSit ? "Suggesting…" : "Suggest Sensitive Info Types"}
+            {classifyingSit ? "Suggesting…" : "Suggest Term"}
           </button>
         )}
         {canEdit && (

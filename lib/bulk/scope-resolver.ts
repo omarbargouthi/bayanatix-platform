@@ -104,7 +104,7 @@ async function fetchBusinessTermRows(domainId: number | null): Promise<Record<st
       bg.format_text AS format, bg.business_rules_text AS "businessRules", bg.example_text AS example
     FROM bayanat.business_glossaries bg
     LEFT JOIN bayanat.business_glossaries parent ON parent.glossary_id = bg.parent_glossary_id
-    WHERE bg.parent_glossary_id IS NOT NULL ${whereDomain}
+    WHERE bg.parent_glossary_id IS NOT NULL AND bg.term_type IN ('TERM', 'KPI_METRIC') ${whereDomain}
     ORDER BY parent.term_name_text, bg.term_name_text
   `;
 }
