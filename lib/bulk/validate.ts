@@ -197,8 +197,12 @@ async function validateFieldValue(field: FieldDef, newVal: string | null, errors
 }
 
 async function resolveGlossaryTermByName(name: string): Promise<{ ok: true; value: string } | { ok: false; error: string }> {
+  // TERM/KPI_METRIC only — a DOMAIN/SUBDOMAIN folder name (e.g. "Identification
+  // Data") is not an assignable term, matching lib/bulk/enum-sources.ts's
+  // loadExistingTermNames() (the dropdown this value is picked from).
   const rows = await sql<{ termName: string }[]>`
-    SELECT term_name_text AS "termName" FROM bayanat.business_glossaries WHERE lower(term_name_text) = lower(${name}) AND parent_glossary_id IS NOT NULL
+    SELECT term_name_text AS "termName" FROM bayanat.business_glossaries
+    WHERE lower(term_name_text) = lower(${name}) AND parent_glossary_id IS NOT NULL AND term_type IN ('TERM', 'KPI_METRIC')
   `;
   if (rows.length === 0) return { ok: false, error: `Glossary term "${name}" not found` };
   if (rows.length > 1) return { ok: false, error: `Glossary term "${name}" is ambiguous (matches ${rows.length} terms)` };

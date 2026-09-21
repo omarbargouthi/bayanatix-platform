@@ -36,7 +36,7 @@ export async function GET() {
       g.is_pii_indicator     AS "isPii"
     FROM bayanat.business_glossaries g
     JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
-    WHERE g.parent_glossary_id IS NOT NULL
+    WHERE g.parent_glossary_id IS NOT NULL AND g.term_type IN ('TERM', 'KPI_METRIC')
     ORDER BY p.term_name_text, g.term_name_text
   `;
 

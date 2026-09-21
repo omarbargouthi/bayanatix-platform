@@ -28,9 +28,18 @@ export async function loadExistingTagNames(): Promise<string[]> {
   return rows.map((r) => r.name);
 }
 
+// Assignable business terms only — matches the term_type filter already used by
+// lib/queries/glossary.ts's getGlossaryTerms(). Excludes DOMAIN/SUBDOMAIN rows,
+// which are organizational folders in the glossary hierarchy (e.g. "Identification
+// Data", "Sensitive Data" — the SIT-catalog subdomains added in db/104), not real
+// terms a column can be classified against. A SIT type is a detection pattern a
+// business term can be *associated with*, not itself a pickable business term —
+// this list must stay scoped to genuine business_glossaries TERM/KPI_METRIC rows.
 export async function loadExistingTermNames(): Promise<string[]> {
   const rows = await sql<{ name: string }[]>`
-    SELECT term_name_text AS name FROM bayanat.business_glossaries WHERE parent_glossary_id IS NOT NULL ORDER BY term_name_text
+    SELECT DISTINCT term_name_text AS name FROM bayanat.business_glossaries
+    WHERE parent_glossary_id IS NOT NULL AND term_type IN ('TERM', 'KPI_METRIC')
+    ORDER BY term_name_text
   `;
   return rows.map((r) => r.name);
 }
