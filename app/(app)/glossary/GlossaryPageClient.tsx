@@ -251,21 +251,24 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
               <Link
                 key={term.glossaryId}
                 href={`/glossary/${term.glossaryId}`}
-                className="grid grid-cols-[2fr_1fr_2fr_1fr_0.7fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors"
+                className="grid grid-cols-[2fr_1fr_2fr_1fr_0.7fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3.5 items-start text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors"
               >
-                <div>
-                  <div className="font-semibold text-brand-deep flex items-center gap-1.5">
+                <div className="min-w-0">
+                  <div className="font-semibold text-brand-deep flex items-center gap-1.5 min-w-0">
                     <IconGlossary className="w-3.5 h-3.5 text-brand-purple shrink-0" />
-                    {term.termName}
+                    <span className="truncate">{term.termName}</span>
                   </div>
                   {term.aliasCount > 0 && (
                     <div className="text-[11px] text-muted mt-0.5">{term.aliasCount} alias{term.aliasCount > 1 ? "es" : ""}</div>
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   {term.domainName
-                    ? <Tag variant="blue">{term.domainName}</Tag>
+                    ? <Tag variant="blue" className="max-w-full truncate">{term.domainName}</Tag>
                     : <span className="text-muted">—</span>}
+                  {term.subDomainName && (
+                    <div className="text-[11px] text-muted mt-1 truncate">{term.subDomainName}</div>
+                  )}
                 </div>
                 <div className="text-ink-soft text-[13px] line-clamp-2 leading-snug">{term.definition}</div>
                 <div><ClassBadge code={term.classCode} /></div>

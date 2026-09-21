@@ -32,6 +32,9 @@ export default async function GlossaryTermPage({
           ...(term.domainName
             ? [{ label: term.domainName, href: `/glossary?domain=${term.domainId}` }]
             : []),
+          ...(term.subDomainName
+            ? [{ label: term.subDomainName, href: `/glossary/${term.subDomainId}` }]
+            : []),
           { label: term.termName },
         ]}
         user={user}

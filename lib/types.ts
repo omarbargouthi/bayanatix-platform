@@ -322,6 +322,7 @@ export type GlossaryTerm = {
   isPii:              boolean;
   domainName:         string | null;
   domainId:           number | null;
+  subDomainName:      string | null;
   aliasCount:         number;
   linkedAttrCount:    number;
   createdAt:          string;
@@ -347,6 +348,8 @@ export type GlossaryTermDetail = {
   termType:              string | null;
   domainName:            string | null;
   domainId:              number | null;
+  subDomainName:         string | null;
+  subDomainId:           number | null;
   createdAt:             string;
   retentionCategoryId:   number | null;
   retentionCategoryName: string | null;

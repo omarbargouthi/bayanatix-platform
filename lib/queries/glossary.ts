@@ -31,16 +31,31 @@ export async function getGlossaryStats(): Promise<GlossaryStats> {
   };
 }
 
+// Term count per domain must walk the whole subtree, not just direct children —
+// a domain's terms can sit under an intermediate SUBDOMAIN (Domain > Subdomain >
+// Term), which every domain added after the original demo seed uses. Counting
+// only direct children silently showed 0/null for any such domain.
 export async function getGlossaryDomains(): Promise<GlossaryDomain[]> {
   return sql<GlossaryDomain[]>`
+    WITH RECURSIVE tree AS (
+      SELECT glossary_id, glossary_id AS root_id FROM bayanat.business_glossaries WHERE parent_glossary_id IS NULL
+      UNION ALL
+      SELECT c.glossary_id, t.root_id FROM bayanat.business_glossaries c JOIN tree t ON c.parent_glossary_id = t.glossary_id
+    )
     SELECT
       g.glossary_id    AS "glossaryId",
       g.term_name_text AS "termName",
       g.definition_text AS "description",
       g.classification_code AS "classCode",
-      (SELECT COUNT(*)::int FROM bayanat.business_glossaries c
-         WHERE c.parent_glossary_id = g.glossary_id AND c.term_type IN ('TERM', 'KPI_METRIC')) AS "termCount"
+      coalesce(cnt.term_count, 0) AS "termCount"
     FROM bayanat.business_glossaries g
+    LEFT JOIN (
+      SELECT tree.root_id, count(*)::int AS term_count
+      FROM tree
+      JOIN bayanat.business_glossaries t ON t.glossary_id = tree.glossary_id
+      WHERE t.term_type IN ('TERM', 'KPI_METRIC')
+      GROUP BY tree.root_id
+    ) cnt ON cnt.root_id = g.glossary_id
     WHERE g.parent_glossary_id IS NULL
     ORDER BY g.term_name_text
   `;
@@ -86,16 +101,29 @@ export async function updateGlossaryDomain(
   }
 }
 
+// "domainName"/"domainId" always resolve to the top-level DOMAIN, even when the
+// term actually sits under an intermediate SUBDOMAIN — that's what the left
+// sidebar's ?domain= links and filter expect. The immediate parent is exposed
+// separately as "subDomainName" only when it's a real subdomain (not the domain
+// itself), so a term list can still show the fuller "Domain / Subdomain" path.
 export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[]> {
   return sql<GlossaryTerm[]>`
+    WITH RECURSIVE ancestry AS (
+      SELECT glossary_id, glossary_id AS root_id, term_name_text AS root_name
+      FROM bayanat.business_glossaries WHERE parent_glossary_id IS NULL
+      UNION ALL
+      SELECT c.glossary_id, a.root_id, a.root_name
+      FROM bayanat.business_glossaries c JOIN ancestry a ON c.parent_glossary_id = a.glossary_id
+    )
     SELECT
       g.glossary_id           AS "glossaryId",
       g.term_name_text        AS "termName",
       g.definition_text       AS "definition",
       g.classification_code   AS "classCode",
       g.is_pii_indicator      AS "isPii",
-      p.term_name_text        AS "domainName",
-      p.glossary_id           AS "domainId",
+      anc.root_name           AS "domainName",
+      anc.root_id             AS "domainId",
+      CASE WHEN p.term_type = 'SUBDOMAIN' THEN p.term_name_text ELSE NULL END AS "subDomainName",
       (SELECT COUNT(*)::int FROM bayanat.glossary_aliases a WHERE a.glossary_id = g.glossary_id) AS "aliasCount",
       (SELECT COUNT(*)::int FROM bayanat.data_attributes da WHERE da.glossary_term_text = g.term_name_text) AS "linkedAttrCount",
       g.created_at_timestamp  AS "createdAt",
@@ -105,10 +133,11 @@ export async function getGlossaryTerms(domainId?: number): Promise<GlossaryTerm[
          WHERE bts.glossary_id = g.glossary_id) AS "sitTypeNames"
     FROM bayanat.business_glossaries g
     LEFT JOIN bayanat.business_glossaries p ON p.glossary_id = g.parent_glossary_id
+    JOIN ancestry anc ON anc.glossary_id = g.glossary_id
     WHERE g.parent_glossary_id IS NOT NULL
       AND g.term_type IN ('TERM', 'KPI_METRIC')
-      ${domainId ? sql`AND g.parent_glossary_id = ${domainId}` : sql``}
-    ORDER BY p.term_name_text, g.term_name_text
+      ${domainId ? sql`AND anc.root_id = ${domainId}` : sql``}
+    ORDER BY anc.root_name, g.term_name_text
   `;
 }
 
@@ -127,12 +156,21 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     termType:              string | null;
     domainName:            string | null;
     domainId:              number | null;
+    subDomainName:         string | null;
+    subDomainId:           number | null;
     createdAt:             string;
     retentionCategoryId:   number | null;
     retentionCategoryName: string | null;
     ownerUserId:           string | null;
     ownerName:             string | null;
   }[]>`
+    WITH RECURSIVE ancestry AS (
+      SELECT glossary_id, glossary_id AS root_id, term_name_text AS root_name
+      FROM bayanat.business_glossaries WHERE parent_glossary_id IS NULL
+      UNION ALL
+      SELECT c.glossary_id, a.root_id, a.root_name
+      FROM bayanat.business_glossaries c JOIN ancestry a ON c.parent_glossary_id = a.glossary_id
+    )
     SELECT
       g.glossary_id            AS "glossaryId",
       g.term_name_text         AS "termName",
@@ -145,8 +183,10 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
       g.pi_category_code       AS "piCategory",
       g.npi_category_code      AS "npiCategory",
       g.term_type              AS "termType",
-      p.term_name_text         AS "domainName",
-      p.glossary_id            AS "domainId",
+      anc.root_name            AS "domainName",
+      anc.root_id              AS "domainId",
+      CASE WHEN p.term_type = 'SUBDOMAIN' THEN p.term_name_text ELSE NULL END AS "subDomainName",
+      CASE WHEN p.term_type = 'SUBDOMAIN' THEN p.glossary_id ELSE NULL END AS "subDomainId",
       g.created_at_timestamp   AS "createdAt",
       g.retention_category_id  AS "retentionCategoryId",
       dc.name                  AS "retentionCategoryName",
@@ -156,6 +196,7 @@ export async function getGlossaryTermById(id: number): Promise<GlossaryTermDetai
     LEFT JOIN bayanat.business_glossaries p  ON p.glossary_id  = g.parent_glossary_id
     LEFT JOIN bayanat.data_categories    dc  ON dc.category_id = g.retention_category_id
     LEFT JOIN bayanat.users             ou  ON ou.user_id     = g.owner_user_id
+    LEFT JOIN ancestry anc ON anc.glossary_id = g.glossary_id AND g.parent_glossary_id IS NOT NULL
     WHERE g.glossary_id = ${id}
     LIMIT 1
   `;

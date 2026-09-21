@@ -243,6 +243,11 @@ export function GlossaryTermPageClient({ term, canEdit, canEditGovernance }: Pro
                   ? <Link href={`/glossary?domain=${term.domainId}`} className="text-brand-purple hover:underline font-medium">{term.domainName}</Link>
                   : <span className="text-muted">—</span>}
               </PropRow>
+              {term.subDomainName && (
+                <PropRow label="Sub-domain">
+                  <Link href={`/glossary/${term.subDomainId}`} className="text-brand-purple hover:underline font-medium">{term.subDomainName}</Link>
+                </PropRow>
+              )}
               <PropRow label={g.propTermType}>
                 <span className="text-ink text-[12px]">
                   {term.termType ? (TERM_TYPE_LABEL[term.termType] ?? term.termType) : g.termTypeTerm}
