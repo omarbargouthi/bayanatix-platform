@@ -233,14 +233,14 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
 
             {/* Table header */}
             <div className="grid grid-cols-[2fr_1fr_2fr_1fr_0.7fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div>{g.colTerm}</div>
-              <div>{g.colDomain}</div>
-              <div>{g.colDefinition}</div>
-              <div>{g.colClassification}</div>
-              <div>{g.colPii}</div>
-              <div>{g.colSit}</div>
-              <div>{g.colAliases}</div>
-              <div>{g.colLinked}</div>
+              <div className="min-w-0 truncate">{g.colTerm}</div>
+              <div className="min-w-0 truncate">{g.colDomain}</div>
+              <div className="min-w-0 truncate">{g.colDefinition}</div>
+              <div className="min-w-0 truncate">{g.colClassification}</div>
+              <div className="min-w-0 truncate">{g.colPii}</div>
+              <div className="min-w-0 truncate">{g.colSit}</div>
+              <div className="min-w-0 truncate">{g.colAliases}</div>
+              <div className="min-w-0 truncate">{g.colLinked}</div>
             </div>
 
             {terms.length === 0 && (
@@ -270,12 +270,12 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, canEdi
                     <div className="text-[11px] text-muted mt-1 truncate">{term.subDomainName}</div>
                   )}
                 </div>
-                <div className="text-ink-soft text-[13px] line-clamp-2 leading-snug">{term.definition}</div>
-                <div><ClassBadge code={term.classCode} /></div>
-                <div><PiiBadge isPii={term.isPii} /></div>
-                <div><SitBadges names={term.sitTypeNames} /></div>
-                <div className="text-ink-soft text-xs">{term.aliasCount || "—"}</div>
-                <div>
+                <div className="min-w-0 text-ink-soft text-[13px] line-clamp-2 leading-snug">{term.definition}</div>
+                <div className="min-w-0"><ClassBadge code={term.classCode} /></div>
+                <div className="min-w-0"><PiiBadge isPii={term.isPii} /></div>
+                <div className="min-w-0"><SitBadges names={term.sitTypeNames} /></div>
+                <div className="min-w-0 text-ink-soft text-xs">{term.aliasCount || "—"}</div>
+                <div className="min-w-0">
                   {term.linkedAttrCount > 0
                     ? <Tag variant="green">{term.linkedAttrCount} col{term.linkedAttrCount > 1 ? "s" : ""}</Tag>
                     : <span className="text-muted text-xs">—</span>}
