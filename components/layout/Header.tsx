@@ -194,16 +194,28 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
       </button>
 
       {/* Breadcrumb */}
-      <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted shrink-0">
+      <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted shrink-0 min-w-0 overflow-hidden">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
           return (
-            <span key={i} className="flex items-center gap-1.5">
+            <span key={i} className="flex items-center gap-1.5 min-w-0">
               {c.href && !last
-                ? <Link href={c.href} className="hover:text-brand-purple transition-colors">{c.label}</Link>
-                : <span className={last ? "text-ink font-semibold" : ""}>{c.label}</span>
+                // dir="auto" lets each crumb's own script decide its truncation edge —
+                // needed because a crumb label is often a raw asset name (a table, a
+                // source) rather than a translated UI string, so under an Arabic session
+                // it can still be plain English text that would otherwise clip from the
+                // wrong (leading) side once it inherits the page's dir="rtl".
+                ? <Link href={c.href} className="hover:text-brand-purple transition-colors truncate max-w-[180px]" dir="auto" title={c.label}>{c.label}</Link>
+                // Some crumb labels are auto-generated from a file path or a very long
+                // asset name (e.g. an auto-created CSV source) — cap and truncate every
+                // crumb, not just the linked ones, or one long segment can blow out the
+                // whole header's width and crowd out the search bar next to it.
+                : <span className={`truncate max-w-[220px] ${last ? "text-ink font-semibold" : ""}`} dir="auto" title={c.label}>{c.label}</span>
               }
-              {!last && <span className="text-line select-none">›</span>}
+              {/* The dir="rtl" ancestor already reverses this row's visual order — the
+                  separator glyph itself must still be told which way to point, since a
+                  "›" pointing right reads as "back" once the crumbs run right-to-left. */}
+              {!last && <span className="text-line select-none shrink-0">{isRtl ? "‹" : "›"}</span>}
             </span>
           );
         })}

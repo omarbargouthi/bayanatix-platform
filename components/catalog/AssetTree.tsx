@@ -43,17 +43,25 @@ function SourceRow({
       <div className="flex items-center gap-1 group">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-canvas transition-colors"
+          className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-canvas transition-colors min-w-0"
         >
           <IconChevron
-            className={"w-3 h-3 text-muted transition-transform " + (open ? "" : isRtl ? "rotate-90" : "-rotate-90")}
+            className={"w-3 h-3 text-muted transition-transform shrink-0 " + (open ? "" : isRtl ? "rotate-90" : "-rotate-90")}
           />
-          <svg className="w-[18px] h-[18px] text-brand-navy" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <svg className="w-[18px] h-[18px] text-brand-navy shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M3 7l9-4 9 4v10l-9 4-9-4z" />
             <path d="M3 7l9 4 9-4M12 11v10" />
           </svg>
-          <span className="flex-1 font-semibold text-ink truncate">{src.sourceName}</span>
-          <span className="text-xs text-muted">
+          {/* flex-1 alone doesn't let this shrink below its content's width — a flex
+              item's min-width defaults to auto, same as a grid item's, so a very long
+              source name (e.g. an auto-created name built from a full file path) would
+              refuse to truncate and push the schema/table count off to the side or onto
+              its own line. min-w-0 is what actually lets `truncate` take effect. */}
+          {/* dir="auto" so an English source name inside an Arabic (dir="rtl") page
+              truncates from its own trailing edge instead of the page's leading edge —
+              otherwise the identifying start of the name gets clipped, not the end. */}
+          <span className="flex-1 min-w-0 font-semibold text-ink truncate text-start" dir="auto" title={src.sourceName}>{src.sourceName}</span>
+          <span className="text-xs text-muted shrink-0">
             {src.schemas.length} schemas · {tableTotal.toLocaleString()} tables
           </span>
         </button>
@@ -78,11 +86,11 @@ function SourceRow({
             <Link
               key={sc.schemaId}
               href={`/catalog/${sc.schemaId}`}
-              className={`flex items-center gap-2.5 ${isRtl ? "pr-9 pl-3" : "pl-9 pr-3"} py-2 rounded-md hover:bg-canvas transition-colors`}
+              className={`flex items-center gap-2.5 min-w-0 ${isRtl ? "pr-9 pl-3" : "pl-9 pr-3"} py-2 rounded-md hover:bg-canvas transition-colors`}
             >
-              <IconDB className="w-[18px] h-[18px] text-brand-navy" />
-              <span className="flex-1 truncate">{sc.schemaName}</span>
-              <span className="text-xs text-muted">
+              <IconDB className="w-[18px] h-[18px] text-brand-navy shrink-0" />
+              <span className="flex-1 min-w-0 truncate" dir="auto" title={sc.schemaName}>{sc.schemaName}</span>
+              <span className="text-xs text-muted shrink-0">
                 {sc.tableCount ?? 0} tables · {sc.viewCount ?? 0} views
               </span>
             </Link>

@@ -1,11 +1,12 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { getEntityById, getEntityProfile, CDE_CLASSIFICATION_CODES } from "@/lib/queries/catalog";
 import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
-import { IconTable } from "@/components/layout/icons";
+import { IconTable, IconChevron } from "@/components/layout/icons";
 import { TableHealthPanel } from "@/components/catalog/TableHealthPanel";
 import { TableTabs } from "@/components/catalog/TableTabs";
 import { TableEditPanel } from "@/components/catalog/TableEditPanel";
@@ -97,10 +98,25 @@ export default async function TablePage({
 
       <main className="px-8 py-7 pb-14">
         {/* ── Page header ─────────────────────────────────────────────── */}
+        {entity.schema && (
+          <Link
+            href={`/catalog/${entity.schema.schemaId}`}
+            className="inline-flex items-center gap-1 mb-2 min-w-0 max-w-full text-[12px] font-semibold text-muted hover:text-brand-purple transition-colors"
+          >
+            {/* IconChevron defaults to pointing down; rotated to point back toward the
+                start of the reading direction — left in English, right in Arabic — so
+                it reads as "back" rather than a fixed left arrow that would point the
+                wrong way once the page flips to RTL. */}
+            <IconChevron className="w-3.5 h-3.5 shrink-0 rtl:-rotate-90 rotate-90" />
+            {/* dir="auto" so an English schema name inside an Arabic page truncates from
+                its own trailing edge, not the page's — see the same fix in AssetTree.tsx. */}
+            <span className="min-w-0 truncate" dir="auto" title={entity.schema.schemaName}>{entity.schema.schemaName}</span>
+          </Link>
+        )}
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap">
-            <IconTable className="w-6 h-6 text-brand-purple" />
-            {entity.entityName}
+          <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap min-w-0">
+            <IconTable className="w-6 h-6 text-brand-purple shrink-0" />
+            <span className="min-w-0 truncate" dir="auto" title={entity.entityName}>{entity.entityName}</span>
             <span className="flex items-center gap-1">
               <span className="text-[9px] uppercase tracking-wider text-muted">Metadata</span>
               <CertTag code={entity.certCode} />
@@ -147,7 +163,18 @@ export default async function TablePage({
 
                 <div className="flex flex-wrap gap-2 mt-4">
                   <Tag>PK: <strong className="ml-1">{entity.attributes.find((a) => a.isPrimaryKey)?.physicalName ?? "—"}</strong></Tag>
-                  {entity.schema && <Tag>Schema: <strong className="ml-1">{entity.schema.schemaName}</strong></Tag>}
+                  {entity.schema && (
+                    // A real link, not a plain label — this is the table's actual
+                    // navigation back to its parent schema, so it should behave like one.
+                    // dir="ltr": this "Label: Value" pair is a hardcoded English string
+                    // (not yet run through the i18n layer, matching its sibling PK/Last-
+                    // refreshed tags), so under an Arabic (dir="rtl") page the two runs
+                    // ("Schema:" and the name) would otherwise get bidi-reordered into
+                    // "crm :Schema" instead of reading "Schema: crm".
+                    <Link href={`/catalog/${entity.schema.schemaId}`} dir="ltr" className="tag hover:bg-brand-purple/10 hover:text-brand-purple transition-colors">
+                      Schema: <strong className="ml-1">{entity.schema.schemaName}</strong>
+                    </Link>
+                  )}
                   <Tag>Last refreshed: <strong className="ml-1">2 hours ago</strong></Tag>
                   {entity.openRequestCount ? (
                     <Tag variant="amber">⚠ {entity.openRequestCount} open question{entity.openRequestCount !== 1 ? "s" : ""}</Tag>

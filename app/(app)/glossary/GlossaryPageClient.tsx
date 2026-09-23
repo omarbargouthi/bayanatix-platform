@@ -51,7 +51,7 @@ function SitBadges({ names }: { names: string[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {names.map((name) => (
-        <span key={name} title={name} className="inline-flex items-center max-w-full px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200 truncate">
+        <span key={name} title={name} dir="auto" className="inline-flex items-center max-w-full px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200 truncate">
           {name}
         </span>
       ))}
@@ -91,7 +91,7 @@ interface Props {
 }
 
 export function GlossaryPageClient({ stats, domains, terms, domainFilter, subDomainFilter, canEdit, canEditGovernance }: Props) {
-  const { t } = useLang();
+  const { t, isRtl } = useLang();
   const g = t.glossary;
   const [showNewTerm, setShowNewTerm] = useState(false);
   const [showEditDomain, setShowEditDomain] = useState(false);
@@ -205,14 +205,22 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, subDom
                   >
                     <IconChevron className={`w-3 h-3 transition-transform duration-150 ${isExpanded ? "" : "-rotate-90"}`} />
                   </button>
-                  <Link href={`/glossary?domain=${d.glossaryId}`} className="flex items-center gap-2.5 flex-1 min-w-0 py-2 pr-3">
+                  <Link href={`/glossary?domain=${d.glossaryId}`} className={`flex items-center gap-2.5 flex-1 min-w-0 py-2 ${isRtl ? "pl-3" : "pr-3"}`}>
                     <span className="w-2 h-2 rounded-full bg-brand-purple/50 shrink-0" />
-                    <span className="flex-1 truncate">{d.termName}</span>
+                    {/* dir="auto" lets the browser pick truncation direction from the name's
+                        own script instead of inheriting the page's — without it, an English
+                        domain name truncated inside an Arabic (dir="rtl") page clips from the
+                        start instead of the end (e.g. "Citizen & Government Services" showed as
+                        "...overnment Services", the identifying word cut off, not preserved). */}
+                    <span className="flex-1 min-w-0 truncate" dir="auto" title={d.termName}>{d.termName}</span>
                     {d.termCount > 0 && <span className="text-[11px] text-muted shrink-0">{d.termCount}</span>}
                   </Link>
                 </div>
                 {isExpanded && (
-                  <div className="pl-7 border-l border-line-soft ml-[15px]">
+                  // Indentation guide for the sub-domain level — physical border/padding/margin
+                  // sides must flip explicitly under RTL (dir="rtl" alone only reverses flex
+                  // order, it doesn't turn pl-/border-l/ml- into their mirror image).
+                  <div className={isRtl ? "pr-7 border-r border-line-soft mr-[15px]" : "pl-7 border-l border-line-soft ml-[15px]"}>
                     {children == null ? (
                       <div className="px-3 py-1.5 text-[11px] text-muted">Loading…</div>
                     ) : children.length === 0 ? (
@@ -231,7 +239,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, subDom
                           ].join(" ")}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-brand-purple/30 shrink-0" />
-                          <span className="flex-1 truncate">{sd.termName}</span>
+                          <span className="flex-1 min-w-0 truncate" dir="auto" title={sd.termName}>{sd.termName}</span>
                           {sd.termCount > 0 && <span className="text-[11px] text-muted shrink-0">{sd.termCount}</span>}
                         </Link>
                       );
@@ -337,7 +345,7 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, subDom
                 <div className="min-w-0">
                   <div className="font-semibold text-brand-deep flex items-center gap-1.5 min-w-0">
                     <IconGlossary className="w-3.5 h-3.5 text-brand-purple shrink-0" />
-                    <span className="truncate">{term.termName}</span>
+                    <span className="min-w-0 truncate" dir="auto" title={term.termName}>{term.termName}</span>
                   </div>
                   {term.aliasCount > 0 && (
                     <div className="text-[11px] text-muted mt-0.5">{term.aliasCount} alias{term.aliasCount > 1 ? "es" : ""}</div>
@@ -345,10 +353,16 @@ export function GlossaryPageClient({ stats, domains, terms, domainFilter, subDom
                 </div>
                 <div className="min-w-0">
                   {term.domainName
-                    ? <Tag variant="blue" className="max-w-full truncate">{term.domainName}</Tag>
+                    ? (
+                      <Tag variant="blue" className="max-w-full min-w-0">
+                        {/* dir="auto" so an English domain name inside an Arabic page
+                            truncates from its own trailing edge, not the page's. */}
+                        <span className="truncate" dir="auto" title={term.domainName}>{term.domainName}</span>
+                      </Tag>
+                    )
                     : <span className="text-muted">—</span>}
                   {term.subDomainName && (
-                    <div className="text-[11px] text-muted mt-1 truncate">{term.subDomainName}</div>
+                    <div className="text-[11px] text-muted mt-1 truncate" dir="auto" title={term.subDomainName}>{term.subDomainName}</div>
                   )}
                 </div>
                 <div className="min-w-0 text-ink-soft text-[13px] line-clamp-2 leading-snug">{term.definition}</div>
