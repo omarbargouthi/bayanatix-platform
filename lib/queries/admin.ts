@@ -12,6 +12,7 @@ export async function listUsers(): Promise<AdminUser[]> {
       u.role         AS "systemRole",
       u.is_active    AS "isActive",
       u.created_at   AS "createdAt",
+      u.auth_provider_code AS "authProvider",
       (SELECT COUNT(*)::int FROM bayanat.team_members tm WHERE tm.user_id = u.user_id) AS "teamCount"
     FROM bayanat.users u
     ORDER BY u.full_name
@@ -27,6 +28,7 @@ export async function getUserById(userId: string): Promise<AdminUser | null> {
       u.role         AS "systemRole",
       u.is_active    AS "isActive",
       u.created_at   AS "createdAt",
+      u.auth_provider_code AS "authProvider",
       (SELECT COUNT(*)::int FROM bayanat.team_members tm WHERE tm.user_id = u.user_id) AS "teamCount"
     FROM bayanat.users u
     WHERE u.user_id = ${userId}

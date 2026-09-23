@@ -6,7 +6,9 @@ type UserRow = {
   email: string;
   full_name: string;
   role: SessionUser["role"];
-  password_hash: string;
+  password_hash: string | null;
+  auth_provider_code: "LOCAL" | "LDAP" | "OIDC";
+  is_active: boolean;
   preferred_language_code: string | null;
   avatar_color_code: string | null;
   disabled_notification_types: string[];
@@ -14,8 +16,8 @@ type UserRow = {
 
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
   const rows = await sql<UserRow[]>`
-    select user_id, email, full_name, role, password_hash, preferred_language_code,
-           avatar_color_code, disabled_notification_types
+    select user_id, email, full_name, role, password_hash, auth_provider_code, is_active,
+           preferred_language_code, avatar_color_code, disabled_notification_types
     from bayanat.users
     where lower(email) = lower(${email})
     limit 1
@@ -25,8 +27,8 @@ export async function findUserByEmail(email: string): Promise<UserRow | null> {
 
 export async function findUserById(userId: string) {
   const rows = await sql<UserRow[]>`
-    select user_id, email, full_name, role, password_hash, preferred_language_code,
-           avatar_color_code, disabled_notification_types
+    select user_id, email, full_name, role, password_hash, auth_provider_code, is_active,
+           preferred_language_code, avatar_color_code, disabled_notification_types
     from bayanat.users
     where user_id = ${userId}
     limit 1

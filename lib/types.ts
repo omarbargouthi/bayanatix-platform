@@ -211,6 +211,7 @@ export type AdminUser = {
   isActive:    boolean;
   createdAt:   string;
   teamCount:   number;
+  authProvider: "LOCAL" | "LDAP" | "OIDC";
 };
 
 export type CustomAttributeAssetType = "DATA_SOURCES" | "DATA_SCHEMAS" | "DATA_ENTITIES" | "DATA_ATTRIBUTES" | "BUSINESS_GLOSSARIES";

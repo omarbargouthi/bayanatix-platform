@@ -77,7 +77,14 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
               </div>
               <div className="text-[11px] text-muted ml-8.5 pl-0.5 truncate">{u.userId}</div>
             </div>
-            <div className="min-w-0 text-ink-soft text-[13px] truncate">{u.email}</div>
+            <div className="min-w-0 text-ink-soft text-[13px] truncate flex items-center gap-1.5">
+              <span className="truncate">{u.email}</span>
+              {u.authProvider !== "LOCAL" && (
+                <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                  {u.authProvider}
+                </span>
+              )}
+            </div>
             <div className="min-w-0">
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ROLE_BADGE[u.systemRole] ?? "bg-gray-100 text-gray-600"}`}>
                 {u.systemRole}

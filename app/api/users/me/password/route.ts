@@ -18,6 +18,9 @@ export async function PATCH(req: Request) {
 
   const user = await findUserById(session.userId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!user.password_hash || user.auth_provider_code !== "LOCAL") {
+    return NextResponse.json({ error: "This account signs in via your organization's directory — password changes aren't managed here." }, { status: 400 });
+  }
 
   const ok = await verifyPassword(currentPassword, user.password_hash);
   if (!ok) return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });

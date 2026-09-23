@@ -3,7 +3,7 @@ import { LoginLangBar } from "./LoginLangBar";
 
 export const metadata = { title: "Sign in · Bayanatix" };
 
-export default function LoginPage({ searchParams }: { searchParams: { from?: string } }) {
+export default function LoginPage({ searchParams }: { searchParams: { from?: string; error?: string } }) {
   const from = searchParams.from || "/dashboard";
   return (
     <main className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-canvas">
@@ -56,7 +56,7 @@ export default function LoginPage({ searchParams }: { searchParams: { from?: str
               Welcome back. Enter your credentials to continue.
             </p>
 
-            <LoginForm redirectTo={from} />
+            <LoginForm redirectTo={from} initialError={searchParams.error} />
 
             <p className="mt-8 text-xs text-muted text-center">
               By signing in you agree to the Bayanatix acceptable use policy.

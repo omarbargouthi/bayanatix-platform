@@ -6,6 +6,8 @@ const PUBLIC_PREFIXES = [
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/config",       // login page needs this before a session exists, to know which provider UI to render
+  "/api/auth/oidc",         // OIDC start/callback redirects happen before a session exists by definition
   "/_next",
   "/favicon",
   "/logo.svg",

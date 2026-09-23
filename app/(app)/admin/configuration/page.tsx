@@ -9,6 +9,7 @@ import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
 import { SampleDataConfigSection } from "./SampleDataConfigSection";
 import { FollowSettingsSection } from "./FollowSettingsSection";
 import { SitSettingsSection } from "./SitSettingsSection";
+import { AuthSettingsSection } from "./AuthSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -46,6 +47,7 @@ export default function ConfigurationPage() {
   const [showSampleData, setShowSampleData] = useState(false);
   const [showFollowSettings, setShowFollowSettings] = useState(false);
   const [showSitSettings, setShowSitSettings] = useState(false);
+  const [showAuthSettings, setShowAuthSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -85,6 +87,7 @@ export default function ConfigurationPage() {
     setShowSampleData(false);
     setShowFollowSettings(false);
     setShowSitSettings(false);
+    setShowAuthSettings(false);
     setAdding(false);
   }
 
@@ -165,7 +168,7 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
-    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings;
+    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings && !showAuthSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -245,6 +248,18 @@ export default function ConfigurationPage() {
             <div className="text-[10px] text-muted mt-0.5">Active region · SIT patterns</div>
           </button>
 
+          {/* ── Security section */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
+            Security
+          </div>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowAuthSettings(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showAuthSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Authentication</div>
+            <div className="text-[10px] text-muted mt-0.5">LOCAL · LDAP · OIDC · Auto-provisioning</div>
+          </button>
+
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
             Compliance
@@ -291,6 +306,9 @@ export default function ConfigurationPage() {
 
         {/* ── Sensitive Information Types panel ── */}
         {showSitSettings && <SitSettingsSection />}
+
+        {/* ── Authentication panel ── */}
+        {showAuthSettings && <AuthSettingsSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (

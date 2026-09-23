@@ -13,6 +13,14 @@ import type {
   TableOption,
 } from "../types";
 
+// ----- Lightweight source list (Authentication settings' Viewer-scope picker) -----
+export async function listDataSourcesLite(): Promise<Array<{ id: number; name: string }>> {
+  const rows = await sql<{ id: number; name: string }[]>`
+    SELECT data_source_id AS id, source_name_text AS name FROM bayanat.data_sources ORDER BY source_name_text
+  `;
+  return rows;
+}
+
 // ----- Resource picker (Source → Schema → Table) for scoping role assignments -----
 export async function getResourcePickerOptions(): Promise<{
   sources: SourceOption[]; schemas: SchemaOption[]; tables: TableOption[];

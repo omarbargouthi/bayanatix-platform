@@ -1,0 +1,12 @@
+dn: ou=People,dc=bayanatix,dc=local
+objectClass: organizationalUnit
+ou: People
+
+dn: uid=testviewer,ou=People,dc=bayanatix,dc=local
+objectClass: inetOrgPerson
+uid: testviewer
+cn: Test Viewer
+sn: Viewer
+displayName: Test Viewer
+mail: testviewer@bayanatix.local
+userPassword: TestViewer123!
