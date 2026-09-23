@@ -543,10 +543,10 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
           style={{ gridTemplateColumns: gridTemplate }}
           className="grid gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold"
         >
-          <div />
-          <div />
-          {activeColDefs.map((col) => <div key={col.id}>{col.label}</div>)}
-          {canEdit && <div />}
+          <div className="min-w-0" />
+          <div className="min-w-0" />
+          {activeColDefs.map((col) => <div key={col.id} className="min-w-0 truncate">{col.label}</div>)}
+          {canEdit && <div className="min-w-0" />}
         </div>
 
         {/* Data rows */}

@@ -164,13 +164,13 @@ export function FoiQueue() {
       {/* Table */}
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[120px_1fr_160px_100px_100px_120px_80px] gap-0 px-5 py-2.5 bg-canvas-soft text-[10px] font-bold uppercase tracking-wider text-muted border-b border-line">
-          <div>Reference</div>
-          <div>Subject / Requester</div>
-          <div>Assigned Officer</div>
-          <div>Submitted</div>
-          <div>SLA</div>
-          <div>Status</div>
-          <div>Channel</div>
+          <div className="min-w-0 truncate">Reference</div>
+          <div className="min-w-0 truncate">Subject / Requester</div>
+          <div className="min-w-0 truncate">Assigned Officer</div>
+          <div className="min-w-0 truncate">Submitted</div>
+          <div className="min-w-0 truncate">SLA</div>
+          <div className="min-w-0 truncate">Status</div>
+          <div className="min-w-0 truncate">Channel</div>
         </div>
 
         {loading && (
@@ -189,32 +189,32 @@ export function FoiQueue() {
             onClick={() => router.push(`/foi/${row.foiRequestId}`)}
             className="grid grid-cols-[120px_1fr_160px_100px_100px_120px_80px] gap-0 px-5 py-3.5 border-b border-line-soft hover:bg-canvas-soft cursor-pointer items-center"
           >
-            <div className="text-[12px] font-mono font-semibold text-brand-purple">{row.referenceCode}</div>
+            <div className="min-w-0 text-[12px] font-mono font-semibold text-brand-purple truncate">{row.referenceCode}</div>
 
             <div className="min-w-0 pr-4">
               <div className="text-sm font-medium text-ink truncate">{row.subjectText}</div>
               <div className="text-[11px] text-muted truncate">{row.requesterName} · {row.requesterEmail}</div>
             </div>
 
-            <div className="text-[12px] text-ink-soft truncate">
+            <div className="min-w-0 text-[12px] text-ink-soft truncate">
               {row.assignedOfficerName ?? <span className="italic text-muted">Unassigned</span>}
             </div>
 
-            <div className="text-[11px] text-muted">
+            <div className="min-w-0 text-[11px] text-muted truncate">
               {new Date(row.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
             </div>
 
-            <div>
+            <div className="min-w-0">
               <SlaChip days={row.slaBusinessDaysLeft} />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[row.statusCode] ?? "bg-gray-100 text-gray-600"}`}>
                 {STATUS_LABELS[row.statusCode] ?? row.statusCode}
               </span>
             </div>
 
-            <div className="text-[11px] text-muted uppercase">{row.channelCode}</div>
+            <div className="min-w-0 text-[11px] text-muted uppercase truncate">{row.channelCode}</div>
           </div>
         ))}
       </div>

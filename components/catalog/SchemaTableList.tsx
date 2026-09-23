@@ -330,7 +330,7 @@ export function SchemaTableList({
       <div className="card overflow-hidden">
         {/* Column header */}
         <div className="grid grid-cols-[28px_32px_2fr_1fr_160px_90px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold items-center">
-          <div>
+          <div className="min-w-0">
             {canEdit && (
               <input
                 type="checkbox"
@@ -341,11 +341,11 @@ export function SchemaTableList({
               />
             )}
           </div>
-          <div />
-          <div>{c.colAssetName}</div>
-          <div>{c.colType}</div>
-          <div>{c.colCertification}</div>
-          <div>{c.colRating}</div>
+          <div className="min-w-0" />
+          <div className="min-w-0 truncate">{c.colAssetName}</div>
+          <div className="min-w-0 truncate">{c.colType}</div>
+          <div className="min-w-0 truncate">{c.colCertification}</div>
+          <div className="min-w-0 truncate">{c.colRating}</div>
         </div>
 
         {filtered.length === 0 && (
@@ -368,7 +368,7 @@ export function SchemaTableList({
                 onClick={() => toggleExpand(entity.entityId)}
               >
                 {/* Selection checkbox */}
-                <div onClick={(e) => e.stopPropagation()}>
+                <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
                   {canEdit && (
                     <input
                       type="checkbox"
@@ -380,25 +380,25 @@ export function SchemaTableList({
                 </div>
 
                 {/* Chevron */}
-                <div className="flex justify-center">
+                <div className="min-w-0 flex justify-center">
                   <IconChevron
                     className={`w-3.5 h-3.5 text-muted transition-transform duration-150 ${isExpanded ? "" : "-rotate-90"}`}
                   />
                 </div>
 
                 {/* Name + icon actions */}
-                <div onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 min-w-0">
                     <IconTable className="w-4 h-4 text-brand-purple shrink-0" />
                     <Link
                       href={`/catalog/${schemaId}/tables/${entity.entityId}`}
-                      className="font-semibold text-brand-deep hover:underline"
+                      className="font-semibold text-brand-deep hover:underline truncate"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {entity.entityName}
                     </Link>
                     {entity.displayName && (
-                      <span className="text-muted text-[11px] truncate max-w-[120px]">({entity.displayName})</span>
+                      <span className="text-muted text-[11px] truncate max-w-[120px] shrink-0">({entity.displayName})</span>
                     )}
                     {(entity.totalWarnings ?? 0) > 0 && (
                       <button
@@ -466,13 +466,13 @@ export function SchemaTableList({
                   </div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   {entity.category
                     ? <Tag variant="purple">{({TRANSACTIONAL:c.typeTransactional,MASTER:c.typeMaster,REFERENCE:c.typeReference,SYSTEM:c.typeSystem} as Record<string,string>)[entity.category] ?? entity.category}</Tag>
                     : <span className="text-muted text-[12px]">—</span>}
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="min-w-0 flex flex-col gap-1">
                   <div className="flex items-center gap-1">
                     <span className="text-[9px] uppercase tracking-wider text-muted w-6 shrink-0">M</span>
                     <CertTag code={entity.certCode} />
@@ -483,7 +483,7 @@ export function SchemaTableList({
                   </div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <StarDisplay avg={entity.avgRating} count={entity.ratingCount} />
                 </div>
               </div>

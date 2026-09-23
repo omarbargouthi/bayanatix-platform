@@ -842,14 +842,14 @@ export function DqAdminClient({
 
           <div className="card overflow-hidden">
             <div className="grid grid-cols-[2fr_1fr_1fr_80px_80px_80px_90px_110px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div>{dq.colRule}</div>
-              <div>{dq.colDimension}</div>
-              <div>{dq.colAsset}</div>
-              <div>{dq.colSeverity}</div>
-              <div>{dq.colScore}</div>
-              <div>{dq.colStatus}</div>
-              <div>{dq.colSchedule}</div>
-              <div>{dq.colActions}</div>
+              <div className="min-w-0 truncate">{dq.colRule}</div>
+              <div className="min-w-0 truncate">{dq.colDimension}</div>
+              <div className="min-w-0 truncate">{dq.colAsset}</div>
+              <div className="min-w-0 truncate">{dq.colSeverity}</div>
+              <div className="min-w-0 truncate">{dq.colScore}</div>
+              <div className="min-w-0 truncate">{dq.colStatus}</div>
+              <div className="min-w-0 truncate">{dq.colSchedule}</div>
+              <div className="min-w-0 truncate">{dq.colActions}</div>
             </div>
 
             {filteredRules.length === 0 && (
@@ -867,15 +867,15 @@ export function DqAdminClient({
               const displayScore = runStatus?.score ?? rule.lastScore;
               return (
                 <div key={rule.ruleId} className={`grid grid-cols-[2fr_1fr_1fr_80px_80px_80px_90px_110px] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft ${!rule.isActive ? "opacity-50" : ""}`}>
-                  <div>
-                    <div className="font-semibold text-ink leading-tight">{rule.ruleName}</div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-ink leading-tight truncate">{rule.ruleName}</div>
                     <div className="text-[11px] text-muted mt-0.5 flex items-center gap-2">
-                      {rule.ruleTemplateCode && <span className="font-mono bg-canvas-soft px-1.5 rounded">{rule.ruleTemplateCode}</span>}
-                      {rule.notifyOwners && <span title="Notify owners">🔔</span>}
-                      {rule.openIssueOnFail && <span title="Auto-open issue">🎫</span>}
+                      {rule.ruleTemplateCode && <span className="font-mono bg-canvas-soft px-1.5 rounded shrink-0">{rule.ruleTemplateCode}</span>}
+                      {rule.notifyOwners && <span title="Notify owners" className="shrink-0">🔔</span>}
+                      {rule.openIssueOnFail && <span title="Auto-open issue" className="shrink-0">🎫</span>}
                     </div>
                   </div>
-                  <div className="text-[12px] text-ink-soft">{dimLabelByCode(rule.dimensionCode)}</div>
+                  <div className="min-w-0 text-[12px] text-ink-soft truncate">{dimLabelByCode(rule.dimensionCode)}</div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${rule.assetTypeCode === "DATA_ENTITIES" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
@@ -889,21 +889,21 @@ export function DqAdminClient({
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     {rule.severityLevelCode && (
                       <Badge text={severityLabel(rule.severityLevelCode)} className={SEVERITY_COLORS[rule.severityLevelCode] ?? "bg-gray-100 text-gray-600"} />
                     )}
                   </div>
-                  <div className="font-bold text-ink tabular-nums">
+                  <div className="min-w-0 font-bold text-ink tabular-nums truncate">
                     {displayScore != null ? `${Number(displayScore).toFixed(1)}%` : "—"}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     {displayStatus ? (
                       <Badge text={statusLabel(displayStatus)} className={STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-600"} />
                     ) : <span className="text-muted text-xs">{dq.neverRun}</span>}
                   </div>
-                  <div className="text-[11px] font-mono text-muted truncate">{rule.scheduleCron || "—"}</div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="min-w-0 text-[11px] font-mono text-muted truncate">{rule.scheduleCron || "—"}</div>
+                  <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
                     <button
                       onClick={() => runRule(rule.ruleId)}
                       disabled={runningRuleId === rule.ruleId}
@@ -938,14 +938,14 @@ export function DqAdminClient({
               <button onClick={loadRuns} className="btn btn-sm text-xs">{dq.refreshBtn}</button>
             </div>
             <div className="grid grid-cols-[2fr_1fr_80px_80px_80px_80px_80px_80px] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div>{dq.colRule}</div>
-              <div>{dq.colTimestamp}</div>
-              <div>{dq.colStatus}</div>
-              <div>{dq.colScore}</div>
-              <div>{dq.colScanned}</div>
-              <div>{dq.colPassed}</div>
-              <div>{dq.colFailed}</div>
-              <div>{dq.colDetail}</div>
+              <div className="min-w-0 truncate">{dq.colRule}</div>
+              <div className="min-w-0 truncate">{dq.colTimestamp}</div>
+              <div className="min-w-0 truncate">{dq.colStatus}</div>
+              <div className="min-w-0 truncate">{dq.colScore}</div>
+              <div className="min-w-0 truncate">{dq.colScanned}</div>
+              <div className="min-w-0 truncate">{dq.colPassed}</div>
+              <div className="min-w-0 truncate">{dq.colFailed}</div>
+              <div className="min-w-0 truncate">{dq.colDetail}</div>
             </div>
             {runs.length === 0 && (
               <div className="py-16 text-center text-muted text-sm">
@@ -954,17 +954,17 @@ export function DqAdminClient({
             )}
             {runs.map((r) => (
               <div key={r.resultId} className="grid grid-cols-[2fr_1fr_80px_80px_80px_80px_80px_80px] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft">
-                <div>
-                  <div className="font-semibold text-ink">{r.ruleName}</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-ink truncate">{r.ruleName}</div>
                   {r.message && <div className="text-[11px] text-muted truncate max-w-xs">{r.message}</div>}
                 </div>
-                <div className="text-[11px] text-muted">{new Date(r.executionTimestamp).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</div>
-                <div>{r.statusCode && <Badge text={statusLabel(r.statusCode)} className={STATUS_COLORS[r.statusCode] ?? "bg-gray-100 text-gray-600"} />}</div>
-                <div className="font-bold tabular-nums">{r.score != null ? `${Number(r.score).toFixed(1)}%` : "—"}</div>
-                <div className="tabular-nums text-muted">{r.recordsScanned?.toLocaleString() ?? "—"}</div>
-                <div className="tabular-nums text-emerald-600">{r.recordsPassed?.toLocaleString() ?? "—"}</div>
-                <div className="tabular-nums text-red-600">{r.recordsFailed?.toLocaleString() ?? "—"}</div>
-                <div>
+                <div className="min-w-0 text-[11px] text-muted truncate">{new Date(r.executionTimestamp).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</div>
+                <div className="min-w-0">{r.statusCode && <Badge text={statusLabel(r.statusCode)} className={STATUS_COLORS[r.statusCode] ?? "bg-gray-100 text-gray-600"} />}</div>
+                <div className="min-w-0 font-bold tabular-nums truncate">{r.score != null ? `${Number(r.score).toFixed(1)}%` : "—"}</div>
+                <div className="min-w-0 tabular-nums text-muted truncate">{r.recordsScanned?.toLocaleString() ?? "—"}</div>
+                <div className="min-w-0 tabular-nums text-emerald-600 truncate">{r.recordsPassed?.toLocaleString() ?? "—"}</div>
+                <div className="min-w-0 tabular-nums text-red-600 truncate">{r.recordsFailed?.toLocaleString() ?? "—"}</div>
+                <div className="min-w-0">
                   <button onClick={() => setDetailResult(r)} className="btn btn-sm text-[11px] px-2 py-1">{dq.detailBtn}</button>
                 </div>
               </div>

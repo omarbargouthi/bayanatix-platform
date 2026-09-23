@@ -374,11 +374,11 @@ export default function ConfigurationPage() {
             <div className="card overflow-hidden">
               {/* Header */}
               <div className="grid grid-cols-[80px_1fr_1fr_60px_70px] gap-3 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-                <div>Code</div>
-                <div>English Label</div>
-                <div>Arabic Label (عربي)</div>
-                <div>Active</div>
-                <div>Actions</div>
+                <div className="min-w-0 truncate">Code</div>
+                <div className="min-w-0 truncate">English Label</div>
+                <div className="min-w-0 truncate">Arabic Label (عربي)</div>
+                <div className="min-w-0 truncate">Active</div>
+                <div className="min-w-0 truncate">Actions</div>
               </div>
 
               {lookups.map(l => (
@@ -426,22 +426,22 @@ export default function ConfigurationPage() {
                     </div>
                   ) : (
                     <div className={`grid grid-cols-[80px_1fr_1fr_60px_70px] gap-3 px-5 py-3.5 items-center hover:bg-canvas-soft ${!l.isActive ? "opacity-50" : ""}`}>
-                      <div className="font-mono text-[11px] text-brand-deep font-semibold">{l.lookupCode}</div>
-                      <div className="font-medium text-sm text-ink">
+                      <div className="min-w-0 font-mono text-[11px] text-brand-deep font-semibold truncate">{l.lookupCode}</div>
+                      <div className="min-w-0 font-medium text-sm text-ink truncate">
                         {l.lookupLabel}
                         {l.isSystem && <span className="ml-1.5 text-[10px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded">sys</span>}
                       </div>
-                      <div>
+                      <div className="min-w-0 truncate">
                         {l.labelAr
                           ? <span className="font-medium text-sm text-ink" dir="rtl">{l.labelAr}</span>
                           : <span className="text-muted text-[11px] italic">Not set</span>}
                       </div>
-                      <div className="text-center text-sm">
+                      <div className="min-w-0 text-center text-sm">
                         {l.isActive
                           ? <span className="text-green-600 font-bold">✓</span>
                           : <span className="text-gray-400">✗</span>}
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="min-w-0 flex items-center gap-1.5">
                         <button onClick={() => startEdit(l)} className="btn btn-sm text-xs">Edit</button>
                         {!l.isSystem && (
                           <button onClick={() => handleDelete(l.lookupId)} className="btn btn-sm text-xs text-red-600 hover:bg-red-50">Del</button>

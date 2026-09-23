@@ -54,21 +54,21 @@ function RolesSection() {
           <button onClick={() => setShowForm(true)} className="btn btn-primary btn-sm">+ New Role</button>
         </div>
         <div className="grid grid-cols-[2fr_2fr_2fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div>Role</div><div>Description</div><div>Privileges</div><div>Users</div><div>Teams</div><div>Actions</div>
+          <div className="min-w-0 truncate">Role</div><div className="min-w-0 truncate">Description</div><div className="min-w-0 truncate">Privileges</div><div className="min-w-0 truncate">Users</div><div className="min-w-0 truncate">Teams</div><div className="min-w-0 truncate">Actions</div>
         </div>
         {loading && <div className="py-10 text-center text-muted text-sm">Loading…</div>}
         {roles.map(r => (
           <div key={r.roleId} className="grid grid-cols-[2fr_2fr_2fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-4 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft">
-            <div className="font-semibold text-brand-deep">{r.isAdmin && "🛡 "}{r.roleName}</div>
-            <div className="text-ink-soft text-[13px] line-clamp-2">{r.description ?? "—"}</div>
-            <div className="flex flex-wrap gap-1">
+            <div className="min-w-0 font-semibold text-brand-deep truncate">{r.isAdmin && "🛡 "}{r.roleName}</div>
+            <div className="min-w-0 text-ink-soft text-[13px] line-clamp-2">{r.description ?? "—"}</div>
+            <div className="min-w-0 flex flex-wrap gap-1">
               {r.isAdmin
                 ? <Priv on label="Admin" />
                 : <><Priv on={r.metadataRead} label="Meta R" /><Priv on={r.metadataWrite} label="Meta W" /><Priv on={r.dataRead} label="Data R" /></>}
             </div>
-            <div className="font-semibold text-brand-deep">{r.userCount || "—"}</div>
-            <div className="font-semibold text-brand-deep">{r.teamCount || "—"}</div>
-            <div className="flex items-center gap-2">
+            <div className="min-w-0 font-semibold text-brand-deep truncate">{r.userCount || "—"}</div>
+            <div className="min-w-0 font-semibold text-brand-deep truncate">{r.teamCount || "—"}</div>
+            <div className="min-w-0 flex items-center gap-2">
               <Link href={`/admin/roles/${r.roleId}`} className="btn btn-sm text-xs">Edit</Link>
               <button onClick={() => deleteRole(r.roleId)} className="btn btn-sm text-xs text-red-600 hover:bg-red-50">Delete</button>
             </div>
@@ -132,24 +132,24 @@ function TeamsSection() {
           <button onClick={() => setShowForm(true)} className="btn btn-primary btn-sm">+ New Team</button>
         </div>
         <div className="grid grid-cols-[2fr_3fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div>Team</div><div>Description</div><div>Members</div><div>Roles</div><div>Actions</div>
+          <div className="min-w-0 truncate">Team</div><div className="min-w-0 truncate">Description</div><div className="min-w-0 truncate">Members</div><div className="min-w-0 truncate">Roles</div><div className="min-w-0 truncate">Actions</div>
         </div>
         {loading && <div className="py-10 text-center text-muted text-sm">Loading…</div>}
         {teams.map(t => (
           <div key={t.teamId} className="grid grid-cols-[2fr_3fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft">
-            <div className="flex items-center gap-2.5">
+            <div className="min-w-0 flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-lg bg-brand-purple/10 text-brand-purple text-[11px] font-extrabold grid place-items-center shrink-0">
                 {t.teamName.slice(0,2).toUpperCase()}
               </span>
-              <div>
-                <div className="font-semibold text-brand-deep">{t.teamName}</div>
-                <div className="text-[11px] text-muted">{new Date(t.createdAt).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"})}</div>
+              <div className="min-w-0">
+                <div className="font-semibold text-brand-deep truncate">{t.teamName}</div>
+                <div className="text-[11px] text-muted truncate">{new Date(t.createdAt).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"})}</div>
               </div>
             </div>
-            <div className="text-ink-soft text-[13px] line-clamp-2">{t.description ?? "—"}</div>
-            <div className="font-semibold text-brand-deep text-center">{t.memberCount || "—"}</div>
-            <div className="font-semibold text-brand-deep text-center">{t.roleCount || "—"}</div>
-            <div className="flex items-center gap-2">
+            <div className="min-w-0 text-ink-soft text-[13px] line-clamp-2">{t.description ?? "—"}</div>
+            <div className="min-w-0 font-semibold text-brand-deep text-center truncate">{t.memberCount || "—"}</div>
+            <div className="min-w-0 font-semibold text-brand-deep text-center truncate">{t.roleCount || "—"}</div>
+            <div className="min-w-0 flex items-center gap-2">
               <Link href={`/admin/teams/${t.teamId}`} className="btn btn-sm text-xs">Manage</Link>
               <button onClick={() => deleteTeam(t.teamId)} className="btn btn-sm text-xs text-red-600 hover:bg-red-50">Delete</button>
             </div>

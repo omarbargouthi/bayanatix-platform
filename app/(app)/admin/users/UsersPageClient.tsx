@@ -59,7 +59,7 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
         </div>
 
         <div className="grid grid-cols-[2fr_2fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div>User</div><div>Email</div><div>System Role</div><div>Teams</div><div>Status</div><div>Actions</div>
+          <div className="min-w-0 truncate">User</div><div className="min-w-0 truncate">Email</div><div className="min-w-0 truncate">System Role</div><div className="min-w-0 truncate">Teams</div><div className="min-w-0 truncate">Status</div><div className="min-w-0 truncate">Actions</div>
         </div>
 
         {filtered.length === 0 && (
@@ -68,28 +68,28 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
 
         {filtered.map((u) => (
           <div key={u.userId} className="grid grid-cols-[2fr_2fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3.5 items-center text-sm border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors">
-            <div>
-              <div className="font-semibold text-brand-deep flex items-center gap-1.5">
+            <div className="min-w-0">
+              <div className="font-semibold text-brand-deep flex items-center gap-1.5 min-w-0">
                 <span className="w-7 h-7 rounded-full bg-brand-purple/15 text-brand-purple text-[11px] font-bold grid place-items-center shrink-0">
                   {u.fullName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </span>
-                <Link href={`/admin/users/${u.userId}`} className="hover:underline">{u.fullName}</Link>
+                <Link href={`/admin/users/${u.userId}`} className="hover:underline truncate">{u.fullName}</Link>
               </div>
-              <div className="text-[11px] text-muted ml-8.5 pl-0.5">{u.userId}</div>
+              <div className="text-[11px] text-muted ml-8.5 pl-0.5 truncate">{u.userId}</div>
             </div>
-            <div className="text-ink-soft text-[13px]">{u.email}</div>
-            <div>
+            <div className="min-w-0 text-ink-soft text-[13px] truncate">{u.email}</div>
+            <div className="min-w-0">
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ROLE_BADGE[u.systemRole] ?? "bg-gray-100 text-gray-600"}`}>
                 {u.systemRole}
               </span>
             </div>
-            <div className="text-ink-soft">{u.teamCount || "—"}</div>
-            <div>
+            <div className="min-w-0 text-ink-soft truncate">{u.teamCount || "—"}</div>
+            <div className="min-w-0">
               <span className={`text-[11px] font-semibold ${u.isActive ? "text-emerald-600" : "text-red-500"}`}>
                 {u.isActive ? "Active" : "Inactive"}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="min-w-0 flex items-center gap-2">
               <Link href={`/admin/users/${u.userId}`} className="btn btn-sm text-xs">Manage</Link>
               <button onClick={() => toggleActive(u)} className="btn btn-sm text-xs">
                 {u.isActive ? "Deactivate" : "Activate"}

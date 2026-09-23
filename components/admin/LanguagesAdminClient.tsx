@@ -147,14 +147,14 @@ function LanguagesTab() {
     <div className="space-y-8 max-w-4xl">
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[80px_1fr_90px_100px_90px_110px] gap-3 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div>Code</div><div>Language</div><div>Direction</div><div>Coverage</div><div>Enabled</div><div>Default</div>
+          <div className="min-w-0 truncate">Code</div><div className="min-w-0 truncate">Language</div><div className="min-w-0 truncate">Direction</div><div className="min-w-0 truncate">Coverage</div><div className="min-w-0 truncate">Enabled</div><div className="min-w-0 truncate">Default</div>
         </div>
         {languages.map((l) => (
           <div key={l.languageCode} className="grid grid-cols-[80px_1fr_90px_100px_90px_110px] gap-3 px-5 py-3 items-center border-b border-line-soft last:border-b-0">
-            <div className="font-mono text-[11px] text-brand-deep font-semibold">{l.languageCode}</div>
-            <div className="text-sm font-medium text-ink">{l.languageNameText}</div>
-            <div className="text-xs text-muted">{l.orientationCode}</div>
-            <div className="text-xs">
+            <div className="min-w-0 font-mono text-[11px] text-brand-deep font-semibold truncate">{l.languageCode}</div>
+            <div className="min-w-0 text-sm font-medium text-ink truncate">{l.languageNameText}</div>
+            <div className="min-w-0 text-xs text-muted truncate">{l.orientationCode}</div>
+            <div className="min-w-0 text-xs">
               {l.languageCode === "en" ? (
                 <span className="text-muted">base</span>
               ) : (
@@ -163,7 +163,7 @@ function LanguagesTab() {
                 </span>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               {l.languageCode === "en" ? (
                 <span className="text-[11px] text-muted italic">always</span>
               ) : (
@@ -172,7 +172,7 @@ function LanguagesTab() {
                 </label>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               {l.isDefault ? (
                 <span className="text-[11px] font-semibold text-brand-purple">Default</span>
               ) : (
@@ -541,7 +541,7 @@ function WorkbenchTab({ initialCategory, initialLang }: { initialCategory: strin
 
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[28px_1fr_1fr_100px_140px] gap-3 px-4 py-2 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div></div><div>Base Text</div><div>Translation</div><div>Status</div><div>Actions</div>
+          <div className="min-w-0"></div><div className="min-w-0 truncate">Base Text</div><div className="min-w-0 truncate">Translation</div><div className="min-w-0 truncate">Status</div><div className="min-w-0 truncate">Actions</div>
         </div>
         {loading ? (
           <div className="px-4 py-8 text-center text-muted text-sm">Loading…</div>
@@ -551,14 +551,14 @@ function WorkbenchTab({ initialCategory, initialLang }: { initialCategory: strin
           rows.map((row) => (
             <div key={row.keyId} className="grid grid-cols-[28px_1fr_1fr_100px_140px] gap-3 px-4 py-2.5 items-start border-b border-line-soft last:border-b-0">
               <input type="checkbox" checked={selected.has(row.keyId)} onChange={() => toggleSelect(row.keyId)} className="w-4 h-4 accent-brand-purple mt-1" />
-              <div>
-                <div className="flex items-center gap-1.5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-canvas-soft text-muted uppercase shrink-0" title="Base language">
                     {row.baseLanguageCode}
                   </span>
-                  <div className="text-sm text-ink" dir="auto">{row.baseText}</div>
+                  <div className="text-sm text-ink truncate" dir="auto">{row.baseText}</div>
                 </div>
-                <div className="text-[10px] text-muted font-mono">{row.keyCode}</div>
+                <div className="text-[10px] text-muted font-mono truncate">{row.keyCode}</div>
               </div>
               <textarea
                 value={edits[row.keyId] ?? row.translatedText ?? ""}
@@ -566,12 +566,12 @@ function WorkbenchTab({ initialCategory, initialLang }: { initialCategory: strin
                 onBlur={() => saveEdit(row)}
                 dir="auto"
                 rows={1}
-                className="input text-sm resize-y"
+                className="input text-sm resize-y min-w-0"
               />
-              <div>
+              <div className="min-w-0">
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_STYLES[row.statusCode]}`}>{row.statusCode}</span>
               </div>
-              <div className="flex items-center gap-2 text-[11px]">
+              <div className="min-w-0 flex items-center gap-2 text-[11px]">
                 {row.translatedText && row.statusCode !== "VERIFIED" && (
                   <button onClick={() => verify(row)} disabled={busy} className="text-emerald-700 hover:underline font-semibold">Verify</button>
                 )}

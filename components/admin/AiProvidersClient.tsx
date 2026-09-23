@@ -267,15 +267,15 @@ export function AiProvidersClient() {
         <p className="text-xs text-muted mb-4">Route each enrichment capability to a specific profile, else the default profile is used. Fallback kicks in when the primary fails its health check.</p>
         <div className="bg-white border border-line rounded-xl overflow-hidden">
           <div className="grid grid-cols-[1fr_1fr_1fr] gap-3 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-            <div>Capability</div><div>Profile</div><div>Fallback</div>
+            <div className="min-w-0 truncate">Capability</div><div className="min-w-0 truncate">Profile</div><div className="min-w-0 truncate">Fallback</div>
           </div>
           {routes.map((r) => (
             <div key={r.capabilityCode} className="grid grid-cols-[1fr_1fr_1fr] gap-3 px-5 py-3 items-center border-b border-line-soft last:border-b-0">
-              <div className="text-sm font-medium text-ink">{CAPABILITY_LABELS[r.capabilityCode] ?? r.capabilityCode}</div>
+              <div className="min-w-0 text-sm font-medium text-ink truncate">{CAPABILITY_LABELS[r.capabilityCode] ?? r.capabilityCode}</div>
               <select
                 value={r.profileId ?? ""} disabled={savingRoutes}
                 onChange={(e) => saveRoute(r.capabilityCode, e.target.value ? Number(e.target.value) : null, r.fallbackProfileId)}
-                className="text-[12px] border border-line rounded px-2 py-1.5 bg-white"
+                className="min-w-0 text-[12px] border border-line rounded px-2 py-1.5 bg-white"
               >
                 <option value="">(default profile)</option>
                 {profiles.map((p) => <option key={p.profileId} value={p.profileId}>{p.profileName}</option>)}
@@ -283,7 +283,7 @@ export function AiProvidersClient() {
               <select
                 value={r.fallbackProfileId ?? ""} disabled={savingRoutes}
                 onChange={(e) => saveRoute(r.capabilityCode, r.profileId, e.target.value ? Number(e.target.value) : null)}
-                className="text-[12px] border border-line rounded px-2 py-1.5 bg-white"
+                className="min-w-0 text-[12px] border border-line rounded px-2 py-1.5 bg-white"
               >
                 <option value="">(none)</option>
                 {profiles.map((p) => <option key={p.profileId} value={p.profileId}>{p.profileName}</option>)}
@@ -299,15 +299,15 @@ export function AiProvidersClient() {
         <p className="text-xs text-muted mb-4">Tokens and failure rate per profile & capability, resets at midnight.</p>
         <div className="bg-white border border-line rounded-xl overflow-hidden">
           <div className="grid grid-cols-[1.5fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-            <div>Profile</div><div>Capability</div><div>Calls</div><div>Tokens</div><div>Failures</div>
+            <div className="min-w-0 truncate">Profile</div><div className="min-w-0 truncate">Capability</div><div className="min-w-0 truncate">Calls</div><div className="min-w-0 truncate">Tokens</div><div className="min-w-0 truncate">Failures</div>
           </div>
           {usage.map((u, i) => (
             <div key={i} className="grid grid-cols-[1.5fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 px-5 py-2.5 items-center border-b border-line-soft last:border-b-0 text-sm">
-              <div className="text-ink truncate">{u.profileName}</div>
-              <div className="text-ink-soft text-[12px]">{u.capabilityCode}</div>
-              <div className="text-ink-soft text-[12px]">{u.callsToday}</div>
-              <div className="text-ink-soft text-[12px]">{u.tokensToday}</div>
-              <div className={u.failuresToday > 0 ? "text-red-600 text-[12px] font-semibold" : "text-ink-soft text-[12px]"}>{u.failuresToday}</div>
+              <div className="min-w-0 text-ink truncate">{u.profileName}</div>
+              <div className="min-w-0 text-ink-soft text-[12px] truncate">{u.capabilityCode}</div>
+              <div className="min-w-0 text-ink-soft text-[12px] truncate">{u.callsToday}</div>
+              <div className="min-w-0 text-ink-soft text-[12px] truncate">{u.tokensToday}</div>
+              <div className={`min-w-0 truncate ${u.failuresToday > 0 ? "text-red-600 text-[12px] font-semibold" : "text-ink-soft text-[12px]"}`}>{u.failuresToday}</div>
             </div>
           ))}
           {usage.length === 0 && <div className="text-center text-muted text-sm py-10">No calls yet today.</div>}

@@ -309,7 +309,7 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
 
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[36px_110px_1fr_100px] gap-3 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-          <div></div><div>Code</div><div>English Label</div><div></div>
+          <div className="min-w-0"></div><div className="min-w-0 truncate">Code</div><div className="min-w-0 truncate">English Label</div><div className="min-w-0"></div>
         </div>
         {[...items].sort((a, b) => a.sortOrder - b.sortOrder).map(item => (
           <div key={item.code} className="border-b border-line-soft last:border-b-0">
@@ -339,13 +339,13 @@ function ConfigItemsGroup({ group, frameworkId, items, onUpdate }: {
               </div>
             ) : (
               <div className="grid grid-cols-[36px_110px_1fr_100px] gap-3 px-4 py-3 items-center hover:bg-canvas-soft">
-                <div>
+                <div className="min-w-0">
                   <span className="w-5 h-5 rounded-full inline-block border border-line"
                     style={{ backgroundColor: item.colorHex ?? "#6B7280" }} />
                 </div>
-                <div className="font-mono text-[11px] text-muted font-semibold">{item.code}</div>
-                <div className="font-medium text-sm text-ink">{item.label}</div>
-                <div className="flex items-center gap-2">
+                <div className="min-w-0 font-mono text-[11px] text-muted font-semibold truncate">{item.code}</div>
+                <div className="min-w-0 font-medium text-sm text-ink truncate">{item.label}</div>
+                <div className="min-w-0 flex items-center gap-2">
                   <button onClick={() => startEdit(item)}
                     className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold">Edit</button>
                   <button onClick={() => del(item.code)}
@@ -498,24 +498,24 @@ function DomainConfigGroup({ frameworkId, configs, onUpdate }: {
 
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[70px_1fr_1fr_80px_60px] gap-2 px-4 py-2.5 bg-canvas-soft border-b border-line text-[10px] uppercase tracking-wider text-muted font-bold">
-          <div>Code</div><div>Name EN</div><div>Description EN</div>
-          <div className="text-center">Weight %</div><div></div>
+          <div className="min-w-0 truncate">Code</div><div className="min-w-0 truncate">Name EN</div><div className="min-w-0 truncate">Description EN</div>
+          <div className="min-w-0 text-center truncate">Weight %</div><div className="min-w-0"></div>
         </div>
         {rows.map((row, idx) => (
           <div key={row.configId} className="grid grid-cols-[70px_1fr_1fr_80px_60px] gap-2 px-4 py-2 items-center border-b border-line-soft last:border-b-0">
-            <div className="font-mono text-[11px] font-bold text-muted">{row.domainCode}</div>
+            <div className="min-w-0 font-mono text-[11px] font-bold text-muted truncate">{row.domainCode}</div>
             <input value={row.nameEn} onChange={e => updateRow(idx, "nameEn", e.target.value)}
-              className="input w-full text-sm" />
+              className="input w-full min-w-0 text-sm" />
             <input value={row.descriptionEn ?? ""} onChange={e => updateRow(idx, "descriptionEn", e.target.value)}
-              className="input w-full text-sm" />
-            <div className="flex items-center gap-0.5">
+              className="input w-full min-w-0 text-sm" />
+            <div className="min-w-0 flex items-center gap-0.5">
               <input type="number" min={0} max={100} step={0.01}
                 value={row.weight ?? ""}
                 onChange={e => updateRow(idx, "weight", e.target.value === "" ? null : Number(e.target.value))}
-                className="input w-full text-sm text-center" placeholder="—" />
+                className="input w-full min-w-0 text-sm text-center" placeholder="—" />
               <span className="text-muted text-[11px] shrink-0">%</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <button onClick={() => deleteRow(row.configId)}
                 className="text-[11px] text-red-500 hover:text-red-700 font-semibold">Delete</button>
             </div>

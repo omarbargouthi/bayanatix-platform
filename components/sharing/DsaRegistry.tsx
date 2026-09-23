@@ -133,14 +133,14 @@ export function DsaRegistry() {
       {/* ── Table ── */}
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[1fr_130px_100px_120px_80px_90px_80px_36px] gap-2 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div>{s.colAgreement}</div>
-          <div>{s.colCounterparty}</div>
-          <div>{s.colScope}</div>
-          <div>{s.colMaxClass}</div>
-          <div>{s.colDatasets}</div>
-          <div>{s.colExpiry}</div>
-          <div>{s.colStatus}</div>
-          <div></div>
+          <div className="min-w-0 truncate">{s.colAgreement}</div>
+          <div className="min-w-0 truncate">{s.colCounterparty}</div>
+          <div className="min-w-0 truncate">{s.colScope}</div>
+          <div className="min-w-0 truncate">{s.colMaxClass}</div>
+          <div className="min-w-0 truncate">{s.colDatasets}</div>
+          <div className="min-w-0 truncate">{s.colExpiry}</div>
+          <div className="min-w-0 truncate">{s.colStatus}</div>
+          <div className="min-w-0"></div>
         </div>
 
         {loading ? (
@@ -158,33 +158,33 @@ export function DsaRegistry() {
               onClick={() => router.push(`/sharing/${dsa.dsaId}`)}
               className="grid grid-cols-[1fr_130px_100px_120px_80px_90px_80px_36px] gap-2 px-5 py-3.5 border-b border-line-soft last:border-0 hover:bg-canvas-soft transition-colors items-center cursor-pointer"
             >
-              <div>
+              <div className="min-w-0">
                 <div className="font-medium text-sm text-ink truncate">{dsa.titleText}</div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 min-w-0">
                   {dsa.dsaReferenceCode && (
-                    <span className="font-mono text-[10px] text-brand-purple">{dsa.dsaReferenceCode}</span>
+                    <span className="font-mono text-[10px] text-brand-purple shrink-0">{dsa.dsaReferenceCode}</span>
                   )}
-                  <span className="text-[10px] text-muted">{DIRECTION_LABELS[dsa.directionCode] ?? dsa.directionCode}</span>
+                  <span className="text-[10px] text-muted shrink-0">{DIRECTION_LABELS[dsa.directionCode] ?? dsa.directionCode}</span>
                   {dsa.containsPersonalData && (
-                    <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-medium">{s.piBadge}</span>
+                    <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-medium shrink-0">{s.piBadge}</span>
                   )}
                 </div>
               </div>
-              <div className="text-sm text-ink truncate">{dsa.counterpartyNameText ?? <span className="text-muted italic">—</span>}</div>
-              <div className="text-[11px] text-muted">{SCOPE_LABELS[dsa.sharingScopeCode] ?? dsa.sharingScopeCode}</div>
-              <div>
+              <div className="min-w-0 text-sm text-ink truncate">{dsa.counterpartyNameText ?? <span className="text-muted italic">—</span>}</div>
+              <div className="min-w-0 text-[11px] text-muted truncate">{SCOPE_LABELS[dsa.sharingScopeCode] ?? dsa.sharingScopeCode}</div>
+              <div className="min-w-0">
                 {dsa.maxClassificationCode
                   ? <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase ${CLASS_COLORS[dsa.maxClassificationCode] ?? "bg-gray-100 text-gray-600"}`}>{dsa.maxClassificationCode}</span>
                   : <span className="text-muted italic text-[11px]">{s.notSet}</span>}
               </div>
-              <div className="text-sm text-muted text-center">{dsa.datasetCount}</div>
-              <div className="text-[11px] text-muted">{dsa.effectiveEndDate ?? "—"}</div>
-              <div>
+              <div className="min-w-0 text-sm text-muted text-center">{dsa.datasetCount}</div>
+              <div className="min-w-0 text-[11px] text-muted truncate">{dsa.effectiveEndDate ?? "—"}</div>
+              <div className="min-w-0">
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[dsa.statusCode] ?? "bg-gray-100 text-gray-500"}`}>
                   {STATUS_LABELS[dsa.statusCode] ?? dsa.statusCode}
                 </span>
               </div>
-              <div className="flex justify-center">
+              <div className="min-w-0 flex justify-center">
                 {["DRAFT","RENEWAL_DRAFT"].includes(dsa.statusCode) && (
                   <button
                     onClick={e => { e.stopPropagation(); deleteDsa(dsa.dsaId, dsa.titleText); }}

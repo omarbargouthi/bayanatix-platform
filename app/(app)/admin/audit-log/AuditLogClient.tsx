@@ -188,10 +188,10 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
           <div className="card overflow-hidden">
             {/* Header */}
             <div className="grid grid-cols-[180px_180px_160px_1fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div>Timestamp</div>
-              <div>User</div>
-              <div>Asset</div>
-              <div>Changes</div>
+              <div className="min-w-0 truncate">Timestamp</div>
+              <div className="min-w-0 truncate">User</div>
+              <div className="min-w-0 truncate">Asset</div>
+              <div className="min-w-0 truncate">Changes</div>
             </div>
 
             {entries.length === 0 && (
@@ -201,10 +201,10 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
             {entries.map((e) => (
               <div key={e.auditId} className="grid grid-cols-[180px_180px_160px_1fr] gap-3 px-5 py-4 border-b border-line-soft last:border-b-0 hover:bg-canvas-soft transition-colors items-start">
                 {/* Timestamp */}
-                <div className="text-[12px] text-ink-soft">{fmt(e.timestamp)}</div>
+                <div className="min-w-0 text-[12px] text-ink-soft truncate">{fmt(e.timestamp)}</div>
 
                 {/* User */}
-                <div className="flex items-center gap-2">
+                <div className="min-w-0 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-brand-purple/15 text-brand-purple text-[10px] font-bold grid place-items-center shrink-0">
                     {initials(e.userName, e.userId)}
                   </span>
@@ -212,15 +212,15 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
                 </div>
 
                 {/* Asset */}
-                <div>
-                  <div className="text-[11px] font-semibold text-brand-purple">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-brand-purple truncate">
                     {ASSET_TYPE_LABEL[e.assetType] ?? e.assetType}
                   </div>
-                  <div className="text-[11px] text-muted font-mono">#{e.assetId}</div>
+                  <div className="text-[11px] text-muted font-mono truncate">#{e.assetId}</div>
                 </div>
 
                 {/* Changes */}
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   {e.changes.length === 0 && (
                     <span className="text-[12px] text-muted italic">No field details recorded</span>
                   )}

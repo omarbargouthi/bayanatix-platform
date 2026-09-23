@@ -371,14 +371,14 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
     return (
       <div key={attr.dsaAttributeId} className="border-b border-line-soft last:border-0">
         <div className="grid grid-cols-[1fr_130px_60px_100px_120px] gap-2 px-5 py-2.5 items-center">
-          <div>
-            <div className="text-sm font-medium text-ink">{attr.physicalName}</div>
-            {attr.friendlyName && <div className="text-[11px] text-muted">{attr.friendlyName}</div>}
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-ink truncate">{attr.physicalName}</div>
+            {attr.friendlyName && <div className="text-[11px] text-muted truncate">{attr.friendlyName}</div>}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="min-w-0 flex items-center gap-1.5">
             {effectiveClass
-              ? <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${CLASS_COLORS[effectiveClass] ?? "bg-gray-100 text-gray-600"}`}>{effectiveClass}</span>
-              : <span className="text-[10px] text-red-500 italic font-medium">{ds.unclassifiedBadge}</span>}
+              ? <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase shrink-0 ${CLASS_COLORS[effectiveClass] ?? "bg-gray-100 text-gray-600"}`}>{effectiveClass}</span>
+              : <span className="text-[10px] text-red-500 italic font-medium shrink-0">{ds.unclassifiedBadge}</span>}
             {unclassified && canClassify && !isClassifying && (
               <button
                 onClick={async () => {
@@ -391,15 +391,15 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
               </button>
             )}
           </div>
-          <div className="text-[11px]">
+          <div className="min-w-0 text-[11px]">
             {(attr.isPersonalData || attr.liveIsPii)
               ? <span className="text-purple-600 font-medium">{ds.piLabel}</span>
               : <span className="text-muted">—</span>}
           </div>
-          <div className="text-[11px] text-muted">
+          <div className="min-w-0 text-[11px] text-muted truncate">
             {TREATMENT_LABELS[attr.treatmentCode] ?? attr.treatmentCode}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="min-w-0 flex items-center gap-1.5">
             <DqScoreBadge score={attr.dqScore} ruleCount={attr.dqRuleCount} ds={ds} />
             {attr.dqRuleCount > 0 && (
               <button
@@ -603,11 +603,11 @@ export function DsaDatasetsTab({ dsaId, datasets, directionCode, isEditable, can
             ) : (
               <div>
                 <div className="grid grid-cols-[1fr_130px_60px_100px_120px] gap-2 px-5 py-2 bg-canvas-soft text-[10px] uppercase tracking-wider text-muted font-bold border-b border-line">
-                  <div>{ds.colAttribute}</div>
-                  <div>{ds.colClassification}</div>
-                  <div>{ds.colPi}</div>
-                  <div>{ds.colTreatment}</div>
-                  <div>{ds.colDq}</div>
+                  <div className="min-w-0 truncate">{ds.colAttribute}</div>
+                  <div className="min-w-0 truncate">{ds.colClassification}</div>
+                  <div className="min-w-0 truncate">{ds.colPi}</div>
+                  <div className="min-w-0 truncate">{ds.colTreatment}</div>
+                  <div className="min-w-0 truncate">{ds.colDq}</div>
                 </div>
                 {attrMap[dataset.dsaDatasetId].map(attr => renderAttributeRow(attr, dataset.dsaDatasetId))}
               </div>

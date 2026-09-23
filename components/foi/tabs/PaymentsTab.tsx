@@ -117,25 +117,25 @@ export function PaymentsTab({ caseData, payments, totalPaid, currentUser: _user,
       {/* Payment history */}
       <div className="card overflow-hidden">
         <div className="px-5 py-2.5 border-b border-line bg-canvas-soft text-[10px] font-bold uppercase tracking-wider text-muted grid grid-cols-[120px_80px_160px_1fr_120px]">
-          <div>Type</div>
-          <div>Amount</div>
-          <div>Reference</div>
-          <div>Notes</div>
-          <div>Received</div>
+          <div className="min-w-0 truncate">Type</div>
+          <div className="min-w-0 truncate">Amount</div>
+          <div className="min-w-0 truncate">Reference</div>
+          <div className="min-w-0 truncate">Notes</div>
+          <div className="min-w-0 truncate">Received</div>
         </div>
         {payments.length === 0 ? (
           <div className="p-8 text-center text-muted text-sm">No payments recorded yet.</div>
         ) : payments.map(p => (
           <div key={p.paymentId} className="grid grid-cols-[120px_80px_160px_1fr_120px] px-5 py-3 border-b border-line-soft items-center">
-            <div className={`text-[11px] font-semibold ${p.paymentTypeCode === 'REFUND' ? 'text-red-600' : 'text-green-700'}`}>
+            <div className={`min-w-0 truncate text-[11px] font-semibold ${p.paymentTypeCode === 'REFUND' ? 'text-red-600' : 'text-green-700'}`}>
               {TYPE_LABELS[p.paymentTypeCode] ?? p.paymentTypeCode}
             </div>
-            <div className={`text-sm font-bold ${p.paymentTypeCode === 'REFUND' ? 'text-red-600' : 'text-ink'}`}>
+            <div className={`min-w-0 truncate text-sm font-bold ${p.paymentTypeCode === 'REFUND' ? 'text-red-600' : 'text-ink'}`}>
               {p.paymentTypeCode === 'REFUND' ? '-' : ''}SAR {Math.abs(Number(p.amount)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[11px] font-mono text-muted truncate">{p.paymentReferenceText ?? "—"}</div>
-            <div className="text-[11px] text-muted truncate">{p.notesText ?? "—"}</div>
-            <div className="text-[11px] text-muted">{new Date(p.receivedAt).toLocaleDateString("en-GB")}</div>
+            <div className="min-w-0 text-[11px] font-mono text-muted truncate">{p.paymentReferenceText ?? "—"}</div>
+            <div className="min-w-0 text-[11px] text-muted truncate">{p.notesText ?? "—"}</div>
+            <div className="min-w-0 text-[11px] text-muted truncate">{new Date(p.receivedAt).toLocaleDateString("en-GB")}</div>
           </div>
         ))}
       </div>

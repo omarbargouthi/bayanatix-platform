@@ -169,16 +169,16 @@ export function CustomAttributesConfigSection() {
 
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[100px_1fr_110px_70px_80px] gap-3 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-          <div>Code</div><div>Label</div><div>Type</div><div>Required</div><div>Actions</div>
+          <div className="min-w-0 truncate">Code</div><div className="min-w-0 truncate">Label</div><div className="min-w-0 truncate">Type</div><div className="min-w-0 truncate">Required</div><div className="min-w-0 truncate">Actions</div>
         </div>
         {loading && <div className="py-8 text-center text-muted text-sm">Loading…</div>}
         {!loading && inType.map((d) => (
           <div key={d.attrDefId} className={`grid grid-cols-[100px_1fr_110px_70px_80px] gap-3 px-5 py-3 items-center border-b border-line-soft last:border-b-0 hover:bg-canvas-soft ${!d.isEnabled ? "opacity-50" : ""}`}>
-            <div className="font-mono text-[11px] text-brand-deep font-semibold">{d.attrCode}</div>
-            <div className="text-sm text-ink font-medium">{d.attrName}</div>
-            <div className="text-xs text-muted">{DATA_TYPE_LABELS[d.dataType]}</div>
-            <div className="text-center text-sm">{d.isRequired ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gray-400">✗</span>}</div>
-            <div className="flex items-center gap-1.5">
+            <div className="min-w-0 font-mono text-[11px] text-brand-deep font-semibold truncate">{d.attrCode}</div>
+            <div className="min-w-0 text-sm text-ink font-medium truncate">{d.attrName}</div>
+            <div className="min-w-0 text-xs text-muted truncate">{DATA_TYPE_LABELS[d.dataType]}</div>
+            <div className="min-w-0 text-center text-sm">{d.isRequired ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gray-400">✗</span>}</div>
+            <div className="min-w-0 flex items-center gap-1.5">
               <button onClick={() => handleToggleEnabled(d)} className="btn btn-sm text-xs">{d.isEnabled ? "Disable" : "Enable"}</button>
               <button onClick={() => handleDelete(d)} className="btn btn-sm text-xs text-red-600 hover:bg-red-50">Del</button>
             </div>
