@@ -5,8 +5,8 @@ import { OIDC_STATE_COOKIE, OIDC_VERIFIER_COOKIE, oidcCookieOptions } from "@/li
 
 export async function GET(req: Request) {
   const config = await getResolvedAuthConfig();
-  if (config.providerType !== "OIDC") {
-    return NextResponse.json({ error: "OIDC is not the configured authentication provider" }, { status: 400 });
+  if (!config.oidcEnabled) {
+    return NextResponse.json({ error: "SSO sign-in is not enabled." }, { status: 400 });
   }
 
   try {

@@ -7,7 +7,12 @@ import { authenticateLdap, LdapAuthError } from "@/lib/auth/ldap";
 import { findOrCreateExternalUser } from "@/lib/provisioning";
 import { isLoginRateLimited, recordLoginAttempt } from "@/lib/auth/rate-limit";
 
+// The login screen lets the user pick which configured method to use — `provider`
+// says which one they picked (OIDC is redirect-only and never posts here, see
+// /api/auth/oidc/login instead). Defaults to LOCAL for older clients/scripts that
+// don't send it.
 const Body = z.object({
+  provider: z.enum(["LOCAL", "LDAP"]).default("LOCAL"),
   email: z.string().email(),
   password: z.string().min(1),
 });
@@ -27,23 +32,22 @@ export async function POST(req: Request) {
   const config = await getResolvedAuthConfig();
 
   try {
-    // A LOCAL account (the pre-existing demo users, and any admin-created account)
-    // always signs in with its own password, regardless of the configured external
-    // provider — this is the escape hatch that keeps an admin from ever being
-    // locked out by a bad LDAP/OIDC config. Only emails with no LOCAL account fall
-    // through to the configured external provider.
-    const existing = await findUserByEmail(parsed.email);
-    if (existing && existing.auth_provider_code === "LOCAL" && existing.password_hash) {
-      return await handleLocalLogin(existing, parsed.password);
-    }
-    if (config.providerType === "LDAP") {
+    if (parsed.provider === "LDAP") {
+      if (!config.ldapEnabled) {
+        return NextResponse.json({ error: "LDAP sign-in is not enabled." }, { status: 400 });
+      }
       return await handleLdapLogin(parsed.email, parsed.password, config);
     }
-    if (config.providerType === "OIDC") {
-      return NextResponse.json({ error: "This deployment signs in via SSO — use the Sign in with SSO button." }, { status: 400 });
+
+    if (!config.localEnabled) {
+      return NextResponse.json({ error: "Local sign-in is not enabled." }, { status: 400 });
     }
-    await recordLoginAttempt(parsed.email, false);
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    const user = await findUserByEmail(parsed.email);
+    if (!user || user.auth_provider_code !== "LOCAL" || !user.password_hash) {
+      await recordLoginAttempt(parsed.email, false);
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    }
+    return await handleLocalLogin(user, parsed.password);
   } catch (e) {
     await recordLoginAttempt(parsed.email, false);
     const message = e instanceof LdapAuthError ? "Invalid email or password" : (e as Error).message || "Sign-in failed";

@@ -2,10 +2,10 @@ import { sql } from "../db";
 import { encryptSecret, decryptSecret } from "../secrets";
 import { logUpdate } from "../audit";
 
-export type ProviderType = "LOCAL" | "LDAP" | "OIDC";
-
 export type AuthSettings = {
-  providerType: ProviderType;
+  localEnabled: boolean;
+  ldapEnabled: boolean;
+  oidcEnabled: boolean;
 
   ldapUrl: string | null;
   ldapUseStartTls: boolean;
@@ -27,7 +27,9 @@ export type AuthSettings = {
 };
 
 type Row = {
-  providerType: ProviderType;
+  localEnabled: boolean;
+  ldapEnabled: boolean;
+  oidcEnabled: boolean;
   ldapUrl: string | null;
   ldapUseStartTls: boolean;
   ldapBindDn: string | null;
@@ -48,7 +50,7 @@ type Row = {
 async function getRow(): Promise<Row> {
   const [row] = await sql<Row[]>`
     SELECT
-      provider_type_code AS "providerType",
+      local_enabled AS "localEnabled", ldap_enabled AS "ldapEnabled", oidc_enabled AS "oidcEnabled",
       ldap_url_text AS "ldapUrl", ldap_use_starttls_indicator AS "ldapUseStartTls",
       ldap_bind_dn_text AS "ldapBindDn", ldap_bind_credential_id AS "ldapBindCredentialId",
       ldap_base_dn_text AS "ldapBaseDn", ldap_user_filter_text AS "ldapUserFilter",
@@ -66,7 +68,9 @@ async function getRow(): Promise<Row> {
 export async function getAuthSettings(): Promise<AuthSettings> {
   const row = await getRow();
   return {
-    providerType: row.providerType,
+    localEnabled: row.localEnabled,
+    ldapEnabled: row.ldapEnabled,
+    oidcEnabled: row.oidcEnabled,
     ldapUrl: row.ldapUrl,
     ldapUseStartTls: row.ldapUseStartTls,
     ldapBindDn: row.ldapBindDn,
@@ -117,7 +121,9 @@ async function storeSecret(label: string, plaintext: string, userId: string): Pr
 }
 
 export type AuthSettingsPatch = {
-  providerType?: ProviderType;
+  localEnabled?: boolean;
+  ldapEnabled?: boolean;
+  oidcEnabled?: boolean;
   ldapUrl?: string | null;
   ldapUseStartTls?: boolean;
   ldapBindDn?: string | null;
@@ -135,8 +141,17 @@ export type AuthSettingsPatch = {
   autoProvisionSourceIds?: number[] | null;
 };
 
+export class AuthSettingsError extends Error {}
+
 export async function updateAuthSettings(patch: AuthSettingsPatch, userId: string): Promise<void> {
   const before = await getRow();
+
+  const nextLocal = patch.localEnabled ?? before.localEnabled;
+  const nextLdap = patch.ldapEnabled ?? before.ldapEnabled;
+  const nextOidc = patch.oidcEnabled ?? before.oidcEnabled;
+  if (!nextLocal && !nextLdap && !nextOidc) {
+    throw new AuthSettingsError("At least one sign-in method must stay enabled.");
+  }
 
   let ldapBindCredentialId = before.ldapBindCredentialId;
   if (patch.ldapBindPassword?.trim()) {
@@ -149,7 +164,9 @@ export async function updateAuthSettings(patch: AuthSettingsPatch, userId: strin
 
   await sql`
     UPDATE bayanat.auth_settings SET
-      provider_type_code          = coalesce(${patch.providerType ?? null}, provider_type_code),
+      local_enabled                = ${nextLocal},
+      ldap_enabled                 = ${nextLdap},
+      oidc_enabled                 = ${nextOidc},
       ldap_url_text                = ${patch.ldapUrl !== undefined ? patch.ldapUrl : sql`ldap_url_text`},
       ldap_use_starttls_indicator  = coalesce(${patch.ldapUseStartTls ?? null}, ldap_use_starttls_indicator),
       ldap_bind_dn_text            = ${patch.ldapBindDn !== undefined ? patch.ldapBindDn : sql`ldap_bind_dn_text`},
@@ -171,14 +188,16 @@ export async function updateAuthSettings(patch: AuthSettingsPatch, userId: strin
   `;
 
   await logUpdate("AUTH_SETTINGS", 1, userId, [
-    { field: "provider_type_code", oldVal: before.providerType, newVal: patch.providerType ?? before.providerType },
+    { field: "local_enabled", oldVal: String(before.localEnabled), newVal: String(nextLocal) },
+    { field: "ldap_enabled", oldVal: String(before.ldapEnabled), newVal: String(nextLdap) },
+    { field: "oidc_enabled", oldVal: String(before.oidcEnabled), newVal: String(nextOidc) },
   ]);
 }
 
-/** Public, unauthenticated shape — just enough for the login page to decide which UI to render. No secrets, no internal ids. */
-export async function getPublicAuthConfig(): Promise<{ providerType: ProviderType }> {
-  const [row] = await sql<{ providerType: ProviderType }[]>`
-    SELECT provider_type_code AS "providerType" FROM bayanat.auth_settings WHERE id = 1
+/** Public, unauthenticated shape — just enough for the login page to build its provider picker. No secrets, no internal ids. */
+export async function getPublicAuthConfig(): Promise<{ local: boolean; ldap: boolean; oidc: boolean }> {
+  const [row] = await sql<{ local: boolean; ldap: boolean; oidc: boolean }[]>`
+    SELECT local_enabled AS local, ldap_enabled AS ldap, oidc_enabled AS oidc FROM bayanat.auth_settings WHERE id = 1
   `;
-  return { providerType: row?.providerType ?? "LOCAL" };
+  return row ?? { local: true, ldap: false, oidc: false };
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getAuthSettings, updateAuthSettings, type AuthSettingsPatch } from "@/lib/queries/auth-settings";
+import { getAuthSettings, updateAuthSettings, AuthSettingsError, type AuthSettingsPatch } from "@/lib/queries/auth-settings";
 import { clearOidcConfigCache } from "@/lib/auth/oidc";
 
 export async function GET() {
@@ -14,11 +14,13 @@ export async function PATCH(req: Request) {
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = (await req.json().catch(() => ({}))) as AuthSettingsPatch;
-  if (body.providerType && !["LOCAL", "LDAP", "OIDC"].includes(body.providerType)) {
-    return NextResponse.json({ error: "Invalid provider type" }, { status: 400 });
-  }
 
-  await updateAuthSettings(body, session.userId);
+  try {
+    await updateAuthSettings(body, session.userId);
+  } catch (e) {
+    if (e instanceof AuthSettingsError) return NextResponse.json({ error: e.message }, { status: 400 });
+    throw e;
+  }
   clearOidcConfigCache();
   return NextResponse.json(await getAuthSettings());
 }
