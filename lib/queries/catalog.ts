@@ -1170,13 +1170,30 @@ export async function getCdeDataQuality(dataSourceIds?: number[]): Promise<CdeDa
 }
 
 // ----- Glossaries (top-level domains) -----
+// Term count walks the whole subtree and counts only real terms — a domain's
+// terms can sit under an intermediate SUBDOMAIN (Domain > Subdomain > Term), and
+// the SUBDOMAIN rows themselves are organizational folders, not terms. Counting
+// direct children of any type showed e.g. 2 for a domain holding 14 terms.
+// Mirrors lib/queries/glossary.ts's getGlossaryDomains().
 export async function getGlossaryRoots() {
   return sql<{ glossaryId: number; termName: string; termCount: number }[]>`
+    with recursive tree as (
+      select glossary_id, glossary_id as root_id from bayanat.business_glossaries where parent_glossary_id is null
+      union all
+      select c.glossary_id, t.root_id from bayanat.business_glossaries c join tree t on c.parent_glossary_id = t.glossary_id
+    )
     select
       g.glossary_id as "glossaryId",
       g.term_name_text as "termName",
-      (select count(*)::int from bayanat.business_glossaries c where c.parent_glossary_id = g.glossary_id) as "termCount"
+      coalesce(cnt.term_count, 0) as "termCount"
     from bayanat.business_glossaries g
+    left join (
+      select tree.root_id, count(*)::int as term_count
+      from tree
+      join bayanat.business_glossaries t on t.glossary_id = tree.glossary_id
+      where t.term_type in ('TERM', 'KPI_METRIC')
+      group by tree.root_id
+    ) cnt on cnt.root_id = g.glossary_id
     where g.parent_glossary_id is null
     order by g.term_name_text
   `;
@@ -1186,6 +1203,8 @@ export async function getGlossaryRoots() {
 export async function getGlossaryStats(): Promise<{
   totalTerms: number; linkedTerms: number; linkedAssets: number;
 }> {
+  // TERM/KPI_METRIC only — SUBDOMAIN rows are organizational folders in the
+  // glossary hierarchy, not terms, and were inflating totalTerms/linkedTerms.
   const rows = await sql<{ totalTerms: number; linkedTerms: number; linkedAssets: number }[]>`
     select
       count(*)::int as "totalTerms",
@@ -1198,10 +1217,10 @@ export async function getGlossaryStats(): Promise<{
         select count(distinct (abt2.asset_type_code, abt2.asset_id))::int
         from bayanat.asset_business_terms abt2
         join bayanat.business_glossaries g2 on g2.glossary_id = abt2.glossary_id
-        where g2.parent_glossary_id is not null
+        where g2.parent_glossary_id is not null and g2.term_type in ('TERM', 'KPI_METRIC')
       ) as "linkedAssets"
     from bayanat.business_glossaries g
-    where g.parent_glossary_id is not null
+    where g.parent_glossary_id is not null and g.term_type in ('TERM', 'KPI_METRIC')
   `;
   const r = rows[0];
   return {
