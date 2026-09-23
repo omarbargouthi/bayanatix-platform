@@ -73,6 +73,8 @@ export function ColumnSitReviewClient({ canEdit }: { canEdit: boolean }) {
   const [terms, setTerms] = useState<SitTermOption[]>([]);
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [bulkReason, setBulkReason] = useState("");
   const limit = 25;
 
   const load = useCallback(async () => {
@@ -99,6 +101,19 @@ export function ColumnSitReviewClient({ canEdit }: { canEdit: boolean }) {
 
   function toggle(id: number) {
     setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+
+  // Only PENDING/STALE rows carry a checkbox at all (see the row render below) —
+  // "select all" must mirror that exact eligibility, not every row on the page.
+  const selectableIds = rows.filter((r) => r.status === "PENDING" || r.status === "STALE").map((r) => r.attributeId);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => checked.has(id));
+  function toggleSelectAll() {
+    setChecked((prev) => {
+      if (allSelected) return new Set();
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
   }
 
   async function accept(attributeId: number) {
@@ -155,6 +170,28 @@ export function ColumnSitReviewClient({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  // No bulk-reject endpoint exists — reject is a per-row action requiring a
+  // reason (see submitResolve above), so this applies one shared reason across
+  // every selected row via the same single-item endpoint.
+  async function bulkReject() {
+    if (checked.size === 0 || !bulkReason.trim()) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        [...checked].map((id) =>
+          fetch(`/api/classification/sit-attributes/${id}/reject`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: bulkReason.trim() }),
+          })
+        )
+      );
+      setBulkRejecting(false); setBulkReason("");
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
@@ -180,12 +217,43 @@ export function ColumnSitReviewClient({ canEdit }: { canEdit: boolean }) {
           <SourceSystemSelect value={dataSourceId} onChange={(v) => { setDataSourceId(v); setPage(1); }} />
           <span className="text-[12px] text-muted">{total} suggestion{total !== 1 ? "s" : ""}</span>
         </div>
-        {canEdit && checked.size > 0 && (
-          <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
-            {bulkBusy ? "…" : `Bulk accept (${checked.size})`}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {canEdit && selectableIds.length > 0 && (
+            <label className="flex items-center gap-1.5 text-[12px] text-muted cursor-pointer select-none">
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-3.5 h-3.5 accent-brand-purple" />
+              {allSelected ? "Unselect all" : "Select all"}
+            </label>
+          )}
+          {canEdit && checked.size > 0 && (
+            <>
+              <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
+                {bulkBusy ? "…" : `Bulk accept (${checked.size})`}
+              </button>
+              <button onClick={() => setBulkRejecting((v) => !v)} disabled={bulkBusy} className="text-[12px] font-semibold text-red-600 hover:underline disabled:opacity-50 px-2">
+                {`Bulk reject (${checked.size})`}
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {bulkRejecting && checked.size > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-3 bg-canvas-soft border border-line-soft rounded-lg flex-wrap">
+          <input
+            autoFocus type="text" value={bulkReason} onChange={(e) => setBulkReason(e.target.value)}
+            placeholder={`Why aren't these ${checked.size} sensitive? (applied to all selected)`}
+            className="text-[11px] border border-line rounded px-1.5 py-1 flex-1 min-w-[220px] focus:outline-none focus:border-brand-purple"
+          />
+          <button
+            onClick={bulkReject}
+            disabled={bulkBusy || !bulkReason.trim()}
+            className="text-[11px] font-semibold text-white bg-red-600 rounded px-2 py-1 disabled:opacity-40"
+          >
+            {bulkBusy ? "…" : `Confirm Reject (${checked.size})`}
+          </button>
+          <button onClick={() => { setBulkRejecting(false); setBulkReason(""); }} className="text-[11px] text-muted hover:text-ink">✕</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center text-muted text-sm py-10">Loading…</div>

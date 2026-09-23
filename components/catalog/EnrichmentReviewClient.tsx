@@ -74,6 +74,21 @@ export function EnrichmentReviewClient({ canEdit, fixedTab }: { canEdit: boolean
     setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
 
+  // Checkboxes only render when the "PENDING" status filter is active (see the
+  // row render below) — "select all" must mirror that exact eligibility.
+  const selectableIds = status === "PENDING"
+    ? (tab === "descriptions" ? descRows : dqRows).map((r) => r.suggestionId)
+    : [];
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => checked.has(id));
+  function toggleSelectAll() {
+    setChecked((prev) => {
+      if (allSelected) return new Set();
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
+  }
+
   async function acceptDesc(id: number) {
     await fetch(`/api/enrichment/descriptions/${id}/accept`, { method: "POST" });
     await load();
@@ -146,6 +161,12 @@ export function EnrichmentReviewClient({ canEdit, fixedTab }: { canEdit: boolean
           </select>
           <SourceSystemSelect value={dataSourceId} onChange={(v) => setDataSourceId(v)} />
           <span className="text-[12px] text-muted">{total}</span>
+          {canEdit && selectableIds.length > 0 && (
+            <label className="flex items-center gap-1.5 text-[12px] text-muted cursor-pointer select-none">
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-3.5 h-3.5 accent-brand-purple" />
+              {allSelected ? "Unselect all" : "Select all"}
+            </label>
+          )}
           {canEdit && checked.size > 0 && (
             <>
               <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">

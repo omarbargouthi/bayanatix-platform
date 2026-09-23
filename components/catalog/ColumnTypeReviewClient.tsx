@@ -89,6 +89,19 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
     setChecked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
 
+  // Only PENDING/STALE rows carry a checkbox at all (see the row render below) —
+  // "select all" must mirror that exact eligibility, not every row on the page.
+  const selectableIds = rows.filter((r) => r.status === "PENDING" || r.status === "STALE").map((r) => r.attributeId);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => checked.has(id));
+  function toggleSelectAll() {
+    setChecked((prev) => {
+      if (allSelected) return new Set();
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
+  }
+
   async function accept(attributeId: number) {
     setBusyId(attributeId);
     try {
@@ -166,11 +179,19 @@ export function ColumnTypeReviewClient({ canEdit }: { canEdit: boolean }) {
           <SourceSystemSelect value={dataSourceId} onChange={(v) => { setDataSourceId(v); setPage(1); }} />
           <span className="text-[12px] text-muted">{total} suggestion{total !== 1 ? "s" : ""}</span>
         </div>
-        {canEdit && checked.size > 0 && (
-          <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
-            {bulkBusy ? "…" : `Bulk accept (${checked.size})`}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {canEdit && selectableIds.length > 0 && (
+            <label className="flex items-center gap-1.5 text-[12px] text-muted cursor-pointer select-none">
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-3.5 h-3.5 accent-brand-purple" />
+              {allSelected ? "Unselect all" : "Select all"}
+            </label>
+          )}
+          {canEdit && checked.size > 0 && (
+            <button onClick={bulkAccept} disabled={bulkBusy} className="btn btn-sm disabled:opacity-50">
+              {bulkBusy ? "…" : `Bulk accept (${checked.size})`}
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
