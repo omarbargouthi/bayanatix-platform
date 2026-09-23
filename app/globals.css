@@ -21,7 +21,8 @@
   .btn {
     @apply inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md text-sm font-semibold
            bg-canvas border border-line text-ink transition-colors
-           hover:bg-white hover:border-brand-purple hover:text-brand-purple;
+           hover:bg-white hover:border-brand-purple hover:text-brand-purple
+           disabled:opacity-45 disabled:cursor-not-allowed disabled:pointer-events-none;
   }
   .btn-primary {
     @apply bg-gradient-to-br from-brand-purple to-brand-violet text-white border-transparent

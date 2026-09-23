@@ -96,8 +96,13 @@ export function AuthSettingsSection() {
       const r = await fetch("/api/admin/auth-settings/test", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider }),
       });
-      const result = await r.json();
+      const body = await r.json().catch(() => ({}));
+      const result = r.ok && typeof body.ok === "boolean"
+        ? body
+        : { ok: false, message: body.error || `Test failed (HTTP ${r.status})` };
       setTestResults((prev) => ({ ...prev, [provider]: result }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [provider]: { ok: false, message: "Network error — couldn't reach the server." } }));
     } finally {
       setTesting(null);
     }
@@ -290,9 +295,14 @@ function TestRow({
 }) {
   return (
     <div className="pt-1 space-y-2">
-      <button onClick={onTest} disabled={testing || disabled} title={disabled ? "Save your changes first" : ""} className="btn btn-sm">
-        {testing ? "Testing…" : "Test Connection"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button onClick={onTest} disabled={testing || disabled} title={disabled ? "Save your changes first" : ""} className="btn btn-sm">
+          {testing ? "Testing…" : "Test Connection"}
+        </button>
+        {disabled && !testing && (
+          <span className="text-[11px] text-amber-700">Save your changes first to test them.</span>
+        )}
+      </div>
       {result && (
         <div className={`text-sm rounded-md px-3 py-2 border ${result.ok ? "text-green-700 bg-green-50 border-green-200" : "text-red-700 bg-red-50 border-red-200"}`}>
           {result.message}
