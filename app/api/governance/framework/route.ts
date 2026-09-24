@@ -12,7 +12,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
   const docId = await createGovDoc({ ...body, createdBy: session.userId });
   return NextResponse.json({ docId }, { status: 201 });

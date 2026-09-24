@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
-import { resolveDownloadScope, describeDownloadScope, type DownloadScope } from "@/lib/bulk/scope-resolver";
+import { resolveDownloadScope, describeDownloadScope, assertDownloadScopeAllowed, type DownloadScope } from "@/lib/bulk/scope-resolver";
 import { buildDownloadWorkbooks } from "@/lib/bulk/workbook-writer";
 import { buildJobLogText } from "@/lib/bulk/log-writer";
 import { slugifyForFilename, timestampForFilename } from "@/lib/bulk/filename";
@@ -20,6 +20,9 @@ export async function POST(req: Request) {
   const scope = body.scope as DownloadScope;
   const includeExtended = body.includeExtended !== false;
   if (!scope?.type) return NextResponse.json({ error: "scope is required" }, { status: 400 });
+  if (!(await assertDownloadScopeAllowed(session, scope))) {
+    return NextResponse.json({ error: "You don't have edit permission on part of this scope" }, { status: 403 });
+  }
 
   const jobId = await createDownloadJob(scope, session.userId);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canEditAsset } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getDatasetColumns } from "@/lib/queries/open-data";
 
@@ -20,15 +21,26 @@ export async function POST(req: Request, { params }: Ctx) {
   const datasetId = Number(params.id);
 
   // Verify access
-  const [ds] = await sql<{ raisedBy: string }[]>`
-    SELECT raised_by_user_id AS "raisedBy" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
+  const [ds] = await sql<{ raisedBy: string; status: string }[]>`
+    SELECT raised_by_user_id AS "raisedBy", status_code AS "status" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
   `;
   if (!ds) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (ds.raisedBy !== session.userId && session.role !== "ADMIN" && session.role !== "STEWARD") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (ds.status !== "DRAFT" && ds.status !== "PENDING") {
+    return NextResponse.json({ error: `Cannot edit columns on a dataset that is ${ds.status.replace(/_/g, " ").toLowerCase()}.` }, { status: 409 });
+  }
 
   const body: { attributeId: number; publishName?: string; publishDesc?: string; sortOrder?: number } = await req.json();
+
+  // Dataset ownership is trivially self-satisfied (dataset creation has no
+  // role check) — also require real edit permission on the specific attribute
+  // being added, so a dataset owner can't pull in a column from a table they
+  // have no access to and later reclassify/de-identify/publish it.
+  if (!(await canEditAsset(session, "DATA_ATTRIBUTES", body.attributeId))) {
+    return NextResponse.json({ error: "You don't have edit permission on this column" }, { status: 403 });
+  }
 
   const [existing] = await sql<{ odColumnId: number }[]>`
     SELECT od_column_id AS "odColumnId" FROM bayanat.open_dataset_columns

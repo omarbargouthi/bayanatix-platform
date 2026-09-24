@@ -22,12 +22,18 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const datasetId = Number(params.id);
 
   // Verify ownership or admin
-  const [row] = await sql<{ raisedBy: string }[]>`
-    SELECT raised_by_user_id AS "raisedBy" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
+  const [row] = await sql<{ raisedBy: string; status: string }[]>`
+    SELECT raised_by_user_id AS "raisedBy", status_code AS "status" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
   `;
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (row.raisedBy !== session.userId && session.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  // Same status lock as DELETE below — once a dataset has left drafting, its
+  // metadata shouldn't be silently rewritten out from under an in-progress or
+  // already-approved review. Retract a PUBLISHED dataset (via DELETE) first.
+  if (row.status !== "DRAFT" && row.status !== "PENDING") {
+    return NextResponse.json({ error: `Cannot edit a dataset that is ${row.status.replace(/_/g, " ").toLowerCase()}. Retract or reject it first.` }, { status: 409 });
   }
 
   const body = await req.json();

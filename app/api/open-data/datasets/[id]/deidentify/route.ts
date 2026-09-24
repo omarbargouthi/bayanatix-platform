@@ -62,6 +62,16 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const datasetId = Number(params.id);
+
+  const [ds] = await sql<{ raisedBy: string }[]>`
+    SELECT raised_by_user_id AS "raisedBy"
+    FROM bayanat.open_datasets WHERE dataset_id = ${datasetId} AND deleted_at IS NULL
+  `;
+  if (!ds) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (ds.raisedBy !== session.userId && session.role !== "ADMIN" && session.role !== "STEWARD") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const attributeId = Number(searchParams.get("attributeId"));
 

@@ -10,7 +10,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { name, description } = await req.json();
   const id = await createRegister(name, description ?? null);
   return NextResponse.json({ registerId: id }, { status: 201 });

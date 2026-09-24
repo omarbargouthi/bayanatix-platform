@@ -6,6 +6,8 @@ import { sql } from "../db";
 import type { SheetName } from "./sheets";
 import { loadExtendedFieldsBySheet, customAttrAssetTypeForSheet } from "./extended-fields";
 import { getCustomAttributeValuesForAssets } from "../queries/custom-attributes";
+import { canEditAsset } from "../can";
+import type { SessionUser } from "../types";
 
 // Sheets where the commit pipeline supports creating a brand-new row from a blank
 // _ID cell (auto-assigning the id) — see validateDataSourceCreateRow/validateTermRow/
@@ -181,6 +183,39 @@ export function describeDownloadScope(scope: DownloadScope, rows: SheetRows): st
   if (scope.type === "CUSTOM_ASSET_LINKS_BY_REL_TYPE") return (rows.CustomAssetLinks?.[0]?.relCode as string) || "custom-asset-links";
   if (scope.type === "EMPTY_TEMPLATE") return `empty-template-${scope.sheet}`;
   return "export";
+}
+
+// Mirrors the per-row canEditAsset() check the upload/commit path already does
+// (lib/bulk/validate.ts's validateSimpleRow) — canEditMetadata() alone (the
+// route's own check) only proves the caller has *some* metadata-write role
+// assignment somewhere, not that it covers the specific data source/table/
+// column being requested here, and the scope itself is client-supplied.
+// BUSINESS_TERMS_*/CUSTOM_ASSETS_*/CUSTOM_ASSET_LINKS_*/EMPTY_TEMPLATE have no
+// per-resource scoping concept in role_assignments (only TABLE/SCHEMA/
+// DATA_SOURCE do), so canEditMetadata's global check is the only applicable
+// gate for those and they're left to it.
+export async function assertDownloadScopeAllowed(session: SessionUser, scope: DownloadScope): Promise<boolean> {
+  if (scope.type === "DATA_SOURCE") {
+    return canEditAsset(session, "DATA_SOURCES", scope.dataSourceId);
+  }
+  if (scope.type === "SELECTED") {
+    for (const id of scope.entityIds ?? []) {
+      if (!(await canEditAsset(session, "DATA_ENTITIES", id))) return false;
+    }
+    for (const id of scope.attributeIds ?? []) {
+      if (!(await canEditAsset(session, "DATA_ATTRIBUTES", id))) return false;
+    }
+    return true;
+  }
+  if (scope.type === "SEARCH_RESULTS") {
+    for (const ref of scope.refs) {
+      if (ref.assetType === "DATA_SOURCES" && !(await canEditAsset(session, "DATA_SOURCES", ref.assetId))) return false;
+      if (ref.assetType === "DATA_ENTITIES" && !(await canEditAsset(session, "DATA_ENTITIES", ref.assetId))) return false;
+      if (ref.assetType === "DATA_ATTRIBUTES" && !(await canEditAsset(session, "DATA_ATTRIBUTES", ref.assetId))) return false;
+    }
+    return true;
+  }
+  return true;
 }
 
 export async function resolveDownloadScope(scope: DownloadScope, opts?: { includeExtended?: boolean }): Promise<SheetRows> {

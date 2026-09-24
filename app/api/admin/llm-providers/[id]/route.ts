@@ -4,7 +4,7 @@ import { getProfileById, updateProfile, deleteProfile } from "@/lib/queries/llm-
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const profileId = Number(params.id);
   if (!Number.isFinite(profileId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

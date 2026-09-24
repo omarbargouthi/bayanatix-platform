@@ -11,12 +11,15 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   const datasetId  = Number(params.id);
   const odColumnId = Number(params.colId);
 
-  const [ds] = await sql<{ raisedBy: string }[]>`
-    SELECT raised_by_user_id AS "raisedBy" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
+  const [ds] = await sql<{ raisedBy: string; status: string }[]>`
+    SELECT raised_by_user_id AS "raisedBy", status_code AS "status" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
   `;
   if (!ds) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (ds.raisedBy !== session.userId && session.role !== "ADMIN" && session.role !== "STEWARD") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (ds.status !== "DRAFT" && ds.status !== "PENDING") {
+    return NextResponse.json({ error: `Cannot edit columns on a dataset that is ${ds.status.replace(/_/g, " ").toLowerCase()}.` }, { status: 409 });
   }
 
   await sql`
@@ -35,12 +38,15 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const datasetId  = Number(params.id);
   const odColumnId = Number(params.colId);
 
-  const [ds] = await sql<{ raisedBy: string }[]>`
-    SELECT raised_by_user_id AS "raisedBy" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
+  const [ds] = await sql<{ raisedBy: string; status: string }[]>`
+    SELECT raised_by_user_id AS "raisedBy", status_code AS "status" FROM bayanat.open_datasets WHERE dataset_id = ${datasetId}
   `;
   if (!ds) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (ds.raisedBy !== session.userId && session.role !== "ADMIN" && session.role !== "STEWARD") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (ds.status !== "DRAFT" && ds.status !== "PENDING") {
+    return NextResponse.json({ error: `Cannot edit columns on a dataset that is ${ds.status.replace(/_/g, " ").toLowerCase()}.` }, { status: 409 });
   }
 
   const body: { publishName?: string | null; publishDesc?: string | null } = await req.json();

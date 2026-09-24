@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canEditAsset } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { startWorkflow } from "@/lib/workflow";
 
@@ -26,6 +27,15 @@ export async function POST(req: Request, { params }: Ctx) {
 
   if (!attributeId || !newTermId || !reason?.trim()) {
     return NextResponse.json({ error: "attributeId, newTermId, and reason are required" }, { status: 400 });
+  }
+
+  // Dataset ownership alone isn't enough here — dataset creation has no role
+  // check, so it's trivially self-satisfied, and this action rewrites the
+  // attribute's org-wide classification term (bayanat.asset_business_terms),
+  // not something scoped to this one dataset. Require real edit permission on
+  // the attribute itself, same as any other classification change.
+  if (!(await canEditAsset(session, "DATA_ATTRIBUTES", attributeId))) {
+    return NextResponse.json({ error: "You don't have edit permission on this column" }, { status: 403 });
   }
 
   // Verify the column belongs to this dataset

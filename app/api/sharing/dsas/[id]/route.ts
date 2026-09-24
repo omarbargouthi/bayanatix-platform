@@ -41,9 +41,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
 
   try {
-    // Only updatable in DRAFT / RENEWAL_DRAFT
-    const [cur] = await sql`SELECT status_code FROM bayanat.data_sharing_agreements WHERE dsa_id = ${id}`;
+    // Only updatable in DRAFT / RENEWAL_DRAFT, by its own creator or an ADMIN —
+    // same ownership rule DELETE below already enforces (this PATCH was missing it).
+    const [cur] = await sql`SELECT status_code, created_by FROM bayanat.data_sharing_agreements WHERE dsa_id = ${id}`;
     if (!cur) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (session.role !== "ADMIN" && cur.created_by !== session.userId) {
+      return NextResponse.json({ error: "You can only edit your own agreements" }, { status: 403 });
+    }
     if (!["DRAFT","RENEWAL_DRAFT"].includes(cur.status_code)) {
       return NextResponse.json({ error: "DSA is not editable in its current status" }, { status: 409 });
     }
