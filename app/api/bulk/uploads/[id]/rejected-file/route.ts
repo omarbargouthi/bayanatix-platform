@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getBulkJobRejectedFile } from "@/lib/queries/bulk-jobs";
+import { getBulkJob, getBulkJobRejectedFile } from "@/lib/queries/bulk-jobs";
 
 // The rejected-only workbook — same columns as the original upload, filtered to
 // just the ERROR rows plus a Reason column. Fix the flagged cells and re-upload
@@ -11,6 +11,11 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const jobId = Number(params.id);
   if (!Number.isFinite(jobId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const job = await getBulkJob(jobId);
+  if (!job || (session.role !== "ADMIN" && job.createdByUserId !== session.userId)) {
+    return NextResponse.json({ error: "No rejected records for this upload (or not committed yet / already purged)" }, { status: 404 });
+  }
 
   const fileData = await getBulkJobRejectedFile(jobId);
   if (!fileData) return NextResponse.json({ error: "No rejected records for this upload (or not committed yet / already purged)" }, { status: 404 });

@@ -10,6 +10,7 @@ import { sql } from "./db";
 import { getDqRuleById, saveDqResult } from "./queries/dq";
 import type { DqRule } from "./queries/dq";
 import { startWorkflow } from "./workflow";
+import { validateKpiSql, sandboxSql } from "./reports/kpi-sandbox";
 
 export type RunResult = {
   ruleId: number;
@@ -199,7 +200,7 @@ async function resolveAssetMeta(rule: DqRule): Promise<AssetMeta> {
     `;
     if (rows.length === 0) return { tableName: null, columnName: null, schemaName: null, qualifiedTable: null, qualifiedColumn: null };
     const r = rows[0];
-    const qt = r.schemaName ? `"${r.schemaName}"."${r.tableName}"` : `"${r.tableName}"`;
+    const qt = r.schemaName ? `${qi(r.schemaName)}.${qi(r.tableName)}` : qi(r.tableName);
     return { tableName: r.tableName, columnName: null, schemaName: r.schemaName, qualifiedTable: qt, qualifiedColumn: null };
   }
   if (rule.assetTypeCode === "DATA_ATTRIBUTES") {
@@ -212,8 +213,8 @@ async function resolveAssetMeta(rule: DqRule): Promise<AssetMeta> {
     `;
     if (rows.length === 0) return { tableName: null, columnName: null, schemaName: null, qualifiedTable: null, qualifiedColumn: null };
     const r = rows[0];
-    const qt = r.schemaName ? `"${r.schemaName}"."${r.tableName}"` : `"${r.tableName}"`;
-    return { tableName: r.tableName, columnName: r.colName, schemaName: r.schemaName, qualifiedTable: qt, qualifiedColumn: `"${r.colName}"` };
+    const qt = r.schemaName ? `${qi(r.schemaName)}.${qi(r.tableName)}` : qi(r.tableName);
+    return { tableName: r.tableName, columnName: r.colName, schemaName: r.schemaName, qualifiedTable: qt, qualifiedColumn: qi(r.colName) };
   }
   return { tableName: null, columnName: null, schemaName: null, qualifiedTable: null, qualifiedColumn: null };
 }
@@ -615,8 +616,15 @@ async function executeTemplate(rule: DqRule, meta: AssetMeta): Promise<EngineRes
     case "CUSTOM_SQL": {
       const rawSql = rule.ruleDefinitionText;
       if (!rawSql?.trim()) return simErr("No SQL query configured");
+      // Same validation + read-only sandbox role as the admin-authored custom KPI SQL
+      // (lib/reports/kpi-sandbox.ts) — a DQ rule's SQL is just as admin/steward-authored
+      // and free-text, so it gets the same defense-in-depth: no writes/DDL, no stacked
+      // statements, and even a query that slips past validation still can't touch
+      // anything outside a read-only role's SELECT grants on the bayanat schema.
+      const validation = validateKpiSql(rawSql);
+      if (!validation.ok) return simErr(validation.reason);
       try {
-        const rows = await sql.unsafe(rawSql) as any[];
+        const rows = await sandboxSql.unsafe(rawSql) as any[];
         if (rows.length === 0) return simErr("Custom SQL returned no rows");
         const scanned = Number(rows[0].total_rows ?? 0);
         const failed  = Number(rows[0].failed_rows ?? 0);

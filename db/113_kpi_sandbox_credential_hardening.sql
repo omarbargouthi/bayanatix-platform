@@ -1,0 +1,15 @@
+-- Security fix: bayanat.connection_registry stores live source-connection
+-- credentials in plaintext (username_text/password_text — see db/016_source_connections.sql)
+-- and was never added to the bayanatix_kpi_readonly column-exposure exclusion list that
+-- db/071_reports_extended.sql already applies to bayanat.users and bayanat.llm_credentials.
+-- Since that role has a blanket SELECT grant on every table in the schema (plus
+-- ALTER DEFAULT PRIVILEGES for future ones), any ADMIN authoring a custom KPI SQL query
+-- (or, before this same hardening was applied to it, a DQ CUSTOM_SQL rule — see
+-- lib/dq-engine.ts) could run `SELECT username_text, password_text FROM connection_registry`
+-- and read back plaintext live credentials for every connected customer data source.
+--
+-- This does not by itself encrypt connection_registry at rest (still tracked separately —
+-- llm_credentials/auth_settings already use the AES-256-GCM pattern in lib/secrets.ts, which
+-- connection_registry predates and does not yet use); it closes the specific exposure path
+-- through the read-only SQL sandbox role.
+REVOKE SELECT ON bayanat.connection_registry FROM bayanatix_kpi_readonly;

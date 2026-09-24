@@ -2,10 +2,13 @@ import postgres from "postgres";
 
 // Separate connection authenticated as bayanatix_kpi_readonly (see db/071_reports_extended.sql)
 // — a Postgres role with SELECT-only grants on the bayanat schema and a 3s statement_timeout.
-// THIS ROLE is the actual security boundary for admin-authored custom KPIs; validateKpiSql
-// below is a fail-fast UX layer on top of it, not the guarantee itself — even a query that
-// slips past validation still can't write, alter, or drop anything when run through this client.
-const sandboxSql =
+// THIS ROLE is the actual security boundary for admin-authored custom SQL (KPIs here, and DQ's
+// CUSTOM_SQL rule template in lib/dq-engine.ts); validateKpiSql below is a fail-fast UX layer on
+// top of it, not the guarantee itself — even a query that slips past validation still can't
+// write, alter, or drop anything when run through this client. Exported so any other feature
+// that lets an ADMIN/STEWARD author raw SQL reuses this one hardened execution path rather than
+// running through the main app connection (which has full read/write privileges).
+export const sandboxSql =
   global.__kpiSandboxSql ??
   postgres(process.env.KPI_SANDBOX_DATABASE_URL ?? "postgres://invalid", {
     max: 3,

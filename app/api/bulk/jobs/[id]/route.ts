@@ -11,5 +11,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const job = await getBulkJob(jobId);
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (session.role !== "ADMIN" && job.createdByUserId !== session.userId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   return NextResponse.json(job);
 }
