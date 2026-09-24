@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canEditMetadata } from "@/lib/can";
 import { sql } from "@/lib/db";
 
 type Params = { params: { assetType: string; assetId: string } };
@@ -28,6 +29,7 @@ export async function GET(_: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canEditMetadata(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { dimension, certTypeCode, notes } = await req.json();
   if (!["METADATA", "DATA"].includes(dimension))
     return NextResponse.json({ error: "dimension must be METADATA or DATA" }, { status: 400 });
@@ -46,6 +48,7 @@ export async function POST(req: Request, { params }: Params) {
 export async function DELETE(req: Request, { params }: Params) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canEditMetadata(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { dimension } = await req.json();
   await sql`
     DELETE FROM bayanat.asset_certifications

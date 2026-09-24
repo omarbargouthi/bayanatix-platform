@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canEditMetadata } from "@/lib/can";
 import { removeStakeholder } from "@/lib/queries/stakeholders";
 
 type Params = { params: { id: string } };
@@ -7,6 +8,7 @@ type Params = { params: { id: string } };
 export async function DELETE(_: Request, { params }: Params) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canEditMetadata(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const assignmentId = Number(params.id);
   if (!Number.isFinite(assignmentId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

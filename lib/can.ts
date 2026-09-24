@@ -84,6 +84,17 @@ export async function canEditAsset(
   return (rows[0]?.cnt ?? 0) > 0;
 }
 
+// Gate for the entire FOI (Freedom of Information) case-management module —
+// the OFFICER system role exists in the SessionUser type specifically for this,
+// but nothing under app/api/foi/[id]/** previously checked it (only foi/config's
+// PATCH did). Any authenticated user — including a Viewer or an LDAP/OIDC
+// auto-provisioned External Viewer — could otherwise assess cases, issue
+// payment quotes, record payments, reclassify sensitive columns, and send
+// citizen-facing communications.
+export function isFoiStaff(session: SessionUser): boolean {
+  return session.role === "ADMIN" || session.role === "OFFICER";
+}
+
 // Whether `session` may preview a table's row data at all (Sample Data tab
 // gate). Unlike canEditMetadata/canEditAsset, STEWARD does NOT auto-pass here —
 // "Data Read" is deliberately a separate, explicitly-granted privilege (see the

@@ -53,6 +53,19 @@ export async function PATCH(req: Request, { params }: Params) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // This bypasses the workflow engine entirely (unlike POST .../advance, which
+  // goes through advanceWorkflow's own assignee check) — direct status/assignment
+  // edits are restricted to staff or whoever the request is currently assigned to,
+  // not any authenticated user.
+  const [current] = await sql<{ assignedToUserId: string | null }[]>`
+    SELECT assigned_to_user_id AS "assignedToUserId" FROM bayanat.asset_requests WHERE request_id = ${Number(params.id)}
+  `;
+  if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const isStaff = session.role === "ADMIN" || session.role === "STEWARD";
+  if (!isStaff && current.assignedToUserId !== session.userId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { statusCode, assignedToUserId, resolutionNotes } = await req.json();
 
   const VALID_STATUS = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];

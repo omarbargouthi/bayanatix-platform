@@ -79,6 +79,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const dsaDatasetId = Number(searchParams.get("dsaDatasetId"));
   if (!Number.isFinite(dsaDatasetId)) return NextResponse.json({ error: "dsaDatasetId required" }, { status: 400 });
 
+  const status = await checkEditable(dsaId);
+  if (status === "not_found")    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (status === "not_editable") return NextResponse.json({ error: "DSA is not editable" }, { status: 409 });
+
   const body = await req.json();
 
   await sql`
@@ -101,6 +105,10 @@ export async function DELETE(req: Request, { params }: Ctx) {
   const { searchParams } = new URL(req.url);
   const dsaDatasetId = Number(searchParams.get("dsaDatasetId"));
   if (!Number.isFinite(dsaDatasetId)) return NextResponse.json({ error: "dsaDatasetId required" }, { status: 400 });
+
+  const status = await checkEditable(dsaId);
+  if (status === "not_found")    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (status === "not_editable") return NextResponse.json({ error: "DSA is not editable" }, { status: 409 });
 
   await sql`DELETE FROM bayanat.dsa_datasets WHERE dsa_dataset_id = ${dsaDatasetId} AND dsa_id = ${dsaId}`;
   return NextResponse.json({ ok: true });

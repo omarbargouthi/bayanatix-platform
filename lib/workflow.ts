@@ -279,6 +279,12 @@ export async function advanceWorkflow(
   requestTitle: string,
   outcome:      "APPROVED" | "REJECTED" | "COMPLETED",
   notes?:       string,
+  actorRole?:   string,
+  // The compliance-workflow route already enforces its own role + stage-order
+  // gating (submit/confirm/endorse/reject, checked against session.role before
+  // ever calling here) — skip the generic per-stage assignee check there so it
+  // doesn't second-guess a check that's already stricter and more specific.
+  skipAssigneeCheck?: boolean,
 ): Promise<{ done: boolean; nextStageName?: string }> {
   const [inst] = await sql<{
     instanceId: number; workflowId: number; currentStageId: number; stageOrder: number; isFinal: boolean; requestTypeCode: string;
@@ -295,6 +301,24 @@ export async function advanceWorkflow(
     WHERE wi.request_id = ${requestId} AND wi.status_code = 'ACTIVE'
   `;
   if (!inst) throw new Error("No active workflow for this request");
+
+  // enterStage() already resolved and persisted who may act on the current
+  // stage (one workflow_stage_history row per assignee — see resolveAssignees
+  // above), but nothing previously checked it here: any authenticated user
+  // could approve/reject/complete any request regardless of assignment. A row
+  // with a NULL assignee means resolveAssignees found nobody (e.g. an
+  // ASSET_OWNER stage on an asset with no registered owner) and is treated as
+  // open, matching enterStage's own fallback rather than a permanent dead-end.
+  if (actorRole !== "ADMIN" && !skipAssigneeCheck) {
+    const [assignment] = await sql<{ cnt: number }[]>`
+      SELECT COUNT(*)::int AS cnt FROM bayanat.workflow_stage_history
+      WHERE instance_id = ${inst.instanceId} AND stage_id = ${inst.currentStageId} AND completed_at IS NULL
+        AND (assigned_to_user_id = ${actorUserId} OR assigned_to_user_id IS NULL)
+    `;
+    if ((assignment?.cnt ?? 0) === 0) {
+      throw new Error("You are not assigned to act on this workflow stage");
+    }
+  }
 
   await sql`
     UPDATE bayanat.workflow_stage_history

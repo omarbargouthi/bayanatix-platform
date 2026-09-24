@@ -18,7 +18,7 @@ export async function POST(
   { params }: { params: { frameworkId: string } }
 ) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const fwId = Number(params.frameworkId);
   const body = await req.json();
   const id = await upsertDomainConfig(fwId, {
@@ -36,7 +36,7 @@ export async function DELETE(
   _ctx: { params: { frameworkId: string } }
 ) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
   await deleteDomainConfig(Number(body.configId));
   return NextResponse.json({ ok: true });

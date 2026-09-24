@@ -4,11 +4,25 @@ import { sql } from "@/lib/db";
 
 type Ctx = { params: { id: string } };
 
+// Same DRAFT/RENEWAL_DRAFT edit lock as datasets/route.ts's checkEditable — a
+// DSA's authorization evidence shouldn't be alterable once it's left drafting
+// (submitted, under approval, or already active).
+async function checkEditable(dsaId: number) {
+  const [cur] = await sql`SELECT status_code FROM bayanat.data_sharing_agreements WHERE dsa_id = ${dsaId}`;
+  if (!cur) return "not_found";
+  if (!["DRAFT","RENEWAL_DRAFT"].includes(cur.status_code)) return "not_editable";
+  return "ok";
+}
+
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dsaId = Number(params.id);
+  const status = await checkEditable(dsaId);
+  if (status === "not_found")    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (status === "not_editable") return NextResponse.json({ error: "DSA is not editable" }, { status: 409 });
+
   const body  = await req.json();
 
   if (!body.controllerNameText || !body.evidenceDocumentRef) {
@@ -37,6 +51,10 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dsaId = Number(params.id);
+  const status = await checkEditable(dsaId);
+  if (status === "not_found")    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (status === "not_editable") return NextResponse.json({ error: "DSA is not editable" }, { status: 409 });
+
   const { searchParams } = new URL(req.url);
   const authId = Number(searchParams.get("authId"));
 

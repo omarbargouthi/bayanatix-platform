@@ -7,7 +7,7 @@ export async function PATCH(
   { params }: { params: { frameworkId: string; reqId: string } }
 ) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   await updateRequirement(Number(params.reqId), body);

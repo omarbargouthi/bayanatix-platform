@@ -22,9 +22,11 @@ export async function POST(req: Request, { params }: Params) {
   if (!req_) return NextResponse.json({ error: "Request not found" }, { status: 404 });
 
   try {
-    const result = await advanceWorkflow(requestId, session.userId, req_.title, outcome, notes);
+    const result = await advanceWorkflow(requestId, session.userId, req_.title, outcome, notes, session.role);
     return NextResponse.json({ ok: true, ...result });
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    const message = (e as Error).message;
+    const status = message === "You are not assigned to act on this workflow stage" ? 403 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }

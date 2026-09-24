@@ -80,13 +80,13 @@ export async function POST(
         if (session.role === "STEWARD" && row.currentStageOrder !== 1) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
-        await advanceWorkflow(row.requestId, session.userId, row.title, "REJECTED");
+        await advanceWorkflow(row.requestId, session.userId, row.title, "REJECTED", undefined, session.role, true);
       } else {
         const expectedOrder = action === "confirm" ? 1 : 2;
         if (row.currentStageOrder !== expectedOrder) {
           return NextResponse.json({ error: `Cannot ${action} — review is not at that stage` }, { status: 400 });
         }
-        await advanceWorkflow(row.requestId, session.userId, row.title, "APPROVED");
+        await advanceWorkflow(row.requestId, session.userId, row.title, "APPROVED", undefined, session.role, true);
       }
     }
   } catch (err) {

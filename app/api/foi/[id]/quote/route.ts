@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { isFoiStaff } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getFoiConfig } from "@/lib/queries/foi";
 
@@ -8,7 +9,7 @@ type Ctx = { params: { id: string } };
 // POST — generate and issue quote from current assessment
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -118,7 +119,7 @@ export async function POST(req: Request, { params }: Ctx) {
 // PATCH — accept or decline quote; or approve/reject adjustment
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

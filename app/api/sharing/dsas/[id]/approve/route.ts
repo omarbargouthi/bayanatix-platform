@@ -28,6 +28,38 @@ export async function POST(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: `No approval station is currently active (DSA status: ${dsaBefore.status_code}).` }, { status: 409 });
   }
 
+  // Each station maps to a stakeholder role: DATA_OWNER means the OWNER on any
+  // of this DSA's shared entities (same asset_stakeholders model as
+  // GovernancePanel); the other three are org-wide roles held the same way, on
+  // any asset. ADMIN always bypasses. If nobody is registered in that role at
+  // all, the station is treated as open rather than a permanent dead-end,
+  // matching the convention used by the generic workflow engine.
+  if (session.role !== "ADMIN") {
+    const STATION_ROLE_CODE: Record<string, string> = {
+      DATA_OWNER: "OWNER", DATA_PRIVACY: "DATA_PRIVACY_OFFICER", DMO_REVIEW: "DMO_HEAD", EXEC_DELEGATE: "EXEC_DELEGATE",
+    };
+    const roleCode = STATION_ROLE_CODE[activeStation];
+    const [{ cnt: totalHolders }] = await sql<{ cnt: number }[]>`
+      SELECT COUNT(*)::int AS cnt FROM bayanat.asset_stakeholders WHERE role_code = ${roleCode}
+    `;
+    if (totalHolders > 0) {
+      const [{ cnt: isHolder }] = await sql<{ cnt: number }[]>`
+        SELECT COUNT(*)::int AS cnt FROM bayanat.asset_stakeholders s
+        WHERE s.role_code = ${roleCode} AND s.user_id = ${session.userId}
+          AND (
+            ${roleCode} != 'OWNER'
+            OR EXISTS (
+              SELECT 1 FROM bayanat.dsa_datasets dd
+              WHERE dd.dsa_id = ${dsaId} AND dd.entity_id = s.asset_id AND s.asset_type_code = 'DATA_ENTITIES'
+            )
+          )
+      `;
+      if (isHolder === 0) {
+        return NextResponse.json({ error: "You are not authorized to decide at this approval station." }, { status: 403 });
+      }
+    }
+  }
+
   // Record the decision — only the station matching the DSA's current status may be decided,
   // so approvals execute strictly in sequence like the Open Data workflow.
   const [updated] = await sql`

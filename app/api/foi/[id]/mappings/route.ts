@@ -13,10 +13,18 @@ function classStatusFor(code: string | null | undefined): "PENDING" | "CLEARED" 
   return BLOCKED_SENSITIVITY.has(code) ? "BLOCKED" : "CLEARED";
 }
 
+// Mappings are also where a data STEWARD coordinates on classifying a column
+// for an FOI case (ADD_COLLABORATION_NOTE / MARK_CLASSIFIED in PATCH below,
+// per their own comments) — not just OFFICER/ADMIN case-processing, so the
+// gate here is broader than the rest of the FOI module.
+function canWorkOnMappings(role: string): boolean {
+  return role === "ADMIN" || role === "OFFICER" || role === "STEWARD";
+}
+
 // GET — all mappings with collaboration thread
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !canWorkOnMappings(session.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -134,7 +142,7 @@ type CollabNote = { commId: number; mappingId: number; body: string; sentAt: str
 // POST — upsert a single mapping
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !canWorkOnMappings(session.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -215,7 +223,7 @@ export async function POST(req: Request, { params }: Ctx) {
 // PATCH — quality check | notify steward | add collaboration note | mark classified
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !canWorkOnMappings(session.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -436,7 +444,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 // DELETE — remove a mapping
 export async function DELETE(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !canWorkOnMappings(session.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   const { searchParams } = new URL(req.url);
