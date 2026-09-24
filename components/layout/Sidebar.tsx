@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
@@ -11,7 +12,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconShield, IconHistory, IconFlag, IconAI,
-  IconBulk, IconGlossary, IconDB, IconLineage,
+  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout,
 } from "./icons";
 
 type Item = {
@@ -59,8 +60,16 @@ export function Sidebar({ user }: { user: SessionUser }) {
   const { collapsed } = useSidebar();
   const { t, isRtl } = useLang();
   const pathname = usePathname();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
 
   // Build i18n-resolved item arrays
   const NAV_TOP: Item[] = NAV_TOP_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
@@ -79,13 +88,62 @@ export function Sidebar({ user }: { user: SessionUser }) {
       className={`sticky top-0 h-screen shrink-0 z-30 flex flex-col bg-white overflow-hidden transition-all duration-300 ${borderSide}`}
     >
 
-      {/* User section */}
-      <div className={`flex items-center border-b border-line py-4 ${collapsed ? "justify-center px-2" : "gap-3 px-4"}`}>
-        <Avatar initials={initials(user.fullName)} seed={user.userId} colorCode={user.avatarColorCode} size={36} />
-        {!collapsed && (
-          <div className="min-w-0">
-            <div className="font-semibold text-brand-deep text-sm truncate">{user.fullName}</div>
-            <div className="text-[11px] text-muted">{t.roles[user.role] ?? user.role}</div>
+      {/* User section — the one place the profile menu lives (Header used to have
+          its own separate copy in the top-right; that was a duplicate of this). */}
+      <div className="relative">
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
+          className={`w-full flex items-center border-b border-line py-4 transition-colors hover:bg-canvas ${collapsed ? "justify-center px-2" : "gap-3 px-4"}`}
+        >
+          <Avatar initials={initials(user.fullName)} seed={user.userId} colorCode={user.avatarColorCode} size={36} />
+          {!collapsed && (
+            <div className="min-w-0 text-left rtl:text-right">
+              <div className="font-semibold text-brand-deep text-sm truncate">{user.fullName}</div>
+              <div className="text-[11px] text-muted">{t.roles[user.role] ?? user.role}</div>
+            </div>
+          )}
+        </button>
+        {menuOpen && (
+          // fixed (not absolute) so it isn't clipped by the sidebar's own
+          // overflow-hidden (needed for the collapse-width transition) — this
+          // matters especially in the collapsed 64px-wide state.
+          <div className={`fixed top-[78px] ${isRtl ? "right-3" : "left-3"} w-56 bg-white border border-line rounded-md shadow-lg py-1 z-50`}>
+            <div className="px-3 py-2 border-b border-line">
+              <div className="text-sm font-semibold text-ink truncate">{user.fullName}</div>
+              <div className="text-xs text-muted truncate">{user.email}</div>
+            </div>
+            <Link
+              href="/profile"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-left px-3 py-2 text-sm text-ink-soft hover:bg-canvas flex items-center gap-2"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              My Profile
+            </Link>
+            <Link
+              href="/requests"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-left px-3 py-2 text-sm text-ink-soft hover:bg-canvas flex items-center gap-2"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Asset Requests
+            </Link>
+            <div className="border-t border-line my-1" />
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={logout}
+              className="w-full text-left px-3 py-2 text-sm text-ink-soft hover:bg-canvas flex items-center gap-2"
+            >
+              <IconLogout className="w-4 h-4" /> Sign out
+            </button>
           </div>
         )}
       </div>
