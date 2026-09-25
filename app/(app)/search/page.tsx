@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { SearchPageClient } from "@/components/search/SearchPageClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +18,15 @@ export default async function SearchPage({
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Catalog", href: "/catalog" },
-          { label: "Search" },
+          { label: t.catalog.pageTitle, href: "/catalog" },
+          { label: t.common.search },
         ]}
         user={user}
       />

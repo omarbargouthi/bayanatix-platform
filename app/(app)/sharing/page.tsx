@@ -2,19 +2,21 @@ import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { DsaRegistry } from "@/components/sharing/DsaRegistry";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SharingPage() {
   const user = await getSession();
   if (!user) redirect("/login");
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Sharing Agreements" },
+          { label: t.sharing.pageTitle },
         ]}
         user={user}
         contextTypes={[]}

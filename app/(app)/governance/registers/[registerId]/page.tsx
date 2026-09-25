@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { getRegister, listColumns, listEntries } from "@/lib/queries/gov-registers";
 import { RegisterDetailClient } from "@/components/governance/RegisterDetailClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +24,15 @@ export default async function RegisterDetailPage({ params }: { params: { registe
 
   // Block non-admins from accessing archived registers
   if (register.deletedAt && !isAdmin) notFound();
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Governance", href: "/governance" },
-          { label: "Registers", href: "/governance/registers" },
+          { label: t.governance.pageTitle, href: "/governance" },
+          { label: t.governance.registers, href: "/governance/registers" },
           { label: register.name },
         ]}
         user={user}

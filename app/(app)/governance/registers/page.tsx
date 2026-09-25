@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { listRegisters, listDeletedRegisters } from "@/lib/queries/gov-registers";
 import { RegistersClient } from "@/components/governance/RegistersClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +16,15 @@ export default async function RegistersPage() {
     listRegisters(),
     isAdmin ? listDeletedRegisters() : Promise.resolve([]),
   ]);
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Governance", href: "/governance" },
-          { label: "Registers" },
+          { label: t.governance.pageTitle, href: "/governance" },
+          { label: t.governance.registers },
         ]}
         user={user}
       />

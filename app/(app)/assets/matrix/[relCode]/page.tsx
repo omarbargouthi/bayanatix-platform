@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { getRelationshipTypeByCode, getRelationshipMatrix } from "@/lib/queries/custom-assets";
 import { MatrixAsOfFilter } from "@/components/custom-assets/MatrixAsOfFilter";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,14 @@ export default async function MatrixPage({ params, searchParams }: { params: { r
   const asOf = searchParams.asOf || today;
   const matrix = await getRelationshipMatrix(relType.relTypeId, asOf);
   if (!matrix) notFound();
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Custom Assets", href: "/assets" },
+          { label: t.nav.customAssets, href: "/assets" },
           { label: `${relType.relNameText} Matrix` },
         ]}
         user={user}

@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { getDqDimensions, getDqRules, getDqDashboardStats, getDqTrendData, getRecentDqResults } from "@/lib/queries/dq";
 import { DqAdminClient } from "@/app/(app)/admin/data-quality/DqAdminClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,14 @@ export default async function DataQualityPage() {
   ]);
 
   const canEdit = user.role === "ADMIN" || user.role === "STEWARD";
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Quality" },
+          { label: t.nav.quality },
         ]}
         user={user}
       />

@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { getSectionCounts } from "@/lib/queries/gov-framework";
 import { FrameworkPageClient } from "./FrameworkPageClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +12,15 @@ export default async function FrameworkPage() {
   if (!user) redirect("/login");
 
   const counts = await getSectionCounts();
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Governance", href: "/governance" },
-          { label: "Governance Framework" },
+          { label: t.governance.pageTitle, href: "/governance" },
+          { label: t.governance.framework },
         ]}
         user={user}
       />

@@ -11,6 +11,7 @@ import {
   listDomainConfig,
 } from "@/lib/queries/gov-compliance";
 import { ComplianceClient } from "@/components/governance/ComplianceClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +35,15 @@ export default async function CompliancePage({
     fwId ? getConfigItems(fwId)            : Promise.resolve([]),
     fwId ? listDomainConfig(fwId)          : Promise.resolve([]),
   ]);
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat",         href: "/dashboard" },
-          { label: "Data Governance", href: "/governance" },
-          { label: "Compliance" },
+          { label: t.governance.pageTitle, href: "/governance" },
+          { label: t.compliance.pageTitle },
         ]}
         user={user}
       />

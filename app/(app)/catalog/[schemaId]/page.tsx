@@ -10,6 +10,7 @@ import { SchemaTableList } from "@/components/catalog/SchemaTableList";
 import { DataModelTab } from "@/components/catalog/DataModelTab";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { SchemaTabNav } from "./SchemaTabNav";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -36,13 +37,14 @@ export default async function SchemaPage({
   const tables    = schema.entities.filter((e) => !e.isView);
   const views     = schema.entities.filter((e) => e.isView);
   const totalCols = schema.entities.reduce((s, e) => s + (e.columnCount ?? 0), 0);
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Catalog", href: "/catalog" },
+          { label: t.catalog.pageTitle, href: "/catalog" },
           ...(schema.source ? [{ label: schema.source.sourceName, href: "/catalog" }] : []),
           { label: schema.schemaName },
         ]}

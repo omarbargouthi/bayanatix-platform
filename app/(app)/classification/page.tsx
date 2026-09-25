@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { getClassificationStatsScoped } from "@/lib/queries/catalog";
 import { ClassificationClient } from "@/components/classification/ClassificationClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +18,14 @@ export default async function ClassificationPage({
   const dataSourceId = searchParams.dataSourceId ? Number(searchParams.dataSourceId) : undefined;
   const schemaId = searchParams.schemaId ? Number(searchParams.schemaId) : undefined;
   const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId });
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Classification" },
+          { label: t.classification.pageTitle },
         ]}
         user={user}
         contextTypes={["COLUMN", "TERM"]}

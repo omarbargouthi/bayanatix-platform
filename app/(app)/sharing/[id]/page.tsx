@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { DsaEditor } from "@/components/sharing/DsaEditor";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +29,14 @@ export default async function DsaPage({ params }: Props) {
   const canClassify = await canEditMetadata(session);
 
   const collabHref = `/collaboration?newTitle=${encodeURIComponent(`Re: ${titleText}`)}`;
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Sharing Agreements", href: "/sharing" },
+          { label: t.sharing.pageTitle, href: "/sharing" },
           { label: titleText },
         ]}
         user={session}

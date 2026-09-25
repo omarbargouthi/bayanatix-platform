@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { getGlossaryTermById } from "@/lib/queries/glossary";
 import { GlossaryTermPageClient } from "./GlossaryTermPageClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +23,14 @@ export default async function GlossaryTermPage({
   if (!term) notFound();
 
   const canEdit = await canEditMetadata(user);
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat",           href: "/dashboard" },
-          { label: "Business Glossary", href: "/glossary" },
+          { label: t.glossary.pageTitle, href: "/glossary" },
           ...(term.domainName
             ? [{ label: term.domainName, href: `/glossary?domain=${term.domainId}` }]
             : []),

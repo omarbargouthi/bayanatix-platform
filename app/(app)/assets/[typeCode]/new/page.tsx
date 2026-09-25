@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { getCustomAssetTypeByCode } from "@/lib/queries/custom-assets";
 import { NewAssetClient } from "./NewAssetClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,13 +14,14 @@ export default async function NewAssetPage({ params }: { params: { typeCode: str
 
   const type = await getCustomAssetTypeByCode(params.typeCode.toUpperCase());
   if (!type || !type.isEnabled) notFound();
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Custom Assets", href: "/assets" },
+          { label: t.nav.customAssets, href: "/assets" },
           { label: type.typeNameText, href: `/assets/${params.typeCode}` },
           { label: "New" },
         ]}

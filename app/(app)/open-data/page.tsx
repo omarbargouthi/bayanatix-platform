@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { listOpenDatasets } from "@/lib/queries/open-data";
 import { OpenDataList } from "@/components/open-data/OpenDataList";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,14 @@ export default async function OpenDataPage({
   const page   = Math.max(1, Number(searchParams.page ?? "1"));
 
   const { data: datasets, total } = await listOpenDatasets({ status, search, page, limit: 20 });
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Open Data" },
+          { label: t.openData.pageTitle },
         ]}
         user={user}
         contextTypes={[]}

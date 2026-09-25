@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { getBusinessDomains, getDataSourcesLite, getUsersLite } from "@/lib/queries/reports";
 import { getStewardScopeInfo } from "@/lib/reports/access";
 import { DcReportClient } from "./DcReportClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +19,15 @@ export default async function DcReportPage() {
     getStewardScopeInfo(user),
   ]);
   const domains = scope.restricted ? allDomains.filter((d) => scope.allowedDomainIds.includes(d.glossaryId)) : allDomains;
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Reports", href: "/reports" },
-          { label: "Data Classification" },
+          { label: t.nav.reports, href: "/reports" },
+          { label: t.reports.dc.title },
         ]}
         user={user}
       />

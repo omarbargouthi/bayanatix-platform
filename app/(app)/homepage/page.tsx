@@ -5,6 +5,7 @@ import { getHomepageLayout } from "@/lib/queries/homepage";
 import { ALL_WIDGET_KEYS, resolveWidgetKeys } from "@/lib/homepage/widget-meta";
 import { fetchWidgetData } from "@/lib/homepage/widget-registry";
 import { HomepageClient } from "./HomepageClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,11 @@ export default async function HomepagePage() {
   const widgetData = Object.fromEntries(entries);
 
   const firstName = user.fullName.split(" ")[0];
+  const t = getServerT();
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: "Homepage" }]} user={user} />
+      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.homepage.pageTitle }]} user={user} />
       <HomepageClient firstName={firstName} initialWidgetKeys={initialWidgetKeys} widgetData={widgetData} />
     </>
   );

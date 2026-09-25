@@ -5,6 +5,7 @@ import { getSectionCounts } from "@/lib/queries/gov-framework";
 import { listRegisters } from "@/lib/queries/gov-registers";
 import { listFrameworks } from "@/lib/queries/gov-compliance";
 import { GovernancePageClient } from "./GovernancePageClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,12 @@ export default async function GovernancePage() {
     listRegisters(),
     listFrameworks(false), // only regulations the admin has marked applicable — matches /governance/compliance
   ]);
+  const t = getServerT();
 
   return (
     <>
       <Header
-        crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: "Data Governance" }]}
+        crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.governance.pageTitle }]}
         user={user}
       />
       <GovernancePageClient

@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getOpenDataset, getDatasetColumns, getDatasetDqIssues, getOpenDatasetWorkflowProgress } from "@/lib/queries/open-data";
 import { OpenDataEditor } from "@/components/open-data/OpenDataEditor";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,14 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
     user.role === "ADMIN" ||
     user.role === "STEWARD" ||
     dataset.raisedByUserId === user.userId;
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Open Data", href: "/open-data" },
+          { label: t.openData.pageTitle, href: "/open-data" },
           { label: dataset.datasetName },
         ]}
         user={user}

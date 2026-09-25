@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries/dashboard";
 import { DashboardClient } from "./DashboardClient";
 import { redirect } from "next/navigation";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,11 @@ export default async function DashboardPage() {
   ]);
 
   const firstName = user.fullName.split(" ")[0];
+  const t = getServerT();
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: "Dashboard" }]} user={user} />
+      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.nav.dashboard }]} user={user} />
       <DashboardClient
         firstName={firstName}
         domains={domains}

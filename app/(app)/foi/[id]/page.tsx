@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { CaseFile } from "@/components/foi/CaseFile";
 import { sql } from "@/lib/db";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,13 +22,14 @@ export default async function FoiCasePage({ params }: Props) {
     `;
     if (row) refCode = row.ref;
   }
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Freedom of Information", href: "/foi" },
+          { label: t.nav.foi, href: "/foi" },
           { label: refCode },
         ]}
         user={session}

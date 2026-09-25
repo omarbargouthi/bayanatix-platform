@@ -6,6 +6,7 @@ import {
 } from "@/lib/queries/custom-assets";
 import { AssetActivityPanel } from "@/components/custom-assets/AssetActivityPanel";
 import { AssetDetailClient } from "./AssetDetailClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +32,14 @@ export default async function AssetDetailPage({ params }: { params: { typeCode: 
   ]);
 
   const canWrite = user.role === "ADMIN" || user.role === "STEWARD";
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Custom Assets", href: "/assets" },
+          { label: t.nav.customAssets, href: "/assets" },
           { label: type.typeNameText, href: `/assets/${params.typeCode}` },
           { label: instance.assetNameText },
         ]}

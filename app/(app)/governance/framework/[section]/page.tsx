@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { listGovDocs } from "@/lib/queries/gov-framework";
 import { FrameworkSectionClient } from "@/components/governance/FrameworkSectionClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +29,15 @@ export default async function FrameworkSectionPage({ params }: { params: { secti
 
   const sectionCode = key.toUpperCase();
   const docs = await listGovDocs(sectionCode);
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat",             href: "/dashboard" },
-          { label: "Data Governance",     href: "/governance" },
-          { label: "Governance Framework",href: "/governance/framework" },
+          { label: t.governance.pageTitle,     href: "/governance" },
+          { label: t.governance.framework,href: "/governance/framework" },
           { label: SECTION_EN_LABEL[key] },
         ]}
         user={user}

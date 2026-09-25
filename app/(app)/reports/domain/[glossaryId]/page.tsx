@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { getDomainScorecard } from "@/lib/queries/reports";
 import { DomainScorecardClient } from "./DomainScorecardClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,13 +14,14 @@ export default async function DomainScorecardPage({ params }: { params: { glossa
   const glossaryId = Number(params.glossaryId);
   const scorecard = await getDomainScorecard(glossaryId);
   if (!scorecard) notFound();
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Reports", href: "/reports" },
+          { label: t.nav.reports, href: "/reports" },
           { label: scorecard.domain.name },
         ]}
         user={user}

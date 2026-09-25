@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { EnrichmentHubClient } from "@/components/catalog/EnrichmentHubClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +12,14 @@ export default async function EnrichmentPage() {
   if (!user) redirect("/login");
 
   const canEdit = await canEditMetadata(user);
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Enrichment" },
+          { label: t.nav.enrichment },
         ]}
         user={user}
         contextTypes={["COLUMN", "TABLE", "TERM"]}

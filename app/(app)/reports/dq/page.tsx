@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { getBusinessDomains, getDataSourcesLite, getUsersLite } from "@/lib/queries/reports";
 import { getStewardScopeInfo } from "@/lib/reports/access";
 import { DqReportClient } from "./DqReportClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +19,15 @@ export default async function DqReportPage() {
     getStewardScopeInfo(user),
   ]);
   const domains = scope.restricted ? allDomains.filter((d) => scope.allowedDomainIds.includes(d.glossaryId)) : allDomains;
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Reports", href: "/reports" },
-          { label: "Data Quality" },
+          { label: t.nav.reports, href: "/reports" },
+          { label: t.reports.dq.title },
         ]}
         user={user}
       />

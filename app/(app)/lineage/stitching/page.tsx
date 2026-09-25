@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { StitchingReviewClient } from "./StitchingReviewClient";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +10,14 @@ export default async function StitchingReviewPage() {
   const user = await getSession();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN" && user.role !== "STEWARD") redirect("/lineage");
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Lineage", href: "/lineage" },
+          { label: t.lineage.pageTitle, href: "/lineage" },
           { label: "Stitching Review" },
         ]}
         user={user}

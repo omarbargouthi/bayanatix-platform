@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { OpenDataEditor } from "@/components/open-data/OpenDataEditor";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,14 @@ export default async function NewOpenDataPage() {
     SELECT dimension_code AS code, dimension_name_text AS name
     FROM bayanat.dq_dimensions ORDER BY dimension_code
   `;
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Open Data", href: "/open-data" },
+          { label: t.openData.pageTitle, href: "/open-data" },
           { label: "New Dataset" },
         ]}
         user={user}

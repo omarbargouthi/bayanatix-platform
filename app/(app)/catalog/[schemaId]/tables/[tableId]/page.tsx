@@ -26,6 +26,7 @@ import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPane
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { SampleDataTab } from "@/components/catalog/SampleDataTab";
+import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -77,13 +78,14 @@ export default async function TablePage({
     entity.entityName, entity.schema?.schemaName,
     entity.rowCount ?? undefined,
   ).catch(() => {});
+  const t = getServerT();
 
   return (
     <>
       <Header
         crumbs={[
           { label: "Bayanat", href: "/dashboard" },
-          { label: "Data Catalog", href: "/catalog" },
+          { label: t.catalog.pageTitle, href: "/catalog" },
           ...(entity.source ? [{ label: entity.source.sourceName, href: "/catalog" }] : []),
           ...(entity.schema
             ? [{ label: entity.schema.schemaName, href: `/catalog/${entity.schema.schemaId}` }]
