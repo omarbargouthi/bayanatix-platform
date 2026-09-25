@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 type CertLevel = "GOLD" | "SILVER" | "BRONZE";
 
@@ -19,11 +21,13 @@ interface Props {
   onSaved?:  () => void;
 }
 
-const LEVELS: { code: CertLevel; label: string; color: string; badge: string }[] = [
-  { code: "GOLD",   label: "Gold",   color: "border-yellow-400 bg-yellow-50 text-yellow-700",  badge: "bg-yellow-400" },
-  { code: "SILVER", label: "Silver", color: "border-gray-400  bg-gray-50  text-gray-600",      badge: "bg-gray-400"   },
-  { code: "BRONZE", label: "Bronze", color: "border-orange-400 bg-orange-50 text-orange-700",  badge: "bg-orange-400" },
-];
+function buildLevels(c: I18nStrings["catalog"]): { code: CertLevel; label: string; color: string; badge: string }[] {
+  return [
+    { code: "GOLD",   label: c.levelGold,   color: "border-yellow-400 bg-yellow-50 text-yellow-700",  badge: "bg-yellow-400" },
+    { code: "SILVER", label: c.levelSilver, color: "border-gray-400  bg-gray-50  text-gray-600",      badge: "bg-gray-400"   },
+    { code: "BRONZE", label: c.levelBronze, color: "border-orange-400 bg-orange-50 text-orange-700",  badge: "bg-orange-400" },
+  ];
+}
 
 function DimPanel({
   title,
@@ -42,6 +46,9 @@ function DimPanel({
   initial:   DimState | null;
   onRefresh: () => void;
 }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const LEVELS = buildLevels(c);
   const [notes,   setNotes]   = useState(initial?.notes ?? "");
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -57,8 +64,8 @@ function DimPanel({
         body: JSON.stringify({ dimension, certTypeCode: level, notes: notes.trim() || null }),
       });
       if (!r.ok) {
-        const d = await r.json().catch(() => ({ error: "Failed" }));
-        setError(d.error ?? "Failed to save");
+        const d = await r.json().catch(() => ({ error: c.certSaveFailed }));
+        setError(d.error ?? c.certSaveFailed);
         return;
       }
       onRefresh();
@@ -68,7 +75,7 @@ function DimPanel({
   }
 
   async function removeCert() {
-    if (!confirm(`Remove ${title} certification?`)) return;
+    if (!confirm(c.removeCertConfirm.replace("{title}", title))) return;
     setSaving(true);
     setError(null);
     try {
@@ -93,7 +100,7 @@ function DimPanel({
             disabled={saving}
             className="text-[11px] text-red-500 hover:text-red-700 hover:underline"
           >
-            Remove
+            {t.common.remove}
           </button>
         )}
       </div>
@@ -103,12 +110,12 @@ function DimPanel({
       {current ? (
         <div className="mb-3 px-3 py-2 rounded-lg bg-canvas-soft border border-line text-[12px] flex items-center gap-2">
           <span className={`w-2.5 h-2.5 rounded-full ${LEVELS.find((l) => l.code === current)?.badge ?? "bg-gray-300"}`} />
-          <span className="font-semibold text-ink">{current}</span> certified
+          <span className="font-semibold text-ink">{current}</span> {c.certifiedSuffix}
           {initial?.certDate && <span className="text-muted ml-auto">{initial.certDate}</span>}
         </div>
       ) : (
         <div className="mb-3 px-3 py-2 rounded-lg bg-canvas-soft border border-line text-[12px] text-muted italic">
-          Not yet certified
+          {c.notYetCertified}
         </div>
       )}
 
@@ -132,13 +139,13 @@ function DimPanel({
 
       {/* Notes */}
       <div>
-        <label className="field-label">Notes <span className="text-muted font-normal normal-case">(optional)</span></label>
+        <label className="field-label">{c.certNotesLabel} <span className="text-muted font-normal normal-case">{c.certNotesOptional}</span></label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           className="input-field resize-none text-[12px]"
-          placeholder="Add certification notes…"
+          placeholder={c.certNotesPlaceholder}
         />
       </div>
 
@@ -150,6 +157,8 @@ function DimPanel({
 }
 
 export function CertifyAssetModal({ assetType, assetId, assetName, onClose, onSaved }: Props) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [data,    setData]    = useState<Record<string, DimState> | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -179,7 +188,7 @@ export function CertifyAssetModal({ assetType, assetId, assetName, onClose, onSa
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-line sticky top-0 bg-white z-10">
           <div>
-            <h2 className="font-bold text-brand-deep">Certify Asset</h2>
+            <h2 className="font-bold text-brand-deep">{c.certifyAssetTitle}</h2>
             <p className="text-[11px] text-muted font-mono mt-0.5">{assetName}</p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
@@ -187,16 +196,16 @@ export function CertifyAssetModal({ assetType, assetId, assetName, onClose, onSa
 
         <div className="px-6 py-5 space-y-4">
           <p className="text-[12px] text-muted">
-            Set independent certification levels for metadata quality and data quality.
+            {c.certifyAssetDesc}
           </p>
 
           {loading ? (
-            <div className="py-8 text-center text-muted text-sm">Loading…</div>
+            <div className="py-8 text-center text-muted text-sm">{t.common.loading}</div>
           ) : (
             <>
               <DimPanel
-                title="Metadata Certification"
-                subtitle="Certifies that descriptions, classifications, and definitions are complete and accurate."
+                title={c.metadataCertificationTitle}
+                subtitle={c.metadataCertificationDesc}
                 dimension="METADATA"
                 assetType={assetType}
                 assetId={assetId}
@@ -204,8 +213,8 @@ export function CertifyAssetModal({ assetType, assetId, assetName, onClose, onSa
                 onRefresh={handleRefresh}
               />
               <DimPanel
-                title="Data Certification"
-                subtitle="Certifies that the underlying data values are accurate, complete, and fit for use."
+                title={c.dataCertificationTitle}
+                subtitle={c.dataCertificationDesc}
                 dimension="DATA"
                 assetType={assetType}
                 assetId={assetId}
@@ -217,7 +226,7 @@ export function CertifyAssetModal({ assetType, assetId, assetName, onClose, onSa
         </div>
 
         <div className="flex justify-end px-6 py-4 border-t border-line">
-          <button onClick={onClose} className="btn btn-primary">Done</button>
+          <button onClick={onClose} className="btn btn-primary">{c.doneBtn}</button>
         </div>
       </div>
     </div>

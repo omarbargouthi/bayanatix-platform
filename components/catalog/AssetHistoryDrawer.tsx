@@ -2,36 +2,40 @@
 
 import { useState, useEffect } from "react";
 import type { AuditEntry } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
-const FIELD_LABEL: Record<string, string> = {
-  description_text:     "Description",
-  friendly_name_text:   "Friendly Name",
-  is_encrypted:         "Encrypted",
-  attribute_class_code: "Column Type",
-  glossary_term_text:   "Business Term",
-  entity_category_code: "Table Type",
-  definition_text:      "Definition",
-  format_text:          "Format",
-  business_rules_text:  "Business Rules",
-  classification_code:  "Classification",
-  is_pii_indicator:     "PII Flag",
-  pi_category_code:     "PI Category",
-  example_text:         "Example",
-  term_type:            "Term Type",
-  business_app_name:    "Business Application",
-  schema_name_text:     "Schema Name",
-  source_name_text:     "Source Name",
-};
+function buildFieldLabel(c: I18nStrings["catalog"]): Record<string, string> {
+  return {
+    description_text:     c.fieldDescription,
+    friendly_name_text:   c.fieldFriendlyName,
+    is_encrypted:         c.fieldEncrypted,
+    attribute_class_code: c.fieldColumnType,
+    glossary_term_text:   c.fieldBusinessTerm,
+    entity_category_code: c.fieldTableType,
+    definition_text:      c.fieldDefinition,
+    format_text:          c.fieldFormat,
+    business_rules_text:  c.fieldBusinessRules,
+    classification_code:  c.fieldClassification,
+    is_pii_indicator:     c.fieldPiiFlag,
+    pi_category_code:     c.fieldPiCategory,
+    example_text:         c.fieldExample,
+    term_type:            c.fieldTermType,
+    business_app_name:    c.fieldBusinessApplication,
+    schema_name_text:     c.fieldSchemaName,
+    source_name_text:     c.fieldSourceName,
+  };
+}
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: I18nStrings) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1)  return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1)  return t.common.justNow;
+  if (m < 60) return t.common.minutesAgo.replace("{n}", String(m));
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t.common.hoursAgo.replace("{n}", String(h));
   const d = Math.floor(h / 24);
-  return d === 1 ? "yesterday" : `${d}d ago`;
+  return d === 1 ? t.common.yesterday : t.common.daysAgo.replace("{n}", String(d));
 }
 
 interface Props {
@@ -42,6 +46,9 @@ interface Props {
 }
 
 export function AssetHistoryDrawer({ assetType, assetId, assetName, onClose }: Props) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const FIELD_LABEL = buildFieldLabel(c);
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -51,7 +58,7 @@ export function AssetHistoryDrawer({ assetType, assetId, assetName, onClose }: P
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setEntries(data);
-        else setError(data.error ?? "Failed to load history");
+        else setError(data.error ?? c.historyLoadFailed);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
@@ -66,7 +73,7 @@ export function AssetHistoryDrawer({ assetType, assetId, assetName, onClose }: P
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-line shrink-0">
           <div>
-            <h2 className="font-bold text-brand-deep">Change History</h2>
+            <h2 className="font-bold text-brand-deep">{c.changeHistoryTitle}</h2>
             <p className="text-[11px] text-muted mt-0.5">{assetName}</p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
@@ -75,7 +82,7 @@ export function AssetHistoryDrawer({ assetType, assetId, assetName, onClose }: P
         {/* Body */}
         <div className="overflow-y-auto flex-1 p-5">
           {loading && (
-            <div className="flex items-center justify-center py-16 text-muted text-sm">Loading…</div>
+            <div className="flex items-center justify-center py-16 text-muted text-sm">{t.common.loading}</div>
           )}
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
@@ -88,7 +95,7 @@ export function AssetHistoryDrawer({ assetType, assetId, assetName, onClose }: P
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
-              No changes recorded yet
+              {c.noChangesYet}
             </div>
           )}
           {!loading && entries.length > 0 && (
@@ -110,10 +117,10 @@ export function AssetHistoryDrawer({ assetType, assetId, assetName, onClose }: P
                           <span className="text-[12px] font-semibold text-ink">
                             {entry.userName ?? entry.userId}
                           </span>
-                          <span className="text-[11px] text-muted">{timeAgo(entry.timestamp)}</span>
+                          <span className="text-[11px] text-muted">{timeAgo(entry.timestamp, t)}</span>
                         </div>
                         {entry.changes.length === 0 ? (
-                          <p className="text-[12px] text-muted italic">No field details recorded</p>
+                          <p className="text-[12px] text-muted italic">{c.noFieldDetails}</p>
                         ) : (
                           <div className="space-y-1.5">
                             {entry.changes.map((c, i) => (

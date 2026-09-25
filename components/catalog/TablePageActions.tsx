@@ -9,6 +9,7 @@ import { FollowButton } from "./FollowButton";
 import { RaiseRequestModal } from "./RaiseRequestModal";
 import { EntityBulkExportImportModal } from "@/components/bulk/EntityBulkExportImportModal";
 import { IconHistory, IconCollaborate } from "@/components/layout/icons";
+import { useLang } from "@/lib/lang-context";
 
 export function TablePageActions({
   entityId,
@@ -20,6 +21,8 @@ export function TablePageActions({
   canEdit?:   boolean;
 }) {
   const router = useRouter();
+  const { t } = useLang();
+  const c = t.catalog;
   const [showHistory, setShowHistory] = useState(false);
   const [showCertify, setShowCertify] = useState(false);
   const [showRequestAccess, setShowRequestAccess] = useState(false);
@@ -36,10 +39,10 @@ export function TablePageActions({
       const res = await fetch(`/api/catalog/entities/${entityId}/classify-columns`, { method: "POST" });
       if (res.ok) {
         const summary = await res.json();
-        setResult(`${summary.attributesEvaluated} column(s) evaluated, ${summary.suggestionsChanged} suggestion(s) changed`);
+        setResult(c.columnsEvaluatedSummary.replace("{count}", String(summary.attributesEvaluated)).replace("{changed}", String(summary.suggestionsChanged)));
         router.refresh();
       } else {
-        setResult("Failed to run classification");
+        setResult(c.classificationFailed);
       }
     } finally {
       setClassifying(false);
@@ -53,10 +56,10 @@ export function TablePageActions({
       const res = await fetch(`/api/catalog/entities/${entityId}/classify-sit`, { method: "POST" });
       if (res.ok) {
         const summary = await res.json();
-        setSitResult(`${summary.attributesEvaluated} column(s) evaluated, ${summary.suggestionsChanged} suggestion(s) changed`);
+        setSitResult(c.columnsEvaluatedSummary.replace("{count}", String(summary.attributesEvaluated)).replace("{changed}", String(summary.suggestionsChanged)));
         router.refresh();
       } else {
-        setSitResult("Failed to run classification");
+        setSitResult(c.classificationFailed);
       }
     } finally {
       setClassifyingSit(false);
@@ -67,19 +70,19 @@ export function TablePageActions({
     <>
       <div className="flex items-center gap-2">
         <FollowButton assetType="DATA_ENTITIES" assetId={entityId} />
-        <button onClick={() => setShowRequestAccess(true)} className="btn btn-sm">Request Access</button>
+        <button onClick={() => setShowRequestAccess(true)} className="btn btn-sm">{c.requestAccessBtn}</button>
         {canEdit && (
           <button onClick={suggestColumnTypes} disabled={classifying} className="btn btn-sm disabled:opacity-50" title={result ?? undefined}>
-            {classifying ? "Suggesting…" : "Suggest Column Types"}
+            {classifying ? c.suggestingBtn : c.suggestColumnTypesBtn}
           </button>
         )}
         {canEdit && (
           <button onClick={suggestSensitiveInfoTypes} disabled={classifyingSit} className="btn btn-sm disabled:opacity-50" title={sitResult ?? undefined}>
-            {classifyingSit ? "Suggesting…" : "Suggest Term"}
+            {classifyingSit ? c.suggestingBtn : c.suggestTermBtn}
           </button>
         )}
         {canEdit && (
-          <button onClick={() => setShowBulk(true)} className="btn btn-sm">Export / Import</button>
+          <button onClick={() => setShowBulk(true)} className="btn btn-sm">{c.exportImportBtn}</button>
         )}
         <div className="w-px h-5 bg-line mx-1" />
 
@@ -87,7 +90,7 @@ export function TablePageActions({
           <button
             onClick={() => setShowCertify(true)}
             className="w-8 h-8 grid place-items-center rounded-lg text-ink-soft hover:bg-canvas-soft hover:text-amber-600 transition-colors"
-            title="Certify table"
+            title={c.certifyTableTooltip}
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
@@ -97,14 +100,14 @@ export function TablePageActions({
         <button
           onClick={() => setShowHistory(true)}
           className="w-8 h-8 grid place-items-center rounded-lg text-ink-soft hover:bg-canvas-soft hover:text-brand-purple transition-colors"
-          title="Change history"
+          title={c.changeHistoryTooltip}
         >
           <IconHistory className="w-4 h-4" />
         </button>
         <Link
-          href={`/collaboration?newTitle=${encodeURIComponent(`Discussion: ${entityName}`)}`}
+          href={`/collaboration?newTitle=${encodeURIComponent(c.discussionTitlePrefix.replace("{name}", entityName))}`}
           className="w-8 h-8 grid place-items-center rounded-lg text-ink-soft hover:bg-canvas-soft hover:text-brand-purple transition-colors"
-          title="Collaboration threads"
+          title={c.collabThreadsTooltip}
         >
           <IconCollaborate className="w-4 h-4" />
         </Link>

@@ -3,15 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import type { AssetRequest, RequestStatus } from "@/lib/types";
 import { RaiseRequestModal } from "./RaiseRequestModal";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
-const TYPE_LABEL: Record<string, string> = {
-  FIX_DATA_ISSUE:    "Fix Data Issue",
-  UPDATE_DEFINITION: "Update Definition",
-  CERTIFY_ASSET:     "Certify Asset",
-  GRANT_ACCESS:      "Grant Access",
-  REMOVE_ACCESS:     "Remove Access",
-  OTHER:             "Other",
-};
+function buildTypeLabel(c: I18nStrings["catalog"]): Record<string, string> {
+  return {
+    FIX_DATA_ISSUE:    c.reqTypeFixDataIssue,
+    UPDATE_DEFINITION: c.reqTypeUpdateDefinition,
+    CERTIFY_ASSET:     c.reqTypeCertifyAsset,
+    GRANT_ACCESS:      c.reqTypeGrantAccess,
+    REMOVE_ACCESS:     c.reqTypeRemoveAccess,
+    OTHER:             c.reqTypeOther,
+  };
+}
 
 const TYPE_COLOR: Record<string, string> = {
   FIX_DATA_ISSUE:    "bg-red-50    text-red-700    border-red-200",
@@ -28,21 +32,23 @@ const PRIORITY_COLOR: Record<string, string> = {
   LOW:    "bg-gray-300",
 };
 
-const STATUS_OPTIONS: { value: RequestStatus; label: string }[] = [
-  { value: "OPEN",        label: "Open"        },
-  { value: "IN_PROGRESS", label: "In Progress" },
-  { value: "RESOLVED",    label: "Resolved"    },
-  { value: "CLOSED",      label: "Closed"      },
-];
+function buildStatusOptions(c: I18nStrings["catalog"]): { value: RequestStatus; label: string }[] {
+  return [
+    { value: "OPEN",        label: c.statusOpen       },
+    { value: "IN_PROGRESS", label: c.statusInProgress },
+    { value: "RESOLVED",    label: c.statusResolved   },
+    { value: "CLOSED",      label: c.statusClosed     },
+  ];
+}
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: I18nStrings) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1)  return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1)  return t.common.justNow;
+  if (m < 60) return t.common.minutesAgo.replace("{n}", String(m));
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return t.common.hoursAgo.replace("{n}", String(h));
+  return t.common.daysAgo.replace("{n}", String(Math.floor(h / 24)));
 }
 
 export function AssetRequestsDrawer({
@@ -58,6 +64,10 @@ export function AssetRequestsDrawer({
   entities?: { entityId: number; entityName: string }[];
   onClose:   () => void;
 }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const TYPE_LABEL = buildTypeLabel(c);
+  const STATUS_OPTIONS = buildStatusOptions(c);
   const [requests,      setRequests]      = useState<AssetRequest[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [expandedId,    setExpandedId]    = useState<number | null>(null);
@@ -100,7 +110,7 @@ export function AssetRequestsDrawer({
         {/* Header */}
         <div className="px-6 py-4 border-b border-line flex items-start justify-between">
           <div>
-            <h2 className="font-bold text-brand-deep text-base">Asset Requests</h2>
+            <h2 className="font-bold text-brand-deep text-base">{c.assetRequestsTitle}</h2>
             <p className="text-[11px] text-muted font-mono mt-0.5">{assetName}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -108,7 +118,7 @@ export function AssetRequestsDrawer({
               onClick={() => setShowNewModal(true)}
               className="btn btn-primary btn-sm text-[12px]"
             >
-              + New Request
+              {c.newRequestBtn}
             </button>
             <button onClick={onClose} className="w-7 h-7 grid place-items-center rounded hover:bg-canvas text-muted hover:text-ink text-xl">
               &times;
@@ -119,16 +129,16 @@ export function AssetRequestsDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto nice-scroll">
           {loading ? (
-            <div className="py-16 text-center text-muted text-sm">Loading…</div>
+            <div className="py-16 text-center text-muted text-sm">{t.common.loading}</div>
           ) : requests.length === 0 ? (
             <div className="py-16 text-center">
               <div className="text-4xl mb-3">✓</div>
-              <p className="text-muted text-sm">No open requests for this asset.</p>
+              <p className="text-muted text-sm">{c.noOpenRequests}</p>
               <button
                 onClick={() => setShowNewModal(true)}
                 className="mt-4 btn btn-primary btn-sm"
               >
-                Raise a Request
+                {c.raiseARequestBtn}
               </button>
             </div>
           ) : (
@@ -137,7 +147,7 @@ export function AssetRequestsDrawer({
               {open.length > 0 && (
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2 px-1">
-                    Open · {open.length}
+                    {c.openCountLabel.replace("{n}", String(open.length))}
                   </p>
                   <div className="space-y-2">
                     {open.map((req) => (
@@ -158,7 +168,7 @@ export function AssetRequestsDrawer({
               {closed.length > 0 && (
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2 px-1">
-                    Resolved · {closed.length}
+                    {c.resolvedCountLabel.replace("{n}", String(closed.length))}
                   </p>
                   <div className="space-y-2 opacity-60">
                     {closed.map((req) => (
@@ -200,6 +210,13 @@ function RequestCard({
   onToggle:       () => void;
   onUpdateStatus: (s: RequestStatus) => void;
 }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const TYPE_LABEL = buildTypeLabel(c);
+  const STATUS_OPTIONS = buildStatusOptions(c);
+  const STATUS_LABEL: Record<string, string> = {
+    OPEN: c.statusOpen, IN_PROGRESS: c.statusInProgress, RESOLVED: c.statusResolved, CLOSED: c.statusClosed,
+  };
   return (
     <div className="border border-line rounded-xl overflow-hidden">
       {/* Summary row */}
@@ -210,7 +227,7 @@ function RequestCard({
         {/* Priority dot */}
         <span
           className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${PRIORITY_COLOR[req.priorityCode] ?? "bg-gray-300"}`}
-          title={`${req.priorityCode} priority`}
+          title={c.priorityTooltip.replace("{priority}", req.priorityCode)}
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -223,12 +240,12 @@ function RequestCard({
               req.statusCode === "RESOLVED"    ? "bg-emerald-50 text-emerald-700" :
               "bg-gray-50 text-gray-500"
             }`}>
-              {req.statusCode.replace("_", " ")}
+              {STATUS_LABEL[req.statusCode] ?? req.statusCode.replace("_", " ")}
             </span>
           </div>
           <p className="text-sm font-semibold text-brand-deep line-clamp-1">{req.title}</p>
           <p className="text-[11px] text-muted mt-0.5">
-            {req.raisedByName ?? req.raisedByUserId} · {timeAgo(req.createdAt)}
+            {req.raisedByName ?? req.raisedByUserId} · {timeAgo(req.createdAt, t)}
           </p>
         </div>
         <span className="text-muted text-[12px] shrink-0 mt-1">{expanded ? "▲" : "▼"}</span>
@@ -244,11 +261,11 @@ function RequestCard({
           {/* Other assets in this request */}
           {(req.targets ?? []).length > 1 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Also targets</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">{c.alsoTargets}</p>
               <div className="flex flex-wrap gap-1">
-                {req.targets.map((t, i) => (
+                {req.targets.map((tg, i) => (
                   <span key={i} className="text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 font-mono">
-                    {t.assetName ?? (t.assetIdText ? `${t.assetTypeCode}:${t.assetIdText}` : `${t.assetTypeCode}:${t.assetId}`)}
+                    {tg.assetName ?? (tg.assetIdText ? `${tg.assetTypeCode}:${tg.assetIdText}` : `${tg.assetTypeCode}:${tg.assetId}`)}
                   </span>
                 ))}
               </div>
@@ -257,14 +274,14 @@ function RequestCard({
 
           {req.resolutionNotes && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Resolution Notes</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">{c.resolutionNotesLabel}</p>
               <p className="text-[12px] text-ink">{req.resolutionNotes}</p>
             </div>
           )}
 
           {/* Status update */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">Update Status</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">{c.updateStatusLabel}</p>
             <div className="flex gap-1.5 flex-wrap">
               {STATUS_OPTIONS.filter((o) => o.value !== req.statusCode).map((o) => (
                 <button

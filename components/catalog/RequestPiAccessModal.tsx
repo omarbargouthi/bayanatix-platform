@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLang } from "@/lib/lang-context";
 
 interface Props {
   entityId:   number;
@@ -10,14 +11,16 @@ interface Props {
 }
 
 export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitted }: Props) {
+  const { t } = useLang();
+  const c = t.catalog;
   const [purpose,    setPurpose]    = useState("");
   const [legalBasis, setLegalBasis] = useState("");
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
   async function submit() {
-    if (!purpose.trim()) { setError("Purpose of use is required."); return; }
-    if (!legalBasis.trim()) { setError("Legal basis is required."); return; }
+    if (!purpose.trim()) { setError(c.purposeRequiredErr); return; }
+    if (!legalBasis.trim()) { setError(c.legalBasisRequiredErr); return; }
     setSaving(true);
     setError(null);
     try {
@@ -31,8 +34,8 @@ export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitte
         }),
       });
       if (!r.ok) {
-        const d = await r.json().catch(() => ({ error: "Failed" }));
-        setError(d.error ?? "Failed to submit request");
+        const d = await r.json().catch(() => ({ error: c.piAccessSubmitFailed }));
+        setError(d.error ?? c.piAccessSubmitFailed);
         return;
       }
       onSubmitted();
@@ -49,7 +52,7 @@ export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitte
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
           <div>
-            <h2 className="font-bold text-brand-deep">Request PI Clear-Text Access</h2>
+            <h2 className="font-bold text-brand-deep">{c.piAccessTitle}</h2>
             <p className="text-[11px] text-muted font-mono mt-0.5">{entityName}</p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
@@ -57,28 +60,27 @@ export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitte
 
         <div className="px-6 py-5 space-y-4">
           <p className="text-[12px] text-muted">
-            Viewing PI/PII columns as clear text requires approval from Admin, the Data Privacy Officer, and DMO
-            Manager. State the business purpose and the legal basis for this request.
+            {c.piAccessDesc}
           </p>
           <div>
-            <label className="field-label">Purpose of Use <span className="text-red-500">*</span></label>
+            <label className="field-label">{c.purposeLabel} <span className="text-red-500">*</span></label>
             <textarea
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               rows={3}
               autoFocus
               className="input-field resize-none"
-              placeholder="Why do you need to see this table's PI/PII columns unmasked?"
+              placeholder={c.purposePlaceholder}
             />
           </div>
           <div>
-            <label className="field-label">Legal Basis <span className="text-red-500">*</span></label>
+            <label className="field-label">{c.legalBasisLabel} <span className="text-red-500">*</span></label>
             <textarea
               value={legalBasis}
               onChange={(e) => setLegalBasis(e.target.value)}
               rows={2}
               className="input-field resize-none"
-              placeholder="Statute, mandate, or consent basis under PDPL for this access…"
+              placeholder={c.legalBasisPlaceholder}
             />
           </div>
           {error && (
@@ -87,9 +89,9 @@ export function RequestPiAccessModal({ entityId, entityName, onClose, onSubmitte
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-line">
-          <button onClick={onClose} className="btn btn-sm">Cancel</button>
+          <button onClick={onClose} className="btn btn-sm">{t.common.cancel}</button>
           <button onClick={submit} disabled={saving} className="btn btn-primary btn-sm">
-            {saving ? "Submitting…" : "Submit Request"}
+            {saving ? t.common.submitting : c.submitRequestBtn}
           </button>
         </div>
       </div>

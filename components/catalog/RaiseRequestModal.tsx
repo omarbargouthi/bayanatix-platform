@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { RequestTypeCode, RequestPriority } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 interface Target {
   assetTypeCode: string;
@@ -9,20 +11,24 @@ interface Target {
   assetName:     string;
 }
 
-const REQUEST_TYPES: { code: RequestTypeCode; label: string; desc: string; icon: string }[] = [
-  { code: "FIX_DATA_ISSUE",    label: "Fix Data Issue",       desc: "Report incorrect, missing, or duplicate data values",      icon: "🔧" },
-  { code: "UPDATE_DEFINITION", label: "Update Definition",    desc: "Request changes to descriptions, terms, or classifications", icon: "📝" },
-  { code: "CERTIFY_ASSET",     label: "Certify Asset",        desc: "Request certification review for metadata or data quality", icon: "🏅" },
-  { code: "GRANT_ACCESS",      label: "Grant Data Access",    desc: "Request read or write permissions to this dataset",         icon: "🔓" },
-  { code: "REMOVE_ACCESS",     label: "Remove Data Access",   desc: "Request revocation of access permissions",                  icon: "🔒" },
-  { code: "OTHER",             label: "Other",                desc: "General request or question about this data asset",         icon: "💬" },
-];
+function buildRequestTypes(c: I18nStrings["catalog"]): { code: RequestTypeCode; label: string; desc: string; icon: string }[] {
+  return [
+    { code: "FIX_DATA_ISSUE",    label: c.reqTypeFixDataIssue,      desc: c.reqTypeFixDataIssueDesc,      icon: "🔧" },
+    { code: "UPDATE_DEFINITION", label: c.reqTypeUpdateDefinition,  desc: c.reqTypeUpdateDefinitionDesc,  icon: "📝" },
+    { code: "CERTIFY_ASSET",     label: c.reqTypeCertifyAsset,      desc: c.reqTypeCertifyAssetDesc,      icon: "🏅" },
+    { code: "GRANT_ACCESS",      label: c.reqTypeGrantAccess,       desc: c.reqTypeGrantAccessDesc,       icon: "🔓" },
+    { code: "REMOVE_ACCESS",     label: c.reqTypeRemoveAccess,      desc: c.reqTypeRemoveAccessDesc,      icon: "🔒" },
+    { code: "OTHER",             label: c.reqTypeOther,             desc: c.reqTypeOtherDesc,             icon: "💬" },
+  ];
+}
 
-const PRIORITY_OPTIONS: { code: RequestPriority; label: string; desc: string; color: string }[] = [
-  { code: "HIGH",   label: "High",   desc: "Urgent — impacts production or compliance",   color: "border-red-400    bg-red-50    text-red-700"   },
-  { code: "MEDIUM", label: "Medium", desc: "Important — should be addressed this sprint", color: "border-amber-400  bg-amber-50  text-amber-700" },
-  { code: "LOW",    label: "Low",    desc: "Nice to have — can wait for the next cycle",  color: "border-gray-300   bg-gray-50   text-gray-600"  },
-];
+function buildPriorityOptions(c: I18nStrings["catalog"]): { code: RequestPriority; label: string; desc: string; color: string }[] {
+  return [
+    { code: "HIGH",   label: c.priorityHigh,   desc: c.priorityHighDesc,   color: "border-red-400    bg-red-50    text-red-700"   },
+    { code: "MEDIUM", label: c.priorityMedium, desc: c.priorityMediumDesc, color: "border-amber-400  bg-amber-50  text-amber-700" },
+    { code: "LOW",    label: c.priorityLow,    desc: c.priorityLowDesc,    color: "border-gray-300   bg-gray-50   text-gray-600"  },
+  ];
+}
 
 export function RaiseRequestModal({
   prefilledTarget,
@@ -37,10 +43,14 @@ export function RaiseRequestModal({
   onClose:              () => void;
   onSaved:              () => void;
 }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const REQUEST_TYPES = buildRequestTypes(c);
+  const PRIORITY_OPTIONS = buildPriorityOptions(c);
   const [requestType,  setRequestType]  = useState<RequestTypeCode | "">(initialRequestType ?? "");
   const [priority,     setPriority]     = useState<RequestPriority>("MEDIUM");
   const [title,        setTitle]        = useState(
-    initialRequestType ? REQUEST_TYPES.find((t) => t.code === initialRequestType)?.label ?? "" : ""
+    initialRequestType ? REQUEST_TYPES.find((rt) => rt.code === initialRequestType)?.label ?? "" : ""
   );
   const [description,  setDescription]  = useState("");
   const [targets,      setTargets]      = useState<Target[]>(prefilledTarget ? [prefilledTarget] : []);
@@ -61,9 +71,9 @@ export function RaiseRequestModal({
   }
 
   async function submit() {
-    if (!requestType) { setError("Please select a request type"); return; }
-    if (!title.trim())  { setError("Please enter a title"); return; }
-    if (targets.length === 0) { setError("At least one target asset is required"); return; }
+    if (!requestType) { setError(c.selectRequestTypeErr); return; }
+    if (!title.trim())  { setError(c.enterTitleErr); return; }
+    if (targets.length === 0) { setError(c.targetRequiredErr); return; }
 
     setSaving(true);
     setError(null);
@@ -80,8 +90,8 @@ export function RaiseRequestModal({
         }),
       });
       if (!r.ok) {
-        const d = await r.json().catch(() => ({ error: "Unknown error" }));
-        setError(d.error ?? "Failed to submit");
+        const d = await r.json().catch(() => ({ error: c.unknownErr }));
+        setError(d.error ?? c.submitRequestFailed);
         return;
       }
       onSaved();
@@ -98,29 +108,29 @@ export function RaiseRequestModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-line sticky top-0 bg-white z-10">
-          <h2 className="font-bold text-brand-deep">Raise a Request</h2>
+          <h2 className="font-bold text-brand-deep">{c.raiseRequestTitle}</h2>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-5">
           {/* Request type */}
           <div>
-            <label className="field-label">Request Type</label>
+            <label className="field-label">{c.requestTypeLabel}</label>
             <div className="grid grid-cols-2 gap-2">
-              {REQUEST_TYPES.map((t) => (
+              {REQUEST_TYPES.map((rt) => (
                 <button
-                  key={t.code}
+                  key={rt.code}
                   type="button"
-                  onClick={() => { setRequestType(t.code); if (!title) setTitle(t.label); }}
+                  onClick={() => { setRequestType(rt.code); if (!title) setTitle(rt.label); }}
                   className={`text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
-                    requestType === t.code
+                    requestType === rt.code
                       ? "border-brand-purple bg-brand-purple/5"
                       : "border-line hover:border-brand-purple/40"
                   }`}
                 >
-                  <div className="text-base leading-none mb-1">{t.icon}</div>
-                  <div className="text-[12px] font-semibold text-brand-deep">{t.label}</div>
-                  <div className="text-[10px] text-muted mt-0.5 leading-tight">{t.desc}</div>
+                  <div className="text-base leading-none mb-1">{rt.icon}</div>
+                  <div className="text-[12px] font-semibold text-brand-deep">{rt.label}</div>
+                  <div className="text-[10px] text-muted mt-0.5 leading-tight">{rt.desc}</div>
                 </button>
               ))}
             </div>
@@ -128,7 +138,7 @@ export function RaiseRequestModal({
 
           {/* Priority */}
           <div>
-            <label className="field-label">Priority</label>
+            <label className="field-label">{c.priorityLabel}</label>
             <div className="flex gap-2">
               {PRIORITY_OPTIONS.map((p) => (
                 <button
@@ -152,39 +162,39 @@ export function RaiseRequestModal({
 
           {/* Title */}
           <div>
-            <label className="field-label">Title</label>
+            <label className="field-label">{c.titleLabel}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="input-field"
-              placeholder="Brief description of the request…"
+              placeholder={c.titlePlaceholder}
               autoFocus
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="field-label">Details <span className="text-muted font-normal normal-case">(optional)</span></label>
+            <label className="field-label">{c.detailsLabel} <span className="text-muted font-normal normal-case">{c.detailsOptional}</span></label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="input-field resize-none"
-              placeholder="Provide context, steps to reproduce, or expected behaviour…"
+              placeholder={c.detailsPlaceholder}
             />
           </div>
 
           {/* Target assets */}
           <div>
-            <label className="field-label">Target Assets</label>
+            <label className="field-label">{c.targetAssetsLabel}</label>
             <div className="space-y-1.5 mb-2">
-              {targets.map((t, idx) => (
+              {targets.map((tg, idx) => (
                 <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-canvas border border-line rounded-lg">
                   <span className="text-[10px] uppercase tracking-wider text-muted w-16 shrink-0">
-                    {t.assetTypeCode.replace("DATA_", "")}
+                    {tg.assetTypeCode.replace("DATA_", "")}
                   </span>
-                  <span className="text-[12px] font-mono font-semibold text-brand-deep flex-1 truncate">{t.assetName}</span>
+                  <span className="text-[12px] font-mono font-semibold text-brand-deep flex-1 truncate">{tg.assetName}</span>
                   {targets.length > 1 && (
                     <button onClick={() => removeTarget(idx)} className="text-muted hover:text-red-500 text-sm leading-none">&times;</button>
                   )}
@@ -196,7 +206,7 @@ export function RaiseRequestModal({
             {availableEntities.length > 0 && (
               <details className="text-[12px]">
                 <summary className="cursor-pointer text-brand-purple hover:underline select-none">
-                  + Add another table from this schema
+                  {c.addAnotherTable}
                 </summary>
                 <div className="mt-2 border border-line rounded-lg overflow-hidden max-h-40 overflow-y-auto">
                   {availableEntities.map((e) => (
@@ -219,9 +229,9 @@ export function RaiseRequestModal({
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-line">
-          <button onClick={onClose} className="btn">Cancel</button>
+          <button onClick={onClose} className="btn">{t.common.cancel}</button>
           <button onClick={submit} disabled={saving} className="btn btn-primary">
-            {saving ? "Submitting…" : "Submit Request"}
+            {saving ? t.common.submitting : c.submitRequestBtn}
           </button>
         </div>
       </div>

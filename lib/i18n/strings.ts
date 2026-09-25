@@ -82,6 +82,15 @@ export type I18nStrings = {
     date:        string;
     by:          string;
     history:     string;
+    remove:      string;
+    submitting:  string;
+    submit:      string;
+    // Relative time (used by activity/history timelines)
+    justNow:     string;
+    minutesAgo:  string;   // "{n}m ago"
+    hoursAgo:    string;   // "{n}h ago"
+    yesterday:   string;
+    daysAgo:     string;   // "{n}d ago"
   };
 
   // ── Compliance Assessment ───────────────────────────────────────────────────
@@ -601,6 +610,118 @@ export type I18nStrings = {
     columnTypeClassification:  string;
     overallQualityScore:       string;
     noRulesScored:             string;
+    // TablePageActions.tsx
+    requestAccessBtn:      string;
+    suggestingBtn:         string;
+    suggestColumnTypesBtn: string;
+    suggestTermBtn:        string;
+    exportImportBtn:       string;
+    certifyTableTooltip:   string;
+    changeHistoryTooltip:  string;
+    collabThreadsTooltip:  string;
+    discussionTitlePrefix: string;   // "Discussion: {name}"
+    columnsEvaluatedSummary: string; // "{count} column(s) evaluated, {changed} suggestion(s) changed"
+    classificationFailed:  string;
+    // CertifyAssetModal.tsx
+    certifyAssetTitle:        string;
+    certifyAssetDesc:         string;
+    metadataCertificationTitle: string;
+    metadataCertificationDesc:  string;
+    dataCertificationTitle:     string;
+    dataCertificationDesc:      string;
+    removeCertConfirm:        string;  // "Remove {title} certification?"
+    certifiedSuffix:          string;
+    notYetCertified:          string;
+    certNotesLabel:           string;
+    certNotesOptional:        string;
+    certNotesPlaceholder:     string;
+    certSaveFailed:           string;
+    doneBtn:                  string;
+    levelGold:                string;
+    levelSilver:              string;
+    levelBronze:              string;
+    // AssetHistoryDrawer.tsx
+    changeHistoryTitle:   string;
+    noChangesYet:         string;
+    noFieldDetails:       string;
+    historyLoadFailed:    string;
+    fieldDescription:        string;
+    fieldFriendlyName:       string;
+    fieldEncrypted:          string;
+    fieldColumnType:         string;
+    fieldBusinessTerm:       string;
+    fieldTableType:          string;
+    fieldDefinition:         string;
+    fieldFormat:             string;
+    fieldBusinessRules:      string;
+    fieldClassification:     string;
+    fieldPiiFlag:            string;
+    fieldPiCategory:         string;
+    fieldExample:            string;
+    fieldTermType:           string;
+    fieldBusinessApplication:string;
+    fieldSchemaName:         string;
+    fieldSourceName:         string;
+    // RaiseRequestModal.tsx (also used by AssetRequestsDrawer)
+    raiseRequestTitle:     string;
+    requestTypeLabel:      string;
+    reqTypeFixDataIssue:      string;
+    reqTypeFixDataIssueDesc:  string;
+    reqTypeUpdateDefinition:     string;
+    reqTypeUpdateDefinitionDesc: string;
+    reqTypeCertifyAsset:      string;
+    reqTypeCertifyAssetDesc:  string;
+    reqTypeGrantAccess:       string;
+    reqTypeGrantAccessDesc:   string;
+    reqTypeRemoveAccess:      string;
+    reqTypeRemoveAccessDesc:  string;
+    reqTypeOther:             string;
+    reqTypeOtherDesc:         string;
+    priorityLabel:      string;
+    priorityHigh:       string;
+    priorityHighDesc:   string;
+    priorityMedium:     string;
+    priorityMediumDesc: string;
+    priorityLow:        string;
+    priorityLowDesc:    string;
+    titleLabel:            string;
+    titlePlaceholder:      string;
+    detailsLabel:          string;
+    detailsOptional:       string;
+    detailsPlaceholder:    string;
+    targetAssetsLabel:     string;
+    addAnotherTable:       string;
+    selectRequestTypeErr:  string;
+    enterTitleErr:         string;
+    targetRequiredErr:     string;
+    submitRequestFailed:   string;
+    unknownErr:            string;
+    submitRequestBtn:      string;
+    // AssetRequestsDrawer.tsx
+    assetRequestsTitle:  string;
+    newRequestBtn:       string;
+    noOpenRequests:      string;
+    raiseARequestBtn:    string;
+    openCountLabel:      string;   // "Open · {n}"
+    resolvedCountLabel:  string;   // "Resolved · {n}"
+    alsoTargets:         string;
+    resolutionNotesLabel: string;
+    updateStatusLabel:    string;
+    statusOpen:        string;
+    statusInProgress:  string;
+    statusResolved:    string;
+    statusClosed:      string;
+    priorityTooltip:   string;   // "{priority} priority"
+    // RequestPiAccessModal.tsx
+    piAccessTitle:           string;
+    piAccessDesc:            string;
+    purposeLabel:            string;
+    purposePlaceholder:      string;
+    legalBasisLabel:         string;
+    legalBasisPlaceholder:   string;
+    purposeRequiredErr:      string;
+    legalBasisRequiredErr:   string;
+    piAccessSubmitFailed:    string;
   };
 
   // ── Data Quality ─────────────────────────────────────────────────────────────
@@ -1160,6 +1281,16 @@ export type I18nStrings = {
       viaLabel:        string;   // "via {name}"
       exportCsv:       string;
     };
+    // PbixUploadButton.tsx
+    uploadPbixBtn:          string;
+    uploadPbixDesc:         string;
+    attachConnectionLabel:  string;
+    noConnectionsOption:    string;
+    parsingBtn:             string;
+    uploadBuildBtn:         string;
+    loadConnectionsFailed:  string;
+    uploadFailedErr:        string;
+    edgesCreatedSummary:    string;  // "{n} lineage edge(s) created"
   };
 
   // ── Data Sharing Agreements ─────────────────────────────────────────────────
