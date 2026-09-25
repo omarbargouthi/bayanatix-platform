@@ -120,11 +120,11 @@ export default async function TablePage({
             <IconTable className="w-6 h-6 text-brand-purple shrink-0" />
             <span className="min-w-0 truncate" dir="auto" title={entity.entityName}>{entity.entityName}</span>
             <span className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider text-muted">Metadata</span>
+              <span className="text-[9px] uppercase tracking-wider text-muted">{t.catalog.metadataCert}</span>
               <CertTag code={entity.certCode} />
             </span>
             <span className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider text-muted">Data</span>
+              <span className="text-[9px] uppercase tracking-wider text-muted">{t.catalog.dataCert}</span>
               <CertTag code={entity.dataCertCode} />
             </span>
             <TableTypeBadge
@@ -184,7 +184,7 @@ export default async function TablePage({
                 </div>
 
                 <div className="mt-6 flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-sm">Data Quality</h4>
+                  <h4 className="font-bold text-sm">{t.catalog.tabDataQuality}</h4>
                   <a href="?tab=Data+Quality" className="text-[11px] text-brand-purple hover:underline">
                     {schemaTabDqRules.length} rule{schemaTabDqRules.length !== 1 ? "s" : ""} → manage
                   </a>
