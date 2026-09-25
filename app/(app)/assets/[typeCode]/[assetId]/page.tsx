@@ -32,7 +32,7 @@ export default async function AssetDetailPage({ params }: { params: { typeCode: 
   ]);
 
   const canWrite = user.role === "ADMIN" || user.role === "STEWARD";
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

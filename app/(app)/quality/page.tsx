@@ -20,7 +20,7 @@ export default async function DataQualityPage() {
   ]);
 
   const canEdit = user.role === "ADMIN" || user.role === "STEWARD";
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

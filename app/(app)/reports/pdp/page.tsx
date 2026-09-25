@@ -19,7 +19,7 @@ export default async function PdpReportPage() {
     getStewardScopeInfo(user),
   ]);
   const domains = scope.restricted ? allDomains.filter((d) => scope.allowedDomainIds.includes(d.glossaryId)) : allDomains;
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

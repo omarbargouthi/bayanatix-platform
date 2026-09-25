@@ -12,7 +12,7 @@ export default async function FrameworkPage() {
   if (!user) redirect("/login");
 
   const counts = await getSectionCounts();
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

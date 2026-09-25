@@ -16,7 +16,7 @@ export default async function RegistersPage() {
     listRegisters(),
     isAdmin ? listDeletedRegisters() : Promise.resolve([]),
   ]);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

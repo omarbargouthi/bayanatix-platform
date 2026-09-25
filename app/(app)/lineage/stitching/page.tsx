@@ -10,7 +10,7 @@ export default async function StitchingReviewPage() {
   const user = await getSession();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN" && user.role !== "STEWARD") redirect("/lineage");
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

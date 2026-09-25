@@ -12,7 +12,7 @@ export default async function EnrichmentPage() {
   if (!user) redirect("/login");
 
   const canEdit = await canEditMetadata(user);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

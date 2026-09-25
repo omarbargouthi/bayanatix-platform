@@ -29,7 +29,7 @@ export default async function CatalogPage() {
     getCdeMetadataQuality(),
     getCdeDataQuality(),
   ]);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

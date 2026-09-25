@@ -18,7 +18,7 @@ export default async function SearchPage({
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

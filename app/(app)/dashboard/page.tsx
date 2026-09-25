@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   ]);
 
   const firstName = user.fullName.split(" ")[0];
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

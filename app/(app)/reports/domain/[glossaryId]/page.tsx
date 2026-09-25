@@ -14,7 +14,7 @@ export default async function DomainScorecardPage({ params }: { params: { glossa
   const glossaryId = Number(params.glossaryId);
   const scorecard = await getDomainScorecard(glossaryId);
   if (!scorecard) notFound();
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

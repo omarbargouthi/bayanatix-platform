@@ -17,7 +17,7 @@ export default async function NewOpenDataPage() {
     SELECT dimension_code AS code, dimension_name_text AS name
     FROM bayanat.dq_dimensions ORDER BY dimension_code
   `;
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

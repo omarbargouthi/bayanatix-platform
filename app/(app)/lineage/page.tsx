@@ -16,7 +16,7 @@ export default async function LineagePage({
 
   const assetType = searchParams.assetType === "DATA_ATTRIBUTES" ? "DATA_ATTRIBUTES" : searchParams.assetType === "DATA_ENTITIES" ? "DATA_ENTITIES" : null;
   const assetId = searchParams.assetId ? Number(searchParams.assetId) : null;
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function FoiPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  const t = getServerT();
+  const t = await getServerT(session);
 
   return (
     <>

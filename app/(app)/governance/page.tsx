@@ -18,7 +18,7 @@ export default async function GovernancePage() {
     listRegisters(),
     listFrameworks(false), // only regulations the admin has marked applicable — matches /governance/compliance
   ]);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

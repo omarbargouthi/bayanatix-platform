@@ -29,7 +29,7 @@ export default async function FrameworkSectionPage({ params }: { params: { secti
 
   const sectionCode = key.toUpperCase();
   const docs = await listGovDocs(sectionCode);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

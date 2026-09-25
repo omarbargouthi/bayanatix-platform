@@ -13,7 +13,7 @@ export default async function AssetListPage({ params }: { params: { typeCode: st
 
   const type = await getCustomAssetTypeByCode(params.typeCode.toUpperCase());
   if (!type) notFound();
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

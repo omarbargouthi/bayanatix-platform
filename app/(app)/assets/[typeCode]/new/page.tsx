@@ -14,7 +14,7 @@ export default async function NewAssetPage({ params }: { params: { typeCode: str
 
   const type = await getCustomAssetTypeByCode(params.typeCode.toUpperCase());
   if (!type || !type.isEnabled) notFound();
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

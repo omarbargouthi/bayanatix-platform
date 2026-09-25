@@ -24,7 +24,7 @@ export default async function HomepagePage() {
   const widgetData = Object.fromEntries(entries);
 
   const firstName = user.fullName.split(" ")[0];
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

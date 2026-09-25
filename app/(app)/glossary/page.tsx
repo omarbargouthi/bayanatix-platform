@@ -25,7 +25,7 @@ export default async function GlossaryPage({
     getGlossaryTerms({ domainId: domainFilter ?? undefined, subDomainId: subDomainFilter ?? undefined }),
     canEditMetadata(user),
   ]);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

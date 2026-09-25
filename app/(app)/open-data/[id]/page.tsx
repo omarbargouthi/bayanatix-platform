@@ -30,7 +30,7 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
     user.role === "ADMIN" ||
     user.role === "STEWARD" ||
     dataset.raisedByUserId === user.userId;
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

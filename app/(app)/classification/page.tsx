@@ -18,7 +18,7 @@ export default async function ClassificationPage({
   const dataSourceId = searchParams.dataSourceId ? Number(searchParams.dataSourceId) : undefined;
   const schemaId = searchParams.schemaId ? Number(searchParams.schemaId) : undefined;
   const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId });
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

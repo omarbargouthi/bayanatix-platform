@@ -79,7 +79,7 @@ export default async function TablePage({
     entity.entityName, entity.schema?.schemaName,
     entity.rowCount ?? undefined,
   ).catch(() => {});
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

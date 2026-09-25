@@ -35,7 +35,7 @@ export default async function CompliancePage({
     fwId ? getConfigItems(fwId)            : Promise.resolve([]),
     fwId ? listDomainConfig(fwId)          : Promise.resolve([]),
   ]);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

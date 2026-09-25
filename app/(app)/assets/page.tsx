@@ -12,7 +12,7 @@ export default async function CustomAssetsHubPage() {
   if (!user) redirect("/login");
 
   const types = await getCustomAssetTypes(false);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

@@ -29,7 +29,7 @@ export default async function DsaPage({ params }: Props) {
   const canClassify = await canEditMetadata(session);
 
   const collabHref = `/collaboration?newTitle=${encodeURIComponent(`Re: ${titleText}`)}`;
-  const t = getServerT();
+  const t = await getServerT(session);
 
   return (
     <>

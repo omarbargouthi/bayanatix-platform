@@ -23,7 +23,7 @@ export default async function GlossaryTermPage({
   if (!term) notFound();
 
   const canEdit = await canEditMetadata(user);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

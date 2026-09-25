@@ -19,7 +19,7 @@ export default async function MatrixPage({ params, searchParams }: { params: { r
   const asOf = searchParams.asOf || today;
   const matrix = await getRelationshipMatrix(relType.relTypeId, asOf);
   if (!matrix) notFound();
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

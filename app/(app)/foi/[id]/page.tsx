@@ -22,7 +22,7 @@ export default async function FoiCasePage({ params }: Props) {
     `;
     if (row) refCode = row.ref;
   }
-  const t = getServerT();
+  const t = await getServerT(session);
 
   return (
     <>

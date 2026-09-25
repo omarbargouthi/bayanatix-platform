@@ -20,7 +20,7 @@ export default async function OpenDataPage({
   const page   = Math.max(1, Number(searchParams.page ?? "1"));
 
   const { data: datasets, total } = await listOpenDatasets({ status, search, page, limit: 20 });
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

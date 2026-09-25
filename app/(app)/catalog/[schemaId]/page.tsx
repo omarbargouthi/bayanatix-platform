@@ -37,7 +37,7 @@ export default async function SchemaPage({
   const tables    = schema.entities.filter((e) => !e.isView);
   const views     = schema.entities.filter((e) => e.isView);
   const totalCols = schema.entities.reduce((s, e) => s + (e.columnCount ?? 0), 0);
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>

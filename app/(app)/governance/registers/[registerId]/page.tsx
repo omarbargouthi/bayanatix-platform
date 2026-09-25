@@ -24,7 +24,7 @@ export default async function RegisterDetailPage({ params }: { params: { registe
 
   // Block non-admins from accessing archived registers
   if (register.deletedAt && !isAdmin) notFound();
-  const t = getServerT();
+  const t = await getServerT(user);
 
   return (
     <>
