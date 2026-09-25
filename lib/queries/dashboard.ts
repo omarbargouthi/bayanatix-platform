@@ -112,8 +112,13 @@ export async function getRecentAssets(userId: string, limit = 6): Promise<Recent
         ELSE '/glossary/' || l."assetId"
       END AS "href"
     FROM latest l
-    LEFT JOIN bayanat.data_schemas  s ON s.schema_name_text = l."assetMeta" AND l."assetType" = 'TABLE'
-    LEFT JOIN bayanat.data_entities e ON e.entity_name_text = l."assetMeta" AND l."assetType" = 'COLUMN'
+    -- assetMeta holds the parent schema_id/entity_id as text (not a name — schema
+    -- and table names aren't unique across sources/schemas, e.g. two sources can
+    -- each have a schema named "crm"; joining on the name fanned one row from the
+    -- "latest" CTE out into two, producing duplicate (assetType, assetId) pairs
+    -- and a React duplicate-key warning wherever this list gets rendered).
+    LEFT JOIN bayanat.data_schemas  s ON s.schema_id::text = l."assetMeta" AND l."assetType" = 'TABLE'
+    LEFT JOIN bayanat.data_entities e ON e.entity_id::text = l."assetMeta" AND l."assetType" = 'COLUMN'
     ORDER BY l."visitedAt" DESC
     LIMIT ${limit}
   `;

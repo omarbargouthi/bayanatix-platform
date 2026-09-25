@@ -73,10 +73,12 @@ export default async function TablePage({
   const metadataCompletionPct         = totalCols > 0 ? Math.round((withDescription / totalCols) * 100) : 0;
   const columnTypeClassificationPct   = totalCols > 0 ? Math.round((withColumnType  / totalCols) * 100) : 0;
 
-  // Fire-and-forget — don't block page render
+  // Fire-and-forget — don't block page render. assetMeta is the schema's id
+  // (not its name — schema names aren't unique across sources, which caused
+  // getRecentAssets()'s join to fan out into duplicate rows; see its comment).
   void trackAssetVisit(
     user.userId, "TABLE", String(entity.entityId),
-    entity.entityName, entity.schema?.schemaName,
+    entity.entityName, entity.schema?.schemaId != null ? String(entity.schema.schemaId) : undefined,
     entity.rowCount ?? undefined,
   ).catch(() => {});
   const t = await getServerT(user);
