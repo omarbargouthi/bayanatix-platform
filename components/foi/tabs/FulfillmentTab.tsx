@@ -3,28 +3,36 @@
 import { useState, useEffect, useCallback } from "react";
 import type { FoiCaseDetail } from "@/lib/queries/foi";
 import type { SessionUser } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 type Props = { caseData: FoiCaseDetail; currentUser: SessionUser; onChanged: () => void };
 
-const STAGES = [
-  { code: "OWNER_IDENTIFICATION",   label: "Owner Identification",    role: "Open Data Officer", desc: "Identify the data owners and responsible parties for the requested information." },
-  { code: "SOURCE_MAPPING",         label: "Source Mapping",          role: "Open Data Officer", desc: "Map each requested attribute to a source system column from the catalog, or register a manual source." },
-  { code: "CLASSIFICATION_GATE",    label: "Classification Gate",     role: "Open Data Officer", desc: "Verify all mapped columns are PUBLIC or INTERNAL. CONFIDENTIAL or higher will block the request." },
-  { code: "QUALITY_GATE",           label: "Quality Gate",            role: "Data Steward",      desc: "Review DQ results for catalog-mapped columns. Flagged issues are documented; officer decides whether to proceed." },
-  { code: "TECHNICAL_COMPILATION",  label: "Technical Compilation",   role: "Technical Team",    desc: "Extract and compile the approved dataset. An Open Data dataset record is auto-created at this stage." },
-  { code: "OWNER_PACKAGE_APPROVAL", label: "Owner Package Approval",  role: "Data Owner",        desc: "Data owner reviews the compiled package for accuracy and completeness before release." },
-  { code: "DMO_RELEASE_APPROVAL",   label: "DMO Release Approval",    role: "DMO Admin",         desc: "DMO Admin gives final approval to release the dataset to the requester." },
-  { code: "DELIVERY",               label: "Delivery",                role: "Open Data Officer", desc: "Deliver the approved dataset to the requester and close the case." },
-];
+type FulfillmentStrings = I18nStrings["foi"]["fulfillment"];
 
-const SENSITIVITY_OPTIONS = [
-  { code: "PUBLIC",       label: "Public",       color: "text-green-700",  bg: "bg-green-100" },
-  { code: "INTERNAL",     label: "Internal",     color: "text-blue-700",   bg: "bg-blue-100" },
-  { code: "CONFIDENTIAL", label: "Confidential", color: "text-orange-700", bg: "bg-orange-100" },
-  { code: "RESTRICTED",   label: "Restricted",   color: "text-red-700",    bg: "bg-red-100" },
-  { code: "SECRET",       label: "Secret",       color: "text-red-900",    bg: "bg-red-200" },
-  { code: "TOP_SECRET",   label: "Top Secret",   color: "text-red-900",    bg: "bg-red-300" },
-];
+function buildStages(c: FulfillmentStrings) {
+  return [
+    { code: "OWNER_IDENTIFICATION",   label: c.stage.ownerIdName,      role: c.stage.ownerIdRole,      desc: c.stage.ownerIdDesc },
+    { code: "SOURCE_MAPPING",         label: c.stage.sourceMapName,    role: c.stage.sourceMapRole,    desc: c.stage.sourceMapDesc },
+    { code: "CLASSIFICATION_GATE",    label: c.stage.classGateName,    role: c.stage.classGateRole,    desc: c.stage.classGateDesc },
+    { code: "QUALITY_GATE",           label: c.stage.qualityGateName,  role: c.stage.qualityGateRole,  desc: c.stage.qualityGateDesc },
+    { code: "TECHNICAL_COMPILATION",  label: c.stage.techCompName,     role: c.stage.techCompRole,     desc: c.stage.techCompDesc },
+    { code: "OWNER_PACKAGE_APPROVAL", label: c.stage.ownerApprovalName,role: c.stage.ownerApprovalRole,desc: c.stage.ownerApprovalDesc },
+    { code: "DMO_RELEASE_APPROVAL",   label: c.stage.dmoApprovalName,  role: c.stage.dmoApprovalRole,  desc: c.stage.dmoApprovalDesc },
+    { code: "DELIVERY",               label: c.stage.deliveryName,     role: c.stage.deliveryRole,     desc: c.stage.deliveryDesc },
+  ];
+}
+
+function buildSensitivityOptions(c: FulfillmentStrings) {
+  return [
+    { code: "PUBLIC",       label: c.sensPublic,       color: "text-green-700",  bg: "bg-green-100" },
+    { code: "INTERNAL",     label: c.sensInternal,     color: "text-blue-700",   bg: "bg-blue-100" },
+    { code: "CONFIDENTIAL", label: c.sensConfidential, color: "text-orange-700", bg: "bg-orange-100" },
+    { code: "RESTRICTED",   label: c.sensRestricted,   color: "text-red-700",    bg: "bg-red-100" },
+    { code: "SECRET",       label: c.sensSecret,       color: "text-red-900",    bg: "bg-red-200" },
+    { code: "TOP_SECRET",   label: c.sensTopSecret,    color: "text-red-900",    bg: "bg-red-300" },
+  ];
+}
 
 const BLOCKED_SENSITIVITIES = new Set(["CONFIDENTIAL","RESTRICTED","SECRET","TOP_SECRET"]);
 const OPEN_DATA_PROCESSED_STATUSES = new Set(["PENDING_APPROVAL","APPROVED","PUBLISHED"]);
@@ -108,9 +116,9 @@ function emptyForm(): MapForm {
   };
 }
 
-function SensChip({ code }: { code: string | null }) {
+function SensChip({ code, opts }: { code: string | null; opts: ReturnType<typeof buildSensitivityOptions> }) {
   if (!code) return null;
-  const opt = SENSITIVITY_OPTIONS.find(s => s.code === code);
+  const opt = opts.find(s => s.code === code);
   if (!opt) return <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{code}</span>;
   return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${opt.bg} ${opt.color}`}>{opt.label}</span>;
 }
@@ -120,6 +128,10 @@ function fmtDate(iso: string) {
 }
 
 export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Props) {
+  const { t } = useLang();
+  const c = t.foi.fulfillment;
+  const STAGES = buildStages(c);
+  const SENSITIVITY_OPTIONS = buildSensitivityOptions(c);
   const currentIdx    = STAGES.findIndex(s => s.code === caseData.fulfillmentStageCode);
   const inFulfillment = caseData.statusCode === "IN_FULFILLMENT";
   const stage         = caseData.fulfillmentStageCode;
@@ -368,7 +380,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
   if (!stage && !inFulfillment) {
     return (
       <div className="card p-8 text-center text-muted text-sm max-w-2xl">
-        Fulfillment starts after the requester accepts the quote and payment is confirmed (or exempted). Use the Assessment &amp; Quote tab to start fulfillment.
+        {c.notStartedYet}
       </div>
     );
   }
@@ -378,7 +390,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
 
       {/* Stage timeline */}
       <div className="card p-5">
-        <h2 className="font-semibold text-sm text-ink mb-4">Fulfillment Stages</h2>
+        <h2 className="font-semibold text-sm text-ink mb-4">{c.stagesTitle}</h2>
         <div className="space-y-1">
           {STAGES.map((s, i) => {
             const done    = i < currentIdx;
@@ -397,13 +409,13 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                   <div className="flex items-baseline gap-2">
                     <span className={`text-sm font-medium ${current ? "text-brand-purple" : done ? "text-green-700" : "text-ink-soft"}`}>{s.label}</span>
                     <span className="text-[10px] text-muted">{s.role}</span>
-                    {current && <span className="text-[10px] bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded-full font-semibold">Current</span>}
+                    {current && <span className="text-[10px] bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded-full font-semibold">{c.currentBadge}</span>}
                   </div>
                   <p className="text-[11px] text-muted mt-0.5">{s.desc}</p>
                   {current && caseData.linkedOpenDatasetId && s.code === "TECHNICAL_COMPILATION" && (
                     <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer"
                       className="text-[11px] text-brand-purple hover:underline mt-0.5 block">
-                      → View linked Open Data dataset #{caseData.linkedOpenDatasetId}
+                      {c.viewLinkedDataset.replace("{id}", String(caseData.linkedOpenDatasetId))}
                     </a>
                   )}
                 </div>
@@ -417,18 +429,17 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {inFulfillment && stage === "SOURCE_MAPPING" && (
         <div className="card p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-ink">Source Mapping</h2>
-            <span className="text-[11px] text-muted">{mappings.length} / {reqAttrs.length} mapped</span>
+            <h2 className="font-semibold text-sm text-ink">{c.sourceMappingTitle}</h2>
+            <span className="text-[11px] text-muted">{c.mappedCount.replace("{mapped}", String(mappings.length)).replace("{total}", String(reqAttrs.length))}</span>
           </div>
           <p className="text-xs text-muted">
-            Map each attribute to a source column. Classification is read automatically from the catalog.
-            For unclassified columns, use the collaboration thread to coordinate with the data steward.
+            {c.sourceMappingDesc}
           </p>
 
           {loadingMap ? (
-            <div className="py-6 text-center text-muted text-sm">Loading…</div>
+            <div className="py-6 text-center text-muted text-sm">{t.common.loading}</div>
           ) : reqAttrs.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted italic">No structured attributes were submitted with this request.</div>
+            <div className="py-6 text-center text-sm text-muted italic">{c.noStructuredAttrs}</div>
           ) : (
             <div className="space-y-3">
               {reqAttrs.map(a => {
@@ -457,36 +468,36 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                                 mapping.classificationStatus === "BLOCKED" ? "bg-red-100 text-red-700" :
                                 "bg-amber-100 text-amber-700"
                               }`}>{mapping.classificationStatus}</span>
-                              {mapping.sensitivityCode && <SensChip code={mapping.sensitivityCode} />}
+                              {mapping.sensitivityCode && <SensChip code={mapping.sensitivityCode} opts={SENSITIVITY_OPTIONS} />}
                               {mapping.catalogClassCode && (
                                 <span className="text-[10px] italic text-blue-600">
-                                  catalog: {mapping.catalogClassLabel ?? mapping.catalogClassCode}
+                                  {c.catalogPrefix.replace("{label}", mapping.catalogClassLabel ?? mapping.catalogClassCode)}
                                 </span>
                               )}
                               {needsClassification && !mapping.catalogClassCode && (
                                 <span className="text-[10px] bg-orange-50 text-orange-700 font-semibold px-1.5 py-0.5 rounded">
-                                  Unclassified in catalog
+                                  {c.unclassifiedInCatalog}
                                 </span>
                               )}
                               {hasNonstandardCode && (
                                 <span className="text-[10px] bg-purple-50 text-purple-700 font-semibold px-1.5 py-0.5 rounded">
-                                  Needs FOI sensitivity
+                                  {c.needsFoiSensitivity}
                                 </span>
                               )}
                               {mapping.stewardNotifiedAt && (
                                 <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded">
-                                  Steward notified {new Date(mapping.stewardNotifiedAt).toLocaleDateString()}
+                                  {c.stewardNotified.replace("{date}", new Date(mapping.stewardNotifiedAt).toLocaleDateString())}
                                 </span>
                               )}
                               {thread.length > 0 && (
                                 <button onClick={() => setExpandedThread(s => { const n = new Set(s); if (n.has(mapping.mappingId)) n.delete(mapping.mappingId); else n.add(mapping.mappingId); return n; })}
                                   className="text-[10px] text-brand-purple hover:underline ml-1">
-                                  {isThreadExpanded ? "Hide" : `Thread (${thread.length})`}
+                                  {isThreadExpanded ? c.hideThread : c.threadCount.replace("{n}", String(thread.length))}
                                 </button>
                               )}
                             </>
                           ) : (
-                            <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 rounded">Not mapped</span>
+                            <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 rounded">{c.notMapped}</span>
                           )}
                         </div>
                         {a.description && <p className="text-[11px] text-muted mt-0.5">{a.description}</p>}
@@ -494,7 +505,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                           <p className="text-[11px] text-muted mt-0.5">
                             {mapping.sourceType === "CATALOG"
                               ? `${mapping.dataSourceName ?? "—"} › ${mapping.dataEntityDisplayName ?? "—"} › ${mapping.dataAttributeDisplayName ?? mapping.dataAttributeName ?? "—"} (${mapping.dataType ?? "—"})`
-                              : `Manual: ${[mapping.manualSystemName, mapping.manualEntityName, mapping.manualColumnName].filter(Boolean).join(" › ")}`
+                              : c.manualPrefix.replace("{parts}", [mapping.manualSystemName, mapping.manualEntityName, mapping.manualColumnName].filter(Boolean).join(" › "))
                             }
                           </p>
                         )}
@@ -504,7 +515,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                       </div>
                       <div className="flex gap-2 shrink-0">
                         {!isEditing && (
-                          <button onClick={() => openEdit(a.reqAttrId)} className="btn btn-sm text-[11px]">{mapping ? "Edit" : "+ Map"}</button>
+                          <button onClick={() => openEdit(a.reqAttrId)} className="btn btn-sm text-[11px]">{mapping ? t.common.edit : c.mapBtn}</button>
                         )}
                         {mapping && !isEditing && (
                           <button onClick={() => deleteMapping(mapping.mappingId)} className="btn btn-sm text-[11px] text-red-500 border-red-200 hover:border-red-400">×</button>
@@ -522,20 +533,20 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                               {caseData.referenceCode} | {mapping!.dataAttributeDisplayName ?? mapping!.dataAttributeName ?? mapping!.manualColumnName ?? "Column"}
                             </span>
                             <span className="text-[10px] text-teal-600 ml-2">
-                              — Classification Discussion{thread.length > 0 ? ` (${thread.length})` : ""}
+                              {c.classificationDiscussion.replace("{count}", thread.length > 0 ? ` (${thread.length})` : "")}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             {!mapping!.sensitivityCode && (
                               <button onClick={() => { setMarkClassifyId(mapping!.mappingId); setMarkSensCode(""); setMarkNotes(""); }}
                                 className="text-[10px] font-semibold text-white bg-teal-600 hover:bg-teal-700 px-2 py-0.5 rounded transition-colors">
-                                Mark as Classified
+                                {c.markAsClassified}
                               </button>
                             )}
                             {thread.length > 0 && (
                               <button onClick={() => setExpandedThread(s => { const n = new Set(s); if (n.has(mapping!.mappingId)) n.delete(mapping!.mappingId); else n.add(mapping!.mappingId); return n; })}
                                 className="text-[10px] text-teal-700 hover:underline">
-                                {isThreadExpanded ? "Collapse" : "Expand"}
+                                {isThreadExpanded ? c.collapse : c.expand}
                               </button>
                             )}
                           </div>
@@ -565,31 +576,31 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         {markClassifyId === mapping!.mappingId && (
                           <div className="px-4 py-3 bg-teal-50/60 border-t border-teal-100 space-y-2">
                             <p className="text-xs font-semibold text-teal-800">
-                              Set FOI sensitivity — {mapping!.dataAttributeDisplayName ?? mapping!.dataAttributeName ?? mapping!.manualColumnName ?? "column"}
+                              {c.setSensitivityTitle.replace("{column}", mapping!.dataAttributeDisplayName ?? mapping!.dataAttributeName ?? mapping!.manualColumnName ?? "column")}
                             </p>
                             <p className="text-[11px] text-teal-700">
                               {mapping!.catalogClassCode
-                                ? `Catalog code is "${mapping!.catalogClassCode}". Select the equivalent FOI sensitivity below.`
-                                : "Select the sensitivity classification confirmed by the steward."}
+                                ? c.catalogCodeHint.replace("{code}", mapping!.catalogClassCode)
+                                : c.selectStewardConfirmedHint}
                             </p>
                             <div className="flex gap-2 items-end">
                               <div className="flex-1">
                                 <select className="input w-full text-sm" value={markSensCode} onChange={e => setMarkSensCode(e.target.value)}>
-                                  <option value="">— Select sensitivity —</option>
+                                  <option value="">{c.selectSensitivityPlaceholder}</option>
                                   {SENSITIVITY_OPTIONS.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
                                 </select>
                               </div>
                               <div className="flex-1">
-                                <input className="input w-full text-sm" placeholder="Notes (optional)" value={markNotes} onChange={e => setMarkNotes(e.target.value)} />
+                                <input className="input w-full text-sm" placeholder={c.notesOptionalPlaceholder} value={markNotes} onChange={e => setMarkNotes(e.target.value)} />
                               </div>
                             </div>
                             {markSensCode && BLOCKED_SENSITIVITIES.has(markSensCode) && (
-                              <p className="text-[10px] text-red-600">⚠ This will block the request at the Classification Gate.</p>
+                              <p className="text-[10px] text-red-600">{c.blockAtGateWarning}</p>
                             )}
                             <div className="flex gap-2 justify-end">
-                              <button onClick={() => setMarkClassifyId(null)} className="btn btn-sm text-[11px]">Cancel</button>
+                              <button onClick={() => setMarkClassifyId(null)} className="btn btn-sm text-[11px]">{t.common.cancel}</button>
                               <button onClick={markClassified} disabled={!markSensCode || markSaving} className="btn btn-primary btn-sm text-[11px]">
-                                {markSaving ? "Saving…" : "Confirm Classification"}
+                                {markSaving ? t.common.saving : c.confirmClassification}
                               </button>
                             </div>
                           </div>
@@ -601,7 +612,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                             <div className="flex gap-2">
                               <textarea
                                 className="input flex-1 text-sm h-10 resize-none"
-                                placeholder="Add a note to the steward or log an update…"
+                                placeholder={c.addNotePlaceholder}
                                 value={threadNotes[mapping!.mappingId] ?? ""}
                                 onChange={e => setThreadNotes(n => ({ ...n, [mapping!.mappingId]: e.target.value }))}
                                 onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendCollabNote(mapping!.mappingId); }}
@@ -610,10 +621,10 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                                 onClick={() => sendCollabNote(mapping!.mappingId)}
                                 disabled={sendingNote === mapping!.mappingId || !(threadNotes[mapping!.mappingId] ?? "").trim()}
                                 className="btn btn-sm text-[11px] self-end">
-                                {sendingNote === mapping!.mappingId ? "…" : "Send"}
+                                {sendingNote === mapping!.mappingId ? "…" : c.send}
                               </button>
                             </div>
-                            <p className="text-[10px] text-muted mt-1">Cmd/Ctrl+Enter to send</p>
+                            <p className="text-[10px] text-muted mt-1">{c.cmdEnterHint}</p>
                           </div>
                         )}
                       </div>
@@ -623,12 +634,12 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                     {isEditing && (
                       <div className="p-4 border-t border-line space-y-4">
                         <div className="flex gap-2">
-                          {(["CATALOG","MANUAL"] as const).map(t => (
-                            <button key={t} onClick={() => { setMapForm(f => ({ ...f, sourceType: t })); setCatalogClassDetected(null); }}
+                          {(["CATALOG","MANUAL"] as const).map(st => (
+                            <button key={st} onClick={() => { setMapForm(f => ({ ...f, sourceType: st })); setCatalogClassDetected(null); }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                                mapForm.sourceType === t ? "bg-brand-purple text-white border-brand-purple" : "border-line text-muted hover:border-brand-purple/50"
+                                mapForm.sourceType === st ? "bg-brand-purple text-white border-brand-purple" : "border-line text-muted hover:border-brand-purple/50"
                               }`}>
-                              {t === "CATALOG" ? "From Catalog" : "Manual Entry"}
+                              {st === "CATALOG" ? c.fromCatalog : c.manualEntry}
                             </button>
                           ))}
                         </div>
@@ -637,30 +648,30 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                           <>
                             <div className="grid grid-cols-3 gap-3">
                               <div>
-                                <label className="block text-[10px] font-bold text-muted uppercase mb-1">Source System</label>
+                                <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.sourceSystemLabel}</label>
                                 <select className="input w-full text-sm" value={mapForm.dataSourceId}
                                   onChange={e => { setMapForm(f => ({ ...f, dataSourceId: e.target.value })); loadEntities(e.target.value); }}>
-                                  <option value="">— Select —</option>
+                                  <option value="">{c.selectPlaceholder}</option>
                                   {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-muted uppercase mb-1">Table / Entity</label>
+                                <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.tableEntityLabel}</label>
                                 <select className="input w-full text-sm" value={mapForm.dataEntityId} disabled={!entities.length}
                                   onChange={e => { setMapForm(f => ({ ...f, dataEntityId: e.target.value })); loadAttrs(e.target.value); }}>
-                                  <option value="">— Select —</option>
+                                  <option value="">{c.selectPlaceholder}</option>
                                   {entities.map(e => <option key={e.id} value={e.id}>{e.displayName ?? e.name}</option>)}
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-muted uppercase mb-1">Column / Attribute <span className="text-red-500">*</span></label>
+                                <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.columnAttributeLabel} <span className="text-red-500">*</span></label>
                                 <select className="input w-full text-sm" value={mapForm.dataAttributeId} disabled={!attrs.length}
                                   onChange={e => onAttrSelected(e.target.value)}>
-                                  <option value="">— Select —</option>
+                                  <option value="">{c.selectPlaceholder}</option>
                                   {attrs.map(a => (
                                     <option key={a.id} value={a.id}>
                                       {a.displayName ?? a.name}{a.dataType ? ` (${a.dataType})` : ""}
-                                      {a.classificationCode ? ` [${a.classificationCode}]` : " [unclassified]"}
+                                      {a.classificationCode ? ` [${a.classificationCode}]` : ` [${c.unclassifiedOption}]`}
                                     </option>
                                   ))}
                                 </select>
@@ -672,26 +683,25 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                               catalogClassDetected.code ? (
                                 catalogClassDetected.mapped ? (
                                   <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-                                    <span className="text-xs text-blue-700">Classification read from catalog:</span>
-                                    <SensChip code={catalogClassDetected.code} />
-                                    <span className="text-xs text-blue-600">(auto-filled below)</span>
+                                    <span className="text-xs text-blue-700">{c.classFromCatalog}</span>
+                                    <SensChip code={catalogClassDetected.code} opts={SENSITIVITY_OPTIONS} />
+                                    <span className="text-xs text-blue-600">{c.autoFilledBelow}</span>
                                   </div>
                                 ) : (
                                   <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
                                     <p className="text-xs font-semibold text-purple-800">
-                                      Catalog code: <strong>{catalogClassDetected.code}</strong>
+                                      {c.catalogCodePrefix.replace("{code}", catalogClassDetected.code)}
                                     </p>
                                     <p className="text-xs text-purple-700 mt-0.5">
-                                      This code ({catalogClassDetected.code}) is an internal catalog classification and does not map directly to an FOI sensitivity level.
-                                      Save the mapping, then use the collaboration thread to confirm the correct FOI sensitivity with the steward, and use <strong>Mark as Classified</strong> to set it.
+                                      {c.catalogCodeNonStandardDesc.replace("{code}", catalogClassDetected.code)}
                                     </p>
                                   </div>
                                 )
                               ) : (
                                 <div className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
-                                  <p className="text-xs font-semibold text-orange-800">⚠ Column is not classified in the data catalog</p>
+                                  <p className="text-xs font-semibold text-orange-800">{c.notClassifiedWarning}</p>
                                   <p className="text-xs text-orange-700 mt-0.5">
-                                    Save this mapping, then use the <strong>Steward Coordination Thread</strong> to ask the responsible steward to classify this column before advancing.
+                                    {c.notClassifiedDesc}
                                   </p>
                                 </div>
                               )
@@ -700,17 +710,17 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         ) : (
                           <div className="grid grid-cols-3 gap-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-muted uppercase mb-1">System / Application</label>
+                              <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.systemAppLabel}</label>
                               <input className="input w-full text-sm" placeholder="e.g. SAP, Oracle HR" value={mapForm.manualSystemName}
                                 onChange={e => setMapForm(f => ({ ...f, manualSystemName: e.target.value }))} />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-bold text-muted uppercase mb-1">Table / Report</label>
+                              <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.tableReportLabel}</label>
                               <input className="input w-full text-sm" placeholder="e.g. PA0001" value={mapForm.manualEntityName}
                                 onChange={e => setMapForm(f => ({ ...f, manualEntityName: e.target.value }))} />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-bold text-muted uppercase mb-1">Column / Field <span className="text-red-500">*</span></label>
+                              <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.columnFieldLabel} <span className="text-red-500">*</span></label>
                               <input className="input w-full text-sm" placeholder="e.g. EMPLOYEE_COUNT" value={mapForm.manualColumnName}
                                 onChange={e => setMapForm(f => ({ ...f, manualColumnName: e.target.value }))} />
                             </div>
@@ -720,34 +730,34 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[10px] font-bold text-muted uppercase mb-1">
-                              Sensitivity Classification
+                              {c.sensitivityLabel}
                               {mapForm.sourceType === "MANUAL" && <span className="text-red-500"> *</span>}
-                              {mapForm.sourceType === "CATALOG" && <span className="text-muted font-normal"> (auto-filled or set via thread)</span>}
+                              {mapForm.sourceType === "CATALOG" && <span className="text-muted font-normal"> {c.autoFilledOrThread}</span>}
                             </label>
                             <select className="input w-full text-sm" value={mapForm.sensitivityCode}
                               onChange={e => setMapForm(f => ({ ...f, sensitivityCode: e.target.value }))}>
                               <option value="">
                                 {mapForm.sourceType === "CATALOG" && (!catalogClassDetected?.code || !catalogClassDetected?.mapped)
-                                  ? "— Pending classification —" : "— Select —"}
+                                  ? c.pendingClassification : c.selectPlaceholder}
                               </option>
                               {SENSITIVITY_OPTIONS.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
                             </select>
                             {mapForm.sensitivityCode && BLOCKED_SENSITIVITIES.has(mapForm.sensitivityCode) && (
-                              <p className="text-[10px] text-red-600 mt-1">⚠ This will block the request. Use Public or Internal to allow disclosure.</p>
+                              <p className="text-[10px] text-red-600 mt-1">{c.blockDisclosureWarning}</p>
                             )}
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-muted uppercase mb-1">Officer Notes</label>
-                            <input className="input w-full text-sm" placeholder="Caveats, conditions, context…" value={mapForm.officerNotes}
+                            <label className="block text-[10px] font-bold text-muted uppercase mb-1">{c.officerNotesLabel}</label>
+                            <input className="input w-full text-sm" placeholder={c.officerNotesPlaceholder} value={mapForm.officerNotes}
                               onChange={e => setMapForm(f => ({ ...f, officerNotes: e.target.value }))} />
                           </div>
                         </div>
 
                         {mapErr && <p className="text-sm text-red-600">{mapErr}</p>}
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => { setEditingAttr(null); setCatalogClassDetected(null); }} className="btn btn-sm">Cancel</button>
+                          <button onClick={() => { setEditingAttr(null); setCatalogClassDetected(null); }} className="btn btn-sm">{t.common.cancel}</button>
                           <button onClick={saveMapping} disabled={savingMap} className="btn btn-primary btn-sm">
-                            {savingMap ? "Saving…" : "Save Mapping"}
+                            {savingMap ? t.common.saving : c.saveMapping}
                           </button>
                         </div>
                       </div>
@@ -761,18 +771,18 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
           {pendingMappings.length > 0 && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
               <p className="text-xs font-semibold text-orange-800">
-                {pendingMappings.length} column(s) still pending classification — use the steward thread on each card to resolve before advancing.
+                {c.pendingClassificationBanner.replace("{n}", String(pendingMappings.length))}
               </p>
             </div>
           )}
 
           {advErr && <p className="text-sm text-red-600">{advErr}</p>}
           {!allMapped && reqAttrs.length > 0 && (
-            <p className="text-xs text-amber-700">Map all {reqAttrs.length} attributes before proceeding.</p>
+            <p className="text-xs text-amber-700">{c.mapAllBeforeProceeding.replace("{n}", String(reqAttrs.length))}</p>
           )}
           <div className="flex justify-end pt-1">
             <button onClick={() => advance()} disabled={advancing || !allMapped} className="btn btn-primary btn-sm">
-              {advancing ? "…" : "Run Classification Check →"}
+              {advancing ? "…" : c.runClassificationCheck}
             </button>
           </div>
         </div>
@@ -781,39 +791,39 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {/* ── CLASSIFICATION_GATE ── */}
       {inFulfillment && stage === "CLASSIFICATION_GATE" && (
         <div className="card p-5 space-y-4">
-          <h2 className="font-semibold text-sm text-ink">Classification Gate</h2>
-          {loadingMap ? <div className="py-4 text-center text-muted text-sm">Loading…</div> : (
+          <h2 className="font-semibold text-sm text-ink">{c.classificationGateTitle}</h2>
+          {loadingMap ? <div className="py-4 text-center text-muted text-sm">{t.common.loading}</div> : (
             <>
               {blockedMappings.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
-                  <p className="text-sm font-semibold text-red-800">⛔ {blockedMappings.length} column(s) blocked</p>
+                  <p className="text-sm font-semibold text-red-800">{c.columnsBlocked.replace("{n}", String(blockedMappings.length))}</p>
                   {blockedMappings.map(m => (
                     <div key={m.mappingId} className="text-xs text-red-700">
-                      • <strong>{m.requestedAttributeName}</strong>: <SensChip code={m.sensitivityCode} />
-                      {m.catalogClassCode && <span className="ml-1 text-red-600 italic">(catalog: {m.catalogClassLabel ?? m.catalogClassCode})</span>}
+                      • <strong>{m.requestedAttributeName}</strong>: <SensChip code={m.sensitivityCode} opts={SENSITIVITY_OPTIONS} />
+                      {m.catalogClassCode && <span className="ml-1 text-red-600 italic">({c.catalogPrefix.replace("{label}", m.catalogClassLabel ?? m.catalogClassCode)})</span>}
                     </div>
                   ))}
-                  <p className="text-xs text-red-600 mt-2">Return to Source Mapping and replace with PUBLIC or INTERNAL columns, or reject the request on classification grounds.</p>
+                  <p className="text-xs text-red-600 mt-2">{c.returnToSourceMapping}</p>
                 </div>
               )}
               {pendingMappings.length > 0 && (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                  <p className="text-sm text-amber-800">{pendingMappings.length} mapping(s) still pending classification — return to Source Mapping.</p>
+                  <p className="text-sm text-amber-800">{c.mappingsPending.replace("{n}", String(pendingMappings.length))}</p>
                   {pendingMappings.map(m => (
                     <div key={m.mappingId} className="text-xs text-amber-700 mt-1">
                       • <strong>{m.requestedAttributeName}</strong>
-                      {m.stewardNotifiedAt ? ` — steward notified ${new Date(m.stewardNotifiedAt).toLocaleDateString()}` : " — steward not yet notified"}
+                      {m.stewardNotifiedAt ? ` — ${c.stewardNotified.replace("{date}", new Date(m.stewardNotifiedAt).toLocaleDateString())}` : ` — ${c.stewardNotYetNotified}`}
                     </div>
                   ))}
                 </div>
               )}
               {blockedMappings.length === 0 && pendingMappings.length === 0 && mappings.length > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1">
-                  <p className="text-sm font-semibold text-green-800">✓ All {mappings.length} columns cleared</p>
+                  <p className="text-sm font-semibold text-green-800">{c.allColumnsCleared.replace("{n}", String(mappings.length))}</p>
                   {mappings.map(m => (
                     <div key={m.mappingId} className="text-xs text-green-700 flex items-center gap-2">
-                      • <strong>{m.requestedAttributeName}</strong> — <SensChip code={m.sensitivityCode} />
-                      {m.catalogClassCode && <span className="italic text-green-600">catalog: {m.catalogClassLabel ?? m.catalogClassCode}</span>}
+                      • <strong>{m.requestedAttributeName}</strong> — <SensChip code={m.sensitivityCode} opts={SENSITIVITY_OPTIONS} />
+                      {m.catalogClassCode && <span className="italic text-green-600">{c.catalogPrefix.replace("{label}", m.catalogClassLabel ?? m.catalogClassCode)}</span>}
                     </div>
                   ))}
                 </div>
@@ -821,7 +831,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
               {advErr && <p className="text-sm text-red-600">{advErr}</p>}
               <div className="flex justify-end pt-1">
                 <button onClick={() => advance()} disabled={advancing || blockedMappings.length > 0 || pendingMappings.length > 0} className="btn btn-primary btn-sm">
-                  {advancing ? "…" : "Proceed to Quality Gate →"}
+                  {advancing ? "…" : c.proceedToQualityGate}
                 </button>
               </div>
             </>
@@ -833,15 +843,15 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {inFulfillment && stage === "QUALITY_GATE" && (
         <div className="card p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-ink">Quality Gate</h2>
+            <h2 className="font-semibold text-sm text-ink">{c.qualityGateTitle}</h2>
             <button onClick={runQualityCheck} disabled={runningQC} className="btn btn-sm text-xs">
-              {runningQC ? "Running…" : "▶ Run DQ Check"}
+              {runningQC ? c.running : c.runDqCheck}
             </button>
           </div>
           <p className="text-xs text-muted">
-            DQ status is read live from the data quality system. Use <strong>Run DQ Check</strong> to store a formal quality review decision for each column.
+            {c.qualityGateDesc}
           </p>
-          {loadingMap || runningQC ? <div className="py-4 text-center text-muted text-sm">Loading…</div> : (
+          {loadingMap || runningQC ? <div className="py-4 text-center text-muted text-sm">{t.common.loading}</div> : (
             <>
               <div className="space-y-2">
                 {mappings.map(m => {
@@ -870,32 +880,32 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                           <span className="text-sm font-semibold text-ink">{m.requestedAttributeName}</span>
                           <span className="text-[10px] text-muted ml-2">
                             {isManual
-                              ? `Manual: ${[m.manualSystemName, m.manualEntityName, m.manualColumnName].filter(Boolean).join(" › ")}`
+                              ? c.manualPrefix.replace("{parts}", [m.manualSystemName, m.manualEntityName, m.manualColumnName].filter(Boolean).join(" › "))
                               : `${m.dataEntityDisplayName ?? ""} › ${m.dataAttributeDisplayName ?? m.dataAttributeName ?? ""}`}
                           </span>
                           {/* DQ status message */}
                           <div className="mt-1">
                             {isManual && (
-                              <p className="text-[11px] text-gray-500 italic">Manual source — no automated DQ indicator</p>
+                              <p className="text-[11px] text-gray-500 italic">{c.manualNoIndicator}</p>
                             )}
                             {noRules && (
-                              <p className="text-[11px] text-gray-500 italic">No data quality indicator available for this column</p>
+                              <p className="text-[11px] text-gray-500 italic">{c.noDqIndicator}</p>
                             )}
                             {neverRun && (
                               <p className="text-[11px] text-blue-700">
-                                {m.dqRulesCount} DQ rule{m.dqRulesCount !== 1 ? "s" : ""} defined — not yet executed. Click <strong>Run DQ Check</strong> to assess.
+                                {c.rulesDefinedNotRun.replace("{n}", String(m.dqRulesCount))}
                               </p>
                             )}
                             {livePassed && (
                               <p className="text-[11px] text-green-700">
-                                DQ passed — {(100 - failPct).toFixed(1)}% pass rate
-                                {m.dqLatestRunAt && <span className="text-green-600"> · checked {fmtDate(m.dqLatestRunAt)}</span>}
+                                {c.dqPassed.replace("{pct}", (100 - failPct).toFixed(1))}
+                                {m.dqLatestRunAt && <span className="text-green-600"> · {c.checkedAt.replace("{date}", fmtDate(m.dqLatestRunAt))}</span>}
                               </p>
                             )}
                             {liveFailed && (
                               <p className="text-[11px] text-amber-700">
-                                DQ issues detected — {failPct.toFixed(1)}% failure rate
-                                {m.dqLatestRunAt && <span className="text-amber-600"> · checked {fmtDate(m.dqLatestRunAt)}</span>}
+                                {c.dqIssuesDetected.replace("{pct}", failPct.toFixed(1))}
+                                {m.dqLatestRunAt && <span className="text-amber-600"> · {c.checkedAt.replace("{date}", fmtDate(m.dqLatestRunAt))}</span>}
                               </p>
                             )}
                             {/* Show stored review decision if Run DQ Check was clicked */}
@@ -907,16 +917,16 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         <div className="shrink-0 flex flex-col items-end gap-1">
                           {/* Live DQ badge */}
                           {(isManual || noRules) && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">No DQ indicator</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">{c.noDqIndicatorBadge}</span>
                           )}
                           {neverRun && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{m.dqRulesCount} rule{m.dqRulesCount !== 1 ? "s" : ""} · not run</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{c.notRunBadge.replace("{n}", String(m.dqRulesCount))}</span>
                           )}
                           {livePassed && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">DQ Passed</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">{c.dqPassedBadge}</span>
                           )}
                           {liveFailed && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">DQ Issues</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">{c.dqIssuesBadge}</span>
                           )}
                           {/* Stored review decision badge (shown after Run DQ Check) */}
                           {m.qualityStatus !== "PENDING" && (
@@ -924,7 +934,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                               m.qualityStatus === "CLEARED" ? "bg-green-50 text-green-600 border border-green-200" :
                               m.qualityStatus === "FLAGGED" ? "bg-amber-50 text-amber-600 border border-amber-200" :
                               "bg-gray-50 text-gray-500 border border-gray-200"
-                            }`}>Review: {m.qualityStatus}</span>
+                            }`}>{c.reviewBadge.replace("{status}", m.qualityStatus)}</span>
                           )}
                         </div>
                       </div>
@@ -934,13 +944,13 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
               </div>
               {qualityFlagged.length > 0 && (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                  <p className="text-xs text-amber-800"><strong>{qualityFlagged.length} column(s) flagged</strong> in DQ review. Document concerns in officer notes before advancing.</p>
+                  <p className="text-xs text-amber-800">{c.columnsFlagged.replace("{n}", String(qualityFlagged.length))}</p>
                 </div>
               )}
 
               {/* ── Delivery type choice ── */}
               <div className="border border-line rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-ink">How should this data be delivered?</p>
+                <p className="text-xs font-semibold text-ink">{c.deliveryTypeQuestion}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setDeliveryType("OPEN_DATA")}
@@ -950,12 +960,12 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         : "border-line hover:border-brand-purple/40"
                     }`}
                   >
-                    <p className="text-sm font-semibold text-ink">Publish as Open Data</p>
+                    <p className="text-sm font-semibold text-ink">{c.publishOpenData}</p>
                     <p className="text-[11px] text-muted mt-1">
-                      Creates a publishable open dataset. Recommended when the requested information is commonly useful and has long-term value. Goes through the full Open Data approval workflow.
+                      {c.publishOpenDataDesc}
                     </p>
                     {deliveryType === "OPEN_DATA" && (
-                      <span className="mt-2 inline-block text-[10px] font-bold text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-full">Selected</span>
+                      <span className="mt-2 inline-block text-[10px] font-bold text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-full">{c.selectedBadge}</span>
                     )}
                   </button>
                   <button
@@ -966,12 +976,12 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                         : "border-line hover:border-teal-400/40"
                     }`}
                   >
-                    <p className="text-sm font-semibold text-ink">One-off Delivery</p>
+                    <p className="text-sm font-semibold text-ink">{c.oneOffDelivery}</p>
                     <p className="text-[11px] text-muted mt-1">
-                      Creates a reference record under <strong>FOI One-off Records</strong> — not published to the open data portal. Retained for audit and traceability with a link back to this FOI request.
+                      {c.oneOffDeliveryDesc}
                     </p>
                     {deliveryType === "ONE_OFF" && (
-                      <span className="mt-2 inline-block text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">Selected</span>
+                      <span className="mt-2 inline-block text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">{c.selectedBadge}</span>
                     )}
                   </button>
                 </div>
@@ -980,16 +990,16 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                   <div className="space-y-2 pt-1">
                     <div>
                       <label className="block text-[10px] font-bold text-muted uppercase mb-1">
-                        Dataset Name <span className="font-normal text-muted">(optional — defaults to FOI reference + subject)</span>
+                        {c.datasetNameLabel} <span className="font-normal text-muted">{c.datasetNameHint}</span>
                       </label>
                       <input className="input w-full text-sm" placeholder={`${caseData.referenceCode}: ${caseData.subjectText}`}
                         value={datasetName} onChange={e => setDatasetName(e.target.value)} />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-muted uppercase mb-1">
-                        Description <span className="font-normal text-muted">(optional override)</span>
+                        {c.datasetDescLabel} <span className="font-normal text-muted">{c.datasetDescHint}</span>
                       </label>
-                      <textarea className="input w-full text-sm h-16 resize-none" placeholder="Auto-generated if left empty…"
+                      <textarea className="input w-full text-sm h-16 resize-none" placeholder={c.datasetDescPlaceholder}
                         value={datasetDesc} onChange={e => setDatasetDesc(e.target.value)} />
                     </div>
                   </div>
@@ -1003,7 +1013,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
                   disabled={advancing || !deliveryType}
                   className="btn btn-primary btn-sm"
                 >
-                  {advancing ? "…" : deliveryType === "ONE_OFF" ? "Create Record & Advance →" : "Create Open Dataset & Advance →"}
+                  {advancing ? "…" : deliveryType === "ONE_OFF" ? c.createRecordAdvance : c.createDatasetAdvance}
                 </button>
               </div>
             </>
@@ -1022,24 +1032,24 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
           {stage === "TECHNICAL_COMPILATION" && caseData.linkedOpenDatasetId && (
             caseData.foiDeliveryType === "ONE_OFF" ? (
               <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 space-y-1">
-                <p className="text-sm font-semibold text-teal-800">One-off Delivery Record created</p>
+                <p className="text-sm font-semibold text-teal-800">{c.oneOffCreatedTitle}</p>
                 <p className="text-xs text-teal-700">
-                  Reference record{" "}
+                  {c.oneOffCreatedDesc.split("#{id}")[0]}
                   <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-medium">
                     #{caseData.linkedOpenDatasetId}
-                  </a>{" "}
-                  created under <strong>FOI One-off Records</strong> — retained for audit and traceability, not published to the open data portal.
+                  </a>
+                  {c.oneOffCreatedDesc.split("#{id}")[1]}
                 </p>
               </div>
             ) : (
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 space-y-1">
-                <p className="text-sm font-semibold text-blue-800">Open Data dataset created</p>
+                <p className="text-sm font-semibold text-blue-800">{c.openDataCreatedTitle}</p>
                 <p className="text-xs text-blue-700">
-                  Dataset{" "}
+                  {c.openDataCreatedDesc.split("#{id}")[0]}
                   <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-semibold">
                     #{caseData.linkedOpenDatasetId}
-                  </a>{" "}
-                  created from this FOI request&apos;s column mappings. Complete compilation then publish through the Open Data workflow.
+                  </a>
+                  {c.openDataCreatedDesc.split("#{id}")[1]}
                 </p>
               </div>
             )
@@ -1047,14 +1057,9 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
 
           {gateBlocking && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1">
-              <p className="text-sm font-semibold text-amber-800">Dataset not fully processed yet</p>
+              <p className="text-sm font-semibold text-amber-800">{c.datasetNotProcessedTitle}</p>
               <p className="text-xs text-amber-700">
-                Status: <strong>{dsStatus ?? "—"}</strong>. Open the linked{" "}
-                {caseData.linkedOpenDatasetId ? (
-                  <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-medium">
-                    Open Data record
-                  </a>
-                ) : "Open Data record"}, complete its details and columns, and submit it for approval before advancing.
+                {c.datasetNotProcessedDesc.replace("{status}", dsStatus ?? "—")}
               </p>
             </div>
           )}
@@ -1062,7 +1067,7 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
           {advErr && <p className="text-sm text-red-600">{advErr}</p>}
           <div className="flex justify-end">
             <button onClick={() => advance()} disabled={advancing || gateBlocking} className="btn btn-primary btn-sm">
-              {advancing ? "…" : "Mark Stage Complete → Advance"}
+              {advancing ? "…" : c.markStageComplete}
             </button>
           </div>
         </div>
@@ -1072,27 +1077,28 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {/* ── DELIVERY ── */}
       {inFulfillment && stage === "DELIVERY" && (
         <div className="card p-5 space-y-4">
-          <h2 className="font-semibold text-sm text-ink">Deliver to Requester</h2>
+          <h2 className="font-semibold text-sm text-ink">{c.deliverToRequester}</h2>
           {caseData.linkedOpenDatasetId && (
             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-800">
-              Linked dataset:{" "}
+              {c.linkedDatasetNote.split("#{id}")[0]}
               <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="underline font-medium">
                 #{caseData.linkedOpenDatasetId}
-              </a>{" "}— ensure it is published before delivery.
+              </a>
+              {c.linkedDatasetNote.split("#{id}")[1]}
             </div>
           )}
           <div>
-            <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Delivery Reference / Link <span className="text-red-500">*</span></label>
-            <input className="input w-full" placeholder="Secure file share URL, dataset portal link, email reference…" value={delivRef} onChange={e => setDelivRef(e.target.value)} />
+            <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.deliveryRefLabel} <span className="text-red-500">*</span></label>
+            <input className="input w-full" placeholder={c.deliveryRefPlaceholder} value={delivRef} onChange={e => setDelivRef(e.target.value)} />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Message to Requester</label>
-            <textarea className="input w-full h-20 resize-none" placeholder="Delivery note sent to the requester…" value={delivMsg} onChange={e => setDelivMsg(e.target.value)} />
+            <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.deliveryMessageLabel}</label>
+            <textarea className="input w-full h-20 resize-none" placeholder={c.deliveryMessagePlaceholder} value={delivMsg} onChange={e => setDelivMsg(e.target.value)} />
           </div>
           {advErr && <p className="text-sm text-red-600">{advErr}</p>}
           <div className="flex justify-end">
             <button onClick={deliver} disabled={advancing} className="btn btn-primary btn-sm">
-              {advancing ? "…" : "✓ Confirm Delivery & Close Case"}
+              {advancing ? "…" : c.confirmDelivery}
             </button>
           </div>
         </div>
@@ -1102,18 +1108,18 @@ export function FulfillmentTab({ caseData, currentUser: _user, onChanged }: Prop
       {caseData.statusCode === "DELIVERED" && (
         <div className="card p-5 bg-green-50 border border-green-200 space-y-2">
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-sm text-green-800">✓ Case Delivered &amp; Closed</h2>
+            <h2 className="font-semibold text-sm text-green-800">{c.caseDeliveredTitle}</h2>
             {caseData.foiDeliveryType === "ONE_OFF" && (
-              <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">One-off Delivery</span>
+              <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">{c.oneOffBadge}</span>
             )}
             {caseData.foiDeliveryType === "OPEN_DATA" && (
-              <span className="text-[10px] font-bold bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded-full">Open Data</span>
+              <span className="text-[10px] font-bold bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded-full">{c.openDataBadge}</span>
             )}
           </div>
-          <p className="text-xs text-green-700">Delivery reference: <span className="font-mono">{caseData.deliveryReference}</span></p>
+          <p className="text-xs text-green-700">{c.deliveryReferenceLabel} <span className="font-mono">{caseData.deliveryReference}</span></p>
           {caseData.linkedOpenDatasetId && (
             <a href={`/open-data/${caseData.linkedOpenDatasetId}`} target="_blank" rel="noreferrer" className="text-xs text-brand-purple hover:underline block">
-              → {caseData.foiDeliveryType === "ONE_OFF" ? "View one-off record" : "View Open Data dataset"} #{caseData.linkedOpenDatasetId}
+              {(caseData.foiDeliveryType === "ONE_OFF" ? c.viewOneOffRecord : c.viewOpenDataDataset).replace("{id}", String(caseData.linkedOpenDatasetId))}
             </a>
           )}
         </div>

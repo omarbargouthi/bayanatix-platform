@@ -3,24 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { FoiRequestSummary } from "@/lib/queries/foi";
-
-const STATUS_LABELS: Record<string, string> = {
-  SUBMITTED:                "Submitted",
-  TRIAGE:                   "In Triage",
-  CLARIFICATION_REQUESTED:  "Clarification Requested",
-  ASSESSMENT:               "Assessment",
-  QUOTED:                   "Quoted",
-  QUOTE_ACCEPTED:           "Quote Accepted",
-  IN_FULFILLMENT:           "In Fulfillment",
-  AWAITING_PAYMENT:         "Awaiting Payment",
-  DELIVERED:                "Delivered",
-  CLOSED:                   "Closed",
-  REJECTED:                 "Rejected",
-  APPEAL_OPEN:              "Appeal Open",
-  APPEAL_DECIDED:           "Appeal Decided",
-  QUOTE_DECLINED:           "Quote Declined",
-  WITHDRAWN:                "Withdrawn",
-};
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 const STATUS_COLORS: Record<string, string> = {
   SUBMITTED:                "bg-blue-100 text-blue-700",
@@ -42,15 +26,17 @@ const STATUS_COLORS: Record<string, string> = {
 
 type Stats = { total: number; active: number; overdue: number; awaitingAction: number };
 
-function SlaChip({ days }: { days: number | null }) {
+function SlaChip({ days, t }: { days: number | null; t: I18nStrings["foi"]["queue"] }) {
   if (days === null) return <span className="text-muted text-[11px]">—</span>;
-  if (days < 0)  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Overdue {Math.abs(days)}d</span>;
-  if (days <= 5) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{days}d left</span>;
-  return <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">{days}d left</span>;
+  if (days < 0)  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{t.slaOverdue.replace("{n}", String(Math.abs(days)))}</span>;
+  if (days <= 5) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{t.slaLeft.replace("{n}", String(days))}</span>;
+  return <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">{t.slaLeft.replace("{n}", String(days))}</span>;
 }
 
 export function FoiQueue() {
   const router = useRouter();
+  const { t } = useLang();
+  const c = t.foi.queue;
   const [rows,    setRows]    = useState<FoiRequestSummary[]>([]);
   const [total,   setTotal]   = useState(0);
   const [stats,   setStats]   = useState<Stats | null>(null);
@@ -80,16 +66,16 @@ export function FoiQueue() {
   useEffect(() => { load(); }, [load]);
 
   const statusFilters = [
-    { key: "ACTIVE",    label: "Active" },
-    { key: "ALL",       label: "All" },
-    { key: "SUBMITTED", label: "Submitted" },
-    { key: "TRIAGE",    label: "In Triage" },
-    { key: "ASSESSMENT",label: "Assessment" },
-    { key: "QUOTED",    label: "Quoted" },
-    { key: "IN_FULFILLMENT", label: "In Fulfillment" },
-    { key: "AWAITING_PAYMENT", label: "Awaiting Payment" },
-    { key: "REJECTED",  label: "Rejected" },
-    { key: "DELIVERED", label: "Delivered" },
+    { key: "ACTIVE",    label: c.filterActive },
+    { key: "ALL",       label: c.filterAll },
+    { key: "SUBMITTED", label: t.foi.status.SUBMITTED },
+    { key: "TRIAGE",    label: t.foi.status.TRIAGE },
+    { key: "ASSESSMENT",label: t.foi.status.ASSESSMENT },
+    { key: "QUOTED",    label: t.foi.status.QUOTED },
+    { key: "IN_FULFILLMENT", label: t.foi.status.IN_FULFILLMENT },
+    { key: "AWAITING_PAYMENT", label: t.foi.status.AWAITING_PAYMENT },
+    { key: "REJECTED",  label: t.foi.status.REJECTED },
+    { key: "DELIVERED", label: t.foi.status.DELIVERED },
   ];
 
   return (
@@ -97,8 +83,8 @@ export function FoiQueue() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Freedom of Information</h1>
-          <p className="text-sm text-muted mt-1">Manage public information requests and track SLA compliance</p>
+          <h1 className="text-2xl font-bold text-ink">{c.pageTitle}</h1>
+          <p className="text-sm text-muted mt-1">{c.pageDesc}</p>
         </div>
         <div className="flex gap-2">
           <a
@@ -106,13 +92,13 @@ export function FoiQueue() {
             target="_blank"
             className="btn btn-sm text-[12px]"
           >
-            ↗ Public Intake Form
+            {c.publicIntakeLink}
           </a>
           <button
             onClick={() => router.push("/foi/new")}
             className="btn btn-primary btn-sm"
           >
-            + Register Request
+            {c.registerRequest}
           </button>
         </div>
       </div>
@@ -121,10 +107,10 @@ export function FoiQueue() {
       {stats && (
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Total Requests", value: stats.total,          color: "text-ink" },
-            { label: "Active Cases",   value: stats.active,         color: "text-brand-purple" },
-            { label: "Overdue",        value: stats.overdue,        color: stats.overdue > 0 ? "text-red-600" : "text-green-600" },
-            { label: "Awaiting Action",value: stats.awaitingAction, color: stats.awaitingAction > 0 ? "text-amber-600" : "text-green-600" },
+            { label: c.statTotal,          value: stats.total,          color: "text-ink" },
+            { label: c.statActive,         value: stats.active,         color: "text-brand-purple" },
+            { label: c.statOverdue,        value: stats.overdue,        color: stats.overdue > 0 ? "text-red-600" : "text-green-600" },
+            { label: c.statAwaitingAction, value: stats.awaitingAction, color: stats.awaitingAction > 0 ? "text-amber-600" : "text-green-600" },
           ].map(s => (
             <div key={s.label} className="card p-4">
               <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
@@ -151,10 +137,11 @@ export function FoiQueue() {
             </button>
           ))}
         </div>
-        <div className="ml-auto">
+        <div className="ms-auto">
           <input
             className="input input-sm w-56"
-            placeholder="Search reference, subject, name…"
+            dir="auto"
+            placeholder={c.searchPlaceholder}
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
           />
@@ -164,22 +151,22 @@ export function FoiQueue() {
       {/* Table */}
       <div className="card overflow-hidden">
         <div className="grid grid-cols-[120px_1fr_160px_100px_100px_120px_80px] gap-0 px-5 py-2.5 bg-canvas-soft text-[10px] font-bold uppercase tracking-wider text-muted border-b border-line">
-          <div className="min-w-0 truncate">Reference</div>
-          <div className="min-w-0 truncate">Subject / Requester</div>
-          <div className="min-w-0 truncate">Assigned Officer</div>
-          <div className="min-w-0 truncate">Submitted</div>
-          <div className="min-w-0 truncate">SLA</div>
-          <div className="min-w-0 truncate">Status</div>
-          <div className="min-w-0 truncate">Channel</div>
+          <div className="min-w-0 truncate">{c.colReference}</div>
+          <div className="min-w-0 truncate">{c.colSubject}</div>
+          <div className="min-w-0 truncate">{c.colOfficer}</div>
+          <div className="min-w-0 truncate">{c.colSubmitted}</div>
+          <div className="min-w-0 truncate">{c.colSla}</div>
+          <div className="min-w-0 truncate">{c.colStatus}</div>
+          <div className="min-w-0 truncate">{c.colChannel}</div>
         </div>
 
         {loading && (
-          <div className="py-16 text-center text-muted text-sm">Loading…</div>
+          <div className="py-16 text-center text-muted text-sm">{t.common.loading}</div>
         )}
 
         {!loading && rows.length === 0 && (
           <div className="py-16 text-center text-muted text-sm">
-            No requests found.{status === "ACTIVE" && " All clear!"}
+            {c.noResults}{status === "ACTIVE" && ` ${c.allClear}`}
           </div>
         )}
 
@@ -189,15 +176,15 @@ export function FoiQueue() {
             onClick={() => router.push(`/foi/${row.foiRequestId}`)}
             className="grid grid-cols-[120px_1fr_160px_100px_100px_120px_80px] gap-0 px-5 py-3.5 border-b border-line-soft hover:bg-canvas-soft cursor-pointer items-center"
           >
-            <div className="min-w-0 text-[12px] font-mono font-semibold text-brand-purple truncate">{row.referenceCode}</div>
+            <div className="min-w-0 text-[12px] font-mono font-semibold text-brand-purple truncate" dir="ltr">{row.referenceCode}</div>
 
-            <div className="min-w-0 pr-4">
-              <div className="text-sm font-medium text-ink truncate">{row.subjectText}</div>
+            <div className="min-w-0 pe-4">
+              <div className="text-sm font-medium text-ink truncate" dir="auto">{row.subjectText}</div>
               <div className="text-[11px] text-muted truncate">{row.requesterName} · {row.requesterEmail}</div>
             </div>
 
             <div className="min-w-0 text-[12px] text-ink-soft truncate">
-              {row.assignedOfficerName ?? <span className="italic text-muted">Unassigned</span>}
+              {row.assignedOfficerName ?? <span className="italic text-muted">{c.unassigned}</span>}
             </div>
 
             <div className="min-w-0 text-[11px] text-muted truncate">
@@ -205,12 +192,12 @@ export function FoiQueue() {
             </div>
 
             <div className="min-w-0">
-              <SlaChip days={row.slaBusinessDaysLeft} />
+              <SlaChip days={row.slaBusinessDaysLeft} t={c} />
             </div>
 
             <div className="min-w-0">
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[row.statusCode] ?? "bg-gray-100 text-gray-600"}`}>
-                {STATUS_LABELS[row.statusCode] ?? row.statusCode}
+                {t.foi.status[row.statusCode as keyof typeof t.foi.status] ?? row.statusCode}
               </span>
             </div>
 
@@ -222,11 +209,11 @@ export function FoiQueue() {
       {/* Pagination */}
       {total > 20 && (
         <div className="flex items-center justify-between mt-4 text-sm text-muted">
-          <span>{total} total</span>
+          <span>{c.totalCount.replace("{n}", String(total))}</span>
           <div className="flex gap-2">
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn btn-sm">← Prev</button>
-            <span className="self-center">Page {page}</span>
-            <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="btn btn-sm">Next →</button>
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn btn-sm">{c.prev}</button>
+            <span className="self-center">{c.page.replace("{n}", String(page))}</span>
+            <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="btn btn-sm">{c.next}</button>
           </div>
         </div>
       )}

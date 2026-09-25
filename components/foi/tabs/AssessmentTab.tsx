@@ -3,23 +3,29 @@
 import { useState, useEffect } from "react";
 import type { FoiCaseDetail } from "@/lib/queries/foi";
 import type { SessionUser } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 type Props = { caseData: FoiCaseDetail; totalPaid: number; currentUser: SessionUser; onChanged: () => void };
 
 type ReqAttr = { reqAttrId: number; name: string; description: string | null; formatHint: string | null };
 
-const ELIGIBILITY_OPTS = [
-  { value: "ELIGIBLE",       label: "Eligible — proceed with fulfillment" },
-  { value: "ALREADY_PUBLIC", label: "Already Public — free answer with link" },
-  { value: "PARTIAL",        label: "Partial — fulfillment with redactions" },
-  { value: "PROTECTED",      label: "Protected — must reject" },
-];
+function eligibilityOpts(c: I18nStrings["foi"]["assessment"]) {
+  return [
+    { value: "ELIGIBLE",       label: c.eligibleLabel },
+    { value: "ALREADY_PUBLIC", label: c.alreadyPublicLabel },
+    { value: "PARTIAL",        label: c.partialLabel },
+    { value: "PROTECTED",      label: c.protectedLabel },
+  ];
+}
 
-const COMPLEXITY_OPTS = [
-  { value: "SIMPLE",  label: "Simple (≤ 2 days)" },
-  { value: "MEDIUM",  label: "Medium (3–10 days)" },
-  { value: "COMPLEX", label: "Complex (> 10 days)" },
-];
+function complexityOpts(c: I18nStrings["foi"]["assessment"]) {
+  return [
+    { value: "SIMPLE",  label: c.simpleLabel },
+    { value: "MEDIUM",  label: c.mediumLabel },
+    { value: "COMPLEX", label: c.complexLabel },
+  ];
+}
 
 function suggestDays(complexity: string, columns: number, sources: number): number {
   const base     = complexity === "SIMPLE" ? 1 : complexity === "COMPLEX" ? 7 : 3;
@@ -29,6 +35,10 @@ function suggestDays(complexity: string, columns: number, sources: number): numb
 }
 
 export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChanged }: Props) {
+  const { t } = useLang();
+  const c = t.foi.assessment;
+  const ELIGIBILITY_OPTS = eligibilityOpts(c);
+  const COMPLEXITY_OPTS = complexityOpts(c);
   const [dailyRate, setDailyRate] = useState<number>(2000);
 
   // Requested attributes (shown read-only for officer reference)
@@ -185,12 +195,12 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
 
       {/* ── Requested Attributes (read-only reference for officer) ── */}
       <div className="card p-5 space-y-3">
-        <h2 className="font-semibold text-sm text-ink">Requested Data Attributes</h2>
-        <p className="text-xs text-muted">What the requester specified — use this to guide your assessment and source mapping.</p>
+        <h2 className="font-semibold text-sm text-ink">{c.requestedAttrs}</h2>
+        <p className="text-xs text-muted">{c.requestedAttrsDesc}</p>
         {loadingAttrs ? (
-          <p className="text-sm text-muted italic">Loading…</p>
+          <p className="text-sm text-muted italic">{t.common.loading}</p>
         ) : reqAttrs.length === 0 ? (
-          <p className="text-sm text-muted italic">No structured attributes were submitted — requester used free-text description only.</p>
+          <p className="text-sm text-muted italic">{c.noStructuredAttrs}</p>
         ) : (
           <div className="divide-y divide-line">
             {reqAttrs.map((a, i) => (
@@ -214,25 +224,25 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
       {/* ── Assessment form ── */}
       <div className="card p-5 space-y-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-sm text-ink">Assessment</h2>
-          {hasAssessment && <span className="text-[10px] text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-full">Assessed</span>}
+          <h2 className="font-semibold text-sm text-ink">{c.assessmentTitle}</h2>
+          {hasAssessment && <span className="text-[10px] text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-full">{c.assessedBadge}</span>}
         </div>
 
         {!isAssessable && !hasAssessment && (
-          <p className="text-sm text-muted italic">Assessment is done during Triage or Assessment status.</p>
+          <p className="text-sm text-muted italic">{c.notAssessableYet}</p>
         )}
 
         {(isAssessable || hasAssessment) && (
           <>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Eligibility <span className="text-red-500">*</span></label>
+                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.eligibilityLabel} <span className="text-red-500">*</span></label>
                 <select className="input w-full" disabled={!isAssessable} value={eligibility} onChange={e => setEligibility(e.target.value)}>
                   {ELIGIBILITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Complexity <span className="text-red-500">*</span></label>
+                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.complexityLabel} <span className="text-red-500">*</span></label>
                 <select className="input w-full" disabled={!isAssessable} value={complexity} onChange={e => setComplexity(e.target.value)}>
                   {COMPLEXITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -241,7 +251,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
 
             {eligibility === "ALREADY_PUBLIC" && (
               <div>
-                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Public Link / Reference</label>
+                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.publicLinkLabel}</label>
                 <input className="input w-full" disabled={!isAssessable} placeholder="URL or document reference" value={publicLink} onChange={e => setPublicLink(e.target.value)} />
               </div>
             )}
@@ -250,26 +260,26 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
               <div className={`p-4 rounded-lg border space-y-4 ${paymentExempt ? "bg-amber-50 border-amber-100" : "bg-blue-50 border-blue-100"}`}>
                 <div className="flex items-center justify-between">
                   <h3 className={`text-xs font-bold uppercase ${paymentExempt ? "text-amber-700" : "text-blue-700"}`}>
-                    {paymentExempt ? "Exemption Applied — No Charges" : "Cost Calculator"}
+                    {paymentExempt ? c.exemptionAppliedTitle : c.costCalculatorTitle}
                   </h3>
                   {isAssessable && !paymentExempt && (
                     <label className="flex items-center gap-1.5 text-[11px] text-blue-600 cursor-pointer">
                       <input type="checkbox" checked={autoCalc} onChange={e => setAutoCalc(e.target.checked)} className="accent-blue-600" />
-                      Auto-suggest days
+                      {c.autoSuggestDays}
                     </label>
                   )}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1"># Columns</label>
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1">{c.columnsCount}</label>
                     <input type="number" min="0" className="input w-full input-sm" disabled={!isAssessable} value={columns} onChange={e => setColumns(e.target.value)} placeholder="0" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1"># Data Sources</label>
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1">{c.sourcesCount}</label>
                     <input type="number" min="1" className="input w-full input-sm" disabled={!isAssessable} value={sources} onChange={e => setSources(e.target.value)} placeholder="1" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1">Effort Days <span className="text-red-500">*</span></label>
+                    <label className="block text-[10px] font-semibold text-muted uppercase mb-1">{c.effortDaysLabel} <span className="text-red-500">*</span></label>
                     <input type="number" min="0.5" step="0.5" className="input w-full input-sm" disabled={!isAssessable || paymentExempt} value={effortDays}
                       onChange={e => { setAutoCalc(false); setEffortDays(e.target.value); }} placeholder="1" />
                   </div>
@@ -277,13 +287,13 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                 <div className={`flex items-center justify-between pt-1 border-t ${paymentExempt ? "border-amber-200" : "border-blue-100"}`}>
                   {paymentExempt ? (
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-amber-800">SAR 0.00 — Payment exempted</p>
-                      <p className="text-[11px] text-amber-700 mt-0.5">The requester will be informed that no charges are required.</p>
+                      <p className="text-sm font-bold text-amber-800">{c.exemptZeroCost}</p>
+                      <p className="text-[11px] text-amber-700 mt-0.5">{c.exemptZeroCostDesc}</p>
                     </div>
                   ) : (
                     <>
                       <div className="text-xs text-blue-700">
-                        <span className="font-bold">{days} days</span> × SAR {dailyRate.toLocaleString()} / day
+                        <span className="font-bold">{c.daysAtRate.replace("{days}", String(days))}</span> {c.perDay.replace("{rate}", dailyRate.toLocaleString())}
                       </div>
                       <div className="text-base font-bold text-blue-800">
                         SAR {computedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
@@ -295,9 +305,9 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
             )}
 
             <div>
-              <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Assessment Notes</label>
+              <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.assessmentNotes}</label>
               <textarea className="input w-full h-20 resize-none" disabled={!isAssessable}
-                placeholder="Internal notes about eligibility, scope, complexity rationale…" value={notes} onChange={e => setNotes(e.target.value)} />
+                placeholder={c.assessmentNotesPlaceholder} value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
 
             {/* Payment exemption */}
@@ -305,23 +315,23 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
               <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={paymentExempt} onChange={e => { setPaymentExempt(e.target.checked); setManualOverride(false); }} className="accent-amber-600 w-4 h-4" />
-                  <span className="text-sm font-semibold text-amber-800">Grant Payment Exemption (No Charges)</span>
+                  <span className="text-sm font-semibold text-amber-800">{c.grantExemption}</span>
                 </label>
                 {paymentExempt && (
                   <>
                     <div>
-                      <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">Exemption Reason <span className="text-red-500">*</span></label>
-                      <input className="input w-full text-sm" placeholder="e.g. Academic research, Public interest, NGO partner…"
+                      <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">{c.exemptionReasonLabel} <span className="text-red-500">*</span></label>
+                      <input className="input w-full text-sm" placeholder={c.exemptionReasonPlaceholder}
                         value={exemptionReason} onChange={e => setExemptionReason(e.target.value)} />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">Supporting Evidence Reference</label>
-                      <input className="input w-full text-sm" placeholder="e.g. Letter ref, accreditation number, URL…"
+                      <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">{c.exemptionEvidenceLabel}</label>
+                      <input className="input w-full text-sm" placeholder={c.exemptionEvidencePlaceholder}
                         value={exemptEvidRef} onChange={e => setExemptEvidRef(e.target.value)} />
                     </div>
-                    <p className="text-[11px] text-amber-700">The data owner will review and approve this exemption during the fulfillment workflow. The requester will be notified that no charges are required.</p>
-                    {caseData.exemptionApproved === true  && <p className="text-[11px] text-green-700 font-semibold">✓ Exemption approved by owner</p>}
-                    {caseData.exemptionApproved === false && <p className="text-[11px] text-red-600 font-semibold">✗ Exemption rejected — payment required</p>}
+                    <p className="text-[11px] text-amber-700">{c.exemptionOwnerNote}</p>
+                    {caseData.exemptionApproved === true  && <p className="text-[11px] text-green-700 font-semibold">{c.exemptionApproved}</p>}
+                    {caseData.exemptionApproved === false && <p className="text-[11px] text-red-600 font-semibold">{c.exemptionRejected}</p>}
                   </>
                 )}
               </div>
@@ -334,7 +344,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                   <button onClick={saveAssessment}
                     disabled={savingAssess || (!effortDays && eligibility !== "ALREADY_PUBLIC" && !paymentExempt)}
                     className="btn btn-primary btn-sm">
-                    {savingAssess ? "Saving…" : hasAssessment ? "Update Assessment" : "Save Assessment"}
+                    {savingAssess ? c.saving : hasAssessment ? c.updateAssessment : c.saveAssessment}
                   </button>
                 </div>
               </div>
@@ -347,7 +357,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
       {(hasAssessment || hasQuote) && (
         <div className="card p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-ink">Quote</h2>
+            <h2 className="font-semibold text-sm text-ink">{c.quoteTitle}</h2>
             {hasQuote && (
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                 caseData.quoteStatusCode === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
@@ -364,66 +374,66 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
               {/* Exempt / zero-cost banner */}
               {quotedAmt === 0 && caseData.paymentExempt && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                  <p className="text-sm font-semibold text-amber-800">Payment Exempt — No Charges</p>
-                  <p className="text-xs text-amber-700 mt-0.5">The requester has been informed that no payment is required.</p>
-                  {caseData.exemptionReason && <p className="text-xs text-amber-700 mt-0.5">Reason: {caseData.exemptionReason}</p>}
+                  <p className="text-sm font-semibold text-amber-800">{c.exemptBannerTitle}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">{c.exemptBannerDesc}</p>
+                  {caseData.exemptionReason && <p className="text-xs text-amber-700 mt-0.5">{c.exemptReasonPrefix.replace("{reason}", caseData.exemptionReason)}</p>}
                 </div>
               )}
 
               <div className="grid grid-cols-3 gap-4 p-4 bg-canvas-soft rounded-xl">
                 <div>
-                  <div className="text-[10px] text-muted uppercase font-bold">Quoted Amount</div>
+                  <div className="text-[10px] text-muted uppercase font-bold">{c.quotedAmountLabel}</div>
                   <div className="text-lg font-bold text-ink">
                     {quotedAmt === 0 ? (
-                      <span className="text-green-700">Free</span>
+                      <span className="text-green-700">{c.freeLabel}</span>
                     ) : (
                       `SAR ${quotedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
                     )}
                   </div>
                   {caseData.adjustmentReason && (
-                    <div className="text-[10px] text-amber-700 mt-0.5">Manually adjusted</div>
+                    <div className="text-[10px] text-amber-700 mt-0.5">{c.manuallyAdjusted}</div>
                   )}
                 </div>
                 <div>
-                  <div className="text-[10px] text-muted uppercase font-bold">Daily Rate</div>
+                  <div className="text-[10px] text-muted uppercase font-bold">{c.dailyRateLabel}</div>
                   <div className="text-sm text-ink">SAR {Number(caseData.dailyRateSar).toLocaleString()}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-muted uppercase font-bold">Delivery Est.</div>
-                  <div className="text-sm text-ink">{caseData.estimatedDeliveryDays} working days</div>
+                  <div className="text-[10px] text-muted uppercase font-bold">{c.deliveryEstLabel}</div>
+                  <div className="text-sm text-ink">{caseData.estimatedDeliveryDays} {c.workingDaysSuffix}</div>
                 </div>
               </div>
 
               {/* Manual adjustment review */}
               {caseData.adjustmentReason && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
-                  <p className="text-xs font-semibold text-blue-800">Manual Amount Adjustment</p>
-                  <p className="text-xs text-blue-700">Justification: {caseData.adjustmentReason}</p>
+                  <p className="text-xs font-semibold text-blue-800">{c.manualAdjustmentTitle}</p>
+                  <p className="text-xs text-blue-700">{c.justificationPrefix.replace("{reason}", caseData.adjustmentReason)}</p>
                   {caseData.adjustmentApproved === null && (
                     <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[11px] text-amber-700">Pending owner review</span>
-                      <button onClick={() => decideAdjustment(true)} disabled={adjustBusy} className="btn btn-sm text-[11px] border-green-400 text-green-700">✓ Approve</button>
-                      <button onClick={() => decideAdjustment(false)} disabled={adjustBusy} className="btn btn-sm text-[11px] border-red-300 text-red-600">✗ Reject</button>
+                      <span className="text-[11px] text-amber-700">{c.pendingOwnerReview}</span>
+                      <button onClick={() => decideAdjustment(true)} disabled={adjustBusy} className="btn btn-sm text-[11px] border-green-400 text-green-700">{c.approve}</button>
+                      <button onClick={() => decideAdjustment(false)} disabled={adjustBusy} className="btn btn-sm text-[11px] border-red-300 text-red-600">{c.rejectBtn}</button>
                     </div>
                   )}
-                  {caseData.adjustmentApproved === true  && <p className="text-[11px] text-green-700 font-semibold">✓ Adjustment approved by owner</p>}
-                  {caseData.adjustmentApproved === false && <p className="text-[11px] text-red-600 font-semibold">✗ Adjustment rejected — reissue quote at standard rate</p>}
+                  {caseData.adjustmentApproved === true  && <p className="text-[11px] text-green-700 font-semibold">{c.adjustmentApproved}</p>}
+                  {caseData.adjustmentApproved === false && <p className="text-[11px] text-red-600 font-semibold">{c.adjustmentRejected}</p>}
                 </div>
               )}
 
               {caseData.quoteStatusCode === 'ISSUED' && (
                 <div className="flex gap-2 items-center">
-                  <p className="text-xs text-muted flex-1">Record requester decision (verbal / email / portal):</p>
-                  <button onClick={() => decideQuote("ACCEPTED")} disabled={quoteBusy} className="btn btn-sm border-green-400 text-green-700">{quoteBusy ? "…" : "✓ Accepted"}</button>
-                  <button onClick={() => decideQuote("DECLINED")} disabled={quoteBusy} className="btn btn-sm border-red-300 text-red-600">{quoteBusy ? "…" : "✗ Declined"}</button>
+                  <p className="text-xs text-muted flex-1">{c.recordDecisionPrompt}</p>
+                  <button onClick={() => decideQuote("ACCEPTED")} disabled={quoteBusy} className="btn btn-sm border-green-400 text-green-700">{quoteBusy ? "…" : c.accepted}</button>
+                  <button onClick={() => decideQuote("DECLINED")} disabled={quoteBusy} className="btn btn-sm border-red-300 text-red-600">{quoteBusy ? "…" : c.declined}</button>
                 </div>
               )}
 
               {caseData.statusCode === 'AWAITING_PAYMENT' && !isPaid && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-                  <strong>Payment required:</strong> SAR {quotedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })} must be received in full before fulfillment can start.
-                  Received so far: SAR {totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}.
-                  Record payments in the <strong>Payments</strong> tab.
+                  <strong>{c.paymentRequiredPrefix}</strong> SAR {quotedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })} {c.paymentRequiredSuffix}
+                  {" "}{c.receivedSoFar.replace("{amount}", totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+                  {" "}{c.recordPaymentsHint} <strong>{c.paymentsTabName}</strong>.
                 </div>
               )}
 
@@ -440,7 +450,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                     }}
                     className="btn btn-primary btn-sm"
                   >
-                    → Start Fulfillment
+                    {c.startFulfillment}
                   </button>
                 </div>
               )}
@@ -452,35 +462,35 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
             <div className="space-y-4">
               {paymentExempt ? (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                  <p className="text-sm font-semibold text-amber-800">No-charge quote will be issued</p>
-                  <p className="text-xs text-amber-700 mt-0.5">The requester will be notified that their request has been approved with no charges required.</p>
+                  <p className="text-sm font-semibold text-amber-800">{c.noChargeQuoteTitle}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">{c.noChargeQuoteDesc}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
                     <span className="text-sm text-blue-700">
-                      Computed amount: <strong>SAR {computedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
+                      {c.computedAmount} <strong>SAR {computedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
                     </span>
                     {isAssessable && (
                       <label className="flex items-center gap-1.5 text-[11px] text-blue-600 cursor-pointer">
                         <input type="checkbox" checked={manualOverride} onChange={e => setManualOverride(e.target.checked)} className="accent-blue-600" />
-                        Override amount
+                        {c.overrideAmount}
                       </label>
                     )}
                   </div>
                   {manualOverride && (
                     <div className="grid grid-cols-2 gap-3 p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
                       <div>
-                        <label className="block text-[10px] font-bold text-yellow-800 uppercase mb-1">Override Amount (SAR) <span className="text-red-500">*</span></label>
+                        <label className="block text-[10px] font-bold text-yellow-800 uppercase mb-1">{c.overrideAmountLabel} <span className="text-red-500">*</span></label>
                         <input type="number" min="0" step="0.01" className="input w-full text-sm"
                           placeholder={String(computedCost)} value={manualAmount} onChange={e => setManualAmount(e.target.value)} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-yellow-800 uppercase mb-1">Justification <span className="text-red-500">*</span></label>
-                        <input className="input w-full text-sm" placeholder="Reason for amount override (required for owner review)"
+                        <label className="block text-[10px] font-bold text-yellow-800 uppercase mb-1">{c.justificationLabel} <span className="text-red-500">*</span></label>
+                        <input className="input w-full text-sm" placeholder={c.overrideJustificationPlaceholder}
                           value={adjustReason} onChange={e => setAdjustReason(e.target.value)} />
                       </div>
-                      <p className="col-span-2 text-[11px] text-yellow-800">The override amount and justification will be flagged for owner review during the fulfillment workflow.</p>
+                      <p className="col-span-2 text-[11px] text-yellow-800">{c.overrideOwnerNote}</p>
                     </div>
                   )}
                 </div>
@@ -488,32 +498,32 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Estimated Delivery (working days)</label>
+                  <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.estDeliveryDaysLabel}</label>
                   <input type="number" min="1" className="input w-full" value={deliveryDays}
                     onChange={e => setDeliveryDays(e.target.value)} placeholder={String(Math.ceil(days * 2))} />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Note (optional)</label>
-                  <input className="input w-full" value={quoteNote} onChange={e => setQuoteNote(e.target.value)} placeholder="Any scope caveat or comment…" />
+                  <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.noteOptionalLabel}</label>
+                  <input className="input w-full" value={quoteNote} onChange={e => setQuoteNote(e.target.value)} placeholder={c.noteOptionalPlaceholder} />
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted">
-                  Final amount: <strong className={paymentExempt ? "text-amber-700" : "text-ink"}>
-                    {paymentExempt ? "SAR 0.00 (Exempt)" : `SAR ${effectiveCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+                  {c.finalAmount} <strong className={paymentExempt ? "text-amber-700" : "text-ink"}>
+                    {paymentExempt ? c.finalAmountExempt : `SAR ${effectiveCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
                   </strong>
                 </span>
                 {quoteError && <span className="text-sm text-red-600">{quoteError}</span>}
                 <button onClick={issueQuote} disabled={issuingQuote} className="btn btn-primary btn-sm">
-                  {issuingQuote ? "Issuing…" : "Issue Quote to Requester"}
+                  {issuingQuote ? c.issuing : c.issueQuote}
                 </button>
               </div>
             </div>
           )}
 
           {!canIssueQuote && !hasQuote && hasAssessment && (
-            <p className="text-sm text-muted italic">Save the assessment above to enable quote generation.</p>
+            <p className="text-sm text-muted italic">{c.saveAssessmentHint}</p>
           )}
         </div>
       )}

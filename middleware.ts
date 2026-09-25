@@ -13,9 +13,13 @@ const PUBLIC_PREFIXES = [
   "/logo.svg",
   "/foi-request",           // public FOI intake form + tracking
   "/api/foi/intake",        // public intake submission
+  "/api/foi/track",         // public tracking lookup + quote accept/decline (own token-based auth, not session-based —
+                            // was missing here entirely, so every anonymous citizen hitting the tracking page got
+                            // silently redirected to /login before ever reaching the route's own "no auth" handler
   "/api/reports/cron/snapshot", // Vercel Cron — no session cookie, authenticates via its own CRON_SECRET bearer check
   "/api/lineage/pbix/scheduled-scan", // scripts/pbix-scheduler.mjs — no session cookie, same CRON_SECRET bearer check
   "/api/languages",         // login page's language picker needs this before a session exists
+  "/api/translations/bundle", // same reason — non-sensitive UI copy, needed pre-auth by login + public FOI pages
 ];
 
 function isPublic(pathname: string) {
