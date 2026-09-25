@@ -16,6 +16,7 @@ import { GovernancePanel } from "./GovernancePanel";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { useLang } from "@/lib/lang-context";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 // ── Column chooser definitions ──────────────────────────────────────────────
 
@@ -26,22 +27,36 @@ type GridColId =
 
 type GridColDef = { id: GridColId; label: string; width: string; defaultOn: boolean };
 
-const ALL_GRID_COLS: GridColDef[] = [
-  { id: "name",        label: "Column",               width: "1.6fr", defaultOn: true  },
-  { id: "type",        label: "Data Type",            width: "1fr",   defaultOn: true  },
-  { id: "nullpct",     label: "Null %",               width: "0.8fr", defaultOn: true  },
-  { id: "sensitivity", label: "Classification",        width: "1.1fr", defaultOn: true  },
-  { id: "cde",         label: "CDE",                  width: "0.7fr", defaultOn: true  },
-  { id: "classTerm",   label: "Classification Term",  width: "1.2fr", defaultOn: true  },
-  { id: "enrichTerms", label: "Context Enrichment",   width: "1.3fr", defaultOn: false },
-  { id: "glossary",    label: "Glossary Term",        width: "1fr",   defaultOn: false },
-  { id: "quality",     label: "Quality",              width: "0.9fr", defaultOn: true  },
-  { id: "friendly",    label: "Friendly Name",        width: "1fr",   defaultOn: false },
-  { id: "coltype",     label: "Column Type",          width: "0.9fr", defaultOn: false },
-  { id: "encrypted",   label: "Encrypted",            width: "0.8fr", defaultOn: false },
-  { id: "pii",         label: "PII",                  width: "0.7fr", defaultOn: false },
-  { id: "picategory",  label: "PI Category",          width: "1fr",   defaultOn: false },
+// Structural metadata only (no translated labels) — safe to use at module level
+// for computing DEFAULT_COLS / validating localStorage prefs before any
+// component (and its useLang() hook) has mounted.
+const GRID_COL_META: { id: GridColId; width: string; defaultOn: boolean }[] = [
+  { id: "name",        width: "1.6fr", defaultOn: true  },
+  { id: "type",        width: "1fr",   defaultOn: true  },
+  { id: "nullpct",     width: "0.8fr", defaultOn: true  },
+  { id: "sensitivity", width: "1.1fr", defaultOn: true  },
+  { id: "cde",         width: "0.7fr", defaultOn: true  },
+  { id: "classTerm",   width: "1.2fr", defaultOn: true  },
+  { id: "enrichTerms", width: "1.3fr", defaultOn: false },
+  { id: "glossary",    width: "1fr",   defaultOn: false },
+  { id: "quality",     width: "0.9fr", defaultOn: true  },
+  { id: "friendly",    width: "1fr",   defaultOn: false },
+  { id: "coltype",     width: "0.9fr", defaultOn: false },
+  { id: "encrypted",   width: "0.8fr", defaultOn: false },
+  { id: "pii",         width: "0.7fr", defaultOn: false },
+  { id: "picategory",  width: "1fr",   defaultOn: false },
 ];
+
+function buildGridCols(c: I18nStrings["catalog"]): GridColDef[] {
+  const LABEL: Record<GridColId, string> = {
+    name: c.colHeaderColumn, type: c.colHeaderDataType, nullpct: c.colHeaderNullPct,
+    sensitivity: c.colHeaderClassification, cde: c.colHeaderCde, classTerm: c.colHeaderClassTerm,
+    enrichTerms: c.colHeaderContextEnrichment, glossary: c.colHeaderGlossaryTerm, quality: c.colHeaderQuality,
+    friendly: c.colHeaderFriendlyName, coltype: c.colHeaderColumnType, encrypted: c.colHeaderEncrypted,
+    pii: c.colHeaderPii, picategory: c.colHeaderPiCategory,
+  };
+  return GRID_COL_META.map((m) => ({ ...m, label: LABEL[m.id] }));
+}
 
 // CDE = Critical Data Element: column is CDE when classified as Confidential, Secret, or Top Secret
 const CDE_CODES = new Set(["CONFIDENTIAL", "SECRET", "TOP_SECRET"]);
@@ -51,7 +66,7 @@ function isCde(attr: import("@/lib/types").DataAttribute): boolean {
 }
 
 const LS_KEY = "bayanatix_col_prefs_v3";
-const DEFAULT_COLS: GridColId[] = ALL_GRID_COLS.filter((c) => c.defaultOn).map((c) => c.id);
+const DEFAULT_COLS: GridColId[] = GRID_COL_META.filter((m) => m.defaultOn).map((m) => m.id);
 
 function loadColPrefs(): GridColId[] {
   if (typeof window === "undefined") return DEFAULT_COLS;
@@ -59,7 +74,7 @@ function loadColPrefs(): GridColId[] {
     const stored = localStorage.getItem(LS_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as GridColId[];
-      const known = new Set<string>(ALL_GRID_COLS.map((c) => c.id));
+      const known = new Set<string>(GRID_COL_META.map((m) => m.id));
       const valid = parsed.filter((id) => known.has(id));
       if (valid.length > 0) return valid;
     }
@@ -71,10 +86,9 @@ function saveColPrefs(cols: GridColId[]) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(cols)); } catch {}
 }
 
-const COLUMN_TYPE_LABEL: Record<string, string> = {
-  BUSINESS:  "Business",
-  TECHNICAL: "Technical",
-};
+function buildColumnTypeLabel(c: I18nStrings["catalog"]): Record<string, string> {
+  return { BUSINESS: c.columnTypeBusiness, TECHNICAL: c.columnTypeTechnical };
+}
 
 // ── Column chooser popover ──────────────────────────────────────────────────
 
@@ -85,6 +99,9 @@ function ColumnChooser({
   activeColIds: GridColId[];
   onChange: (cols: GridColId[]) => void;
 }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const ALL_GRID_COLS = buildGridCols(c);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -98,7 +115,7 @@ function ColumnChooser({
 
   function toggle(id: GridColId) {
     const next = activeColIds.includes(id)
-      ? activeColIds.filter((c) => c !== id)
+      ? activeColIds.filter((colId) => colId !== id)
       : [...activeColIds, id];
     onChange(next);
     saveColPrefs(next);
@@ -125,18 +142,18 @@ function ColumnChooser({
           <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
           <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
-        Columns
+        {c.columnsChooserBtn}
       </button>
 
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl border border-line w-60 overflow-hidden">
           <div className="px-4 py-2.5 border-b border-line-soft flex items-center justify-between">
-            <span className="text-sm font-bold text-brand-deep">Visible Columns</span>
+            <span className="text-sm font-bold text-brand-deep">{c.visibleColumnsTitle}</span>
             <button
               onClick={() => { onChange(DEFAULT_COLS); saveColPrefs(DEFAULT_COLS); }}
               className="text-[11px] text-muted hover:text-brand-purple"
             >
-              Reset
+              {c.resetBtn}
             </button>
           </div>
           <div className="max-h-72 overflow-y-auto divide-y divide-line-soft">
@@ -205,7 +222,8 @@ function EnrichmentTermsCell({ attributeId }: { attributeId: number }) {
 type TagRow = { tagId: number; tagName: string; colorHex: string };
 
 function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: () => void; canEdit: boolean }) {
-  const { lang } = useLang();
+  const { t, lang } = useLang();
+  const c = t.catalog;
   const [tags,            setTags]            = useState<TagRow[]  | null>(null);
   const [enrichment,      setEnrichment]      = useState<TermRow[] | null>(null);
   const [showRelationships, setShowRelationships] = useState(false);
@@ -228,21 +246,21 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
 
       {/* Description */}
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">Description</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colDetailDescription}</div>
         {(attr.description || attr.sourceDescription)
           ? <p className="text-sm text-ink leading-relaxed">{attr.description ?? attr.sourceDescription}</p>
-          : <span className="text-sm text-muted italic">No description</span>}
+          : <span className="text-sm text-muted italic">{c.colDetailNoDescription}</span>}
         {canEdit && <DescriptionEnrichWidget assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} currentText={attr.description ?? null} canEdit={canEdit} />}
       </div>
 
       {/* Metadata row */}
       <div className="flex items-start gap-8 flex-wrap">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">Friendly Name</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colHeaderFriendlyName}</div>
           <div className="text-sm text-ink">{attr.friendlyName ?? <span className="text-muted">—</span>}</div>
         </div>
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">Column Type</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colHeaderColumnType}</div>
           <div className="text-sm text-ink">
             <ColumnTypeBadge
               attributeId={attr.attributeId} physicalName={attr.physicalName}
@@ -254,26 +272,26 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
           </div>
         </div>
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">Encrypted</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colHeaderEncrypted}</div>
           <div className="text-sm">
             {attr.isEncrypted
-              ? <span className="font-semibold text-amber-700">🔒 Yes</span>
-              : <span className="text-muted">No</span>}
+              ? <span className="font-semibold text-amber-700">🔒 {t.common.yes}</span>
+              : <span className="text-muted">{t.common.no}</span>}
           </div>
         </div>
       </div>
 
       {/* Classification term */}
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-wide text-brand-purple mb-2">Classification Term</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-brand-purple mb-2">{c.colHeaderClassTerm}</div>
         {hasClassTerm ? (
           <div className="flex items-center gap-6 flex-wrap text-sm bg-white border border-brand-purple/15 rounded-lg px-4 py-2.5">
             <div>
-              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">Term</span>
+              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colDetailTermWord}</span>
               <span className="font-semibold text-brand-deep">{attr.classTermName}</span>
             </div>
             <div>
-              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">Classification</span>
+              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colHeaderClassification}</span>
               <div className="flex items-center gap-1.5">
                 <ClassificationTag code={attr.classTermClassCode ?? undefined} />
                 {attr.classTermClassName && (
@@ -282,42 +300,42 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
               </div>
             </div>
             <div>
-              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">PII</span>
+              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colHeaderPii}</span>
               {attr.classTermIsPii
-                ? <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">Yes</span>
-                : <span className="text-sm text-muted">No</span>}
+                ? <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">{t.common.yes}</span>
+                : <span className="text-sm text-muted">{t.common.no}</span>}
             </div>
             <div>
-              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">CDE</span>
+              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colHeaderCde}</span>
               {isCde(attr)
-                ? <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5">Yes — Critical Data Element</span>
-                : <span className="text-sm text-muted">No</span>}
+                ? <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5">{c.colDetailCdeYes}</span>
+                : <span className="text-sm text-muted">{t.common.no}</span>}
             </div>
             <div>
-              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">PI Category</span>
+              <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colHeaderPiCategory}</span>
               {attr.classTermPiCategoryName
                 ? <span className="text-[12px] font-medium text-ink">{attr.classTermPiCategoryName}</span>
                 : <span className="text-sm text-muted">—</span>}
             </div>
           </div>
         ) : (
-          <span className="text-sm text-muted italic">No classification term linked</span>
+          <span className="text-sm text-muted italic">{c.colDetailNoClassTerm}</span>
         )}
       </div>
 
       {/* Enrichment terms */}
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">Business Terms (Enrichment)</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">{c.colDetailBusinessTermsEnrichment}</div>
         {enrichment === null
-          ? <span className="text-[11px] text-muted">Loading…</span>
+          ? <span className="text-[11px] text-muted">{t.common.loading}</span>
           : enrichment.length === 0
-          ? <span className="text-sm text-muted italic">None linked</span>
+          ? <span className="text-sm text-muted italic">{c.colDetailNoneLinked}</span>
           : (
             <div className="flex flex-wrap gap-1.5">
-              {enrichment.map((t) => (
-                <span key={t.glossaryId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-purple/10 text-brand-deep border border-brand-purple/20">
-                  {t.termName}
-                  {t.isPii && <span className="text-[9px] font-bold text-red-600 ml-0.5">PII</span>}
+              {enrichment.map((et) => (
+                <span key={et.glossaryId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-purple/10 text-brand-deep border border-brand-purple/20">
+                  {et.termName}
+                  {et.isPii && <span className="text-[9px] font-bold text-red-600 ml-0.5">PII</span>}
                 </span>
               ))}
             </div>
@@ -326,11 +344,11 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
 
       {/* Tags */}
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">Tags</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">{c.colDetailTagsWord}</div>
         {tags === null
-          ? <span className="text-[11px] text-muted">Loading…</span>
+          ? <span className="text-[11px] text-muted">{t.common.loading}</span>
           : tags.length === 0
-          ? <span className="text-sm text-muted italic">No tags</span>
+          ? <span className="text-sm text-muted italic">{c.colDetailNoTags}</span>
           : (
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag) => (
@@ -360,9 +378,9 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
             <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
             <line x1="12" y1="8" x2="5.5" y2="16"/><line x1="12" y1="8" x2="18.5" y2="16"/>
           </svg>
-          {showRelationships ? "Hide Relationships" : "View Relationships"}
+          {showRelationships ? c.colDetailHideRelationships : c.colDetailViewRelationships}
         </button>
-        <button onClick={onEdit} className="btn btn-sm btn-primary">Edit Column</button>
+        <button onClick={onEdit} className="btn btn-sm btn-primary">{c.colDetailEditColumnBtn}</button>
       </div>
 
       {/* Inline relationship diagram */}
@@ -395,9 +413,9 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
   const [showHistory,  setShowHistory]  = useState(false);
 
   const COLUMN_TYPE_OPTIONS = [
-    { value: "",          label: "— None —" },
-    { value: "BUSINESS",  label: "Business Column" },
-    { value: "TECHNICAL", label: "Technical Column" },
+    { value: "",          label: c.colEditNoneOption },
+    { value: "BUSINESS",  label: c.colEditBusinessOption },
+    { value: "TECHNICAL", label: c.colEditTechnicalOption },
   ];
 
   async function save() {
@@ -408,8 +426,8 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
         body: JSON.stringify({ description, friendlyName, isEncrypted, columnType: columnType || null }),
       });
       if (!r.ok) {
-        const d = await r.json().catch(() => ({ error: "Unknown error" }));
-        setError(d.error ?? "Failed to save"); return;
+        const d = await r.json().catch(() => ({ error: c.colEditUnknownErr }));
+        setError(d.error ?? c.colEditSaveFailed); return;
       }
       onClose(); router.refresh();
     } catch (e) { setError(String(e)); }
@@ -434,18 +452,18 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
           <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
             <div>
               <label className="field-label">{t.common.description}</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="input-field resize-none" placeholder="Describe this column…" />
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="input-field resize-none" placeholder={c.colEditDescPlaceholder} />
               <div className="mt-2 rounded-md bg-canvas-soft border border-line px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-0.5">{c.fromSource}</div>
                 {attr.sourceDescription
                   ? <p className="text-[12px] text-ink-soft leading-relaxed">{attr.sourceDescription}</p>
-                  : <p className="text-[12px] text-muted italic">No comment found in source database.</p>}
+                  : <p className="text-[12px] text-muted italic">{c.colEditNoSourceComment}</p>}
               </div>
             </div>
 
             <div>
               <label className="field-label">{c.editFriendlyName}</label>
-              <input type="text" value={friendlyName} onChange={(e) => setFriendlyName(e.target.value)} className="input-field" placeholder="e.g. Customer Identifier" />
+              <input type="text" value={friendlyName} onChange={(e) => setFriendlyName(e.target.value)} className="input-field" placeholder={c.colEditFriendlyPlaceholder} />
             </div>
 
             <div className="grid grid-cols-2 gap-4 items-end">
@@ -496,6 +514,9 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
   const { t } = useLang();
   const g = t.catalog;
 
+  const ALL_GRID_COLS = buildGridCols(g);
+  const COLUMN_TYPE_LABEL = buildColumnTypeLabel(g);
+
   const [editing,      setEditing]      = useState<DataAttribute | null>(null);
   const [expandedId,   setExpandedId]   = useState<number | null>(null);
   const [activeColIds, setActiveColIds] = useState<GridColId[]>(DEFAULT_COLS);
@@ -504,7 +525,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
   useEffect(() => { setActiveColIds(loadColPrefs()); }, []);
 
   const activeColDefs = activeColIds
-    .map((id) => ALL_GRID_COLS.find((c) => c.id === id))
+    .map((id) => ALL_GRID_COLS.find((gc) => gc.id === id))
     .filter(Boolean) as GridColDef[];
 
   // CSS grid template: expand chevron | PK/FK | ...dynamic cols... | edit (optional)
@@ -712,7 +733,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                   <button
                     onClick={() => setEditing(a)}
                     className="w-7 h-7 grid place-items-center rounded hover:bg-brand-purple/10 text-muted hover:text-brand-purple transition-colors"
-                    title="Edit column metadata"
+                    title={g.colEditTooltip}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>

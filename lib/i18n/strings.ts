@@ -537,6 +537,58 @@ export type I18nStrings = {
     encryptedField:    string;
     saveChanges:       string;
     viewHistory:       string;
+    colEditDescPlaceholder:    string;
+    colEditNoSourceComment:    string;
+    colEditFriendlyPlaceholder: string;
+    colEditNoneOption:         string;
+    colEditBusinessOption:     string;
+    colEditTechnicalOption:    string;
+    colEditUnknownErr:         string;
+    colEditSaveFailed:         string;
+    colEditTooltip:            string;
+    // ColumnsTable.tsx — grid headers & column chooser
+    colHeaderColumn:           string;
+    colHeaderDataType:         string;
+    colHeaderNullPct:          string;
+    colHeaderClassification:   string;
+    colHeaderCde:              string;
+    colHeaderClassTerm:        string;
+    colHeaderContextEnrichment:string;
+    colHeaderGlossaryTerm:     string;
+    colHeaderQuality:          string;
+    colHeaderFriendlyName:     string;
+    colHeaderColumnType:       string;
+    colHeaderEncrypted:        string;
+    colHeaderPii:              string;
+    colHeaderPiCategory:       string;
+    columnsChooserBtn:         string;
+    visibleColumnsTitle:       string;
+    resetBtn:                  string;
+    // ColumnsTable.tsx — expanded column detail panel
+    colDetailDescription:      string;
+    colDetailNoDescription:    string;
+    colDetailNoClassTerm:      string;
+    colDetailTermWord:         string;
+    colDetailCdeYes:           string;
+    colDetailBusinessTermsEnrichment: string;
+    colDetailNoneLinked:       string;
+    colDetailTagsWord:         string;
+    colDetailNoTags:           string;
+    colDetailHideRelationships: string;
+    colDetailViewRelationships: string;
+    colDetailEditColumnBtn:    string;
+    // Table detail page — DQ summary panel & schema-tab tags
+    viewBadge:              string;
+    tableBadge:             string;
+    rowsWord:               string;
+    schemaLabelPrefix:      string;
+    lastRefreshedLabel:     string;
+    lastRefreshedPlaceholderValue: string;
+    openQuestionsBadge:     string;   // "{n} open question(s)"
+    rulesManageLink:        string;   // "{n} rule(s) → manage"
+    dqNotRunYet:            string;
+    dqNoRulesAssigned:      string;
+    freshness:              string;
     // Table detail page tabs
     tabSchema:         string;
     tabDataQuality:    string;

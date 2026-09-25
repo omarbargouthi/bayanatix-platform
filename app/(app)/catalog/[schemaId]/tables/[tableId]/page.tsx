@@ -27,6 +27,7 @@ import { SetChatContext } from "@/components/chat/SetChatContext";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { SampleDataTab } from "@/components/catalog/SampleDataTab";
 import { getServerT } from "@/lib/i18n/server";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
 export const dynamic = "force-dynamic";
 
@@ -134,7 +135,7 @@ export default async function TablePage({
               categoryIsConfirmed={entity.categoryIsConfirmed}
               canEdit={canEdit}
             />
-            <Tag>{entity.isView ? "View" : "Table"} · {fmtNumber(entity.rowCount as number | null)} rows</Tag>
+            <Tag>{entity.isView ? t.catalog.viewBadge : t.catalog.tableBadge} · {fmtNumber(entity.rowCount as number | null)} {t.catalog.rowsWord}</Tag>
           </h1>
           <TablePageActions
             entityId={entity.entityId}
@@ -168,30 +169,29 @@ export default async function TablePage({
                   {entity.schema && (
                     // A real link, not a plain label — this is the table's actual
                     // navigation back to its parent schema, so it should behave like one.
-                    // dir="ltr": this "Label: Value" pair is a hardcoded English string
-                    // (not yet run through the i18n layer, matching its sibling PK/Last-
-                    // refreshed tags), so under an Arabic (dir="rtl") page the two runs
-                    // ("Schema:" and the name) would otherwise get bidi-reordered into
-                    // "crm :Schema" instead of reading "Schema: crm".
+                    // dir="ltr": this "Label: Value" pair keeps LTR direction (matching its
+                    // sibling PK/Last-refreshed tags) so under an Arabic (dir="rtl") page the
+                    // two runs (the translated prefix and the schema name) don't get
+                    // bidi-reordered into "crm :Schema" instead of reading "Schema: crm".
                     <Link href={`/catalog/${entity.schema.schemaId}`} dir="ltr" className="tag hover:bg-brand-purple/10 hover:text-brand-purple transition-colors">
-                      Schema: <strong className="ml-1">{entity.schema.schemaName}</strong>
+                      {t.catalog.schemaLabelPrefix} <strong className="ml-1">{entity.schema.schemaName}</strong>
                     </Link>
                   )}
-                  <Tag>Last refreshed: <strong className="ml-1">2 hours ago</strong></Tag>
+                  <Tag>{t.catalog.lastRefreshedLabel} <strong className="ml-1">{t.catalog.lastRefreshedPlaceholderValue}</strong></Tag>
                   {entity.openRequestCount ? (
-                    <Tag variant="amber">⚠ {entity.openRequestCount} open question{entity.openRequestCount !== 1 ? "s" : ""}</Tag>
+                    <Tag variant="amber">⚠ {t.catalog.openQuestionsBadge.replace("{n}", String(entity.openRequestCount))}</Tag>
                   ) : null}
                 </div>
 
                 <div className="mt-6 flex items-center justify-between mb-2">
                   <h4 className="font-bold text-sm">{t.catalog.tabDataQuality}</h4>
                   <a href="?tab=Data+Quality" className="text-[11px] text-brand-purple hover:underline">
-                    {schemaTabDqRules.length} rule{schemaTabDqRules.length !== 1 ? "s" : ""} → manage
+                    {t.catalog.rulesManageLink.replace("{n}", String(schemaTabDqRules.length))}
                   </a>
                 </div>
                 <div className="grid grid-cols-3 gap-3.5">
                   {(tableDq?.dimensions ?? []).map((d) => (
-                    <DqItem key={d.dimensionCode} label={d.label} value={d.score} ruleCount={d.ruleCount} />
+                    <DqItem key={d.dimensionCode} label={DQ_DIMENSION_LABEL(t)[d.dimensionCode] ?? d.dimensionCode} value={d.score} ruleCount={d.ruleCount} t={t} />
                   ))}
                 </div>
               </div>
@@ -257,7 +257,18 @@ export default async function TablePage({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function DqItem({ label, value, ruleCount }: { label: string; value: number | null; ruleCount: number }) {
+function DQ_DIMENSION_LABEL(t: I18nStrings): Record<string, string> {
+  return {
+    COMP: t.catalog.completeness,
+    VALIDITY: t.catalog.validity,
+    UNIQUENESS: t.catalog.uniqueness,
+    FRESHNESS: t.catalog.freshness,
+    CONSISTENCY: t.catalog.consistency,
+    ACCURACY: t.catalog.accuracy,
+  };
+}
+
+function DqItem({ label, value, ruleCount, t }: { label: string; value: number | null; ruleCount: number; t: I18nStrings }) {
   return (
     <div className="bg-canvas-soft rounded-md px-3.5 py-2.5">
       <div className="text-base font-bold text-ink">{value != null ? `${value.toFixed(1)}%` : "—"}</div>
@@ -268,7 +279,7 @@ function DqItem({ label, value, ruleCount }: { label: string; value: number | nu
         </div>
       ) : (
         <div className="text-[10px] text-muted italic mt-1.5">
-          {ruleCount > 0 ? "Not run yet" : "No rules assigned"}
+          {ruleCount > 0 ? t.catalog.dqNotRunYet : t.catalog.dqNoRulesAssigned}
         </div>
       )}
     </div>

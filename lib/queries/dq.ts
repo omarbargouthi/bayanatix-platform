@@ -205,20 +205,16 @@ export async function getDqRules(filters?: {
 // long-standing 6-tile layout) — a dimension with no rules assigned shows
 // score:null so the UI can render "No rules assigned" rather than a fake number.
 
-const TABLE_DQ_DIMENSIONS: { code: string; label: string }[] = [
-  { code: "COMP",        label: "Completeness" },
-  { code: "VALIDITY",    label: "Validity" },
-  { code: "UNIQUENESS",  label: "Uniqueness" },
-  { code: "FRESHNESS",   label: "Freshness" },
-  { code: "CONSISTENCY", label: "Consistency" },
-  { code: "ACCURACY",    label: "Accuracy" },
-];
+// Labels are resolved by the caller (page.tsx, via getServerT()) from
+// dimensionCode — kept out of this data-layer module so they can be
+// translated without this file needing i18n access.
+const TABLE_DQ_DIMENSION_CODES = ["COMP", "VALIDITY", "UNIQUENESS", "FRESHNESS", "CONSISTENCY", "ACCURACY"];
 
 // ruleCount = total active rules assigned to this dimension (whether or not
 // they've run yet); scoredCount = how many of those have a last_score, which
 // is what avgScore is actually averaged over. Keeping both lets the UI tell
 // "no rules assigned" apart from "assigned but not run yet".
-export type TableDqDimensionResult = { dimensionCode: string; label: string; score: number | null; ruleCount: number };
+export type TableDqDimensionResult = { dimensionCode: string; score: number | null; ruleCount: number };
 export type TableDqResult = { overallScore: number | null; dimensions: TableDqDimensionResult[] };
 
 export async function getTableDqDimensions(entityId: number): Promise<TableDqResult> {
@@ -238,11 +234,10 @@ export async function getTableDqDimensions(entityId: number): Promise<TableDqRes
   `;
   const scoreMap = new Map(scoreRows.map((s) => [s.dimensionCode, s]));
 
-  const dimensions: TableDqDimensionResult[] = TABLE_DQ_DIMENSIONS.map(({ code, label }) => {
+  const dimensions: TableDqDimensionResult[] = TABLE_DQ_DIMENSION_CODES.map((code) => {
     const s = scoreMap.get(code);
     return {
       dimensionCode: code,
-      label,
       score: s?.avgScore != null ? Number(s.avgScore) : null,
       ruleCount: Number(s?.ruleCount ?? 0),
     };
