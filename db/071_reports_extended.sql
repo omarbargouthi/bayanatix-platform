@@ -22,10 +22,14 @@ CREATE INDEX IF NOT EXISTS idx_report_export_audit_time ON bayanat.report_export
 -- This role — not the SQL-text validation in lib/reports/kpi-sandbox.ts — is the
 -- real security boundary: it can SELECT from bayanat.* and nothing else, so even a
 -- custom KPI query that slips past text validation cannot write, alter, or drop.
+-- Password comes from KPI_SANDBOX_ROLE_PASSWORD in .env.local (see
+-- scripts/migrate.mjs's placeholder substitution) rather than a literal here —
+-- this file previously hardcoded 'kpi_sandbox_readonly_pw' directly, which is
+-- exactly the kind of committed-secret exposure db/114 rotates away from.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bayanatix_kpi_readonly') THEN
-    CREATE ROLE bayanatix_kpi_readonly LOGIN PASSWORD 'kpi_sandbox_readonly_pw';
+    CREATE ROLE bayanatix_kpi_readonly LOGIN PASSWORD '__KPI_SANDBOX_ROLE_PASSWORD__';
   END IF;
 END
 $$;

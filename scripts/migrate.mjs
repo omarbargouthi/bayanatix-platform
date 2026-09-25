@@ -27,13 +27,29 @@ if (!DB) {
 
 const sql = postgres(DB, { ssl: DB.includes("sslmode=require") ? "require" : "prefer" });
 
+// Simple env-var placeholder substitution for migrations that set a DB role's
+// password — keeps the actual secret out of the committed .sql file (see
+// db/071_reports_extended.sql / db/114_rotate_kpi_sandbox_password.sql). A
+// placeholder is a bare token like __SOME_NAME__; the matching env var must be
+// set or the migration containing it is refused rather than silently applying
+// a wrong/empty password.
+function resolvePlaceholders(sqlText, fileName) {
+  return sqlText.replace(/__([A-Z0-9_]+)__/g, (match, envName) => {
+    const value = process.env[envName];
+    if (!value) {
+      throw new Error(`${fileName} references ${match}, but ${envName} is not set in .env.local`);
+    }
+    return value.replace(/'/g, "''");
+  });
+}
+
 const dir = resolve(process.cwd(), "db");
 const files = (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort();
 
 for (const file of files) {
   console.log(`→ running ${file}`);
   const sqlText = await readFile(resolve(dir, file), "utf8");
-  await sql.unsafe(sqlText);
+  await sql.unsafe(resolvePlaceholders(sqlText, file));
 }
 
 console.log("✓ migrations complete");
