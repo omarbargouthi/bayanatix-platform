@@ -91,6 +91,10 @@ export type DataEntity = {
   avgQueryMs?: number | null;
   avgQueryMsPrev?: number | null;
   lastAccessedAt?: string | null;
+  // Set to DEPRECATED when a rescan no longer finds this table at the source —
+  // soft-deleted rather than removed, so history/references stay intact.
+  lifecycleStatus?: "ACTIVE" | "DEPRECATED";
+  deprecatedAt?: string | null;
 };
 
 export type TagRecord = {
@@ -133,6 +137,9 @@ export type DataAttribute = {
   classTermIsPii?:          boolean | null;
   classTermPiCategoryCode?: string | null;
   classTermPiCategoryName?: string | null;
+  // See DataEntity.lifecycleStatus — same soft-delete concept, column-level.
+  lifecycleStatus?: "ACTIVE" | "DEPRECATED";
+  deprecatedAt?: string | null;
 };
 
 export type Steward = {
@@ -460,7 +467,8 @@ export type RequestTypeCode =
   | "OTHER"
   | "CLASSIFY_ASSET"
   | "PUBLISH_OPEN_DATA"
-  | "PUBLISH_OPEN_DATA_PI";
+  | "PUBLISH_OPEN_DATA_PI"
+  | "METADATA_UPDATE";
 
 // ── Open Data ─────────────────────────────────────────────────────────────────
 

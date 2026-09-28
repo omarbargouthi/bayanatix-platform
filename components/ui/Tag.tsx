@@ -66,3 +66,16 @@ export function ClassificationTag({ code }: { code?: string | null }) {
     </Tag>
   );
 }
+
+// System-managed status badge for a table/column a rescan no longer found at
+// the source — soft-deleted (see db/117), not a free-form user tag, so it
+// can't be accidentally removed or duplicated. Renders nothing when active.
+export function LifecycleBadge({ status, deprecatedAt }: { status?: string | null; deprecatedAt?: string | null }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  if (status !== "DEPRECATED") return null;
+  const dateSuffix = deprecatedAt
+    ? c.deprecatedAtSuffix.replace("{date}", new Date(deprecatedAt).toLocaleDateString())
+    : "";
+  return <Tag variant="red">{c.deprecatedBadge}{dateSuffix}</Tag>;
+}

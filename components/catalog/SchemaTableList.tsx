@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { DataEntity } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
-import { CertTag, Tag } from "@/components/ui/Tag";
+import { CertTag, Tag, LifecycleBadge } from "@/components/ui/Tag";
 import {
   IconTable,
   IconHistory,
@@ -228,18 +228,21 @@ export function SchemaTableList({
   const [requestsEntity, setRequestsEntity] = useState<DataEntity | null>(null);
   const [selectedIds,   setSelectedIds]   = useState<Set<number>>(new Set());
   const [showBulk,      setShowBulk]      = useState(false);
+  const [showDeprecated, setShowDeprecated] = useState(false);
 
   const tables = useMemo(() => entities.filter((e) => !e.isView), [entities]);
+  const hasDeprecated = useMemo(() => tables.some((e) => e.lifecycleStatus === "DEPRECATED"), [tables]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return tables.filter((e) => {
+      if (!showDeprecated && e.lifecycleStatus === "DEPRECATED") return false;
       if (q && !e.entityName.toLowerCase().includes(q) && !(e.description ?? "").toLowerCase().includes(q)) return false;
       if (filterType && e.category !== filterType) return false;
       if (filterCert && e.certCode !== filterCert) return false;
       return true;
     });
-  }, [tables, search, filterType, filterCert]);
+  }, [tables, search, filterType, filterCert, showDeprecated]);
 
   // Selection tracks against the currently-filtered set — a table scrolled out of
   // view by a filter change is deselected too, so "Export Selected" always means
@@ -312,6 +315,18 @@ export function SchemaTableList({
           <option value="SILVER">{c.certSilver}</option>
           <option value="BRONZE">{c.certBronze}</option>
         </select>
+
+        {hasDeprecated && (
+          <label className="flex items-center gap-1.5 text-[12px] text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showDeprecated}
+              onChange={(e) => setShowDeprecated(e.target.checked)}
+              className="w-3.5 h-3.5 accent-brand-purple"
+            />
+            {c.showDeprecatedToggle}
+          </label>
+        )}
 
         {visibleSelectedIds.length > 0 && canEdit && (
           <div className="flex items-center gap-2">
@@ -400,6 +415,7 @@ export function SchemaTableList({
                     {entity.displayName && (
                       <span className="text-muted text-[11px] truncate max-w-[120px] shrink-0">({entity.displayName})</span>
                     )}
+                    <LifecycleBadge status={entity.lifecycleStatus} deprecatedAt={entity.deprecatedAt} />
                     {(entity.totalWarnings ?? 0) > 0 && (
                       <button
                         title={`${entity.totalWarnings} open request${entity.totalWarnings !== 1 ? "s" : ""} — click to view`}

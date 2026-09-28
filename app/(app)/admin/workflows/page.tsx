@@ -16,22 +16,25 @@ const ALL_TYPES = [
   { code: "PUBLISH_OPEN_DATA",    label: "Publish Open Data" },
   { code: "PUBLISH_OPEN_DATA_PI", label: "Publish Open Data (PI)" },
   { code: "PI_CLEAR_TEXT_ACCESS", label: "PI Clear-Text Access" },
+  { code: "METADATA_UPDATE",      label: "Metadata Update (Rescan Changes)" },
 ];
 
 const ASSIGNEE_TYPE_OPTIONS = [
-  { value: "ROLE",        label: "A Role" },
-  { value: "TEAM",        label: "A Team" },
-  { value: "USER",        label: "A Specific User" },
-  { value: "REQUESTER",   label: "Whoever Raised the Request" },
-  { value: "ASSET_OWNER", label: "The Asset's Governance Owner" },
+  { value: "ROLE",          label: "A Role" },
+  { value: "TEAM",          label: "A Team" },
+  { value: "USER",          label: "A Specific User" },
+  { value: "REQUESTER",     label: "Whoever Raised the Request" },
+  { value: "ASSET_OWNER",   label: "The Asset's Governance Owner" },
+  { value: "ASSET_STEWARD", label: "The Asset's Owner + Business/Technical Stewards" },
 ];
 
 const ASSIGNEE_TYPE_COLOR: Record<string, string> = {
-  ROLE:        "bg-blue-50 text-blue-700",
-  TEAM:        "bg-purple-50 text-purple-700",
-  USER:        "bg-gray-50 text-gray-600",
-  REQUESTER:   "bg-emerald-50 text-emerald-700",
-  ASSET_OWNER: "bg-amber-50 text-amber-700",
+  ROLE:          "bg-blue-50 text-blue-700",
+  TEAM:          "bg-purple-50 text-purple-700",
+  USER:          "bg-gray-50 text-gray-600",
+  REQUESTER:     "bg-emerald-50 text-emerald-700",
+  ASSET_OWNER:   "bg-amber-50 text-amber-700",
+  ASSET_STEWARD: "bg-teal-50 text-teal-700",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -45,6 +48,7 @@ const TYPE_COLOR: Record<string, string> = {
   COMPLIANCE_REVIEW:    "bg-teal-50 text-teal-700 border-teal-200",
   PUBLISH_OPEN_DATA:    "bg-cyan-50 text-cyan-700 border-cyan-200",
   PUBLISH_OPEN_DATA_PI: "bg-pink-50 text-pink-700 border-pink-200",
+  METADATA_UPDATE:      "bg-teal-50 text-teal-700 border-teal-200",
 };
 
 const STATUS_COLOR: Record<string, string> = {

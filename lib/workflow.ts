@@ -1,10 +1,11 @@
 import { sql } from "./db";
+import { resolveEffectiveGovernance, resolveEffectiveEntityGovernance, resolveEffectiveSchemaGovernance } from "./queries/stakeholders";
 
 type StageRow = {
   stageId:        number;
   stageName:      string;
   stageOrder:     number;
-  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER" | "ASSET_OWNER";
+  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER" | "ASSET_OWNER" | "ASSET_STEWARD";
   assigneeRoleId: number | null;
   assigneeTeamId: number | null;
   assigneeUserId: string | null;
@@ -47,6 +48,34 @@ async function resolveAssetOwner(assetTypeCode: string, assetId: number): Promis
   return [];
 }
 
+// Same inheritance walk as resolveAssetOwner, but returns every effective
+// stakeholder (Owner + Business Steward + Technical Steward) rather than just
+// the Owner — for workflows where "steward action" means the whole governance
+// team around the asset, not just whoever owns it (e.g. a metadata-change
+// review triggered by a rescan).
+async function resolveAssetSteward(assetTypeCode: string, assetId: number): Promise<string[]> {
+  if (assetTypeCode === "DATA_ATTRIBUTES") {
+    const eff = await resolveEffectiveGovernance(assetId);
+    return [...new Set(eff.map((e) => e.userId))];
+  }
+  if (assetTypeCode === "DATA_ENTITIES") {
+    const eff = await resolveEffectiveEntityGovernance(assetId);
+    return [...new Set(eff.map((e) => e.userId))];
+  }
+  if (assetTypeCode === "DATA_SCHEMAS") {
+    const eff = await resolveEffectiveSchemaGovernance(assetId);
+    return [...new Set(eff.map((e) => e.userId))];
+  }
+  if (assetTypeCode === "DATA_SOURCES") {
+    const rows = await sql<{ userId: string }[]>`
+      SELECT user_id AS "userId" FROM bayanat.asset_stakeholders
+      WHERE asset_type_code = 'DATA_SOURCES' AND asset_id = ${assetId}
+    `;
+    return [...new Set(rows.map((r) => r.userId))];
+  }
+  return [];
+}
+
 async function resolveAssignees(stage: StageRow, requestId: number): Promise<string[]> {
   switch (stage.assigneeType) {
     case "USER":
@@ -63,6 +92,19 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
         for (const userId of await resolveAssetOwner(t.assetTypeCode, t.assetId)) owners.add(userId);
       }
       return [...owners];
+    }
+
+    case "ASSET_STEWARD": {
+      const targets = await sql<{ assetTypeCode: string; assetId: number }[]>`
+        SELECT asset_type_code AS "assetTypeCode", asset_id AS "assetId"
+        FROM bayanat.asset_request_targets
+        WHERE request_id = ${requestId} AND asset_id IS NOT NULL
+      `;
+      const stewards = new Set<string>();
+      for (const t of targets) {
+        for (const userId of await resolveAssetSteward(t.assetTypeCode, t.assetId)) stewards.add(userId);
+      }
+      return [...stewards];
     }
 
     case "REQUESTER": {
@@ -269,7 +311,10 @@ async function applyApprovalOutcome(requestId: number, requestTypeCode: string, 
       return;
     }
     default:
-      return; // FIX_DATA_ISSUE, UPDATE_DEFINITION, CERTIFY_ASSET, GRANT_ACCESS, REMOVE_ACCESS, OTHER
+      // FIX_DATA_ISSUE, UPDATE_DEFINITION, CERTIFY_ASSET, GRANT_ACCESS, REMOVE_ACCESS, OTHER,
+      // METADATA_UPDATE (the crawler already applied the actual schema change/soft-delete at
+      // crawl time — this workflow is purely a steward review/audit trail, nothing to apply here)
+      return;
   }
 }
 

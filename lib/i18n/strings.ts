@@ -567,6 +567,10 @@ export type I18nStrings = {
     certSilver:       string;
     certBronze:       string;
     certUncertified:  string;
+    // Lifecycle status (soft-deleted tables/columns from a rescan)
+    deprecatedBadge:     string;
+    deprecatedAtSuffix:  string;   // " on {date}"
+    showDeprecatedToggle: string;
     // Picker / widget labels
     addTags:           string;
     loadingTags:       string;

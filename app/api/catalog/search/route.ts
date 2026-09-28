@@ -27,9 +27,10 @@ export async function GET(req: NextRequest) {
              e.schema_id AS "schemaId"
       FROM bayanat.data_entities e
       LEFT JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
-      WHERE e.entity_name_text ILIKE ${like}
+      WHERE e.lifecycle_status_code = 'ACTIVE'
+        AND (e.entity_name_text ILIKE ${like}
          OR e.display_name_text ILIKE ${like}
-         OR e.description_text ILIKE ${like}
+         OR e.description_text ILIKE ${like})
       ORDER BY e.entity_name_text
       LIMIT 8
     `,
@@ -39,9 +40,10 @@ export async function GET(req: NextRequest) {
              a.entity_id AS "entityId", e.schema_id AS "schemaId"
       FROM bayanat.data_attributes a
       LEFT JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
-      WHERE a.physical_name_text ILIKE ${like}
+      WHERE a.lifecycle_status_code = 'ACTIVE'
+        AND (a.physical_name_text ILIKE ${like}
          OR a.friendly_name_text ILIKE ${like}
-         OR a.description_text ILIKE ${like}
+         OR a.description_text ILIKE ${like})
       ORDER BY a.physical_name_text
       LIMIT 8
     `,

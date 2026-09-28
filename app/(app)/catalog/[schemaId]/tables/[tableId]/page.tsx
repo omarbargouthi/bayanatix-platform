@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata, canViewCatalogAsset } from "@/lib/can";
 import { getEntityById, getEntityProfile, CDE_CLASSIFICATION_CODES } from "@/lib/queries/catalog";
-import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
+import { CertTag, ClassificationTag, Tag, LifecycleBadge } from "@/components/ui/Tag";
 import { IconTable, IconChevron } from "@/components/layout/icons";
 import { TableHealthPanel } from "@/components/catalog/TableHealthPanel";
 import { TableTabs } from "@/components/catalog/TableTabs";
@@ -123,6 +123,7 @@ export default async function TablePage({
           <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap min-w-0">
             <IconTable className="w-6 h-6 text-brand-purple shrink-0" />
             <span className="min-w-0 truncate" dir="auto" title={entity.entityName}>{entity.entityName}</span>
+            <LifecycleBadge status={entity.lifecycleStatus} deprecatedAt={entity.deprecatedAt} />
             <span className="flex items-center gap-1">
               <span className="text-[9px] uppercase tracking-wider text-muted">{t.catalog.metadataCert}</span>
               <CertTag code={entity.certCode} />

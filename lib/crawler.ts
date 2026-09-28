@@ -1,7 +1,8 @@
 import postgres from "postgres";
 import { sql } from "./db";
 import { applyGovernanceDefaults } from "./queries/stakeholders";
-import { logUpdate } from "./audit";
+import { logUpdate, logCreate } from "./audit";
+import { startWorkflow } from "./workflow";
 
 // Actor id used for audit_logs entries the crawler writes on its own (table-type
 // suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
@@ -907,6 +908,27 @@ type GovernanceDefaults = {
   defaultTechStewardId: string | null;
 };
 
+// One entry per table that had ANY change this crawl (new, modified/added/removed
+// columns, or the table itself appeared/disappeared) — bundled per-table (not
+// per-column) so a table's steward(s) get one review item covering everything,
+// not a flood. Populated only when !isFirstCrawl (see saveCrawlResults).
+type ColumnRef = { id: number; name: string; oldValue?: string | null; newValue?: string | null };
+export type EntityChange = {
+  entityId:        number;
+  entityName:      string;
+  schemaId:        number;
+  isNewEntity:     boolean;
+  isRemovedEntity: boolean;
+  addedColumns:    ColumnRef[];
+  modifiedColumns: ColumnRef[];
+  removedColumns:  ColumnRef[];
+};
+
+function hasAnyChange(c: EntityChange): boolean {
+  return c.isNewEntity || c.isRemovedEntity
+    || c.addedColumns.length > 0 || c.modifiedColumns.length > 0 || c.removedColumns.length > 0;
+}
+
 // Non-destructive, idempotent sync (find-or-create + update-in-place, matched by name),
 // mirroring the same pattern already used by the lineage scanner's ensureSchema/ensureEntity/
 // ensureAttribute. A prior version deleted-and-recreated the whole schema/entity/attribute
@@ -919,10 +941,24 @@ async function saveCrawlResults(
   hostAddress: string, databaseName: string | null,
   result: CrawlResult, jobId: number,
   govDefaults: GovernanceDefaults,
-): Promise<number> {
+): Promise<{ sourceId: number; isFirstCrawl: boolean; changes: EntityChange[] }> {
   const existing = await sql<{ id: number }[]>`
     SELECT data_source_id AS id FROM bayanat.data_sources WHERE connection_id = ${connectionId}
   `;
+  // No prior data_sources row for this connection = nothing to diff against.
+  // Skipping change-tracking here isn't just an optimization: nobody could be
+  // following/stewarding a source that didn't exist yet, so there's no
+  // audience for "new" notifications on an initial import of hundreds of tables.
+  const isFirstCrawl = existing.length === 0;
+  const changes = new Map<number, EntityChange>();
+  function recordChange(entityId: number, entityName: string, schemaId: number): EntityChange {
+    let c = changes.get(entityId);
+    if (!c) {
+      c = { entityId, entityName, schemaId, isNewEntity: false, isRemovedEntity: false, addedColumns: [], modifiedColumns: [], removedColumns: [] };
+      changes.set(entityId, c);
+    }
+    return c;
+  }
   let sourceId: number;
   const prevCounts = new Map<string, number | null>();
   if (existing.length > 0) {
@@ -973,36 +1009,44 @@ async function saveCrawlResults(
     for (const table of schema.tables) {
       const [existingEntity] = await sql<{
         id: number; suggestedCategory: string | null; category: string | null; isConfirmed: boolean;
+        lifecycleStatus: string;
       }[]>`
         SELECT entity_id AS id, suggested_category_code AS "suggestedCategory",
-               entity_category_code AS category, coalesce(category_is_confirmed, false) AS "isConfirmed"
+               entity_category_code AS category, coalesce(category_is_confirmed, false) AS "isConfirmed",
+               lifecycle_status_code AS "lifecycleStatus"
         FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${table.name}
       `;
       const suggestion = classifyTableType(schema.name, table);
       let entityId: number;
       if (existingEntity) {
         entityId = existingEntity.id;
+        const wasDeprecated = existingEntity.lifecycleStatus === "DEPRECATED";
         await sql`
           UPDATE bayanat.data_entities SET
             is_view_indicator = ${table.isView},
             source_description_text = ${table.comment ?? null},
             suggested_category_code = ${suggestion.code},
             category_confidence_code = ${suggestion.confidence},
-            entity_category_code = CASE WHEN category_is_confirmed THEN entity_category_code ELSE ${suggestion.code} END
+            entity_category_code = CASE WHEN category_is_confirmed THEN entity_category_code ELSE ${suggestion.code} END,
+            lifecycle_status_code = 'ACTIVE',
+            deprecated_at_timestamp = NULL
           WHERE entity_id = ${entityId}
         `;
         // Only worth a history entry when the model's opinion actually moved (re-crawls
         // with no layout change would otherwise write an identical row every time).
         // Attributed to SYSTEM so it reads distinctly from a steward's own decisions.
         if (suggestion.code !== existingEntity.suggestedCategory) {
-          const changes: Parameters<typeof logUpdate>[3] = [
+          const entChanges: Parameters<typeof logUpdate>[3] = [
             { field: "suggested_category_code", oldVal: existingEntity.suggestedCategory, newVal: suggestion.code },
           ];
           if (!existingEntity.isConfirmed && suggestion.code !== existingEntity.category) {
-            changes.push({ field: "entity_category_code", oldVal: existingEntity.category, newVal: suggestion.code });
+            entChanges.push({ field: "entity_category_code", oldVal: existingEntity.category, newVal: suggestion.code });
           }
-          await logUpdate("DATA_ENTITIES", entityId, SYSTEM_ACTOR, changes);
+          await logUpdate("DATA_ENTITIES", entityId, SYSTEM_ACTOR, entChanges);
         }
+        // A table that reappears after being soft-deleted is treated as
+        // rediscovered, not a silent no-op — worth surfacing again.
+        if (wasDeprecated) recordChange(entityId, table.name, schemaId).isNewEntity = true;
       } else {
         entityId = (await sql<{ id: number }[]>`
           INSERT INTO bayanat.data_entities
@@ -1016,6 +1060,7 @@ async function saveCrawlResults(
           { field: "suggested_category_code", oldVal: null, newVal: suggestion.code },
           { field: "entity_category_code", oldVal: null, newVal: suggestion.code },
         ]);
+        recordChange(entityId, table.name, schemaId).isNewEntity = true;
       }
       touchedEntityIds.push(entityId);
 
@@ -1040,12 +1085,24 @@ async function saveCrawlResults(
       }
 
       for (const col of table.columns) {
-        const [existingAttr] = await sql<{ id: number }[]>`
-          SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${entityId} AND physical_name_text = ${col.name}
+        const [existingAttr] = await sql<{ id: number; dataType: string; lifecycleStatus: string }[]>`
+          SELECT attribute_id AS id, data_type_text AS "dataType", lifecycle_status_code AS "lifecycleStatus"
+          FROM bayanat.data_attributes WHERE entity_id = ${entityId} AND physical_name_text = ${col.name}
         `;
         let attributeId: number;
         if (existingAttr) {
           attributeId = existingAttr.id;
+          const wasDeprecated = existingAttr.lifecycleStatus === "DEPRECATED";
+          if (wasDeprecated) {
+            recordChange(entityId, table.name, schemaId).addedColumns.push({ id: attributeId, name: col.name });
+          } else if (existingAttr.dataType !== col.dataType) {
+            // Deliberately narrow "modified" signal — just the physical type,
+            // not description/friendly-name which regenerate often and would
+            // create noise disproportionate to the review this triggers.
+            recordChange(entityId, table.name, schemaId).modifiedColumns.push({
+              id: attributeId, name: col.name, oldValue: existingAttr.dataType, newValue: col.dataType,
+            });
+          }
           await sql`
             UPDATE bayanat.data_attributes SET
               data_type_text = ${col.dataType},
@@ -1053,7 +1110,9 @@ async function saveCrawlResults(
               is_primary_key_indicator = ${col.isPrimaryKey},
               is_foreign_key_indicator = ${col.isForeignKey},
               default_value_text = ${col.defaultValue},
-              source_description_text = ${col.comment ?? null}
+              source_description_text = ${col.comment ?? null},
+              lifecycle_status_code = 'ACTIVE',
+              deprecated_at_timestamp = NULL
             WHERE attribute_id = ${attributeId}
           `;
         } else {
@@ -1066,6 +1125,7 @@ async function saveCrawlResults(
                     ${col.isForeignKey}, ${col.defaultValue}, ${col.comment ?? null})
             RETURNING attribute_id AS id
           `)[0].id;
+          recordChange(entityId, table.name, schemaId).addedColumns.push({ id: attributeId, name: col.name });
         }
         touchedAttributeIds.push(attributeId);
 
@@ -1087,33 +1147,60 @@ async function saveCrawlResults(
     }
   }
 
-  // Remove columns/tables/schemas that existed from a previous crawl of this source but
-  // weren't found this time (dropped or renamed at the source). Each delete is attempted
-  // independently and skipped — not fatal — if another module still references the row;
-  // that row is simply left in place as stale rather than aborting the whole crawl.
-  const staleAttrs = await sql<{ id: number }[]>`
-    SELECT a.attribute_id AS id FROM bayanat.data_attributes a
+  // Columns/tables that existed from a previous crawl of this source but weren't
+  // found this time (dropped or renamed at the source) are soft-deleted — flagged
+  // DEPRECATED rather than removed — so they stay available for reference/history
+  // and anything referencing them (DQ rules, DSA columns, past requests, lineage
+  // edges, Open Data columns, ...) keeps working. Only rows still ACTIVE are
+  // touched, so an already-deprecated row from an earlier rescan isn't re-flagged
+  // (and doesn't get re-notified) every time.
+  const staleAttrs = await sql<{ id: number; physicalName: string; entityId: number; entityName: string; schemaId: number }[]>`
+    SELECT a.attribute_id AS id, a.physical_name_text AS "physicalName",
+           a.entity_id AS "entityId", e.entity_name_text AS "entityName", e.schema_id AS "schemaId"
+    FROM bayanat.data_attributes a
     JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     WHERE s.data_source_id = ${sourceId}
+      AND a.lifecycle_status_code = 'ACTIVE'
       AND a.attribute_id != ALL(${touchedAttributeIds.length > 0 ? touchedAttributeIds : [-1]})
   `;
-  for (const row of staleAttrs) {
-    try { await sql`DELETE FROM bayanat.data_attributes WHERE attribute_id = ${row.id}`; }
-    catch { /* referenced elsewhere (DQ rules, DSA columns, Open Data columns, ...) — left as stale */ }
+  if (staleAttrs.length > 0) {
+    await sql`
+      UPDATE bayanat.data_attributes SET lifecycle_status_code = 'DEPRECATED', deprecated_at_timestamp = NOW()
+      WHERE attribute_id = ANY(${staleAttrs.map((r) => r.id)})
+    `;
+    for (const row of staleAttrs) {
+      // Only record against entities that are themselves still active this crawl —
+      // an entity that's ALSO gone gets its own isRemovedEntity record below instead,
+      // rather than double-reporting every one of its columns too.
+      if (touchedEntityIds.includes(row.entityId)) {
+        recordChange(row.entityId, row.entityName, row.schemaId).removedColumns.push({ id: row.id, name: row.physicalName });
+      }
+    }
   }
 
-  const staleEntities = await sql<{ id: number }[]>`
-    SELECT e.entity_id AS id FROM bayanat.data_entities e
+  const staleEntities = await sql<{ id: number; entityName: string; schemaId: number }[]>`
+    SELECT e.entity_id AS id, e.entity_name_text AS "entityName", e.schema_id AS "schemaId"
+    FROM bayanat.data_entities e
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     WHERE s.data_source_id = ${sourceId}
+      AND e.lifecycle_status_code = 'ACTIVE'
       AND e.entity_id != ALL(${touchedEntityIds.length > 0 ? touchedEntityIds : [-1]})
   `;
-  for (const row of staleEntities) {
-    try { await sql`DELETE FROM bayanat.data_entities WHERE entity_id = ${row.id}`; }
-    catch { /* referenced elsewhere (DSA datasets, lineage edges, ...) — left as stale */ }
+  if (staleEntities.length > 0) {
+    await sql`
+      UPDATE bayanat.data_entities SET lifecycle_status_code = 'DEPRECATED', deprecated_at_timestamp = NOW()
+      WHERE entity_id = ANY(${staleEntities.map((r) => r.id)})
+    `;
+    for (const row of staleEntities) {
+      recordChange(row.id, row.entityName, row.schemaId).isRemovedEntity = true;
+    }
   }
 
+  // Schema-level removal deliberately keeps today's hard-delete-cascade behavior —
+  // a whole schema vanishing from a live source is rare, and cascading through
+  // already-deprecated child rows here is a known, accepted limitation (not
+  // silently swallowed — see db/117's migration header).
   const staleSchemas = await sql<{ id: number }[]>`
     SELECT schema_id AS id FROM bayanat.data_schemas
     WHERE data_source_id = ${sourceId}
@@ -1124,7 +1211,92 @@ async function saveCrawlResults(
     catch { /* still has entities that couldn't be removed — left as stale */ }
   }
 
-  return sourceId;
+  return { sourceId, isFirstCrawl, changes: [...changes.values()].filter(hasAnyChange) };
+}
+
+// Turns a rescan's collected EntityChange list into (a) an audit-log trail so
+// anyone following the table/schema/source sees it in their Homepage Followed
+// Activity feed, and (b) — only if an admin has actually mapped a workflow to
+// METADATA_UPDATE via /admin/workflows (an unmapped request type is a no-op in
+// startWorkflow(), which is exactly "the workflow is not enabled") — one
+// asset_requests row per changed table, routed to its steward(s)
+// (Owner/Business Steward/Technical Steward, via the new ASSET_STEWARD
+// assignee type in lib/workflow.ts) for review. Never called on a source's
+// first crawl — see saveCrawlResults.
+async function processEntityChanges(changes: EntityChange[], isFirstCrawl: boolean): Promise<void> {
+  if (isFirstCrawl) return;
+
+  for (const c of changes) {
+    // New-entity creation already gets its own audit_logs entry (see the
+    // suggested_category_code logUpdate call above, unconditional and
+    // pre-existing) — don't duplicate it here. Column-level add/modify/remove
+    // and whole-table removal have no existing audit trail, so add one.
+    if (!c.isNewEntity) {
+      for (const col of c.addedColumns) {
+        await logCreate("DATA_ATTRIBUTES", col.id, SYSTEM_ACTOR, [{ field: "physical_name_text", newVal: col.name }]);
+      }
+      for (const col of c.modifiedColumns) {
+        await logUpdate("DATA_ATTRIBUTES", col.id, SYSTEM_ACTOR, [{ field: "data_type_text", oldVal: col.oldValue ?? null, newVal: col.newValue ?? null }]);
+      }
+      for (const col of c.removedColumns) {
+        await logUpdate("DATA_ATTRIBUTES", col.id, SYSTEM_ACTOR, [{ field: "lifecycle_status_code", oldVal: "ACTIVE", newVal: "DEPRECATED" }]);
+      }
+    }
+    if (c.isRemovedEntity) {
+      await logUpdate("DATA_ENTITIES", c.entityId, SYSTEM_ACTOR, [{ field: "lifecycle_status_code", oldVal: "ACTIVE", newVal: "DEPRECATED" }]);
+    }
+
+    const title = c.isNewEntity
+      ? `New table discovered: ${c.entityName}`
+      : c.isRemovedEntity
+      ? `Table removed from source: ${c.entityName}`
+      : `Schema change detected: ${c.entityName}`;
+
+    const descParts: string[] = [];
+    if (c.isNewEntity)     descParts.push("Table newly discovered on rescan.");
+    if (c.isRemovedEntity) descParts.push("Table no longer found at the source — flagged deprecated.");
+    if (c.addedColumns.length)    descParts.push(`Added: ${c.addedColumns.map((x) => x.name).join(", ")}`);
+    if (c.modifiedColumns.length) descParts.push(`Type changed: ${c.modifiedColumns.map((x) => `${x.name} (${x.oldValue} → ${x.newValue})`).join(", ")}`);
+    if (c.removedColumns.length)  descParts.push(`Removed: ${c.removedColumns.map((x) => x.name).join(", ")}`);
+
+    // Dedupe against an existing OPEN/IN_PROGRESS METADATA_UPDATE request for
+    // this exact table — a table that keeps drifting across rescans before
+    // anyone actions the first request shouldn't spawn duplicates (same
+    // pattern as lib/dq-engine.ts's handleFailureActions).
+    const existingReq = await sql<{ id: number }[]>`
+      SELECT ar.request_id AS id
+      FROM bayanat.asset_requests ar
+      JOIN bayanat.asset_request_targets art ON art.request_id = ar.request_id
+      WHERE ar.request_type_code = 'METADATA_UPDATE'
+        AND ar.status_code IN ('OPEN','IN_PROGRESS')
+        AND art.asset_type_code = 'DATA_ENTITIES'
+        AND art.asset_id = ${c.entityId}
+      LIMIT 1
+    `;
+    if (existingReq.length > 0) continue;
+
+    // "Workflow enabled" == an admin has actually mapped one via
+    // /admin/workflows — if not, skip creating a request entirely rather than
+    // leaving an unrouted OPEN one nobody is watching.
+    const mapping = await sql<{ workflowId: number }[]>`
+      SELECT workflow_id AS "workflowId" FROM bayanat.request_type_workflows
+      WHERE request_type_code = 'METADATA_UPDATE'
+    `;
+    if (mapping.length === 0) continue;
+
+    const [req] = await sql<{ requestId: number }[]>`
+      INSERT INTO bayanat.asset_requests
+        (request_type_code, title, description_text, priority_code, raised_by_user_id)
+      VALUES ('METADATA_UPDATE', ${title}, ${descParts.join(" ")}, 'MEDIUM', 'SYSTEM')
+      RETURNING request_id AS "requestId"
+    `;
+
+    await sql`
+      INSERT INTO bayanat.asset_request_targets (request_id, asset_type_code, asset_id, asset_name)
+      VALUES (${req.requestId}, 'DATA_ENTITIES', ${c.entityId}, ${c.entityName})
+    `;
+    await startWorkflow(req.requestId, "METADATA_UPDATE", title);
+  }
 }
 
 // Resolves harvested FK column-pairs to attribute_ids and upserts them into
@@ -1238,7 +1410,12 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     else throw new Error(`Unsupported DB type: ${cfgRow.dbTypeCode}`);
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);
-    const sourceId = await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId, govDefaults);
+    const { sourceId, isFirstCrawl, changes } = await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId, govDefaults);
+
+    if (changes.length > 0) {
+      await logger.info(`Schema changes detected: ${changes.length} table(s)${isFirstCrawl ? " (first crawl — no notifications/workflow)" : ""}`);
+      await processEntityChanges(changes, isFirstCrawl);
+    }
 
     const [crawlerSettingsRow] = await sql<{ settings: {
       auto_classify_columns?: boolean; classify_scope?: "NEW_ONLY" | "UNCLASSIFIED_ONLY" | "ALL";

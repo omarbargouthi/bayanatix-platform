@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { DataAttribute } from "@/lib/types";
-import { Tag, ClassificationTag } from "@/components/ui/Tag";
+import { Tag, ClassificationTag, LifecycleBadge } from "@/components/ui/Tag";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { TagPicker } from "./TagPicker";
 import { TermMultiPicker } from "./TermMultiPicker";
@@ -520,9 +520,16 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
   const [editing,      setEditing]      = useState<DataAttribute | null>(null);
   const [expandedId,   setExpandedId]   = useState<number | null>(null);
   const [activeColIds, setActiveColIds] = useState<GridColId[]>(DEFAULT_COLS);
+  const [showDeprecated, setShowDeprecated] = useState(false);
 
   // Load localStorage prefs on mount (client only)
   useEffect(() => { setActiveColIds(loadColPrefs()); }, []);
+
+  const hasDeprecated = useMemo(() => attributes.some((a) => a.lifecycleStatus === "DEPRECATED"), [attributes]);
+  const visibleAttributes = useMemo(
+    () => showDeprecated ? attributes : attributes.filter((a) => a.lifecycleStatus !== "DEPRECATED"),
+    [attributes, showDeprecated],
+  );
 
   const activeColDefs = activeColIds
     .map((id) => ALL_GRID_COLS.find((gc) => gc.id === id))
@@ -549,13 +556,26 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
         <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
           <h3 className="font-bold">
             {g.columns}
-            <span className="text-muted text-xs font-normal ml-1.5">{attributes.length} {g.attributes}</span>
+            <span className="text-muted text-xs font-normal ml-1.5">{visibleAttributes.length} {g.attributes}</span>
           </h3>
-          <div className="flex items-center gap-2">
-            <button className="btn btn-sm">{g.filterBtn}</button>
-            <button className="btn btn-sm">{g.sortBtn}</button>
-            <ColumnChooser activeColIds={activeColIds} onChange={setActiveColIds} />
-            {canEdit && <button className="btn btn-sm">{t.common.edit}</button>}
+          <div className="flex items-center gap-3">
+            {hasDeprecated && (
+              <label className="flex items-center gap-1.5 text-[12px] text-muted cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showDeprecated}
+                  onChange={(e) => setShowDeprecated(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-brand-purple"
+                />
+                {g.showDeprecatedToggle}
+              </label>
+            )}
+            <div className="flex items-center gap-2">
+              <button className="btn btn-sm">{g.filterBtn}</button>
+              <button className="btn btn-sm">{g.sortBtn}</button>
+              <ColumnChooser activeColIds={activeColIds} onChange={setActiveColIds} />
+              {canEdit && <button className="btn btn-sm">{t.common.edit}</button>}
+            </div>
           </div>
         </div>
 
@@ -571,7 +591,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
         </div>
 
         {/* Data rows */}
-        {attributes.map((a) => (
+        {visibleAttributes.map((a) => (
           <div key={a.attributeId}>
             {/* Main row */}
             <div
@@ -606,6 +626,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                       <div key="name" className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-semibold text-brand-deep truncate">{a.physicalName}</span>
+                          <LifecycleBadge status={a.lifecycleStatus} deprecatedAt={a.deprecatedAt} />
                           {a.isEncrypted && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">🔒 Enc</span>}
                           {a.columnType && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">{COLUMN_TYPE_LABEL[a.columnType] ?? a.columnType}</span>}
                           {!a.columnType && a.suggestedColumnType && (

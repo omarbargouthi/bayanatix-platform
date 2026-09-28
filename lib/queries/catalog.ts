@@ -73,7 +73,7 @@ export async function getCatalogStats(dataSourceIds?: number[]): Promise<Catalog
                 where true ${whereS}), 0)::bigint                     as records,
       (select count(*)::int from bayanat.data_entities e
         join bayanat.data_schemas s on s.schema_id = e.schema_id
-        where true ${whereS})                                        as tables,
+        where e.lifecycle_status_code = 'ACTIVE' ${whereS})           as tables,
       (select count(*)::int from bayanat.data_schemas s
         where true ${whereS})                                        as schemas
   `;
@@ -138,9 +138,11 @@ export async function getSourcesWithSchemas(restrictToUserId?: string): Promise<
       s.description_text as "description",
       s.owner_user_id  as "ownerUserId",
       (select count(*)::int from bayanat.data_entities e
-        where e.schema_id = s.schema_id and coalesce(e.is_view_indicator,false) = false) as "tableCount",
+        where e.schema_id = s.schema_id and coalesce(e.is_view_indicator,false) = false
+          and e.lifecycle_status_code = 'ACTIVE') as "tableCount",
       (select count(*)::int from bayanat.data_entities e
-        where e.schema_id = s.schema_id and coalesce(e.is_view_indicator,false) = true)  as "viewCount"
+        where e.schema_id = s.schema_id and coalesce(e.is_view_indicator,false) = true
+          and e.lifecycle_status_code = 'ACTIVE')  as "viewCount"
     from bayanat.data_schemas s
     order by s.schema_name_text
   `;
@@ -203,7 +205,10 @@ export async function getSchemaById(schemaId: number): Promise<
       e.description_text      as "description",
       coalesce(e.is_view_indicator, false) as "isView",
       e.row_count_estimate    as "rowCount",
-      (select count(*)::int from bayanat.data_attributes a where a.entity_id = e.entity_id) as "columnCount",
+      e.lifecycle_status_code as "lifecycleStatus",
+      e.deprecated_at_timestamp::text as "deprecatedAt",
+      (select count(*)::int from bayanat.data_attributes a where a.entity_id = e.entity_id
+        and a.lifecycle_status_code = 'ACTIVE') as "columnCount",
       (select cert_type_code from bayanat.asset_certifications c
         where c.asset_type_code = 'DATA_ENTITIES' and c.asset_id = e.entity_id
           and c.cert_dimension = 'METADATA'
@@ -332,6 +337,8 @@ export async function getEntityById(entityId: number): Promise<
       coalesce(e.is_view_indicator, false) as "isView",
       e.row_count_estimate as "rowCount",
       e.trust_score as "trustScore",
+      e.lifecycle_status_code as "lifecycleStatus",
+      e.deprecated_at_timestamp::text as "deprecatedAt",
       (select cert_type_code from bayanat.asset_certifications c
         where c.asset_type_code = 'DATA_ENTITIES' and c.asset_id = e.entity_id
           and c.cert_dimension = 'METADATA'
@@ -375,7 +382,9 @@ export async function getEntityById(entityId: number): Promise<
       ${sql.unsafe(translatedColumnSql(`'list.classification_types.' || ct_cls.class_code`, "classTermClassNameTranslations"))},
       bg_cls.is_pii_indicator      as "classTermIsPii",
       bg_cls.pi_category_code      as "classTermPiCategoryCode",
-      pct_cls.category_name_text   as "classTermPiCategoryName"
+      pct_cls.category_name_text   as "classTermPiCategoryName",
+      a.lifecycle_status_code      as "lifecycleStatus",
+      a.deprecated_at_timestamp::text as "deprecatedAt"
     from bayanat.data_attributes a
     left join bayanat.business_glossaries bg
       on bg.term_name_text = a.glossary_term_text
@@ -890,6 +899,7 @@ export async function getClassificationStats(): Promise<ClassificationStats> {
      AND abt.asset_id = a.attribute_id
      AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
+    WHERE a.lifecycle_status_code = 'ACTIVE'
   `;
 
   const piRows = await sql<{ name: string; count: number }[]>`
@@ -902,6 +912,7 @@ export async function getClassificationStats(): Promise<ClassificationStats> {
     JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     JOIN bayanat.pi_category_types pct ON pct.category_code = bg.pi_category_code
     WHERE bg.pi_category_code IS NOT NULL
+      AND a.lifecycle_status_code = 'ACTIVE'
     GROUP BY pct.category_name_text
     ORDER BY COUNT(*) DESC
     LIMIT 6
@@ -951,6 +962,7 @@ export async function getClassificationStatsScoped(
     LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     WHERE (${scope.schemaId ?? null}::int IS NULL OR s.schema_id = ${scope.schemaId ?? null})
       AND (${scope.sourceId ?? null}::int IS NULL OR s.data_source_id = ${scope.sourceId ?? null})
+      AND a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE'
       AND ${mine}
   `;
 
@@ -968,6 +980,7 @@ export async function getClassificationStatsScoped(
     WHERE bg.pi_category_code IS NOT NULL
       AND (${scope.schemaId ?? null}::int IS NULL OR s.schema_id = ${scope.schemaId ?? null})
       AND (${scope.sourceId ?? null}::int IS NULL OR s.data_source_id = ${scope.sourceId ?? null})
+      AND a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE'
       AND ${mine}
     GROUP BY pct.category_name_text
     ORDER BY COUNT(*) DESC
@@ -1012,7 +1025,7 @@ export async function getCdeCoverage(dataSourceIds?: number[]): Promise<CdeCover
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
-    WHERE true ${whereS}
+    WHERE a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE' ${whereS}
   `;
   return {
     businessColumns: Number(row?.businessColumns ?? 0),
@@ -1039,7 +1052,7 @@ export async function getBusinessClassificationBreakdown(dataSourceIds?: number[
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     LEFT JOIN bayanat.asset_business_terms abt
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
-    WHERE a.attribute_class_code = 'BUSINESS' ${whereS}
+    WHERE a.attribute_class_code = 'BUSINESS' AND a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE' ${whereS}
   `;
   const segments = await sql<ClassificationSegment[]>`
     SELECT bg.classification_code AS code, ct.class_name_text AS name, COUNT(*)::int AS count
@@ -1050,7 +1063,7 @@ export async function getBusinessClassificationBreakdown(dataSourceIds?: number[
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     JOIN bayanat.classification_types ct ON ct.class_code = bg.classification_code
-    WHERE a.attribute_class_code = 'BUSINESS' ${whereS}
+    WHERE a.attribute_class_code = 'BUSINESS' AND a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE' ${whereS}
     GROUP BY bg.classification_code, ct.class_name_text, ct.rank_order
     ORDER BY ct.rank_order
   `;
@@ -1085,7 +1098,8 @@ export async function getCdeMetadataQuality(dataSourceIds?: number[]): Promise<C
         ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
       JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
       WHERE a.attribute_class_code = 'BUSINESS'
-        AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES}) ${whereS}
+        AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+        AND a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE' ${whereS}
     )
     SELECT
       (SELECT COUNT(*) FROM cde)::int AS total,
@@ -1168,7 +1182,8 @@ export async function getCdeDataQuality(dataSourceIds?: number[]): Promise<CdeDa
       ON abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.asset_id = a.attribute_id AND abt.term_role = 'CLASSIFICATION'
     JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     WHERE a.attribute_class_code = 'BUSINESS'
-      AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES}) ${whereS}
+      AND bg.classification_code = ANY(${CDE_CLASSIFICATION_CODES})
+      AND a.lifecycle_status_code = 'ACTIVE' AND e.lifecycle_status_code = 'ACTIVE' ${whereS}
   `;
   const cdeIds = cdeIdRows.map((r) => r.id);
 
