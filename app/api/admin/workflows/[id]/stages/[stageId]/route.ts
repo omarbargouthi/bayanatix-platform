@@ -52,6 +52,23 @@ export async function DELETE(_: Request, { params }: Params) {
   if (!session || session.role !== "ADMIN")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  await sql`DELETE FROM bayanat.workflow_stages WHERE stage_id = ${Number(params.stageId)} AND workflow_id = ${Number(params.id)}`;
+  const stageId = Number(params.stageId);
+
+  // workflow_stage_history.stage_id has no ON DELETE CASCADE — a stage that
+  // any request has ever entered (in-progress or completed) can't be
+  // silently removed without corrupting that request's history. Check first
+  // and return a real error instead of letting the FK violation bubble up
+  // as an opaque 500 the frontend then swallows.
+  const [used] = await sql<{ cnt: number }[]>`
+    SELECT count(*)::int AS cnt FROM bayanat.workflow_stage_history WHERE stage_id = ${stageId}
+  `;
+  if (used.cnt > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete this stage — it has history from in-progress or completed requests. Mark it final or remove it from new requests instead." },
+      { status: 400 },
+    );
+  }
+
+  await sql`DELETE FROM bayanat.workflow_stages WHERE stage_id = ${stageId} AND workflow_id = ${Number(params.id)}`;
   return NextResponse.json({ ok: true });
 }

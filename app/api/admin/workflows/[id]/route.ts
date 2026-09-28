@@ -38,6 +38,23 @@ export async function DELETE(_: Request, { params }: Params) {
   if (!session || session.role !== "ADMIN")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  await sql`DELETE FROM bayanat.workflow_definitions WHERE workflow_id = ${Number(params.id)}`;
+  const workflowId = Number(params.id);
+
+  // Same restriction as the per-stage DELETE (see stages/[stageId]/route.ts):
+  // workflow_instances.workflow_id and workflow_stage_history.stage_id both
+  // have no ON DELETE CASCADE, so a workflow any request has ever run
+  // through can't be silently removed. Check first for a real error instead
+  // of an opaque FK-violation 500.
+  const [used] = await sql<{ cnt: number }[]>`
+    SELECT count(*)::int AS cnt FROM bayanat.workflow_instances WHERE workflow_id = ${workflowId}
+  `;
+  if (used.cnt > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete this workflow — requests have already run through it. Set it to Deactive instead." },
+      { status: 400 },
+    );
+  }
+
+  await sql`DELETE FROM bayanat.workflow_definitions WHERE workflow_id = ${workflowId}`;
   return NextResponse.json({ ok: true });
 }

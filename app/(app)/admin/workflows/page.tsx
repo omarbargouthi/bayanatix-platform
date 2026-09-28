@@ -150,7 +150,8 @@ export default function WorkflowsAdminPage() {
   async function deleteStage(stageId: number) {
     if (!selected) return;
     if (!confirm("Delete this stage?")) return;
-    await fetch(`/api/admin/workflows/${selected.workflowId}/stages/${stageId}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/workflows/${selected.workflowId}/stages/${stageId}`, { method: "DELETE" });
+    if (!res.ok) { const { error } = await res.json().catch(() => ({})); alert(error ?? "Delete failed"); return; }
     load();
   }
 
@@ -180,7 +181,8 @@ export default function WorkflowsAdminPage() {
 
   async function deleteWorkflow(wfId: number) {
     if (!confirm("Delete this workflow and all its stages?")) return;
-    await fetch(`/api/admin/workflows/${wfId}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/workflows/${wfId}`, { method: "DELETE" });
+    if (!res.ok) { const { error } = await res.json().catch(() => ({})); alert(error ?? "Delete failed"); return; }
     if (selected?.workflowId === wfId) setSelected(null);
     load();
   }
