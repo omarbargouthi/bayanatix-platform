@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain, canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getDsa, getDsaDatasets, getDsaApprovals, getDsaAuthorizations, getDsaDqIssues } from "@/lib/queries/sharing";
 
@@ -8,6 +9,7 @@ type Ctx = { params: { id: string } };
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -28,6 +30,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -91,6 +94,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 export async function DELETE(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain, canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getOpenDataset } from "@/lib/queries/open-data";
 
@@ -8,6 +9,7 @@ type Ctx = { params: { id: string } };
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dataset = await getOpenDataset(Number(params.id));
   if (!dataset) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -18,6 +20,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const datasetId = Number(params.id);
 
@@ -64,6 +67,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 export async function DELETE(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const datasetId = Number(params.id);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 
 type Ctx = { params: { id: string; colId: string } };
@@ -7,6 +8,7 @@ type Ctx = { params: { id: string; colId: string } };
 export async function DELETE(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const datasetId  = Number(params.id);
   const odColumnId = Number(params.colId);
@@ -34,6 +36,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const datasetId  = Number(params.id);
   const odColumnId = Number(params.colId);

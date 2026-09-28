@@ -8,7 +8,7 @@ type Ctx = { params: { id: string } };
 // GET — list requested attributes for a case
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !(await isFoiStaff(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 // POST — replace all requested attributes (officer adds on behalf of walk-in / phone requests)
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !(await isFoiStaff(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

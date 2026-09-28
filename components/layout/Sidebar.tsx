@@ -31,15 +31,17 @@ const NAV_TOP_DEF = [
   { href: "/assets",     key: "customAssets" as const, Icon: IconGlossary },
 ];
 
+// domain: which DomainCode gates this nav item (see lib/can.ts) — omitted for
+// Catalog/Classification, which stay open to every logged-in user.
 const NAV_DOMAINS_DEF = [
-  { href: "/governance",     key: "governance"    as const, Icon: IconCircle },
+  { href: "/governance",     key: "governance"    as const, Icon: IconCircle, domain: "GOVERNANCE" as const },
   { href: "/catalog",        key: "catalog"       as const, Icon: IconBook },
-  { href: "/quality",        key: "quality"       as const, Icon: IconCheck },
+  { href: "/quality",        key: "quality"       as const, Icon: IconCheck, domain: "DATA_QUALITY" as const },
   { href: "/classification", key: "classification"as const, Icon: IconLines },
-  { href: "/privacy",        key: "privacy"       as const, Icon: IconLock },
-  { href: "/sharing",        key: "sharing"       as const, Icon: IconShare },
-  { href: "/open-data",      key: "openData"      as const, Icon: IconFlag },
-  { href: "/foi",            key: "foi"           as const, Icon: IconChat },
+  { href: "/privacy",        key: "privacy"       as const, Icon: IconLock, domain: "DATA_PRIVACY" as const },
+  { href: "/sharing",        key: "sharing"       as const, Icon: IconShare, domain: "SHARING" as const },
+  { href: "/open-data",      key: "openData"      as const, Icon: IconFlag, domain: "OPEN_DATA" as const },
+  { href: "/foi",            key: "foi"           as const, Icon: IconChat, domain: "FOI" as const },
 ];
 
 const NAV_ADMIN_DEF = [
@@ -56,7 +58,7 @@ const NAV_ADMIN_DEF = [
   { href: "/admin/custom-assets",        key: "customAssetTypes"    as const, Icon: IconDB },
 ];
 
-export function Sidebar({ user }: { user: SessionUser }) {
+export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAccess?: Partial<Record<string, "WRITE" | "READ" | "NONE">> }) {
   const { collapsed } = useSidebar();
   const { t, isRtl } = useLang();
   const pathname = usePathname();
@@ -74,9 +76,17 @@ export function Sidebar({ user }: { user: SessionUser }) {
   // Build i18n-resolved item arrays
   const NAV_TOP: Item[] = NAV_TOP_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
 
-  const NAV_DOMAINS: Item[] = NAV_DOMAINS_DEF.map((d) => ({
-    href: d.href, label: t.nav[d.key], Icon: d.Icon, badge: (d as { badge?: number }).badge,
-  }));
+  // Hide nav items for domains the user has no grant on (ADMIN's domainAccess
+  // entries are always "WRITE", see getDomainAccess) — Catalog/Classification
+  // have no `domain` field and stay visible to everyone.
+  const NAV_DOMAINS: Item[] = NAV_DOMAINS_DEF
+    .filter((d) => {
+      const domain = (d as { domain?: string }).domain;
+      return !domain || (domainAccess?.[domain] ?? "NONE") !== "NONE";
+    })
+    .map((d) => ({
+      href: d.href, label: t.nav[d.key], Icon: d.Icon, badge: (d as { badge?: number }).badge,
+    }));
 
   const NAV_ADMIN: Item[] = NAV_ADMIN_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
 

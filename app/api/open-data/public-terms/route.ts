@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 
 // Classification codes that are NOT suitable for open data publication
@@ -15,6 +16,7 @@ export type PublicTerm = {
 export async function GET(_req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const restricted = RESTRICTED_CODES;
 

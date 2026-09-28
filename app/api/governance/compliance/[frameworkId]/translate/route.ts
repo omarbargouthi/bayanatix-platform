@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import crypto from "crypto";
 import { getLangDef } from "@/lib/lang-config";
 
+// Read-only convenience (translates already-visible requirement text; writes
+// nothing but a shared translation cache) — gated on domain read access, not
+// canManageDomain, so a "Data Governance (Read)" holder can use it too.
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const text: string = body.text;

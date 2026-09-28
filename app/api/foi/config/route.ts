@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getFoiConfig, getRejectionGrounds } from "@/lib/queries/foi";
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "FOI"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const [config, grounds] = await Promise.all([getFoiConfig(), getRejectionGrounds()]);
   return NextResponse.json({ config, grounds });

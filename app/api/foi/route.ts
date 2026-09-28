@@ -5,7 +5,7 @@ import { listFoiRequests, getFoiStats } from "@/lib/queries/foi";
 
 export async function GET(req: Request) {
   const session = await getSession();
-  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !(await isFoiStaff(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") ?? undefined;

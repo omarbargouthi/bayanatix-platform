@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 
-// Cascading catalog lookup for FOI source mapping
+// Cascading catalog lookup for FOI source mapping — feeds the dropdowns in
+// FulfillmentTab's mapping form, so the same audience as that form's own
+// POST (mappings/route.ts's canWorkOnMappings: ADMIN/OFFICER/STEWARD, since a
+// data steward coordinates on classification there too), not the narrower
+// isFoiStaff (ADMIN/OFFICER only) used by the rest of the FOI module.
 // ?type=sources | ?type=entities&sourceId=N | ?type=attributes&entityId=N
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const roleOk = session.role === "ADMIN" || session.role === "OFFICER" || session.role === "STEWARD";
+  if (!roleOk || !(await canAccessDomain(session, "FOI"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");

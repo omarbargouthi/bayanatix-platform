@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain, canManageDomain } from "@/lib/can";
 import { getConfigItems, upsertConfigItem, deleteConfigItem } from "@/lib/queries/gov-compliance";
 
 export async function GET(
@@ -8,6 +9,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const items = await getConfigItems(Number(params.frameworkId));
   return NextResponse.json({ items });
 }
@@ -17,7 +19,8 @@ export async function POST(
   { params }: { params: { frameworkId: string } }
 ) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
   if (!body.configGroup || !body.code || !body.label) {
     return NextResponse.json({ error: "configGroup, code, and label are required" }, { status: 400 });
@@ -31,7 +34,8 @@ export async function DELETE(
   { params }: { params: { frameworkId: string } }
 ) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
   if (!body.configGroup || !body.code) {
     return NextResponse.json({ error: "configGroup and code are required" }, { status: 400 });

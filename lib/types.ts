@@ -242,6 +242,8 @@ export type Role = {
   metadataDelete: boolean;
   dataRead:       boolean;
   piClearTextAllowed: boolean;
+  domainWrite:    boolean;
+  domainRead:     boolean;
   isAdmin:        boolean;
   createdAt:      string;
   userCount:      number;

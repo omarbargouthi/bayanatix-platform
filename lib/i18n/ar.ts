@@ -81,6 +81,15 @@ export const ar: I18nStrings = {
     daysAgo:     "منذ {n} يوم",
   },
 
+  domainAccess: {
+    manageAccessTitle: "إدارة الوصول",
+    manageAccessDesc:  "منح مستخدمين آخرين صلاحية العرض فقط لهذا القسم.",
+    noReadGrantsYet:   "لم يُمنح أي مستخدم صلاحية العرض فقط حتى الآن.",
+    addUserPlaceholder: "ابحث عن مستخدمين لمنحهم صلاحية العرض…",
+    grantFailed:        "فشل تحديث الصلاحية",
+    revokeConfirm:       "إزالة صلاحية العرض عن {name} لـ {domain}؟",
+  },
+
   compliance: {
     pageTitle:       "تقييم الامتثال",
     tabs: {

@@ -5,6 +5,13 @@ import { nextStatusAfterApproval, STATUS_TO_STATION } from "@/lib/sharing-routin
 
 type Ctx = { params: { id: string } };
 
+// Deciding at an approval station is its own per-DSA stakeholder check below
+// (Data Owner/Privacy Officer/DMO Head/Exec Delegate on this specific DSA's
+// assets, or ADMIN) — the same "asset stewardship overrides the coarse domain
+// role" pattern used for DQ rule creation. It's deliberately NOT additionally
+// gated behind the Sharing domain role (canManageDomain) — an approval-station
+// holder shouldn't need "Open Data & Access" granted just to decide on a DSA
+// they're a legitimate stakeholder for.
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

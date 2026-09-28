@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain, canManageDomain } from "@/lib/can";
 import {
   getMaturitySelections,
   setMaturitySelection,
@@ -12,6 +13,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const sels = await getMaturitySelections(Number(params.frameworkId));
   return NextResponse.json({ selections: sels });
 }
@@ -22,6 +24,7 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const fwId = Number(params.frameworkId);
   const body = await req.json();

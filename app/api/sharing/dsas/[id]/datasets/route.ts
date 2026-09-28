@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain, canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getDsaAttributes } from "@/lib/queries/sharing";
 
@@ -16,6 +17,7 @@ async function checkEditable(dsaId: number) {
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   if (!Number.isFinite(dsaId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -73,6 +75,7 @@ export async function POST(req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   const { searchParams } = new URL(req.url);
@@ -100,6 +103,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 export async function DELETE(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   const { searchParams } = new URL(req.url);
@@ -118,6 +122,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
 export async function GET(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const dsaDatasetId = Number(searchParams.get("dsaDatasetId"));

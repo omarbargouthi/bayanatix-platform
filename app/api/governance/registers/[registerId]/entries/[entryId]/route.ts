@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canManageDomain } from "@/lib/can";
 import { updateEntry, deleteEntry } from "@/lib/queries/gov-registers";
 
 export async function PATCH(req: Request, { params }: { params: { entryId: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { data } = await req.json();
   await updateEntry(Number(params.entryId), data, session.userId);
   return NextResponse.json({ ok: true });
@@ -13,6 +15,7 @@ export async function PATCH(req: Request, { params }: { params: { entryId: strin
 export async function DELETE(_req: Request, { params }: { params: { entryId: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await deleteEntry(Number(params.entryId), session.userId);
   return NextResponse.json({ ok: true });
 }

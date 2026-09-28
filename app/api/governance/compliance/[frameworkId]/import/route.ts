@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canManageDomain } from "@/lib/can";
 import { importRequirements } from "@/lib/queries/gov-compliance";
 import * as XLSX from "xlsx";
 
@@ -76,7 +77,8 @@ const COL_MAP: Record<string, string> = {
 
 export async function POST(req: Request, { params }: { params: { frameworkId: string } }) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;

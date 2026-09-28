@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 
 export type ColumnDqRule = {
@@ -16,6 +17,7 @@ export type ColumnDqRule = {
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "OPEN_DATA"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const attributeId = Number(searchParams.get("attributeId"));

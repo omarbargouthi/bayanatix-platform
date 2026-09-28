@@ -93,6 +93,16 @@ export type I18nStrings = {
     daysAgo:     string;   // "{n}d ago"
   };
 
+  // ── Domain access delegation panel (DomainAccessPanel.tsx) ───────────────────
+  domainAccess: {
+    manageAccessTitle: string;
+    manageAccessDesc:  string;
+    noReadGrantsYet:   string;
+    addUserPlaceholder: string;
+    grantFailed:        string;
+    revokeConfirm:       string;   // "Remove {name}'s read access to {domain}?"
+  };
+
   // ── Compliance Assessment ───────────────────────────────────────────────────
   compliance: {
     pageTitle:        string;

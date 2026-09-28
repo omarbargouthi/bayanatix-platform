@@ -2,8 +2,11 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { getLanguages } from "@/lib/queries/languages";
+import { getDomainAccess, type DomainCode } from "@/lib/can";
 import { AppShell } from "@/components/layout/AppShell";
 import type { Lang } from "@/lib/lang-context";
+
+const NAV_DOMAINS: DomainCode[] = ["GOVERNANCE", "DATA_QUALITY", "DATA_PRIVACY", "SHARING", "FOI", "OPEN_DATA"];
 
 // Preference precedence for SSR's initial language (AC-3): the user's persisted
 // choice wins (cross-device), then a saved cookie (e.g. not-yet-logged-in device),
@@ -26,5 +29,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
-  return <AppShell user={user} initialLang={initialLang}>{children}</AppShell>;
+  const domainEntries = await Promise.all(
+    NAV_DOMAINS.map(async (d) => [d, await getDomainAccess(user, d)] as const),
+  );
+  const domainAccess = Object.fromEntries(domainEntries) as Record<DomainCode, "WRITE" | "READ" | "NONE">;
+
+  return <AppShell user={user} initialLang={initialLang} domainAccess={domainAccess}>{children}</AppShell>;
 }

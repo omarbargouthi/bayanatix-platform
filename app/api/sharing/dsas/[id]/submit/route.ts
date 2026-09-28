@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { computeApprovalStations } from "@/lib/sharing-routing";
 
@@ -8,6 +9,7 @@ type Ctx = { params: { id: string } };
 export async function POST(_req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   if (!Number.isFinite(dsaId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canManageDomain } from "@/lib/can";
 import { updateColumn, deleteColumnWithCleanup, listColumns } from "@/lib/queries/gov-registers";
 
 export async function PATCH(req: Request, { params }: { params: { colId: string } }) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
   await updateColumn(Number(params.colId), body);
   return NextResponse.json({ ok: true });
@@ -13,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: { colId: string 
 export async function DELETE(req: Request, { params }: { params: { registerId: string; colId: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const colId = Number(params.colId);
   const registerId = Number(params.registerId);

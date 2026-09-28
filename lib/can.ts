@@ -1,5 +1,6 @@
 import { sql } from "./db";
 import type { SessionUser } from "./types";
+import { resolveEffectiveGovernance, resolveEffectiveEntityGovernance } from "./queries/stakeholders";
 
 // Resolves an entity down to its schema/data-source ids, for resource-scoped
 // role_assignments checks (GLOBAL / DATA_SOURCE / SCHEMA / TABLE all apply).
@@ -85,14 +86,15 @@ export async function canEditAsset(
 }
 
 // Gate for the entire FOI (Freedom of Information) case-management module —
-// the OFFICER system role exists in the SessionUser type specifically for this,
-// but nothing under app/api/foi/[id]/** previously checked it (only foi/config's
-// PATCH did). Any authenticated user — including a Viewer or an LDAP/OIDC
-// auto-provisioned External Viewer — could otherwise assess cases, issue
-// payment quotes, record payments, reclassify sensitive columns, and send
-// citizen-facing communications.
-export function isFoiStaff(session: SessionUser): boolean {
-  return session.role === "ADMIN" || session.role === "OFFICER";
+// the OFFICER system role exists in the SessionUser type specifically for
+// this. Being OFFICER is necessary but, since the FOI domain was locked down
+// (see canAccessDomain), no longer sufficient on its own: an OFFICER also
+// needs an "Open Data & Access" domain grant covering FOI (ADMIN still
+// bypasses both, via getDomainAccess). Async because of that domain check —
+// every call site awaits this now.
+export async function isFoiStaff(session: SessionUser): Promise<boolean> {
+  if (session.role !== "ADMIN" && session.role !== "OFFICER") return false;
+  return canAccessDomain(session, "FOI");
 }
 
 // Whether `session` may preview a table's row data at all (Sample Data tab
@@ -168,4 +170,60 @@ export async function canViewPiClearText(session: SessionUser, entityId: number)
     hasPiClearTextGrant(session.userId, entityId),
   ]);
   return eligible && granted;
+}
+
+// ── Domain-level access (Governance / Data Quality / Data Privacy / Data
+// Sharing / FOI / Open Data) ────────────────────────────────────────────────
+// A separate dimension from the asset-scoped checks above: whether the user
+// may see/manage an entire feature domain at all, independent of any
+// particular table/schema/source. Reuses the same bayanat.roles /
+// role_assignments tables via a new resource_type='DOMAIN', resource_id one
+// of the DomainCode values below (see db/115_domain_access.sql).
+export type DomainCode = "GOVERNANCE" | "DATA_QUALITY" | "DATA_PRIVACY" | "SHARING" | "FOI" | "OPEN_DATA";
+
+export async function getDomainAccess(session: SessionUser, domain: DomainCode): Promise<"WRITE" | "READ" | "NONE"> {
+  if (session.role === "ADMIN") return "WRITE";
+  const [row] = await sql<{ write: boolean; read: boolean }[]>`
+    SELECT bool_or(r.domain_write) AS write, bool_or(r.domain_read) AS read
+    FROM bayanat.role_assignments ra
+    JOIN bayanat.roles r ON r.role_id = ra.role_id
+    WHERE ra.resource_type = 'DOMAIN' AND ra.resource_id = ${domain}
+      AND (
+        ra.user_id = ${session.userId}
+        OR ra.team_id IN (SELECT team_id FROM bayanat.team_members WHERE user_id = ${session.userId})
+      )
+  `;
+  if (row?.write) return "WRITE";
+  if (row?.read) return "READ";
+  return "NONE";
+}
+
+export async function canAccessDomain(session: SessionUser, domain: DomainCode): Promise<boolean> {
+  return (await getDomainAccess(session, domain)) !== "NONE";
+}
+
+export async function canManageDomain(session: SessionUser, domain: DomainCode): Promise<boolean> {
+  return (await getDomainAccess(session, domain)) === "WRITE";
+}
+
+// DQ-rule creation: the Data Quality domain role, OR being an effective
+// Owner/Business Steward/Technical Steward of the specific asset (walks
+// column -> table -> schema -> source via the existing governance resolvers —
+// no new stewardship concept needed).
+const DQ_STEWARD_CODES = new Set(["OWNER", "BIZ_STEWARD", "TECH_STEWARD"]);
+
+export async function canCreateDqRule(
+  session: SessionUser,
+  assetTypeCode: string,
+  assetId: number,
+): Promise<boolean> {
+  if (session.role === "ADMIN") return true;
+  if (await canManageDomain(session, "DATA_QUALITY")) return true;
+
+  const effective = assetTypeCode === "DATA_ENTITIES"
+    ? await resolveEffectiveEntityGovernance(assetId)
+    : assetTypeCode === "DATA_ATTRIBUTES"
+    ? await resolveEffectiveGovernance(assetId)
+    : [];
+  return effective.some((e) => e.userId === session.userId && DQ_STEWARD_CODES.has(e.roleCode));
 }

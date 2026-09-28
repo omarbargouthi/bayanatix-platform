@@ -8,7 +8,7 @@ type Ctx = { params: { id: string } };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !(await isFoiStaff(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 // PATCH — status transitions and field updates
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !(await isFoiStaff(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -360,7 +360,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 // DELETE — permanently remove an FOI request (only if not yet in fulfillment)
 export async function DELETE(_req: Request, { params }: Ctx) {
   const session = await getSession();
-  if (!session || !isFoiStaff(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !(await isFoiStaff(session))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });

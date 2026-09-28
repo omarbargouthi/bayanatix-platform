@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canAccessDomain, canManageDomain } from "@/lib/can";
 import { getComplianceWorkflowStatus, submitComplianceReview } from "@/lib/queries/gov-compliance";
 import { advanceWorkflow } from "@/lib/workflow";
 import { sql } from "@/lib/db";
@@ -10,6 +11,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canAccessDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const workflow = await getComplianceWorkflowStatus(Number(params.reqId));
   return NextResponse.json({ workflow });
 }
@@ -39,6 +41,7 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { action } = body;

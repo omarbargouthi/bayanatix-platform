@@ -81,6 +81,15 @@ export const en: I18nStrings = {
     daysAgo:     "{n}d ago",
   },
 
+  domainAccess: {
+    manageAccessTitle: "Manage Access",
+    manageAccessDesc:  "Grant other users read-only access to this section.",
+    noReadGrantsYet:   "No one has been granted read-only access yet.",
+    addUserPlaceholder: "Search users to grant read access…",
+    grantFailed:        "Failed to update access",
+    revokeConfirm:       "Remove {name}'s read access to {domain}?",
+  },
+
   compliance: {
     pageTitle:       "Compliance Assessment",
     tabs: {

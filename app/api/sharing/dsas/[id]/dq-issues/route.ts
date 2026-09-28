@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 
 type Ctx = { params: { id: string } };
@@ -18,6 +19,7 @@ async function checkEditable(dsaId: number, userId: string, role: string) {
 export async function POST(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   if (!Number.isFinite(dsaId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -52,6 +54,7 @@ export async function POST(req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   if (!Number.isFinite(dsaId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -85,6 +88,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 export async function DELETE(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await canManageDomain(session, "SHARING"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dsaId = Number(params.id);
   if (!Number.isFinite(dsaId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
