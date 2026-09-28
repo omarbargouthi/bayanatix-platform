@@ -605,12 +605,13 @@ export type RetentionSchedule = {
   triggerCustomExpr:   string | null;
   retentionPeriod:     number;
   retentionUnit:       "DAYS" | "MONTHS" | "YEARS";
-  postRetentionAction: "DELETE" | "ANONYMIZE" | "ARCHIVE" | "REVIEW";
+  postRetentionAction: "DELETE" | "ANONYMIZE" | "ARCHIVE" | "REVIEW" | "SCRAMBLE";
   archiveLocation:     string | null;
   regulatoryReference: string | null;
   notes:               string | null;
   isDefault:           boolean;
   createdAt:           string;
+  automationConfigJson: { technique?: string; details?: string } | null;
 };
 
 export type LegalHold = {

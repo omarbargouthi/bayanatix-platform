@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import type { DataCategory, RetentionSchedule } from "@/lib/types";
+import { EntitySearchPicker, type EntitySearchResult } from "@/components/ui/EntitySearchPicker";
 
 // ── Sensitivity badge ─────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ const ACTION_COLORS: Record<string, string> = {
   ANONYMIZE:  "bg-purple-50 text-purple-600",
   ARCHIVE:    "bg-sky-50 text-sky-600",
   REVIEW:     "bg-amber-50 text-amber-600",
+  SCRAMBLE:   "bg-fuchsia-50 text-fuchsia-600",
 };
 
 function ActionBadge({ value }: { value: string }) {
@@ -59,6 +61,8 @@ function SchedulePanel({ category }: { category: DataCategory }) {
     regulatoryReference: "",
     notes: "",
     isDefault: false,
+    scrambleTechnique: "",
+    scrambleDetails: "",
   });
 
   const load = useCallback(() => {
@@ -73,14 +77,17 @@ function SchedulePanel({ category }: { category: DataCategory }) {
   async function saveSchedule() {
     if (!form.jurisdiction || !form.triggerEvent) return;
     setSaving(true);
+    const automationConfigJson = form.postRetentionAction === "SCRAMBLE" && (form.scrambleTechnique || form.scrambleDetails)
+      ? { technique: form.scrambleTechnique || undefined, details: form.scrambleDetails || undefined }
+      : null;
     await fetch(`/api/retention/schedules/${category.categoryId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, retentionPeriod: Number(form.retentionPeriod) }),
+      body: JSON.stringify({ ...form, retentionPeriod: Number(form.retentionPeriod), automationConfigJson }),
     });
     setSaving(false);
     setShowAdd(false);
-    setForm({ jurisdiction: "", triggerEvent: "", retentionPeriod: "5", retentionUnit: "YEARS", postRetentionAction: "DELETE", regulatoryReference: "", notes: "", isDefault: false });
+    setForm({ jurisdiction: "", triggerEvent: "", retentionPeriod: "5", retentionUnit: "YEARS", postRetentionAction: "DELETE", regulatoryReference: "", notes: "", isDefault: false, scrambleTechnique: "", scrambleDetails: "" });
     load();
   }
 
@@ -121,8 +128,15 @@ function SchedulePanel({ category }: { category: DataCategory }) {
               <option value="ANONYMIZE">{r.actionAnonymize}</option>
               <option value="ARCHIVE">{r.actionArchive}</option>
               <option value="REVIEW">{r.actionReview}</option>
+              <option value="SCRAMBLE">{r.actionScramble}</option>
             </select>
           </div>
+          {form.postRetentionAction === "SCRAMBLE" && (
+            <div className="grid grid-cols-2 gap-2">
+              <input className="input-sm" placeholder={r.scrambleTechnique} value={form.scrambleTechnique} onChange={(e) => setForm((f) => ({ ...f, scrambleTechnique: e.target.value }))} />
+              <input className="input-sm" placeholder={r.scrambleDetails} value={form.scrambleDetails} onChange={(e) => setForm((f) => ({ ...f, scrambleDetails: e.target.value }))} />
+            </div>
+          )}
           <input className="input-sm w-full" placeholder={r.reference} value={form.regulatoryReference} onChange={(e) => setForm((f) => ({ ...f, regulatoryReference: e.target.value }))} />
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1.5 cursor-pointer">
@@ -162,6 +176,9 @@ function SchedulePanel({ category }: { category: DataCategory }) {
                 {s.regulatoryReference && (
                   <div className="text-[9px] text-muted mt-0.5">{s.regulatoryReference}</div>
                 )}
+                {s.automationConfigJson?.technique && (
+                  <div className="text-[9px] text-fuchsia-700 mt-0.5">{r.scrambleTechnique}: {s.automationConfigJson.technique}</div>
+                )}
               </div>
               <button
                 className="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 shrink-0"
@@ -171,6 +188,136 @@ function SchedulePanel({ category }: { category: DataCategory }) {
                 ✕
               </button>
             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tables panel ──────────────────────────────────────────────────────────────
+
+type ColumnResult = { attributeId: number; physicalName: string; friendlyName: string | null; isPrimaryKey: boolean; isPii: boolean };
+type CategoryEntity = {
+  entityId: number; entityName: string; schemaName: string; sourceName: string;
+  keyAttributeId: number | null; keyAttributeName: string | null; cascadeEnabled: boolean;
+};
+
+function AssignedTableCard({ categoryId, entity, onChange }: {
+  categoryId: number; entity: CategoryEntity; onChange: () => void;
+}) {
+  const [columns, setColumns] = useState<ColumnResult[]>([]);
+  const [keyAttributeId, setKeyAttributeId] = useState<number | "">(entity.keyAttributeId ?? "");
+  const [cascadeEnabled, setCascadeEnabled] = useState(entity.cascadeEnabled);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const dirty = keyAttributeId !== (entity.keyAttributeId ?? "") || cascadeEnabled !== entity.cascadeEnabled;
+
+  useEffect(() => {
+    fetch(`/api/catalog/entities/${entity.entityId}/columns`).then((r) => (r.ok ? r.json() : [])).then(setColumns).catch(() => {});
+  }, [entity.entityId]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await fetch(`/api/retention/categories/${categoryId}/entities/${entity.entityId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyAttributeId: keyAttributeId || null, cascadeEnabled }),
+      });
+      onChange();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    setRemoving(true);
+    try {
+      await fetch(`/api/retention/categories/${categoryId}/entities/${entity.entityId}`, { method: "DELETE" });
+      onChange();
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-white p-2.5">
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="min-w-0">
+          <div className="text-[12px] font-semibold text-ink truncate">{entity.entityName}</div>
+          <div className="text-[10px] text-muted">{entity.sourceName} · {entity.schemaName}</div>
+        </div>
+        <button onClick={remove} disabled={removing} className="shrink-0 text-[11px] text-muted hover:text-red-600">Remove</button>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <select className="input-sm text-[11px]" value={keyAttributeId} onChange={(e) => setKeyAttributeId(e.target.value ? Number(e.target.value) : "")}>
+          <option value="">— ID column —</option>
+          {columns.map((c) => (
+            <option key={c.attributeId} value={c.attributeId}>{c.friendlyName ?? c.physicalName}{c.isPii ? " (PII)" : ""}{c.isPrimaryKey ? " (PK)" : ""}</option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer select-none">
+          <input type="checkbox" checked={cascadeEnabled} onChange={(e) => setCascadeEnabled(e.target.checked)} />
+          Cascade
+        </label>
+        {dirty && (
+          <button onClick={save} disabled={saving} className="text-[11px] text-brand-purple hover:underline font-medium">
+            {saving ? "Saving…" : "Save"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TablesPanel({ category }: { category: DataCategory }) {
+  const [entities, setEntities] = useState<CategoryEntity[] | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const load = useCallback(() => {
+    fetch(`/api/retention/categories/${category.categoryId}/entities`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setEntities)
+      .catch(() => setEntities([]));
+  }, [category.categoryId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function addTable(e: EntitySearchResult) {
+    setShowAdd(false);
+    await fetch(`/api/retention/categories/${category.categoryId}/entities`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityId: e.entityId, keyAttributeId: null, cascadeEnabled: false }),
+    });
+    load();
+  }
+
+  return (
+    <div className="mt-3 border-t border-line-soft pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-semibold text-brand-deep">Tables</span>
+        <button
+          className="text-[10px] px-2 py-1 rounded bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20"
+          onClick={() => setShowAdd((v) => !v)}
+        >
+          + Add Table
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-line">
+          <EntitySearchPicker onSelect={addTable} showPiiFilter />
+        </div>
+      )}
+
+      {entities == null ? (
+        <div className="text-[11px] text-muted">Loading…</div>
+      ) : entities.length === 0 ? (
+        <div className="text-[11px] text-muted italic">No tables assigned yet.</div>
+      ) : (
+        <div className="space-y-1.5">
+          {entities.map((e) => (
+            <AssignedTableCard key={e.entityId} categoryId={category.categoryId} entity={e} onChange={load} />
           ))}
         </div>
       )}
@@ -193,6 +340,7 @@ function CategoryRow({
   const r = t.retention;
   const [open, setOpen] = useState(false);
   const [showSchedules, setShowSchedules] = useState(false);
+  const [showTables, setShowTables] = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
   const [subForm, setSubForm] = useState({ name: "", sensitivity: "INTERNAL" });
   const [saving, setSaving] = useState(false);
@@ -235,6 +383,12 @@ function CategoryRow({
         >
           {r.schedulesTitle}
         </button>
+        <button
+          className="opacity-0 group-hover:opacity-100 text-[10px] text-brand-purple"
+          onClick={() => setShowTables((v) => !v)}
+        >
+          Tables
+        </button>
         {depth === 0 && (
           <button
             className="opacity-0 group-hover:opacity-100 text-[10px] text-brand-purple"
@@ -247,6 +401,9 @@ function CategoryRow({
 
       {/* Schedules panel */}
       {showSchedules && <SchedulePanel category={category} />}
+
+      {/* Tables panel */}
+      {showTables && <TablesPanel category={category} />}
 
       {/* Add subcategory inline form */}
       {showAddSub && (

@@ -1,10 +1,18 @@
 import { sql } from "../db";
 
+export type ConditionOperator =
+  | "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "GREATER_OR_EQUAL"
+  | "LESS_THAN" | "LESS_OR_EQUAL" | "BETWEEN" | "CONTAINS" | "IN_LIST"
+  | "IS_NULL" | "IS_NOT_NULL";
+
 export type LegalHoldCondition = {
   conditionId: number;
   attributeId: number;
   attributeName: string;
   valueText: string;
+  valueText2: string | null;
+  operator: ConditionOperator;
+  logicOperator: "AND" | "OR";
 };
 
 export type LegalHoldEntity = {
@@ -37,11 +45,13 @@ export async function getHoldEntities(holdId: number): Promise<LegalHoldEntity[]
   if (entities.length === 0) return [];
 
   const conditions = await sql<{
-    entityId: number; conditionId: number; attributeId: number; attributeName: string; valueText: string;
+    entityId: number; conditionId: number; attributeId: number; attributeName: string;
+    valueText: string; valueText2: string | null; operator: ConditionOperator; logicOperator: "AND" | "OR";
   }[]>`
     SELECT lhc.entity_id AS "entityId", lhc.condition_id AS "conditionId",
            lhc.attribute_id AS "attributeId", a.physical_name_text AS "attributeName",
-           lhc.value_text AS "valueText"
+           lhc.value_text AS "valueText", lhc.value_text_2 AS "valueText2",
+           lhc.operator AS operator, lhc.logic_operator AS "logicOperator"
     FROM bayanat.legal_hold_conditions lhc
     JOIN bayanat.data_attributes a ON a.attribute_id = lhc.attribute_id
     WHERE lhc.hold_id = ${holdId}
@@ -50,7 +60,10 @@ export async function getHoldEntities(holdId: number): Promise<LegalHoldEntity[]
   const byEntity = new Map<number, LegalHoldCondition[]>();
   for (const c of conditions) {
     const list = byEntity.get(c.entityId) ?? [];
-    list.push({ conditionId: c.conditionId, attributeId: c.attributeId, attributeName: c.attributeName, valueText: c.valueText });
+    list.push({
+      conditionId: c.conditionId, attributeId: c.attributeId, attributeName: c.attributeName,
+      valueText: c.valueText, valueText2: c.valueText2, operator: c.operator, logicOperator: c.logicOperator,
+    });
     byEntity.set(c.entityId, list);
   }
 
@@ -71,10 +84,12 @@ export async function removeHoldEntity(holdId: number, entityId: number): Promis
 
 export async function addHoldCondition(
   holdId: number, entityId: number, attributeId: number, valueText: string,
+  valueText2: string | null, operator: ConditionOperator, logicOperator: "AND" | "OR",
 ): Promise<number> {
   const [row] = await sql<{ conditionId: number }[]>`
-    INSERT INTO bayanat.legal_hold_conditions (hold_id, entity_id, attribute_id, value_text)
-    VALUES (${holdId}, ${entityId}, ${attributeId}, ${valueText})
+    INSERT INTO bayanat.legal_hold_conditions
+      (hold_id, entity_id, attribute_id, value_text, value_text_2, operator, logic_operator)
+    VALUES (${holdId}, ${entityId}, ${attributeId}, ${valueText}, ${valueText2}, ${operator}, ${logicOperator})
     RETURNING condition_id AS "conditionId"
   `;
   return row.conditionId;

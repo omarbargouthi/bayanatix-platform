@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { EntitySearchPicker, type EntitySearchResult } from "@/components/ui/EntitySearchPicker";
 
-type EntitySearchResult = { entityId: number; entityName: string; schemaName: string; sourceName: string };
-type ColumnResult = { attributeId: number; physicalName: string; friendlyName: string | null; isPrimaryKey: boolean };
-type Condition = { conditionId: number; attributeId: number; attributeName: string; valueText: string };
+type ColumnResult = { attributeId: number; physicalName: string; friendlyName: string | null; dataType: string; isPrimaryKey: boolean; isPii: boolean };
+type ConditionOperator =
+  | "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "GREATER_OR_EQUAL"
+  | "LESS_THAN" | "LESS_OR_EQUAL" | "BETWEEN" | "CONTAINS" | "IN_LIST"
+  | "IS_NULL" | "IS_NOT_NULL";
+type Condition = {
+  conditionId: number; attributeId: number; attributeName: string;
+  valueText: string; valueText2: string | null; operator: ConditionOperator; logicOperator: "AND" | "OR";
+};
 type HoldEntity = {
   entityId: number; entityName: string; schemaName: string; sourceName: string;
   keyAttributeId: number | null; keyAttributeName: string | null;
@@ -12,47 +19,48 @@ type HoldEntity = {
 };
 type Estimate = { available: true; count: number } | { available: false; reason: string };
 
-function EntityPicker({ onSelect }: { onSelect: (e: EntitySearchResult) => void }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<EntitySearchResult[]>([]);
-  const [open, setOpen] = useState(false);
+// Column data types are inconsistent across sources — e.g. numeric(12,2),
+// NUMBER(10), int8, dateTime, varchar(100) all appear in the live catalog —
+// so this is a loose, case-insensitive classifier, not an exact match.
+type TypeFamily = "TEXT" | "NUMERIC" | "DATE" | "BOOLEAN";
+function classifyDataType(dataType: string): TypeFamily {
+  const t = dataType.toLowerCase();
+  if (t.includes("bool")) return "BOOLEAN";
+  if (t.includes("date") || t.includes("time")) return "DATE";
+  if (/(int|numeric|decimal|number|double|float|real|money)/.test(t)) return "NUMERIC";
+  return "TEXT";
+}
 
-  useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
-    const timer = setTimeout(() => {
-      fetch(`/api/catalog/entities?search=${encodeURIComponent(query)}`)
-        .then((r) => (r.ok ? r.json() : []))
-        .then((rows) => { setResults(rows); setOpen(true); })
-        .catch(() => setResults([]));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [query]);
+const OPERATORS_BY_FAMILY: Record<TypeFamily, { value: ConditionOperator; label: string }[]> = {
+  TEXT: [
+    { value: "EQUALS", label: "=" }, { value: "NOT_EQUALS", label: "≠" },
+    { value: "CONTAINS", label: "contains" }, { value: "IN_LIST", label: "in list (comma-separated)" },
+    { value: "IS_NULL", label: "is empty" }, { value: "IS_NOT_NULL", label: "is not empty" },
+  ],
+  NUMERIC: [
+    { value: "EQUALS", label: "=" }, { value: "NOT_EQUALS", label: "≠" },
+    { value: "GREATER_THAN", label: ">" }, { value: "GREATER_OR_EQUAL", label: "≥" },
+    { value: "LESS_THAN", label: "<" }, { value: "LESS_OR_EQUAL", label: "≤" },
+    { value: "BETWEEN", label: "between" },
+    { value: "IS_NULL", label: "is empty" }, { value: "IS_NOT_NULL", label: "is not empty" },
+  ],
+  DATE: [
+    { value: "EQUALS", label: "on" }, { value: "NOT_EQUALS", label: "not on" },
+    { value: "GREATER_THAN", label: "after" }, { value: "GREATER_OR_EQUAL", label: "on or after" },
+    { value: "LESS_THAN", label: "before" }, { value: "LESS_OR_EQUAL", label: "on or before" },
+    { value: "BETWEEN", label: "between" },
+    { value: "IS_NULL", label: "is empty" }, { value: "IS_NOT_NULL", label: "is not empty" },
+  ],
+  BOOLEAN: [
+    { value: "EQUALS", label: "=" },
+    { value: "IS_NULL", label: "is empty" }, { value: "IS_NOT_NULL", label: "is not empty" },
+  ],
+};
+const NO_VALUE_OPERATORS: ConditionOperator[] = ["IS_NULL", "IS_NOT_NULL"];
 
-  return (
-    <div className="relative">
-      <input
-        className="input-sm w-full"
-        placeholder="Search tables…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => setOpen(true)}
-      />
-      {open && results.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-xl max-h-56 overflow-y-auto">
-          {results.map((e) => (
-            <button
-              key={e.entityId}
-              onMouseDown={() => { onSelect(e); setQuery(""); setResults([]); setOpen(false); }}
-              className="w-full text-left px-3 py-2 hover:bg-canvas-soft border-b border-line-soft last:border-b-0"
-            >
-              <div className="text-[12px] font-medium text-ink">{e.entityName}</div>
-              <div className="text-[10px] text-muted">{e.sourceName} · {e.schemaName}</div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+function operatorLabel(op: ConditionOperator, family: TypeFamily): string {
+  return OPERATORS_BY_FAMILY[family].find((o) => o.value === op)?.label
+    ?? OPERATORS_BY_FAMILY.TEXT.find((o) => o.value === op)?.label ?? op;
 }
 
 function AddDrivingTableModal({
@@ -109,7 +117,7 @@ function AddDrivingTableModal({
                 <button onClick={() => setEntity(null)} className="text-muted hover:text-red-500 text-sm leading-none">&times;</button>
               </div>
             ) : (
-              <EntityPicker onSelect={setEntity} />
+              <EntitySearchPicker onSelect={setEntity} />
             )}
           </div>
           {entity && (
@@ -137,8 +145,8 @@ function AddDrivingTableModal({
   );
 }
 
-function ConditionRow({ holdId, entityId, condition, onRemoved }: {
-  holdId: number; entityId: number; condition: Condition; onRemoved: () => void;
+function ConditionRow({ holdId, entityId, condition, isFirst, dataType, onRemoved }: {
+  holdId: number; entityId: number; condition: Condition; isFirst: boolean; dataType: string; onRemoved: () => void;
 }) {
   const [removing, setRemoving] = useState(false);
   async function remove() {
@@ -150,53 +158,103 @@ function ConditionRow({ holdId, entityId, condition, onRemoved }: {
       setRemoving(false);
     }
   }
+  const family = classifyDataType(dataType);
+  const opLabel = operatorLabel(condition.operator, family);
+  const showsValue = !NO_VALUE_OPERATORS.includes(condition.operator);
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-      {condition.attributeName} = &quot;{condition.valueText}&quot;
+      {!isFirst && <span className="font-sans font-bold text-amber-600">{condition.logicOperator}</span>}
+      {condition.attributeName} {opLabel}
+      {showsValue && <>&quot;{condition.valueText}&quot;{condition.operator === "BETWEEN" && <> and &quot;{condition.valueText2}&quot;</>}</>}
       <button onClick={remove} disabled={removing} className="text-amber-500 hover:text-red-600 leading-none font-sans font-bold">×</button>
     </span>
   );
 }
 
-function AddConditionForm({ holdId, entityId, onAdded }: { holdId: number; entityId: number; onAdded: () => void }) {
+function AddConditionForm({ holdId, entityId, hasExisting, onAdded }: {
+  holdId: number; entityId: number; hasExisting: boolean; onAdded: () => void;
+}) {
   const [columns, setColumns] = useState<ColumnResult[]>([]);
   const [attributeId, setAttributeId] = useState<number | "">("");
+  const [operator, setOperator] = useState<ConditionOperator>("EQUALS");
   const [valueText, setValueText] = useState("");
+  const [valueText2, setValueText2] = useState("");
+  const [logicOperator, setLogicOperator] = useState<"AND" | "OR">("OR");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch(`/api/catalog/entities/${entityId}/columns`).then((r) => (r.ok ? r.json() : [])).then(setColumns).catch(() => {});
   }, [entityId]);
 
+  const selectedColumn = columns.find((c) => c.attributeId === attributeId);
+  const family = selectedColumn ? classifyDataType(selectedColumn.dataType) : "TEXT";
+  const needsValue = !NO_VALUE_OPERATORS.includes(operator);
+  const needsSecondValue = operator === "BETWEEN";
+  const canSubmit = !!attributeId && (!needsValue || !!valueText.trim()) && (!needsSecondValue || !!valueText2.trim());
+
+  useEffect(() => {
+    // Reset to a valid operator whenever the column (and therefore its type family) changes.
+    setOperator("EQUALS");
+  }, [attributeId]);
+
   async function submit() {
-    if (!attributeId || !valueText.trim()) return;
+    if (!canSubmit) return;
     setSaving(true);
     try {
       const r = await fetch(`/api/retention/legal-holds/${holdId}/entities/${entityId}/conditions`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attributeId, valueText: valueText.trim() }),
+        body: JSON.stringify({
+          attributeId, operator,
+          valueText: needsValue ? valueText.trim() : "",
+          valueText2: needsSecondValue ? valueText2.trim() : null,
+          logicOperator: hasExisting ? logicOperator : "OR",
+        }),
       });
-      if (r.ok) { setValueText(""); onAdded(); }
+      if (r.ok) { setValueText(""); setValueText2(""); onAdded(); }
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="flex items-center gap-1.5 mt-1.5">
+    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+      {hasExisting && (
+        <select className="input-sm text-[11px] font-bold" value={logicOperator} onChange={(e) => setLogicOperator(e.target.value as "AND" | "OR")}>
+          <option value="OR">OR</option>
+          <option value="AND">AND</option>
+        </select>
+      )}
       <select className="input-sm text-[11px]" value={attributeId} onChange={(e) => setAttributeId(e.target.value ? Number(e.target.value) : "")}>
         <option value="">Column…</option>
-        {columns.map((c) => <option key={c.attributeId} value={c.attributeId}>{c.friendlyName ?? c.physicalName}</option>)}
+        {columns.map((c) => (
+          <option key={c.attributeId} value={c.attributeId}>{c.friendlyName ?? c.physicalName}{c.isPii ? " (PII)" : ""}</option>
+        ))}
       </select>
-      <span className="text-[11px] text-muted">=</span>
-      <input
-        className="input-sm text-[11px] flex-1"
-        placeholder="value"
-        value={valueText}
-        onChange={(e) => setValueText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-      />
-      <button onClick={submit} disabled={saving || !attributeId || !valueText.trim()} className="text-[11px] text-brand-purple hover:underline font-medium shrink-0">
+      <select className="input-sm text-[11px]" value={operator} onChange={(e) => setOperator(e.target.value as ConditionOperator)} disabled={!attributeId}>
+        {OPERATORS_BY_FAMILY[family].map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      {needsValue && (
+        <input
+          className="input-sm text-[11px] flex-1 min-w-[80px]"
+          placeholder="value"
+          value={valueText}
+          onChange={(e) => setValueText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+        />
+      )}
+      {needsSecondValue && (
+        <>
+          <span className="text-[11px] text-muted">and</span>
+          <input
+            className="input-sm text-[11px] flex-1 min-w-[80px]"
+            placeholder="value 2"
+            value={valueText2}
+            onChange={(e) => setValueText2(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+          />
+        </>
+      )}
+      <button onClick={submit} disabled={saving || !canSubmit} className="text-[11px] text-brand-purple hover:underline font-medium shrink-0">
         + Add
       </button>
     </div>
@@ -206,6 +264,16 @@ function AddConditionForm({ holdId, entityId, onAdded }: { holdId: number; entit
 function DrivingTableCard({ holdId, entity, onChange }: { holdId: number; entity: HoldEntity; onChange: () => void }) {
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [dataTypeByAttr, setDataTypeByAttr] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    fetch(`/api/catalog/entities/${entity.entityId}/columns`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((cols: ColumnResult[]) => {
+        setDataTypeByAttr(Object.fromEntries(cols.map((c) => [c.attributeId, c.dataType])));
+      })
+      .catch(() => {});
+  }, [entity.entityId]);
 
   const loadEstimate = useCallback(() => {
     if (entity.conditions.length === 0) { setEstimate(null); return; }
@@ -243,18 +311,21 @@ function DrivingTableCard({ holdId, entity, onChange }: { holdId: number; entity
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {entity.conditions.map((c) => (
-          <ConditionRow key={c.conditionId} holdId={holdId} entityId={entity.entityId} condition={c} onRemoved={onChange} />
+        {entity.conditions.map((c, i) => (
+          <ConditionRow
+            key={c.conditionId} holdId={holdId} entityId={entity.entityId} condition={c}
+            isFirst={i === 0} dataType={dataTypeByAttr[c.attributeId] ?? "text"} onRemoved={onChange}
+          />
         ))}
         {entity.conditions.length === 0 && (
           <span className="text-[11px] text-muted italic">No conditions yet — this table is attached but no records are excluded.</span>
         )}
       </div>
       {entity.conditions.length > 1 && (
-        <p className="text-[10px] text-muted mt-1">Conditions are OR'd — a record matching any one of them is under hold.</p>
+        <p className="text-[10px] text-muted mt-1">Conditions combine left to right using the AND/OR shown on each one.</p>
       )}
 
-      <AddConditionForm holdId={holdId} entityId={entity.entityId} onAdded={() => { onChange(); loadEstimate(); }} />
+      <AddConditionForm holdId={holdId} entityId={entity.entityId} hasExisting={entity.conditions.length > 0} onAdded={() => { onChange(); loadEstimate(); }} />
 
       {estimate && (
         <div className="mt-2 text-[11px]">

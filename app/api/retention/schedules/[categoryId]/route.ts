@@ -25,6 +25,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     notes: string | null;
     isDefault: boolean;
     createdAt: string;
+    automationConfigJson: { technique?: string; details?: string } | null;
   }[]>`
     SELECT
       schedule_id           AS "scheduleId",
@@ -39,7 +40,8 @@ export async function GET(_req: Request, { params }: Ctx) {
       regulatory_reference  AS "regulatoryReference",
       notes                 AS notes,
       is_default            AS "isDefault",
-      created_at            AS "createdAt"
+      created_at            AS "createdAt",
+      automation_config_json AS "automationConfigJson"
     FROM bayanat.retention_schedules
     WHERE category_id = ${id}
     ORDER BY is_default DESC, jurisdiction, schedule_id
@@ -62,7 +64,7 @@ export async function POST(req: Request, { params }: Ctx) {
   const {
     jurisdiction, triggerEvent, triggerCustomExpr, retentionPeriod,
     retentionUnit, postRetentionAction, archiveLocation,
-    regulatoryReference, notes, isDefault,
+    regulatoryReference, notes, isDefault, automationConfigJson,
   } = body;
 
   if (!jurisdiction || !triggerEvent || !retentionPeriod || !retentionUnit || !postRetentionAction) {
@@ -73,11 +75,12 @@ export async function POST(req: Request, { params }: Ctx) {
     INSERT INTO bayanat.retention_schedules (
       category_id, jurisdiction, trigger_event, trigger_custom_expr,
       retention_period, retention_unit, post_retention_action,
-      archive_location, regulatory_reference, notes, is_default
+      archive_location, regulatory_reference, notes, is_default, automation_config_json
     ) VALUES (
       ${id}, ${jurisdiction}, ${triggerEvent}, ${triggerCustomExpr ?? null},
       ${retentionPeriod}, ${retentionUnit}, ${postRetentionAction},
-      ${archiveLocation ?? null}, ${regulatoryReference ?? null}, ${notes ?? null}, ${isDefault ?? false}
+      ${archiveLocation ?? null}, ${regulatoryReference ?? null}, ${notes ?? null}, ${isDefault ?? false},
+      ${automationConfigJson ? sql.json(automationConfigJson) : null}
     )
     RETURNING schedule_id AS "scheduleId"
   `;

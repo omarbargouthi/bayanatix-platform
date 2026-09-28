@@ -74,9 +74,46 @@ export type AffectedRowEstimate =
 // (data_attributes.physical_name_text, not user input) so they're quoted as
 // identifiers; condition values are user-entered and passed as bound
 // parameters, never string-interpolated into the query.
+// Whitelisted operator -> SQL fragment. Every branch consumes exactly the
+// number of $-placeholders it declares (0, 1, or 2 for BETWEEN) so the
+// caller can keep a single running placeholder counter across conditions.
+function operatorSql(op: string, col: string, i: number): { sql: string; paramCount: number } {
+  switch (op) {
+    case "NOT_EQUALS":       return { sql: `${col} <> $${i}`, paramCount: 1 };
+    case "GREATER_THAN":     return { sql: `${col} > $${i}`, paramCount: 1 };
+    case "GREATER_OR_EQUAL": return { sql: `${col} >= $${i}`, paramCount: 1 };
+    case "LESS_THAN":        return { sql: `${col} < $${i}`, paramCount: 1 };
+    case "LESS_OR_EQUAL":    return { sql: `${col} <= $${i}`, paramCount: 1 };
+    case "BETWEEN":          return { sql: `${col} BETWEEN $${i} AND $${i + 1}`, paramCount: 2 };
+    case "CONTAINS":         return { sql: `${col}::text ILIKE '%' || $${i} || '%'`, paramCount: 1 };
+    case "IN_LIST":          return { sql: `${col}::text = ANY(string_to_array($${i}, ','))`, paramCount: 1 };
+    case "IS_NULL":          return { sql: `${col} IS NULL`, paramCount: 0 };
+    case "IS_NOT_NULL":      return { sql: `${col} IS NOT NULL`, paramCount: 0 };
+    case "EQUALS":
+    default:                 return { sql: `${col} = $${i}`, paramCount: 1 };
+  }
+}
+
+// postgres.js sends a plain JS string parameter compared against a boolean
+// column in a way Postgres does NOT coerce the way it does for numeric/date
+// columns (verified live: `is_active = $1` with $1 bound to the STRING
+// "true" silently matches nothing, even though `is_active = true` — a real
+// boolean literal, or a real JS `true` param — correctly matches). So a
+// boolean-family value must be converted to an actual JS boolean before it's
+// pushed into the params array, not left as the text the condition UI stores.
+function isBooleanDataType(dataType: string): boolean {
+  return dataType.toLowerCase().includes("bool");
+}
+function toBoolean(valueText: string): boolean {
+  return /^(true|1|yes|y)$/i.test(valueText.trim());
+}
+
 export async function estimateAffectedRowCount(
   entityId: number,
-  conditions: { attributeName: string; valueText: string }[],
+  conditions: {
+    attributeId: number; attributeName: string; valueText: string; valueText2?: string | null;
+    operator?: string; logicOperator?: "AND" | "OR";
+  }[],
 ): Promise<AffectedRowEstimate> {
   if (conditions.length === 0) return { available: true, count: 0 };
 
@@ -86,10 +123,26 @@ export async function estimateAffectedRowCount(
   }
 
   const qs = `"${conn.schemaName.replace(/"/g, '""')}"."${conn.entityName.replace(/"/g, '""')}"`;
-  const whereSql = conditions
-    .map((c, i) => `"${c.attributeName.replace(/"/g, '""')}" = $${i + 1}`)
-    .join(" OR ");
-  const values = conditions.map((c) => c.valueText);
+
+  const typeRows = await sql<{ attributeId: number; dataType: string }[]>`
+    SELECT attribute_id AS "attributeId", data_type_text AS "dataType"
+    FROM bayanat.data_attributes WHERE attribute_id IN ${sql(conditions.map((c) => c.attributeId))}
+  `;
+  const dataTypeById = new Map(typeRows.map((r) => [r.attributeId, r.dataType]));
+
+  // Explicit left fold — ((cond1) OR (cond2)) AND (cond3) — rather than
+  // relying on flat SQL AND/OR precedence, so the UI's "in order, left to
+  // right" chain is literally what executes.
+  const values: (string | boolean)[] = [];
+  let whereSql = "";
+  for (const c of conditions) {
+    const col = `"${c.attributeName.replace(/"/g, '""')}"`;
+    const isBool = isBooleanDataType(dataTypeById.get(c.attributeId) ?? "");
+    const { sql: fragment, paramCount } = operatorSql(c.operator ?? "EQUALS", col, values.length + 1);
+    if (paramCount >= 1) values.push(isBool ? toBoolean(c.valueText) : c.valueText);
+    if (paramCount >= 2) values.push(isBool ? toBoolean(c.valueText2 ?? "") : (c.valueText2 ?? ""));
+    whereSql = whereSql === "" ? `(${fragment})` : `(${whereSql} ${c.logicOperator ?? "OR"} (${fragment}))`;
+  }
 
   const pg = postgres({
     host: conn.hostAddress, port: conn.portNumber,

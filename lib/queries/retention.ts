@@ -1,6 +1,65 @@
 import { sql } from "../db";
 import type { RetentionOverview } from "../types";
 
+export type CategoryEntity = {
+  entityId: number;
+  entityName: string;
+  schemaName: string;
+  sourceName: string;
+  keyAttributeId: number | null;
+  keyAttributeName: string | null;
+  cascadeEnabled: boolean;
+};
+
+export async function getCategoryEntities(categoryId: number): Promise<CategoryEntity[]> {
+  return sql<CategoryEntity[]>`
+    SELECT
+      e.entity_id AS "entityId", e.entity_name_text AS "entityName",
+      s.schema_name_text AS "schemaName", ds.source_name_text AS "sourceName",
+      e.retention_key_attribute_id AS "keyAttributeId", ka.physical_name_text AS "keyAttributeName",
+      e.retention_cascade_enabled AS "cascadeEnabled"
+    FROM bayanat.data_entities e
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
+    LEFT JOIN bayanat.data_attributes ka ON ka.attribute_id = e.retention_key_attribute_id
+    WHERE e.retention_category_id = ${categoryId}
+    ORDER BY e.entity_name_text
+  `;
+}
+
+export async function assignCategoryEntity(
+  categoryId: number, entityId: number, keyAttributeId: number | null, cascadeEnabled: boolean,
+): Promise<void> {
+  await sql`
+    UPDATE bayanat.data_entities SET
+      retention_category_id      = ${categoryId},
+      retention_key_attribute_id = ${keyAttributeId},
+      retention_cascade_enabled  = ${cascadeEnabled}
+    WHERE entity_id = ${entityId}
+  `;
+}
+
+export async function updateCategoryEntity(
+  entityId: number, keyAttributeId: number | null, cascadeEnabled: boolean,
+): Promise<void> {
+  await sql`
+    UPDATE bayanat.data_entities SET
+      retention_key_attribute_id = ${keyAttributeId},
+      retention_cascade_enabled  = ${cascadeEnabled}
+    WHERE entity_id = ${entityId}
+  `;
+}
+
+export async function unassignCategoryEntity(categoryId: number, entityId: number): Promise<void> {
+  await sql`
+    UPDATE bayanat.data_entities SET
+      retention_category_id      = NULL,
+      retention_key_attribute_id = NULL,
+      retention_cascade_enabled  = FALSE
+    WHERE entity_id = ${entityId} AND retention_category_id = ${categoryId}
+  `;
+}
+
 export async function getRetentionOverview(): Promise<RetentionOverview> {
   const [
     countRows,

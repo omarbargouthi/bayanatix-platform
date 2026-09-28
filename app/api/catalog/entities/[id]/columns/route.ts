@@ -11,17 +11,24 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const rows = await sql<{
     attributeId: number; physicalName: string; friendlyName: string | null;
-    dataType: string; isPrimaryKey: boolean;
+    dataType: string; isPrimaryKey: boolean; isPii: boolean;
   }[]>`
     SELECT
-      attribute_id AS "attributeId",
-      physical_name_text AS "physicalName",
-      friendly_name_text AS "friendlyName",
-      data_type_text AS "dataType",
-      COALESCE(is_primary_key_indicator, false) AS "isPrimaryKey"
-    FROM bayanat.data_attributes
-    WHERE entity_id = ${entityId}
-    ORDER BY is_primary_key_indicator DESC NULLS LAST, physical_name_text
+      a.attribute_id AS "attributeId",
+      a.physical_name_text AS "physicalName",
+      a.friendly_name_text AS "friendlyName",
+      a.data_type_text AS "dataType",
+      COALESCE(a.is_primary_key_indicator, false) AS "isPrimaryKey",
+      COALESCE(bg_cls.is_pii_indicator, false) AS "isPii"
+    FROM bayanat.data_attributes a
+    LEFT JOIN bayanat.asset_business_terms abt_cls
+      ON abt_cls.asset_type_code = 'DATA_ATTRIBUTES'
+      AND abt_cls.asset_id = a.attribute_id
+      AND abt_cls.term_role = 'CLASSIFICATION'
+    LEFT JOIN bayanat.business_glossaries bg_cls
+      ON bg_cls.glossary_id = abt_cls.glossary_id
+    WHERE a.entity_id = ${entityId}
+    ORDER BY a.is_primary_key_indicator DESC NULLS LAST, a.physical_name_text
   `;
   return NextResponse.json(rows);
 }

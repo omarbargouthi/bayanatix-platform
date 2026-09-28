@@ -17,7 +17,10 @@ export async function GET(_req: Request, { params }: { params: { holdId: string;
 
   const result = await estimateAffectedRowCount(
     entityId,
-    entity.conditions.map((c) => ({ attributeName: c.attributeName, valueText: c.valueText })),
+    entity.conditions.map((c) => ({
+      attributeId: c.attributeId, attributeName: c.attributeName, valueText: c.valueText, valueText2: c.valueText2,
+      operator: c.operator, logicOperator: c.logicOperator,
+    })),
   );
   return NextResponse.json(result);
 }

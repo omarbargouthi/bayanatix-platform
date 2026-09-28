@@ -1032,6 +1032,9 @@ export type I18nStrings = {
     actionAnonymize:    string;
     actionArchive:      string;
     actionReview:       string;
+    actionScramble:     string;
+    scrambleTechnique:  string;
+    scrambleDetails:    string;
     // Legal Holds
     legalHoldsTitle:    string;
     newHold:            string;
