@@ -1,6 +1,13 @@
 import { sql } from "./db";
 import type { SessionUser } from "./types";
-import { resolveEffectiveGovernance, resolveEffectiveEntityGovernance } from "./queries/stakeholders";
+import {
+  resolveEffectiveGovernance,
+  resolveEffectiveEntityGovernance,
+  resolveEffectiveSchemaGovernance,
+  getStakeholders,
+} from "./queries/stakeholders";
+
+const STEWARD_ROLE_CODES = new Set(["OWNER", "BIZ_STEWARD", "TECH_STEWARD"]);
 
 // Resolves an entity down to its schema/data-source ids, for resource-scoped
 // role_assignments checks (GLOBAL / DATA_SOURCE / SCHEMA / TABLE all apply).
@@ -206,12 +213,41 @@ export async function canManageDomain(session: SessionUser, domain: DomainCode):
   return (await getDomainAccess(session, domain)) === "WRITE";
 }
 
+// Shared by the domain-access self-service delegation endpoint and the
+// access-requests approval flow — both end up doing the exact same grant.
+export const DOMAIN_READ_ROLE_NAME: Record<DomainCode, string> = {
+  GOVERNANCE:    "Data Governance (Read)",
+  DATA_QUALITY:  "Data Quality (Read)",
+  DATA_PRIVACY:  "Data Privacy (Read)",
+  SHARING:       "Open Data & Access (Read)",
+  FOI:           "Open Data & Access (Read)",
+  OPEN_DATA:     "Open Data & Access (Read)",
+};
+
+// Grants a user the domain's read-only role (idempotent). Callers must
+// validate authorization (canManageDomain) BEFORE calling this.
+export async function grantDomainRead(domain: DomainCode, userId: string): Promise<void> {
+  const [role] = await sql<{ roleId: number }[]>`
+    SELECT role_id AS "roleId" FROM bayanat.roles WHERE role_name = ${DOMAIN_READ_ROLE_NAME[domain]}
+  `;
+  if (!role) throw new Error(`Read role not found for domain ${domain}`);
+
+  const existing = await sql<{ id: number }[]>`
+    SELECT assignment_id AS id FROM bayanat.role_assignments
+    WHERE role_id = ${role.roleId} AND resource_type = 'DOMAIN' AND resource_id = ${domain} AND user_id = ${userId}
+  `;
+  if (existing.length === 0) {
+    await sql`
+      INSERT INTO bayanat.role_assignments (role_id, user_id, resource_type, resource_id, resource_name)
+      VALUES (${role.roleId}, ${userId}, 'DOMAIN', ${domain}, ${domain})
+    `;
+  }
+}
+
 // DQ-rule creation: the Data Quality domain role, OR being an effective
 // Owner/Business Steward/Technical Steward of the specific asset (walks
 // column -> table -> schema -> source via the existing governance resolvers —
 // no new stewardship concept needed).
-const DQ_STEWARD_CODES = new Set(["OWNER", "BIZ_STEWARD", "TECH_STEWARD"]);
-
 export async function canCreateDqRule(
   session: SessionUser,
   assetTypeCode: string,
@@ -225,5 +261,106 @@ export async function canCreateDqRule(
     : assetTypeCode === "DATA_ATTRIBUTES"
     ? await resolveEffectiveGovernance(assetId)
     : [];
-  return effective.some((e) => e.userId === session.userId && DQ_STEWARD_CODES.has(e.roleCode));
+  return effective.some((e) => e.userId === session.userId && STEWARD_ROLE_CODES.has(e.roleCode));
+}
+
+// ── Catalog / Classification view access (per-asset ownership default) ──────
+// A third, separate dimension from both the asset-scoped edit/data-read
+// checks above and the domain checks below: whether the user may even *see*
+// a catalog asset or classification data for it. Default is "owner/steward
+// of the asset (or something broader an admin explicitly granted)" rather
+// than a single domain switch, since Catalog/Classification are inherently
+// per-asset, not one flippable feature area.
+
+// Resolves a loose {sourceId?, schemaId?, entityId?} scope down to concrete
+// schemaId/sourceId (entityId implies both; schemaId implies sourceId).
+async function resolveCatalogScope(
+  scope: { sourceId?: number; schemaId?: number; entityId?: number },
+): Promise<{ sourceId: number | null; schemaId: number | null; entityId: number | null }> {
+  let sourceId = scope.sourceId ?? null;
+  let schemaId = scope.schemaId ?? null;
+  const entityId = scope.entityId ?? null;
+
+  if (entityId != null) {
+    const resolved = await resolveEntityScope(entityId);
+    schemaId = schemaId ?? resolved.schemaId;
+    sourceId = sourceId ?? resolved.dataSourceId;
+  } else if (schemaId != null && sourceId == null) {
+    const [row] = await sql<{ dataSourceId: number | null }[]>`
+      SELECT data_source_id AS "dataSourceId" FROM bayanat.data_schemas WHERE schema_id = ${schemaId}
+    `;
+    sourceId = row?.dataSourceId ?? null;
+  }
+  return { sourceId, schemaId, entityId };
+}
+
+export async function canViewCatalogAsset(
+  session: SessionUser,
+  scope: { sourceId?: number; schemaId?: number; entityId?: number },
+): Promise<boolean> {
+  if (session.role === "ADMIN") return true;
+  const { sourceId, schemaId, entityId } = await resolveCatalogScope(scope);
+
+  const roleRows = await sql<{ cnt: number }[]>`
+    SELECT COUNT(*)::int AS cnt
+    FROM bayanat.role_assignments ra
+    JOIN bayanat.roles r ON r.role_id = ra.role_id
+    WHERE r.metadata_read = true
+      AND (
+        ra.user_id = ${session.userId}
+        OR ra.team_id IN (SELECT team_id FROM bayanat.team_members WHERE user_id = ${session.userId})
+      )
+      AND (
+        ra.resource_type = 'GLOBAL'
+        OR (ra.resource_type = 'TABLE' AND ra.resource_id = ${entityId != null ? String(entityId) : null})
+        OR (ra.resource_type = 'SCHEMA' AND ra.resource_id = ${schemaId != null ? String(schemaId) : null})
+        OR (ra.resource_type = 'DATA_SOURCE' AND ra.resource_id = ${sourceId != null ? String(sourceId) : null})
+      )
+  `;
+  if ((roleRows[0]?.cnt ?? 0) > 0) return true;
+
+  if (entityId != null) {
+    const eff = await resolveEffectiveEntityGovernance(entityId);
+    if (eff.some((e) => e.userId === session.userId && STEWARD_ROLE_CODES.has(e.roleCode))) return true;
+  } else if (schemaId != null) {
+    const eff = await resolveEffectiveSchemaGovernance(schemaId);
+    if (eff.some((e) => e.userId === session.userId && STEWARD_ROLE_CODES.has(e.roleCode))) return true;
+  } else if (sourceId != null) {
+    const stakeholders = await getStakeholders("DATA_SOURCES", sourceId);
+    if (stakeholders.some((s) => s.userId === session.userId && STEWARD_ROLE_CODES.has(s.roleCode))) return true;
+  }
+  return false;
+}
+
+// Classification dashboard: Governance and Privacy domain roles (read or
+// write tier — either is enough, since seeing the classification picture is
+// an oversight need for both) see everything; everyone else is filtered to
+// what they own/steward (see the mySources-style filters this backs).
+export async function canViewAllClassification(session: SessionUser): Promise<boolean> {
+  if (session.role === "ADMIN") return true;
+  return (await canAccessDomain(session, "GOVERNANCE")) || (await canAccessDomain(session, "DATA_PRIVACY"));
+}
+
+// The request-access approver for a Data Source/Schema/Table request: always
+// that data source's own OWNER stakeholder (not resolved down through
+// schema/table — a source is the top of the hierarchy, so this is a direct
+// lookup, not an "effective" walk).
+export async function isDataSourceOwner(session: SessionUser, sourceId: number): Promise<boolean> {
+  if (session.role === "ADMIN") return true;
+  const stakeholders = await getStakeholders("DATA_SOURCES", sourceId);
+  return stakeholders.some((s) => s.userId === session.userId && s.roleCode === "OWNER");
+}
+
+// Resolves a CATALOG-kind access request's resource (a Data Source, Schema, or
+// Table) up to its owning data source id — for the approver check, which is
+// always the source's OWNER regardless of which level was requested.
+export async function resolveSourceIdForCatalogResource(
+  resourceType: "DATA_SOURCE" | "SCHEMA" | "TABLE",
+  resourceId: number,
+): Promise<number | null> {
+  const scope = resourceType === "DATA_SOURCE" ? { sourceId: resourceId }
+    : resourceType === "SCHEMA" ? { schemaId: resourceId }
+    : { entityId: resourceId };
+  const { sourceId } = await resolveCatalogScope(scope);
+  return sourceId;
 }

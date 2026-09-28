@@ -12,7 +12,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconShield, IconHistory, IconFlag, IconAI,
-  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout,
+  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout, IconUserPlus,
 } from "./icons";
 
 type Item = {
@@ -29,6 +29,7 @@ const NAV_TOP_DEF = [
   { href: "/reports",    key: "reports"      as const, Icon: IconReports },
   { href: "/enrichment", key: "enrichment"   as const, Icon: IconAI },
   { href: "/assets",     key: "customAssets" as const, Icon: IconGlossary },
+  { href: "/request-access", key: "requestAccess" as const, Icon: IconUserPlus },
 ];
 
 // domain: which DomainCode gates this nav item (see lib/can.ts) — omitted for

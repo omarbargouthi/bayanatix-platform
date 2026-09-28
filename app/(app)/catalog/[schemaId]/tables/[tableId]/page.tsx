@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
-import { canEditMetadata } from "@/lib/can";
+import { canEditMetadata, canViewCatalogAsset } from "@/lib/can";
 import { getEntityById, getEntityProfile, CDE_CLASSIFICATION_CODES } from "@/lib/queries/catalog";
 import { CertTag, ClassificationTag, Tag } from "@/components/ui/Tag";
 import { IconTable, IconChevron } from "@/components/layout/icons";
@@ -50,6 +50,7 @@ export default async function TablePage({
 
   const id = Number(params.tableId);
   if (!Number.isFinite(id)) notFound();
+  if (!(await canViewCatalogAsset(user, { entityId: id }))) redirect("/catalog");
 
   const activeTab: Tab = isValidTab(searchParams.tab) ? searchParams.tab : "Schema";
 

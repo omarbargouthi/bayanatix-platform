@@ -25,6 +25,7 @@ export type I18nStrings = {
     openData:         string;
     foi:              string;
     customAssets:     string;
+    requestAccess:    string;
     // Admin section items
     userManagement:   string;
     workflows:        string;
@@ -101,6 +102,53 @@ export type I18nStrings = {
     addUserPlaceholder: string;
     grantFailed:        string;
     revokeConfirm:       string;   // "Remove {name}'s read access to {domain}?"
+  };
+
+  // ── Request Access (self-service domain/catalog access requests) ─────────────
+  requestAccess: {
+    pageTitle:            string;
+    pageDesc:             string;
+    tabNewRequest:        string;
+    tabMyRequests:        string;
+    tabPendingApproval:   string;
+    kindLabel:            string;
+    kindDomainOption:     string;
+    kindDomainDesc:       string;
+    kindCatalogOption:    string;
+    kindCatalogDesc:      string;
+    domainLabel:          string;
+    domainPlaceholder:    string;
+    resourceLevelLabel:   string;
+    resourceLevelSource:  string;
+    resourceLevelSchema:  string;
+    resourceLevelTable:   string;
+    dataSourceLabel:      string;
+    dataSourcePlaceholder: string;
+    schemaLabel:          string;
+    schemaPlaceholder:    string;
+    tableLabel:           string;
+    tablePlaceholder:     string;
+    justificationLabel:   string;
+    justificationOptional: string;
+    justificationPlaceholder: string;
+    submitBtn:            string;
+    submitSuccess:        string;
+    submitFailed:         string;
+    myRequestsEmpty:      string;
+    pendingApprovalEmpty: string;
+    columnRequested:      string;
+    columnRequester:      string;
+    columnStatus:         string;
+    columnDate:           string;
+    columnActions:        string;
+    statusPending:        string;
+    statusApproved:       string;
+    statusRejected:       string;
+    approveBtn:           string;
+    rejectBtn:            string;
+    decisionNotePlaceholder: string;
+    domainRequestLabel:   string;   // "Domain: {domain}"
+    catalogRequestLabel:  string;   // "{level}: {name}"
   };
 
   // ── Compliance Assessment ───────────────────────────────────────────────────

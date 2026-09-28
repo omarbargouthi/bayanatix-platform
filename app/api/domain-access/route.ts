@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { canManageDomain } from "@/lib/can";
+import { canManageDomain, grantDomainRead, DOMAIN_READ_ROLE_NAME } from "@/lib/can";
 import type { DomainCode } from "@/lib/can";
 import { sql } from "@/lib/db";
 
@@ -11,15 +11,6 @@ import { sql } from "@/lib/db";
 // than trusting the client's claimed domain.
 
 const ALL_DOMAINS: DomainCode[] = ["GOVERNANCE", "DATA_QUALITY", "DATA_PRIVACY", "SHARING", "FOI", "OPEN_DATA"];
-
-const READ_ROLE_NAME: Record<DomainCode, string> = {
-  GOVERNANCE:    "Data Governance (Read)",
-  DATA_QUALITY:  "Data Quality (Read)",
-  DATA_PRIVACY:  "Data Privacy (Read)",
-  SHARING:       "Open Data & Access (Read)",
-  FOI:           "Open Data & Access (Read)",
-  OPEN_DATA:     "Open Data & Access (Read)",
-};
 
 // GET — for every domain the caller manages, list current read-only grants.
 export async function GET() {
@@ -59,20 +50,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [role] = await sql<{ roleId: number }[]>`
-    SELECT role_id AS "roleId" FROM bayanat.roles WHERE role_name = ${READ_ROLE_NAME[domain]}
-  `;
-  if (!role) return NextResponse.json({ error: "Read role not found" }, { status: 500 });
-
-  const existing = await sql<{ id: number }[]>`
-    SELECT assignment_id AS id FROM bayanat.role_assignments
-    WHERE role_id = ${role.roleId} AND resource_type = 'DOMAIN' AND resource_id = ${domain} AND user_id = ${userId}
-  `;
-  if (existing.length === 0) {
-    await sql`
-      INSERT INTO bayanat.role_assignments (role_id, user_id, resource_type, resource_id, resource_name)
-      VALUES (${role.roleId}, ${userId}, 'DOMAIN', ${domain}, ${domain})
-    `;
+  try {
+    await grantDomainRead(domain, userId);
+  } catch {
+    return NextResponse.json({ error: "Read role not found" }, { status: 500 });
   }
   return NextResponse.json({ ok: true }, { status: 201 });
 }
@@ -94,7 +75,7 @@ export async function DELETE(req: Request) {
   await sql`
     DELETE FROM bayanat.role_assignments ra
     USING bayanat.roles r
-    WHERE ra.role_id = r.role_id AND r.role_name = ${READ_ROLE_NAME[domain]}
+    WHERE ra.role_id = r.role_id AND r.role_name = ${DOMAIN_READ_ROLE_NAME[domain]}
       AND ra.resource_type = 'DOMAIN' AND ra.resource_id = ${domain} AND ra.user_id = ${userId}
   `;
   return NextResponse.json({ ok: true });

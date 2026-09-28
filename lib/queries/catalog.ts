@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import { logUpdate } from "../audit";
 import { translatedColumnSql } from "../i18n-admin/translated-column";
+import { myAssetsSourceFilter } from "./classification-scope";
 import type {
   DataSource,
   DataSchema,
@@ -86,19 +87,46 @@ export async function getCatalogStats(dataSourceIds?: number[]): Promise<Catalog
 }
 
 // ----- Sources tree (catalog page left/main) -----
-export async function getSourcesWithSchemas(): Promise<
+// Sources visible to `userId` without a broader (ADMIN-equivalent) view: any
+// they own/steward (see myAssetsSourceFilter), OR any covered by a
+// metadata_read-granting role_assignment at GLOBAL or that specific
+// DATA_SOURCE scope — the latter is how "admin grants another user view
+// access to Catalog as needed" actually works, reusing the existing
+// fine-grained RBAC (e.g. assigning the pre-seeded "Metadata Viewer" role)
+// rather than a new mechanism.
+function viewableSourcesFilter(userId: string) {
+  return sql`(
+    ${myAssetsSourceFilter(userId)}
+    OR s.data_source_id IN (
+      SELECT DISTINCT ra.resource_id::int FROM bayanat.role_assignments ra
+      JOIN bayanat.roles r ON r.role_id = ra.role_id
+      WHERE r.metadata_read = true AND ra.resource_type = 'DATA_SOURCE'
+        AND (ra.user_id = ${userId} OR ra.team_id IN (SELECT team_id FROM bayanat.team_members WHERE user_id = ${userId}))
+    )
+    OR EXISTS (
+      SELECT 1 FROM bayanat.role_assignments ra
+      JOIN bayanat.roles r ON r.role_id = ra.role_id
+      WHERE r.metadata_read = true AND ra.resource_type = 'GLOBAL'
+        AND (ra.user_id = ${userId} OR ra.team_id IN (SELECT team_id FROM bayanat.team_members WHERE user_id = ${userId}))
+    )
+  )`;
+}
+
+export async function getSourcesWithSchemas(restrictToUserId?: string): Promise<
   (DataSource & { schemas: DataSchema[] })[]
 > {
+  const mine = restrictToUserId ? viewableSourcesFilter(restrictToUserId) : sql`true`;
   const sources = await sql<DataSource[]>`
     select
-      data_source_id     as "dataSourceId",
-      source_name_text   as "sourceName",
-      source_type_code   as "sourceType",
-      database_name_text as "databaseName",
-      description_text   as "description",
-      business_app_name  as "businessAppName"
-    from bayanat.data_sources
-    order by source_name_text
+      s.data_source_id     as "dataSourceId",
+      s.source_name_text   as "sourceName",
+      s.source_type_code   as "sourceType",
+      s.database_name_text as "databaseName",
+      s.description_text   as "description",
+      s.business_app_name  as "businessAppName"
+    from bayanat.data_sources s
+    where ${mine}
+    order by s.source_name_text
   `;
   if (sources.length === 0) return [];
 
@@ -895,8 +923,12 @@ export async function getClassificationStats(): Promise<ClassificationStats> {
 // get_classification_summary tool needs "the finance schema" style scoping the
 // global-only function above can't do. Same shape/logic, with an optional join
 // down to data_entities/data_schemas to filter by schema or source.
-export async function getClassificationStatsScoped(scope?: { schemaId?: number; sourceId?: number }): Promise<ClassificationStats> {
-  if (!scope?.schemaId && !scope?.sourceId) return getClassificationStats();
+export async function getClassificationStatsScoped(
+  scope?: { schemaId?: number; sourceId?: number; restrictToUserId?: string },
+): Promise<ClassificationStats> {
+  if (!scope?.schemaId && !scope?.sourceId && !scope?.restrictToUserId) return getClassificationStats();
+
+  const mine = scope.restrictToUserId ? myAssetsSourceFilter(scope.restrictToUserId) : sql`true`;
 
   const [row] = await sql<{
     total: number; classified: number; cde: number; pii: number;
@@ -919,6 +951,7 @@ export async function getClassificationStatsScoped(scope?: { schemaId?: number; 
     LEFT JOIN bayanat.business_glossaries bg ON bg.glossary_id = abt.glossary_id
     WHERE (${scope.schemaId ?? null}::int IS NULL OR s.schema_id = ${scope.schemaId ?? null})
       AND (${scope.sourceId ?? null}::int IS NULL OR s.data_source_id = ${scope.sourceId ?? null})
+      AND ${mine}
   `;
 
   const piRows = await sql<{ name: string; count: number }[]>`
@@ -935,6 +968,7 @@ export async function getClassificationStatsScoped(scope?: { schemaId?: number; 
     WHERE bg.pi_category_code IS NOT NULL
       AND (${scope.schemaId ?? null}::int IS NULL OR s.schema_id = ${scope.schemaId ?? null})
       AND (${scope.sourceId ?? null}::int IS NULL OR s.data_source_id = ${scope.sourceId ?? null})
+      AND ${mine}
     GROUP BY pct.category_name_text
     ORDER BY COUNT(*) DESC
     LIMIT 6

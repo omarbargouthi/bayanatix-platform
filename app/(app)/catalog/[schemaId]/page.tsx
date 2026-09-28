@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
-import { canEditMetadata } from "@/lib/can";
+import { canEditMetadata, canViewCatalogAsset } from "@/lib/can";
 import { getSchemaById } from "@/lib/queries/catalog";
 import { trackAssetVisit } from "@/lib/queries/dashboard";
 import { HighlightScroll } from "@/components/catalog/HighlightScroll";
@@ -26,6 +26,7 @@ export default async function SchemaPage({
 
   const id = Number(params.schemaId);
   if (!Number.isFinite(id)) notFound();
+  if (!(await canViewCatalogAsset(user, { schemaId: id }))) redirect("/catalog");
   const schema = await getSchemaById(id);
   if (!schema) notFound();
 

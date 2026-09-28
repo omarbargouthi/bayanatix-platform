@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
+import { canViewAllClassification } from "@/lib/can";
 import { getClassificationStatsScoped } from "@/lib/queries/catalog";
 import { ClassificationClient } from "@/components/classification/ClassificationClient";
 import { getServerT } from "@/lib/i18n/server";
@@ -17,7 +18,11 @@ export default async function ClassificationPage({
 
   const dataSourceId = searchParams.dataSourceId ? Number(searchParams.dataSourceId) : undefined;
   const schemaId = searchParams.schemaId ? Number(searchParams.schemaId) : undefined;
-  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId });
+  const canViewAll = await canViewAllClassification(user);
+  const stats = await getClassificationStatsScoped({
+    sourceId: dataSourceId, schemaId,
+    restrictToUserId: canViewAll ? undefined : user.userId,
+  });
   const t = await getServerT(user);
 
   return (

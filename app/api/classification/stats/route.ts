@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canViewAllClassification } from "@/lib/can";
 import { getClassificationStatsScoped } from "@/lib/queries/catalog";
 
 export async function GET(req: Request) {
@@ -8,6 +9,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const dataSourceId = searchParams.get("dataSourceId") ? Number(searchParams.get("dataSourceId")) : undefined;
   const schemaId = searchParams.get("schemaId") ? Number(searchParams.get("schemaId")) : undefined;
-  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId });
+  const restrictToUserId = (await canViewAllClassification(session)) ? undefined : session.userId;
+  const stats = await getClassificationStatsScoped({ sourceId: dataSourceId, schemaId, restrictToUserId });
   return NextResponse.json(stats);
 }

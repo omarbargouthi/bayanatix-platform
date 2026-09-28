@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { canViewAllClassification } from "@/lib/can";
 import { sql } from "@/lib/db";
+import { myAssetsSourceFilter } from "@/lib/queries/classification-scope";
 
 export type ClassificationColumn = {
   attributeId:              number;
@@ -31,7 +33,7 @@ export async function GET(req: Request) {
   const search     = (searchParams.get("search") ?? "").trim();
   const schemaId   = searchParams.get("schemaId") ? Number(searchParams.get("schemaId")) : null;
   const dataSourceId = searchParams.get("dataSourceId") ? Number(searchParams.get("dataSourceId")) : null;
-  const mySources  = searchParams.get("mySources") === "true";
+  const mySources  = searchParams.get("mySources") === "true" || !(await canViewAllClassification(session));
   const page       = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const limit      = Math.min(100, Math.max(10, Number(searchParams.get("limit") ?? "50")));
   const offset     = (page - 1) * limit;
@@ -72,21 +74,7 @@ export async function GET(req: Request) {
       AND ${filter === "cde"      ? sql`bg.classification_code = ANY(${cdeCodes})`       : sql`true`}
       AND ${schemaId != null      ? sql`s.schema_id = ${schemaId}`                       : sql`true`}
       AND ${dataSourceId != null  ? sql`s.data_source_id = ${dataSourceId}`              : sql`true`}
-      AND ${mySources ? sql`
-            s.data_source_id IN (
-              SELECT DISTINCT asset_id FROM bayanat.asset_stakeholders
-              WHERE asset_type_code = 'DATA_SOURCES' AND user_id = ${session.userId}
-              UNION
-              SELECT DISTINCT sc2.data_source_id FROM bayanat.asset_stakeholders stk2
-              JOIN bayanat.data_schemas sc2 ON sc2.schema_id = stk2.asset_id
-              WHERE stk2.asset_type_code = 'DATA_SCHEMAS' AND stk2.user_id = ${session.userId}
-              UNION
-              SELECT DISTINCT sc3.data_source_id FROM bayanat.asset_stakeholders stk3
-              JOIN bayanat.data_entities  en3 ON en3.entity_id  = stk3.asset_id
-              JOIN bayanat.data_schemas   sc3 ON sc3.schema_id  = en3.schema_id
-              WHERE stk3.asset_type_code = 'DATA_ENTITIES' AND stk3.user_id = ${session.userId}
-            )
-          ` : sql`true`}
+      AND ${mySources ? myAssetsSourceFilter(session.userId) : sql`true`}
       AND ${search !== ""         ? sql`(
             a.physical_name_text ILIKE ${like}
             OR e.entity_name_text ILIKE ${like}

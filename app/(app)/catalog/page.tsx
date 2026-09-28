@@ -20,7 +20,7 @@ export default async function CatalogPage() {
     cdeCoverage, classification, cdeMetadataQuality, cdeDataQuality,
   ] = await Promise.all([
     getCatalogStats(),
-    getSourcesWithSchemas(),
+    getSourcesWithSchemas(user.role === "ADMIN" ? undefined : user.userId),
     getGlossaryRoots(),
     getGlossaryStats(),
     canEditMetadata(user),
