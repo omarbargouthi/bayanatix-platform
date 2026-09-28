@@ -73,7 +73,7 @@ function PropRow({
           <span className="text-[9px] bg-canvas border border-line rounded px-1 text-muted normal-case tracking-normal">auto</span>
         )}
       </dt>
-      <dd className="flex-1 text-[13px] text-ink">{children}</dd>
+      <dd className="flex-1 min-w-0 text-[13px] text-ink break-words">{children}</dd>
     </div>
   );
 }
@@ -652,6 +652,18 @@ export function SchemaTableList({
                           <PropRow label={c.dataCert}>
                             <CertTag code={entity.dataCertCode} />
                           </PropRow>
+                          <PropRow label={c.lifecycleStatusLabel}>
+                            {entity.lifecycleStatus === "DEPRECATED"
+                              ? <LifecycleBadge status={entity.lifecycleStatus} />
+                              : <span className="text-[12px]">{c.statusActiveValue}</span>}
+                          </PropRow>
+                          {entity.lifecycleStatus === "DEPRECATED" && (
+                            <PropRow label={c.deprecatedOnLabel}>
+                              <span className="text-[12px]">
+                                {entity.deprecatedAt ? new Date(entity.deprecatedAt).toLocaleDateString() : "—"}
+                              </span>
+                            </PropRow>
+                          )}
 
                           <div className="py-1.5">
                             <div className="flex items-center gap-2">

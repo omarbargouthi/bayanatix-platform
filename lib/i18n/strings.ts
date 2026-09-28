@@ -524,6 +524,9 @@ export type I18nStrings = {
     friendlyName:     string;
     metadataCert:     string;
     dataCert:         string;
+    lifecycleStatusLabel: string;
+    deprecatedOnLabel:    string;
+    statusActiveValue:    string;
     usageAutomated:   string;
     rowCount:         string;
     columns:          string;
