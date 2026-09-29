@@ -1013,6 +1013,8 @@ export type I18nStrings = {
     schedules:          string;
     entities:           string;
     noCategories:       string;
+    exportManifest:     string;
+    downloadAllManifests: string;
     // Schedule panel
     schedulesTitle:     string;
     addSchedule:        string;

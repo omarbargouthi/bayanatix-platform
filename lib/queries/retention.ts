@@ -257,3 +257,28 @@ export async function getCategoryManifest(categoryId: number): Promise<CategoryM
     schedules, tables, relationships, activeHoldConditions,
   };
 }
+
+export type RetentionAutomationBundle = {
+  generatedAt: string;
+  schemaVersion: 1;
+  categories: CategoryManifest[];
+};
+
+// One combined export across every active category with at least one retention
+// schedule defined — the "report" an external retention/purge automation process
+// can pull once and drive its whole run from, rather than fetching each category's
+// manifest one at a time. Categories with no schedule yet are excluded (nothing
+// for an automation process to act on until one exists).
+export async function getAllCategoriesManifest(): Promise<RetentionAutomationBundle> {
+  const categoryIds = await sql<{ categoryId: number }[]>`
+    SELECT DISTINCT dc.category_id AS "categoryId"
+    FROM bayanat.data_categories dc
+    JOIN bayanat.retention_schedules rs ON rs.category_id = dc.category_id
+    WHERE dc.is_active = true
+    ORDER BY dc.category_id
+  `;
+  const categories = (await Promise.all(categoryIds.map((c) => getCategoryManifest(c.categoryId))))
+    .filter((m): m is CategoryManifest => m !== null);
+
+  return { generatedAt: new Date().toISOString(), schemaVersion: 1, categories };
+}

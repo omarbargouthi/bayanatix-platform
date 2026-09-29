@@ -48,7 +48,7 @@ export function PrivacyClient({ userRole }: { userRole: string }) {
 
       {/* Tab content */}
       {tab === "overview"   && <RetentionOverviewTab />}
-      {tab === "categories" && <DataCategoriesTab />}
+      {tab === "categories" && <DataCategoriesTab userRole={userRole} />}
       {tab === "holds"      && <LegalHoldsTab />}
     </main>
   );

@@ -933,6 +933,8 @@ export const en: I18nStrings = {
     schedules:          "Schedules",
     entities:           "Entities",
     noCategories:       "No categories defined yet",
+    exportManifest:     "Export Manifest",
+    downloadAllManifests: "Download All (JSON)",
     schedulesTitle:     "Retention Schedules",
     addSchedule:        "Add Schedule",
     jurisdiction:       "Jurisdiction",

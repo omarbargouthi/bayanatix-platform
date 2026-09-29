@@ -677,10 +677,12 @@ function CategoryRow({
   category,
   depth = 0,
   onAdded,
+  canExportManifest,
 }: {
   category: DataCategory;
   depth?: number;
   onAdded: () => void;
+  canExportManifest: boolean;
 }) {
   const { t, isRtl, lang } = useLang();
   const r = t.retention;
@@ -742,6 +744,15 @@ function CategoryRow({
         >
           Relationships
         </button>
+        {canExportManifest && (
+          <a
+            href={`/api/retention/categories/${category.categoryId}/manifest/download`}
+            className="opacity-0 group-hover:opacity-100 text-[10px] text-brand-purple"
+            title="Download this category's retention configuration as a JSON manifest for an external automation process"
+          >
+            {r.exportManifest}
+          </a>
+        )}
         {depth === 0 && (
           <button
             className="opacity-0 group-hover:opacity-100 text-[10px] text-brand-purple"
@@ -784,7 +795,7 @@ function CategoryRow({
 
       {/* Children */}
       {open && category.children?.map((child) => (
-        <CategoryRow key={child.categoryId} category={child} depth={depth + 1} onAdded={onAdded} />
+        <CategoryRow key={child.categoryId} category={child} depth={depth + 1} onAdded={onAdded} canExportManifest={canExportManifest} />
       ))}
     </div>
   );
@@ -792,9 +803,10 @@ function CategoryRow({
 
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
-export function DataCategoriesTab() {
+export function DataCategoriesTab({ userRole }: { userRole?: string }) {
   const { t } = useLang();
   const r = t.retention;
+  const canExportManifest = userRole === "ADMIN" || userRole === "OFFICER";
   const [categories, setCategories] = useState<DataCategory[] | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", sensitivity: "INTERNAL", description: "" });
@@ -828,9 +840,20 @@ export function DataCategoriesTab() {
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-ink">{r.categoriesTitle}</h2>
-          <button className="btn-primary text-[12px]" onClick={() => setShowAdd((v) => !v)}>
-            + {r.addCategory}
-          </button>
+          <div className="flex items-center gap-2">
+            {canExportManifest && (
+              <a
+                href="/api/retention/manifest/download"
+                className="btn-secondary text-[12px]"
+                title="Download every scheduled category's retention configuration as one JSON manifest for an external automation process"
+              >
+                {r.downloadAllManifests}
+              </a>
+            )}
+            <button className="btn-primary text-[12px]" onClick={() => setShowAdd((v) => !v)}>
+              + {r.addCategory}
+            </button>
+          </div>
         </div>
 
         {showAdd && (
@@ -865,7 +888,7 @@ export function DataCategoriesTab() {
         ) : (
           <div className="divide-y divide-line-soft">
             {categories.map((cat) => (
-              <CategoryRow key={cat.categoryId} category={cat} onAdded={load} />
+              <CategoryRow key={cat.categoryId} category={cat} onAdded={load} canExportManifest={canExportManifest} />
             ))}
           </div>
         )}

@@ -933,6 +933,8 @@ export const ar: I18nStrings = {
     schedules:          "الجداول الزمنية",
     entities:           "الكيانات",
     noCategories:       "لم يتم تحديد فئات بعد",
+    exportManifest:     "تصدير ملف التكوين",
+    downloadAllManifests: "تنزيل الكل (JSON)",
     schedulesTitle:     "جداول الاحتفاظ",
     addSchedule:        "إضافة جدول",
     jurisdiction:       "الاختصاص القضائي",
