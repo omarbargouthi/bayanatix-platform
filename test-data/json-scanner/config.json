@@ -1,0 +1,11 @@
+{
+  "app_name": "Bayanatix Demo",
+  "version": "1.4.2",
+  "maintenance_mode": false,
+  "max_upload_mb": 25,
+  "supported_locales": ["en", "ar"],
+  "feature_flags": {
+    "json_scanner": true,
+    "legal_hold": true
+  }
+}

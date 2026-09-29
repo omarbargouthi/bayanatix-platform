@@ -1,0 +1,15 @@
+{
+  "users": [
+    { "user_id": 101, "username": "jdoe", "role": "admin", "last_login": "2026-09-01T10:15:00Z" },
+    { "user_id": 102, "username": "asmith", "role": "viewer", "last_login": "2026-09-10T08:30:00Z" }
+  ],
+  "orders": [
+    { "order_id": "ORD-1001", "user_id": 101, "amount": 89.99, "status": "shipped" },
+    { "order_id": "ORD-1002", "user_id": 102, "amount": 15.00, "status": "pending" },
+    { "order_id": "ORD-1003", "user_id": 101, "amount": 210.75, "status": "cancelled" }
+  ],
+  "export_meta": {
+    "generated_at": "2026-09-29T00:00:00Z",
+    "source_system": "legacy-crm"
+  }
+}

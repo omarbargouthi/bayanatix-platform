@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "Alice Johnson",
+    "email": "alice@example.com",
+    "active": true,
+    "signup_date": "2024-01-15",
+    "lifetime_value": 1250.50,
+    "tags": ["vip", "early-adopter"]
+  },
+  {
+    "id": 2,
+    "name": "Bob Smith",
+    "email": "bob@example.com",
+    "active": true,
+    "signup_date": "2024-03-22",
+    "lifetime_value": 340.00
+  },
+  {
+    "id": 3,
+    "name": "Carla Diaz",
+    "email": null,
+    "active": false,
+    "signup_date": "2023-11-02",
+    "lifetime_value": 0,
+    "tags": ["churned"],
+    "notes": {
+      "reason": "price",
+      "followed_up": false
+    }
+  }
+]
