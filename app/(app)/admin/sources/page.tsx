@@ -928,14 +928,24 @@ export default function DataSourcesPage() {
                           : null;
                         return (
                           <div key={job.jobId} className="border border-line rounded-lg overflow-hidden">
-                            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-canvas-soft text-sm"
-                              onClick={() => toggleJobLogs(job.jobId)}>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusStyle[job.status] ?? "bg-gray-100 text-gray-600"}`}>{job.status}</span>
-                              <span className="text-muted text-xs">{new Date(job.startedAt).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
-                              {dur && <span className="text-muted text-xs">({dur})</span>}
-                              <span className="text-xs text-ink ml-auto">{job.tableCount} tables · {job.columnCount} cols</span>
-                              <span className="text-muted text-xs">{expandedJobId === job.jobId ? "▲" : "▼"}</span>
-                            </button>
+                            <div className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-canvas-soft text-sm">
+                              <button className="flex items-center gap-3 text-left flex-1 min-w-0" onClick={() => toggleJobLogs(job.jobId)}>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusStyle[job.status] ?? "bg-gray-100 text-gray-600"}`}>{job.status}</span>
+                                <span className="text-muted text-xs">{new Date(job.startedAt).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+                                {dur && <span className="text-muted text-xs">({dur})</span>}
+                                <span className="text-xs text-ink">{job.tableCount} tables · {job.columnCount} cols</span>
+                              </button>
+                              <a
+                                href={`/api/admin/crawl-jobs/${job.jobId}/download-log`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] text-brand-purple hover:underline shrink-0"
+                              >
+                                Download Log
+                              </a>
+                              <button onClick={() => toggleJobLogs(job.jobId)} className="text-muted text-xs shrink-0">
+                                {expandedJobId === job.jobId ? "▲" : "▼"}
+                              </button>
+                            </div>
                             {expandedJobId === job.jobId && (
                               <div className="bg-gray-950 px-4 py-3 font-mono text-[11px] max-h-48 overflow-y-auto">
                                 {!jobLogs.has(job.jobId) && <div className="text-gray-400">Loading…</div>}

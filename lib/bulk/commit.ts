@@ -10,7 +10,7 @@
 import { sql } from "../db";
 import { logCreate, logUpdate } from "../audit";
 import { updateJobProgress } from "../queries/bulk-jobs";
-import { updateDataSource, updateEntity, updateAttribute } from "../queries/catalog";
+import { updateDataSource, updateSchema, updateEntity, updateAttribute } from "../queries/catalog";
 import { supersedePendingSuggestions } from "../queries/enrichment-descriptions";
 import { createInstance, updateInstance, createLink } from "../queries/custom-assets";
 import { getCustomAttributeValues, saveCustomAttributeValues, listCustomAttributeDefinitions } from "../queries/custom-attributes";
@@ -132,6 +132,14 @@ async function applyDataSourceCreate(plan: RowPlan, userId: string): Promise<num
   ]);
   await saveExtendedAttributesFromPayload("DataSources", row.id, p, userId);
   return row.id;
+}
+
+async function applySchemaRow(plan: RowPlan, userId: string): Promise<void> {
+  const [current] = await sql<{ description: string | null }[]>`
+    SELECT description_text AS description FROM bayanat.data_schemas WHERE schema_id = ${plan.assetId}
+  `;
+  const description = changeVal(plan, "description") ?? current?.description ?? "";
+  await updateSchema(plan.assetId!, userId, description ?? "");
 }
 
 async function applyTableRow(plan: RowPlan, userId: string): Promise<void> {
@@ -337,6 +345,7 @@ export async function commitPlans(jobId: number, plans: RowPlan[], opts: CommitO
 
 async function applyRow(plan: RowPlan, userId: string): Promise<void> {
   if (plan.sheet === "DataSources") return applyDataSourceRow(plan, userId);
+  if (plan.sheet === "Schemas") return applySchemaRow(plan, userId);
   if (plan.sheet === "Tables") return applyTableRow(plan, userId);
   if (plan.sheet === "Columns") return applyColumnRow(plan, userId);
   if (plan.sheet === "BusinessTerms") return applyTermUpdate(plan, userId);

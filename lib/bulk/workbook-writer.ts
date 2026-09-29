@@ -8,7 +8,7 @@ import { loadEnumValues, loadExistingTagNames, loadExistingTermNames } from "./e
 import { loadExtendedFieldsBySheet, EXT_FIELD_PREFIX } from "./extended-fields";
 import type { SheetRows } from "./scope-resolver";
 
-const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
+const SHEET_ORDER: SheetName[] = ["DataSources", "Schemas", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
 
 const HEADER_FILL: Record<FieldDef["kind"], string> = {
   SYSTEM: "FFD9D9D9",     // grey — locked

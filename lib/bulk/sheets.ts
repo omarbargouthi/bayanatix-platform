@@ -4,7 +4,7 @@
 // The reader matches columns by HEADER TEXT, not position, so a user reordering
 // columns in Excel doesn't break the round-trip.
 
-export type SheetName = "DataSources" | "Tables" | "Columns" | "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
+export type SheetName = "DataSources" | "Schemas" | "Tables" | "Columns" | "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
 export type FieldKind = "SYSTEM" | "EDITABLE" | "REFERENCE";
 export type FieldType = "TEXT" | "LONGTEXT" | "ENUM" | "BOOLEAN" | "TAGS" | "TERM" | "NUMBER";
 export type EnumSource = "TABLE_CATEGORY" | "COLUMN_TYPE" | "CLASSIFICATION" | "PI_CATEGORY";
@@ -38,6 +38,13 @@ export const DATA_SOURCES_FIELDS: FieldDef[] = [
   { key: "description", header: "Description", kind: "EDITABLE", type: "LONGTEXT", maxLength: 2000 },
   { key: "businessAppName", header: "Business App Name", kind: "EDITABLE", type: "TEXT", maxLength: 200 },
   REF("schemaCount", "Schema Count", "NUMBER"), REF("tableCount", "Table Count", "NUMBER"),
+];
+
+export const SCHEMAS_FIELDS: FieldDef[] = [
+  SYS("_ID", "_ID"), SYS("_TYPE", "_TYPE"),
+  SYS("sourceName", "Source"), SYS("schemaName", "Schema Name"),
+  { key: "description", header: "Description", kind: "EDITABLE", type: "LONGTEXT", maxLength: 2000 },
+  REF("tableCount", "Table Count", "NUMBER"),
 ];
 
 export const TABLES_FIELDS: FieldDef[] = [
@@ -114,6 +121,7 @@ export const CUSTOM_ASSET_LINKS_FIELDS: FieldDef[] = [
 export function getFieldsForSheet(sheet: SheetName, extended: FieldDef[] = []): FieldDef[] {
   const base =
     sheet === "DataSources" ? DATA_SOURCES_FIELDS :
+    sheet === "Schemas" ? SCHEMAS_FIELDS :
     sheet === "Tables" ? TABLES_FIELDS :
     sheet === "Columns" ? COLUMNS_FIELDS :
     sheet === "BusinessTerms" ? BUSINESS_TERMS_FIELDS :
@@ -124,6 +132,7 @@ export function getFieldsForSheet(sheet: SheetName, extended: FieldDef[] = []): 
 
 export const SHEET_ASSET_TYPE: Record<SheetName, string> = {
   DataSources: "DATA_SOURCES",
+  Schemas: "DATA_SCHEMAS",
   Tables: "DATA_ENTITIES",
   Columns: "DATA_ATTRIBUTES",
   BusinessTerms: "BUSINESS_TERMS",

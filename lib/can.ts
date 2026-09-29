@@ -48,13 +48,13 @@ export async function canEditMetadata(session: SessionUser): Promise<boolean> {
  */
 export async function canEditAsset(
   session: SessionUser,
-  assetType: "DATA_ENTITIES" | "DATA_ATTRIBUTES" | "DATA_SOURCES",
+  assetType: "DATA_ENTITIES" | "DATA_ATTRIBUTES" | "DATA_SOURCES" | "DATA_SCHEMAS",
   assetId: number,
 ): Promise<boolean> {
   if (session.role === "ADMIN" || session.role === "STEWARD") return true;
 
   let entityId: number | null = assetType === "DATA_ENTITIES" ? assetId : null;
-  let schemaId: number | null = null;
+  let schemaId: number | null = assetType === "DATA_SCHEMAS" ? assetId : null;
   let dataSourceId: number | null = assetType === "DATA_SOURCES" ? assetId : null;
 
   if (assetType === "DATA_ATTRIBUTES") {
@@ -62,6 +62,12 @@ export async function canEditAsset(
       SELECT entity_id AS "entityId" FROM bayanat.data_attributes WHERE attribute_id = ${assetId}
     `;
     entityId = row?.entityId ?? null;
+  }
+  if (assetType === "DATA_SCHEMAS") {
+    const [row] = await sql<{ dataSourceId: number | null }[]>`
+      SELECT data_source_id AS "dataSourceId" FROM bayanat.data_schemas WHERE schema_id = ${schemaId}
+    `;
+    dataSourceId = row?.dataSourceId ?? null;
   }
   if (entityId != null) {
     const [row] = await sql<{ schemaId: number | null; dataSourceId: number | null }[]>`

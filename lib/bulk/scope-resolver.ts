@@ -18,7 +18,7 @@ import type { SessionUser } from "../types";
 export type CreatableSheetName = "DataSources" | "BusinessTerms" | "CustomAssets" | "CustomAssetLinks";
 
 export type DownloadScope =
-  | { type: "DATA_SOURCE"; dataSourceId: number; includeTables?: boolean; includeColumns?: boolean }
+  | { type: "DATA_SOURCE"; dataSourceId: number; includeSchemas?: boolean; includeTables?: boolean; includeColumns?: boolean }
   | { type: "SELECTED"; entityIds?: number[]; attributeIds?: number[]; includeColumns?: boolean }
   | { type: "SEARCH_RESULTS"; refs: { assetType: string; assetId: number }[] }
   | { type: "BUSINESS_TERMS_ALL" }
@@ -42,6 +42,26 @@ async function fetchDataSourceRows(dataSourceIds: number[]): Promise<Record<stri
     WHERE ds.data_source_id = ANY(${dataSourceIds})
     ORDER BY ds.source_name_text
   `;
+}
+
+async function fetchSchemaRows(schemaIds: number[]): Promise<Record<string, unknown>[]> {
+  if (schemaIds.length === 0) return [];
+  return sql<Record<string, unknown>[]>`
+    SELECT
+      s.schema_id AS "_ID", 'DATA_SCHEMAS' AS "_TYPE",
+      ds.source_name_text AS "sourceName", s.schema_name_text AS "schemaName",
+      s.description_text AS description,
+      (SELECT count(*)::int FROM bayanat.data_entities e WHERE e.schema_id = s.schema_id) AS "tableCount"
+    FROM bayanat.data_schemas s
+    JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
+    WHERE s.schema_id = ANY(${schemaIds})
+    ORDER BY ds.source_name_text, s.schema_name_text
+  `;
+}
+
+async function resolveSchemaIdsForSource(dataSourceId: number): Promise<number[]> {
+  const rows = await sql<{ id: number }[]>`SELECT schema_id AS id FROM bayanat.data_schemas WHERE data_source_id = ${dataSourceId}`;
+  return rows.map((r) => r.id);
 }
 
 async function fetchTableRows(entityIds: number[]): Promise<Record<string, unknown>[]> {
@@ -223,6 +243,10 @@ export async function resolveDownloadScope(scope: DownloadScope, opts?: { includ
 
   if (scope.type === "DATA_SOURCE") {
     result.DataSources = await fetchDataSourceRows([scope.dataSourceId]);
+    if (scope.includeSchemas) {
+      const schemaIds = await resolveSchemaIdsForSource(scope.dataSourceId);
+      result.Schemas = await fetchSchemaRows(schemaIds);
+    }
     if (scope.includeTables || scope.includeColumns) {
       const entityIds = await resolveEntityIdsForSource(scope.dataSourceId);
       result.Tables = await fetchTableRows(entityIds);

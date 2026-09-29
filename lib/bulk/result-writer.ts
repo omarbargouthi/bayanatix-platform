@@ -8,7 +8,7 @@ import { loadExtendedFieldsBySheet } from "./extended-fields";
 import type { RowPlan } from "./validate";
 import type { ParsedWorkbook } from "./workbook-reader";
 
-const SHEET_ORDER: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
+const SHEET_ORDER: SheetName[] = ["DataSources", "Schemas", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
 
 export async function buildResultWorkbook(plans: RowPlan[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();

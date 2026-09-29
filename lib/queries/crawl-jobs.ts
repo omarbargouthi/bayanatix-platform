@@ -135,6 +135,13 @@ export async function listCrawlJobs(
   `;
 }
 
+export async function getCrawlJob(jobId: number): Promise<CrawlJob | null> {
+  const [row] = await sql<CrawlJob[]>`
+    SELECT ${JOB_COLS} FROM bayanat.crawl_jobs WHERE job_id = ${jobId}
+  `;
+  return row ?? null;
+}
+
 /**
  * Return all log rows for a job in chronological order.
  */

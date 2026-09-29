@@ -14,7 +14,7 @@ export type ParsedWorkbook = {
   sheets: Partial<Record<SheetName, ParsedRow[]>>;
 };
 
-const SHEET_NAMES: SheetName[] = ["DataSources", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
+const SHEET_NAMES: SheetName[] = ["DataSources", "Schemas", "Tables", "Columns", "BusinessTerms", "CustomAssets", "CustomAssetLinks"];
 
 function cellText(value: ExcelJS.CellValue): string {
   if (value == null) return "";

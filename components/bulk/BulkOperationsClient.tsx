@@ -25,6 +25,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [customRelTypes, setCustomRelTypes] = useState<CustomRelTypeOption[]>([]);
   const [downloadKind, setDownloadKind] = useState<"SOURCE" | "TERMS_ALL" | "TERMS_DOMAIN" | "CUSTOM_TYPE" | "CUSTOM_REL_TYPE" | "EMPTY_TEMPLATE">("SOURCE");
   const [sourceId, setSourceId] = useState<number | "">("");
+  const [includeSchemas, setIncludeSchemas] = useState(true);
   const [includeTables, setIncludeTables] = useState(true);
   const [includeColumns, setIncludeColumns] = useState(true);
   const [domainId, setDomainId] = useState<number | "">("");
@@ -48,7 +49,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
     setDownloading(true); setDownloadError(null); setDownloadJobId(null);
     try {
       const scope =
-        downloadKind === "SOURCE" ? { type: "DATA_SOURCE", dataSourceId: sourceId, includeTables, includeColumns }
+        downloadKind === "SOURCE" ? { type: "DATA_SOURCE", dataSourceId: sourceId, includeSchemas, includeTables, includeColumns }
         : downloadKind === "TERMS_ALL" ? { type: "BUSINESS_TERMS_ALL" }
         : downloadKind === "TERMS_DOMAIN" ? { type: "BUSINESS_TERMS_DOMAIN", domainId }
         : downloadKind === "CUSTOM_TYPE" ? { type: "CUSTOM_ASSETS_BY_TYPE", typeId: customTypeId }
@@ -170,6 +171,9 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
               {sources.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.dbType})</option>)}
             </select>
             <div className="flex items-center gap-4 flex-wrap">
+              <label className="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" checked={includeSchemas} onChange={(e) => setIncludeSchemas(e.target.checked)} /> Include Schemas
+              </label>
               <label className="flex items-center gap-1.5 text-sm">
                 <input type="checkbox" checked={includeTables} onChange={(e) => { setIncludeTables(e.target.checked); if (!e.target.checked) setIncludeColumns(false); }} /> Include Tables
               </label>

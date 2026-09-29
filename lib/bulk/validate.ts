@@ -84,6 +84,14 @@ async function fetchCurrentDataSources(ids: number[]): Promise<Map<number, Recor
   return new Map(rows.map((r) => [r.id, { description: r.description, businessAppName: r.businessAppName }]));
 }
 
+async function fetchCurrentSchemas(ids: number[]): Promise<Map<number, Record<string, string | null>>> {
+  if (ids.length === 0) return new Map();
+  const rows = await sql<{ id: number; description: string | null }[]>`
+    SELECT schema_id AS id, description_text AS description FROM bayanat.data_schemas WHERE schema_id = ANY(${ids})
+  `;
+  return new Map(rows.map((r) => [r.id, { description: r.description }]));
+}
+
 async function fetchCurrentTables(ids: number[]): Promise<Map<number, Record<string, string | null>>> {
   if (ids.length === 0) return new Map();
   const rows = await sql<{ id: number; friendlyName: string | null; description: string | null; category: string | null; tags: string | null }[]>`
@@ -228,7 +236,7 @@ export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOpt
   const canCreateTags = await canEditMetadata(opts.session);
   const extendedFields = await loadExtendedFieldsBySheet();
 
-  for (const sheet of ["DataSources", "Tables", "Columns"] as SheetName[]) {
+  for (const sheet of ["DataSources", "Schemas", "Tables", "Columns"] as SheetName[]) {
     const rows = parsed.sheets[sheet];
     if (!rows) continue;
     const assetType = SHEET_ASSET_TYPE[sheet];
@@ -236,6 +244,7 @@ export async function validateWorkbook(parsed: ParsedWorkbook, opts: ValidateOpt
     const ids = rows.map((r) => toNum(r.values._ID)).filter((n): n is number => n != null);
     const currentMap =
       sheet === "DataSources" ? await fetchCurrentDataSources(ids) :
+      sheet === "Schemas" ? await fetchCurrentSchemas(ids) :
       sheet === "Tables" ? await fetchCurrentTables(ids) :
       await fetchCurrentColumns(ids);
     await mergeExtendedIntoCurrentMap(sheet, currentMap, extendedFields[sheet]);
@@ -291,7 +300,7 @@ async function validateSimpleRow(
   const idNum = toNum(row.values._ID);
 
   if (idNum == null) {
-    errors.push("_ID is missing or not a number (Tables/Columns are crawler-discovered and can't be bulk-created)");
+    errors.push("_ID is missing or not a number (Tables/Columns/Schemas are crawler-discovered and can't be bulk-created)");
     return { sheet, rowNumber: row.rowNumber, assetType, assetId: null, isCreate: false, outcome: "ERROR", changes: [], errors, warnings };
   }
   const current = currentMap.get(idNum);
@@ -300,7 +309,7 @@ async function validateSimpleRow(
     return { sheet, rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "ERROR", changes: [], errors, warnings };
   }
 
-  const canEdit = await canEditAsset(opts.session, assetType as "DATA_ENTITIES" | "DATA_ATTRIBUTES" | "DATA_SOURCES", idNum);
+  const canEdit = await canEditAsset(opts.session, assetType as "DATA_ENTITIES" | "DATA_ATTRIBUTES" | "DATA_SOURCES" | "DATA_SCHEMAS", idNum);
   if (!canEdit) {
     errors.push("You don't have edit permission on this asset");
     return { sheet, rowNumber: row.rowNumber, assetType, assetId: idNum, isCreate: false, outcome: "ERROR", changes: [], errors, warnings };
