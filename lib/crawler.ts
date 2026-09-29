@@ -587,6 +587,7 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
 const FILE_EXTENSIONS: Record<string, string[]> = {
   CSV:   [".csv"],
   EXCEL: [".xlsx", ".xls", ".xlsm"],
+  JSON:  [".json"],
 };
 
 // CSV carries no cell-type metadata at all — every value XLSX hands back for a
@@ -594,14 +595,18 @@ const FILE_EXTENSIONS: Record<string, string[]> = {
 // back real JS number/boolean/Date values for typed cells, but a column can
 // still mix genuinely-typed cells with text ones. So every value is classified
 // by inspecting its actual JS type first, falling back to pattern-matching the
-// string form — this handles both sources through one path.
-type ValueKind = "int" | "num" | "bool" | "date" | "text" | "null";
+// string form — this handles both sources through one path. JSON adds a fourth
+// possibility CSV/Excel cells never produce: a nested object or array value —
+// classified as its own "json" kind rather than stringified and matched against
+// the text patterns below.
+type ValueKind = "int" | "num" | "bool" | "date" | "text" | "json" | "null";
 
 function detectValueKind(raw: unknown): ValueKind {
   if (raw === null || raw === undefined) return "null";
   if (typeof raw === "number") return Number.isInteger(raw) ? "int" : "num";
   if (typeof raw === "boolean") return "bool";
   if (raw instanceof Date) return "date";
+  if (typeof raw === "object") return "json";
   const s = String(raw).trim();
   if (s === "") return "null";
   if (/^(true|false)$/i.test(s)) return "bool";
@@ -623,7 +628,7 @@ function inferColumnsFromRows(headers: string[], rows: unknown[][]): { name: str
     let dataType = "text";
     if (kinds.size === 1) {
       const only = [...kinds][0];
-      dataType = only === "int" ? "integer" : only === "num" ? "numeric" : only === "bool" ? "boolean" : only === "date" ? "date" : "text";
+      dataType = only === "int" ? "integer" : only === "num" ? "numeric" : only === "bool" ? "boolean" : only === "date" ? "date" : only === "json" ? "json" : "text";
     } else if (kinds.size > 0 && [...kinds].every(k => k === "int" || k === "num")) {
       dataType = "numeric"; // mixed whole numbers and decimals — numeric is the common supertype
     }
@@ -637,7 +642,7 @@ function profileFileColumn(rows: unknown[][], idx: number, sampleSize: number): 
   for (const row of rows) {
     const v = row[idx];
     if (v === null || v === undefined || v === "") { nullCount++; continue; }
-    const s = v instanceof Date ? v.toISOString().slice(0, 10) : String(v);
+    const s = v instanceof Date ? v.toISOString().slice(0, 10) : typeof v === "object" ? JSON.stringify(v) : String(v);
     counts.set(s, (counts.get(s) ?? 0) + 1);
   }
   const sortedVals = [...counts.keys()].sort();
@@ -732,6 +737,101 @@ async function crawlFile(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
 
       tables.push({ name: tableName, isView: false, columns, comment: null, rowCount: dataRows.length, sampleSize });
       await logger.info(`  → ${tableName}: ${columns.length} columns, ${dataRows.length} rows`);
+    }
+  }
+
+  return summarise(tables.length > 0 ? [{ name: schemaName, tables }] : []);
+}
+
+// ── JSON ──────────────────────────────────────────────────────────────────────
+
+function isArrayOfObjects(v: unknown): v is Record<string, unknown>[] {
+  return Array.isArray(v) && v.length > 0 && v.every(x => x !== null && typeof x === "object" && !Array.isArray(x));
+}
+
+function unionKeys(records: Record<string, unknown>[]): string[] {
+  const keys = new Set<string>();
+  for (const r of records) for (const k of Object.keys(r)) keys.add(k);
+  return [...keys];
+}
+
+// One JSON file can resolve to one or more tables:
+//  - a top-level array of objects → one table, each element a row
+//  - a top-level object whose values include array-of-object fields (e.g.
+//    {"users":[...],"orders":[...]}, a common "nested export" shape) → one
+//    table per such key, named "<fileBase>_<key>" — mirrors how a multi-sheet
+//    Excel workbook becomes one table per sheet in crawlFile above
+//  - anything else (a flat/nested single object, a bare array of scalars, or
+//    a bare scalar) → one table with exactly one row, so the file is still
+//    represented rather than silently skipped
+function resolveJsonTables(fileBase: string, parsed: unknown): { tableName: string; records: Record<string, unknown>[] }[] {
+  if (isArrayOfObjects(parsed)) {
+    return [{ tableName: fileBase, records: parsed }];
+  }
+  if (Array.isArray(parsed)) {
+    return [{ tableName: fileBase, records: parsed.map(v => ({ value: v })) }];
+  }
+  if (parsed !== null && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    const arrayKeys = Object.keys(obj).filter(k => isArrayOfObjects(obj[k]));
+    if (arrayKeys.length > 0) {
+      return arrayKeys.map(k => ({ tableName: `${fileBase}_${k}`, records: obj[k] as Record<string, unknown>[] }));
+    }
+    return [{ tableName: fileBase, records: [obj] }];
+  }
+  return [{ tableName: fileBase, records: [{ value: parsed }] }];
+}
+
+async function crawlJson(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLogger): Promise<CrawlResult> {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  if (!cfg.hostAddress) throw new Error("File or directory path is required");
+  const { files, schemaName } = listSourceFiles(fs, path, cfg.hostAddress, cfg.dbTypeCode);
+  await logger.info(`Found ${files.length} JSON file(s) at ${cfg.hostAddress}`);
+
+  if (!schemaIncluded(schemaName, config)) {
+    await logger.info(`Skipping schema: ${schemaName} (excluded by config)`);
+    return summarise([]);
+  }
+
+  const tables: CrawlTable[] = [];
+
+  for (const filePath of files) {
+    const fileBase = path.basename(filePath, path.extname(filePath));
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    } catch (e) {
+      await logger.warn(`  Failed to read/parse ${filePath}: ${(e as Error).message}`);
+      continue;
+    }
+
+    for (const { tableName, records } of resolveJsonTables(fileBase, parsed)) {
+      if (!tableIncluded(tableName, config)) continue;
+      if (records.length === 0) { await logger.warn(`  ${tableName}: no records, skipped`); continue; }
+
+      const headers = unionKeys(records);
+      const grid: unknown[][] = records.map(r => headers.map(h => r[h] ?? null));
+
+      const inferred = inferColumnsFromRows(headers, grid);
+      const columns: CrawlColumn[] = inferred.map(c => ({
+        name: c.name, dataType: c.dataType, isNullable: c.isNullable,
+        isPrimaryKey: false, isForeignKey: false, defaultValue: null, comment: null,
+      }));
+
+      let sampleSize: number | undefined;
+      if (config?.profilingEnabled) {
+        const limit = config.profilingMode === "FULL" ? grid.length
+          : config.profilingMode === "TOP_PCT" ? Math.ceil(grid.length * (config.profilingLimit / 100))
+          : Math.min(config.profilingLimit, grid.length);
+        const sampleRows = grid.slice(0, limit);
+        sampleSize = sampleRows.length;
+        columns.forEach((col, idx) => { col.profile = profileFileColumn(sampleRows, idx, sampleSize!); });
+      }
+
+      tables.push({ name: tableName, isView: false, columns, comment: null, rowCount: grid.length, sampleSize });
+      await logger.info(`  → ${tableName}: ${columns.length} columns, ${grid.length} rows`);
     }
   }
 
@@ -885,14 +985,15 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
     if (cfg.dbTypeCode === "ORACLE") {
       return { ok: false, message: "Oracle: install oracledb native driver (npm install oracledb) + Oracle Instant Client" };
     }
-    if (cfg.dbTypeCode === "CSV" || cfg.dbTypeCode === "EXCEL") {
+    if (cfg.dbTypeCode === "CSV" || cfg.dbTypeCode === "EXCEL" || cfg.dbTypeCode === "JSON") {
       const fs = await import("node:fs");
       const path = await import("node:path");
       if (!cfg.hostAddress) return { ok: false, message: "File or directory path is required" };
       const { files } = listSourceFiles(fs, path, cfg.hostAddress, cfg.dbTypeCode);
+      const extLabel = cfg.dbTypeCode === "CSV" ? ".csv" : cfg.dbTypeCode === "JSON" ? ".json" : ".xlsx/.xls";
       return files.length > 0
         ? { ok: true, message: `Found ${files.length} ${cfg.dbTypeCode} file(s)` }
-        : { ok: false, message: `No ${cfg.dbTypeCode === "CSV" ? ".csv" : ".xlsx/.xls"} files found at that path` };
+        : { ok: false, message: `No ${extLabel} files found at that path` };
     }
     return { ok: false, message: `Unknown DB type: ${cfg.dbTypeCode}` };
   } catch (e: unknown) {
@@ -1407,6 +1508,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     else if (cfgRow.dbTypeCode === "MSSQL")    result = await crawlMssql(cfgRow, config, logger);
     else if (cfgRow.dbTypeCode === "ORACLE")   result = await crawlOracle(cfgRow, config, logger);
     else if (cfgRow.dbTypeCode === "CSV" || cfgRow.dbTypeCode === "EXCEL") result = await crawlFile(cfgRow, config, logger);
+    else if (cfgRow.dbTypeCode === "JSON") result = await crawlJson(cfgRow, config, logger);
     else throw new Error(`Unsupported DB type: ${cfgRow.dbTypeCode}`);
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);

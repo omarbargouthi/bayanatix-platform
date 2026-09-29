@@ -15,11 +15,11 @@ export async function POST(req: Request) {
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
   const { connectionName, dbTypeCode, hostAddress, portNumber, databaseName, serviceName, defaultSchema, usernameText, passwordText, sslEnabled } = body;
-  const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL"];
+  const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL", "JSON"];
   if (!VALID.includes(dbTypeCode)) return NextResponse.json({ error: `dbTypeCode must be one of ${VALID.join(", ")}` }, { status: 400 });
-  // File sources (CSV/EXCEL) store their path in hostAddress and have no real port,
+  // File sources (CSV/EXCEL/JSON) store their path in hostAddress and have no real port,
   // username, or database — those fields stay null for them.
-  const isFileType = dbTypeCode === "CSV" || dbTypeCode === "EXCEL";
+  const isFileType = dbTypeCode === "CSV" || dbTypeCode === "EXCEL" || dbTypeCode === "JSON";
   if (!connectionName || !hostAddress || (!isFileType && !portNumber))
     return NextResponse.json({ error: isFileType ? "connectionName and hostAddress (file/directory path) are required" : "connectionName, dbTypeCode, hostAddress, portNumber are required" }, { status: 400 });
   const id = await createConnection({

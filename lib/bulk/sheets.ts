@@ -28,7 +28,7 @@ const REF = (key: string, header: string, type: FieldType = "TEXT"): FieldDef =>
 // Not DB-enforced (data_sources.source_type_code is a plain varchar, no CHECK
 // constraint) — this is every value already in use in this app's data, offered as
 // a constrained list so a bulk-created row can't introduce an unrecognized one.
-export const SOURCE_TYPE_VALUES = ["POSTGRES", "MSSQL", "ORACLE", "SNOWFLAKE", "CSV", "EXCEL", "POWERBI", "FABRIC"];
+export const SOURCE_TYPE_VALUES = ["POSTGRES", "MSSQL", "ORACLE", "SNOWFLAKE", "CSV", "EXCEL", "JSON", "POWERBI", "FABRIC"];
 
 export const DATA_SOURCES_FIELDS: FieldDef[] = [
   SYS("_ID", "_ID"), SYS("_TYPE", "_TYPE"),
