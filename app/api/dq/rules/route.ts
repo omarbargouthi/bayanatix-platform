@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canAccessDomain, canCreateDqRule } from "@/lib/can";
 import { getDqRules, createDqRule } from "@/lib/queries/dq";
+import { isValidCronExpression } from "@/lib/scheduler-utils";
 
 export async function GET(req: NextRequest) {
   const user = await getSession();
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   if (!(await canCreateDqRule(user, body.assetTypeCode, Number(body.assetId)))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (body.scheduleCron && !isValidCronExpression(body.scheduleCron)) {
+    return NextResponse.json({ error: "Invalid cron expression" }, { status: 400 });
   }
 
   const ruleId = await createDqRule({

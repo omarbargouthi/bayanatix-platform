@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canCreateDqRule } from "@/lib/can";
 import { getDqRuleById, updateDqRule, deleteDqRule, getDqResults } from "@/lib/queries/dq";
+import { isValidCronExpression } from "@/lib/scheduler-utils";
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const user = await getSession();
@@ -28,6 +29,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
+  if (body.scheduleCron && !isValidCronExpression(body.scheduleCron)) {
+    return NextResponse.json({ error: "Invalid cron expression" }, { status: 400 });
+  }
   await updateDqRule(ruleId, body);
   return NextResponse.json({ ok: true });
 }

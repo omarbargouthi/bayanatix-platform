@@ -13,6 +13,10 @@ export type CrawlConfig = {
   defaultOwnerUserId:   string | null;
   defaultBizStewardId:  string | null;
   defaultTechStewardId: string | null;
+  // Standard 5-field cron expression — checked by /api/admin/sources/scheduled-crawl
+  // (a standalone node-cron process ticks that route, same convention as the
+  // existing PBIX scheduler). Null = manual crawl only, no automatic schedule.
+  scheduleCron: string | null;
 };
 
 export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig> {
@@ -26,7 +30,8 @@ export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig>
            profiling_limit   AS "profilingLimit",
            default_owner_user_id   AS "defaultOwnerUserId",
            default_biz_steward_id  AS "defaultBizStewardId",
-           default_tech_steward_id AS "defaultTechStewardId"
+           default_tech_steward_id AS "defaultTechStewardId",
+           schedule_cron            AS "scheduleCron"
     FROM bayanat.crawl_config WHERE connection_id = ${connectionId}
   `;
   return rows[0] ?? {
@@ -34,6 +39,7 @@ export async function getCrawlConfig(connectionId: number): Promise<CrawlConfig>
     schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
     profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
     defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null,
+    scheduleCron: null,
   };
 }
 
@@ -46,7 +52,7 @@ export async function saveCrawlConfig(
       (connection_id, schema_include_list, schema_exclude_list, table_exclude_patterns,
        profiling_enabled, profiling_mode, profiling_limit,
        default_owner_user_id, default_biz_steward_id, default_tech_steward_id,
-       updated_at)
+       schedule_cron, updated_at)
     VALUES
       (${connectionId},
        ${cfg.schemaIncludeList ?? null},
@@ -58,6 +64,7 @@ export async function saveCrawlConfig(
        ${cfg.defaultOwnerUserId   ?? null},
        ${cfg.defaultBizStewardId  ?? null},
        ${cfg.defaultTechStewardId ?? null},
+       ${cfg.scheduleCron ?? null},
        NOW())
     ON CONFLICT (connection_id) DO UPDATE SET
       schema_include_list       = EXCLUDED.schema_include_list,
@@ -69,6 +76,7 @@ export async function saveCrawlConfig(
       default_owner_user_id     = EXCLUDED.default_owner_user_id,
       default_biz_steward_id    = EXCLUDED.default_biz_steward_id,
       default_tech_steward_id   = EXCLUDED.default_tech_steward_id,
+      schedule_cron              = EXCLUDED.schedule_cron,
       updated_at                = NOW()
   `;
 }

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "node scripts/migrate.mjs",
-    "scheduler:pbix": "node scripts/pbix-scheduler.mjs"
+    "scheduler:pbix": "node scripts/pbix-scheduler.mjs",
+    "scheduler": "node scripts/scheduler.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
@@ -16,6 +17,7 @@
     "@xyflow/react": "^12.10.2",
     "bcryptjs": "2.4.3",
     "clsx": "2.1.1",
+    "cron-parser": "^5.10.1",
     "dagre": "^0.8.5",
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.1",

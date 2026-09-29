@@ -31,6 +31,7 @@ type CrawlCfg = {
   defaultOwnerUserId:   string | null;
   defaultBizStewardId:  string | null;
   defaultTechStewardId: string | null;
+  scheduleCron: string | null;
 };
 
 type UserOption = { userId: string; fullName: string | null; email: string };
@@ -113,6 +114,7 @@ const BLANK_CFG: CrawlCfg = {
   schemaIncludeList: null, schemaExcludeList: [], tableExcludePatterns: [],
   profilingEnabled: false, profilingMode: "TOP_N", profilingLimit: 1000,
   defaultOwnerUserId: null, defaultBizStewardId: null, defaultTechStewardId: null,
+  scheduleCron: null,
 };
 
 function arr2str(a: string[] | null | undefined) { return (a ?? []).join(", "); }
@@ -244,6 +246,7 @@ export default function DataSourcesPage() {
           defaultOwnerUserId:   crawlCfg.defaultOwnerUserId,
           defaultBizStewardId:  crawlCfg.defaultBizStewardId,
           defaultTechStewardId: crawlCfg.defaultTechStewardId,
+          scheduleCron:         crawlCfg.scheduleCron || null,
         }),
       });
       setCfgSaved(true);
@@ -631,6 +634,19 @@ export default function DataSourcesPage() {
                     <div>
                       <label className="block text-xs font-semibold text-ink mb-1">Exclude Table Patterns <span className="text-muted font-normal">(LIKE patterns, comma-separated)</span></label>
                       <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={cfgPatterns} onChange={e => setCfgPatterns(e.target.value)} placeholder="tmp_%, _bak, %_archive" />
+                    </div>
+                    <div className="border-t border-line pt-4">
+                      <label className="block text-xs font-semibold text-ink mb-1">Crawl Schedule <span className="text-muted font-normal">(cron expression, blank = manual only)</span></label>
+                      <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={crawlCfg.scheduleCron ?? ""} onChange={e => setCrawlCfg(c => ({ ...c, scheduleCron: e.target.value || null }))} placeholder="0 2 * * * (nightly at 2am)" />
+                      <div className="flex gap-3 mt-2">
+                        {["0 2 * * *", "0 */6 * * *", "0 6 * * 1"].map(c => (
+                          <button key={c} type="button" onClick={() => setCrawlCfg(cfg => ({ ...cfg, scheduleCron: c }))} className="text-[11px] text-brand-purple hover:underline font-mono">{c}</button>
+                        ))}
+                        {crawlCfg.scheduleCron && (
+                          <button type="button" onClick={() => setCrawlCfg(cfg => ({ ...cfg, scheduleCron: null }))} className="text-[11px] text-muted hover:underline">Clear</button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted mt-1">Requires the standalone scheduler process (scripts/scheduler.mjs) to be running — it ticks periodically and crawls any due, active connection.</p>
                     </div>
                     <div className="border-t border-line pt-4 space-y-3">
                       <div className="flex items-center gap-3">

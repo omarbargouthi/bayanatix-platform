@@ -18,6 +18,8 @@ const PUBLIC_PREFIXES = [
                             // silently redirected to /login before ever reaching the route's own "no auth" handler
   "/api/reports/cron/snapshot", // Vercel Cron — no session cookie, authenticates via its own CRON_SECRET bearer check
   "/api/lineage/pbix/scheduled-scan", // scripts/pbix-scheduler.mjs — no session cookie, same CRON_SECRET bearer check
+  "/api/admin/sources/scheduled-crawl", // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
+  "/api/dq/scheduled-run",              // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
   "/api/languages",         // login page's language picker needs this before a session exists
   "/api/translations/bundle", // same reason — non-sensitive UI copy, needed pre-auth by login + public FOI pages
 ];

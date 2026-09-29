@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getCrawlConfig, saveCrawlConfig } from "@/lib/queries/sources";
+import { isValidCronExpression } from "@/lib/scheduler-utils";
 
 type Params = { params: { id: string } };
 
@@ -15,6 +16,9 @@ export async function PUT(req: Request, { params }: Params) {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
+  if (body.scheduleCron && !isValidCronExpression(body.scheduleCron)) {
+    return NextResponse.json({ error: "Invalid cron expression" }, { status: 400 });
+  }
   await saveCrawlConfig(Number(params.id), {
     schemaIncludeList:    body.schemaIncludeList    ?? null,
     schemaExcludeList:    body.schemaExcludeList    ?? [],
@@ -25,6 +29,7 @@ export async function PUT(req: Request, { params }: Params) {
     defaultOwnerUserId:   body.defaultOwnerUserId   ?? null,
     defaultBizStewardId:  body.defaultBizStewardId  ?? null,
     defaultTechStewardId: body.defaultTechStewardId ?? null,
+    scheduleCron:         body.scheduleCron || null,
   });
   return NextResponse.json({ ok: true });
 }
