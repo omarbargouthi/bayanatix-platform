@@ -266,7 +266,7 @@ export function LegalHoldsTab() {
                     </button>
                   )}
                 </div>
-                {hold.holdScopeType === "ENTITY" && <LegalHoldEntitiesPanel holdId={hold.holdId} />}
+                {hold.holdScopeType === "ENTITY" && <LegalHoldEntitiesPanel holdId={hold.holdId} categoryIds={hold.categoryIds} />}
               </div>
             ))}
           </div>

@@ -197,11 +197,18 @@ function SchedulePanel({ category }: { category: DataCategory }) {
 
 // ── Tables panel ──────────────────────────────────────────────────────────────
 
-type ColumnResult = { attributeId: number; physicalName: string; friendlyName: string | null; isPrimaryKey: boolean; isPii: boolean };
-type CategoryEntity = {
+type ColumnResult = { attributeId: number; physicalName: string; friendlyName: string | null; dataType: string; isPrimaryKey: boolean; isPii: boolean };
+export type CategoryEntity = {
   entityId: number; entityName: string; schemaName: string; sourceName: string;
   keyAttributeId: number | null; keyAttributeName: string | null; cascadeEnabled: boolean; isMaster: boolean;
+  dateAttributeId: number | null; dateAttributeName: string | null;
 };
+
+// Loose, case-insensitive match — crawled types are inconsistent across
+// sources (date, DATE, timestamp, dateTime, datetime64[ns], ...).
+function isDateLikeColumn(dataType: string): boolean {
+  return /date|time/i.test(dataType);
+}
 
 function AssignedTableCard({ categoryId, entity, onChange }: {
   categoryId: number; entity: CategoryEntity; onChange: () => void;
@@ -210,20 +217,24 @@ function AssignedTableCard({ categoryId, entity, onChange }: {
   const [keyAttributeId, setKeyAttributeId] = useState<number | "">(entity.keyAttributeId ?? "");
   const [cascadeEnabled, setCascadeEnabled] = useState(entity.cascadeEnabled);
   const [isMaster, setIsMaster] = useState(entity.isMaster);
+  const [dateAttributeId, setDateAttributeId] = useState<number | "">(entity.dateAttributeId ?? "");
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const dirty = keyAttributeId !== (entity.keyAttributeId ?? "") || cascadeEnabled !== entity.cascadeEnabled || isMaster !== entity.isMaster;
+  const dirty = keyAttributeId !== (entity.keyAttributeId ?? "") || cascadeEnabled !== entity.cascadeEnabled
+    || isMaster !== entity.isMaster || dateAttributeId !== (entity.dateAttributeId ?? "");
 
   useEffect(() => {
     fetch(`/api/catalog/entities/${entity.entityId}/columns`).then((r) => (r.ok ? r.json() : [])).then(setColumns).catch(() => {});
   }, [entity.entityId]);
+
+  const dateColumns = columns.filter((c) => isDateLikeColumn(c.dataType));
 
   async function save() {
     setSaving(true);
     try {
       await fetch(`/api/retention/categories/${categoryId}/entities/${entity.entityId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyAttributeId: keyAttributeId || null, cascadeEnabled, isMaster }),
+        body: JSON.stringify({ keyAttributeId: keyAttributeId || null, cascadeEnabled, isMaster, dateAttributeId: dateAttributeId || null }),
       });
       onChange();
     } finally {
@@ -268,6 +279,14 @@ function AssignedTableCard({ categoryId, entity, onChange }: {
           <input type="checkbox" checked={isMaster} onChange={(e) => setIsMaster(e.target.checked)} />
           Is Master (identity root)
         </label>
+        {isMaster && (
+          <select className="input-sm text-[11px]" value={dateAttributeId} onChange={(e) => setDateAttributeId(e.target.value ? Number(e.target.value) : "")}>
+            <option value="">— Retention date column —</option>
+            {dateColumns.map((c) => (
+              <option key={c.attributeId} value={c.attributeId}>{c.friendlyName ?? c.physicalName}</option>
+            ))}
+          </select>
+        )}
         {dirty && (
           <button onClick={save} disabled={saving} className="text-[11px] text-brand-purple hover:underline font-medium">
             {saving ? "Saving…" : "Save"}

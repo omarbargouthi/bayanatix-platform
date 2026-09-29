@@ -63,14 +63,42 @@ function operatorLabel(op: ConditionOperator, family: TypeFamily): string {
     ?? OPERATORS_BY_FAMILY.TEXT.find((o) => o.value === op)?.label ?? op;
 }
 
+// A table already registered under one of the hold's categories — same
+// shape the Retention Categories "Tables" panel manages (lib/queries/
+// retention.ts's CategoryEntity) — reduced to what this modal needs.
+type RegisteredCategoryTable = {
+  entityId: number; entityName: string; schemaName: string; sourceName: string;
+  keyAttributeId: number | null; keyAttributeName: string | null;
+};
+
 function AddDrivingTableModal({
-  holdId, onClose, onAdded,
-}: { holdId: number; onClose: () => void; onAdded: () => void }) {
+  holdId, categoryIds, onClose, onAdded,
+}: { holdId: number; categoryIds: number[]; onClose: () => void; onAdded: () => void }) {
   const [entity, setEntity] = useState<EntitySearchResult | null>(null);
   const [columns, setColumns] = useState<ColumnResult[]>([]);
   const [keyAttributeId, setKeyAttributeId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [registeredTables, setRegisteredTables] = useState<RegisteredCategoryTable[] | null>(null);
+  const [showSearch, setShowSearch] = useState(categoryIds.length === 0);
+
+  useEffect(() => {
+    if (categoryIds.length === 0) { setRegisteredTables([]); return; }
+    Promise.all(categoryIds.map((id) => fetch(`/api/retention/categories/${id}/entities`).then((r) => (r.ok ? r.json() : []))))
+      .then((lists: RegisteredCategoryTable[][]) => {
+        const byEntityId = new Map<number, RegisteredCategoryTable>();
+        for (const list of lists) for (const t of list) byEntityId.set(t.entityId, t);
+        setRegisteredTables([...byEntityId.values()]);
+      })
+      .catch(() => setRegisteredTables([]));
+  }, [categoryIds]);
+
+  function selectRegistered(t: RegisteredCategoryTable) {
+    setEntity({ entityId: t.entityId, entityName: t.entityName, schemaName: t.schemaName, sourceName: t.sourceName });
+    // Pre-filled below once columns load; seed with the category's own key
+    // column immediately so it's correct even before that fetch resolves.
+    setKeyAttributeId(t.keyAttributeId ?? "");
+  }
 
   useEffect(() => {
     if (!entity) { setColumns([]); return; }
@@ -78,8 +106,11 @@ function AddDrivingTableModal({
       .then((r) => (r.ok ? r.json() : []))
       .then((cols: ColumnResult[]) => {
         setColumns(cols);
-        const pk = cols.find((c) => c.isPrimaryKey);
-        setKeyAttributeId(pk ? pk.attributeId : "");
+        setKeyAttributeId((prev) => {
+          if (prev !== "") return prev;
+          const pk = cols.find((c) => c.isPrimaryKey);
+          return pk ? pk.attributeId : "";
+        });
       })
       .catch(() => setColumns([]));
   }, [entity]);
@@ -116,8 +147,40 @@ function AddDrivingTableModal({
                 <span className="text-[12px] font-medium text-ink flex-1 truncate">{entity.entityName}</span>
                 <button onClick={() => setEntity(null)} className="text-muted hover:text-red-500 text-sm leading-none">&times;</button>
               </div>
+            ) : showSearch ? (
+              <>
+                <EntitySearchPicker onSelect={setEntity} />
+                {registeredTables !== null && registeredTables.length > 0 && (
+                  <button onClick={() => setShowSearch(false)} className="text-[11px] text-brand-purple hover:underline mt-1.5">
+                    ← Choose from this category&apos;s registered tables instead
+                  </button>
+                )}
+              </>
             ) : (
-              <EntitySearchPicker onSelect={setEntity} />
+              <>
+                {registeredTables === null ? (
+                  <div className="text-[11px] text-muted">Loading…</div>
+                ) : registeredTables.length === 0 ? (
+                  <p className="text-[11px] text-muted italic">No tables registered under this hold&apos;s category yet.</p>
+                ) : (
+                  <div className="border border-line rounded-lg divide-y divide-line-soft max-h-40 overflow-y-auto">
+                    {registeredTables.map((t) => (
+                      <button
+                        key={t.entityId} onClick={() => selectRegistered(t)}
+                        className="w-full text-left px-3 py-2 hover:bg-canvas-soft"
+                      >
+                        <div className="text-[12px] font-medium text-ink">{t.entityName}</div>
+                        <div className="text-[10px] text-muted">
+                          {t.sourceName} · {t.schemaName}{t.keyAttributeName ? ` · Key: ${t.keyAttributeName}` : ""}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setShowSearch(true)} className="text-[11px] text-brand-purple hover:underline mt-1.5">
+                  Or search all catalog tables
+                </button>
+              </>
             )}
           </div>
           {entity && (
@@ -338,7 +401,7 @@ function DrivingTableCard({ holdId, entity, onChange }: { holdId: number; entity
   );
 }
 
-export function LegalHoldEntitiesPanel({ holdId }: { holdId: number }) {
+export function LegalHoldEntitiesPanel({ holdId, categoryIds = [] }: { holdId: number; categoryIds?: number[] }) {
   const [entities, setEntities] = useState<HoldEntity[] | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -373,7 +436,7 @@ export function LegalHoldEntitiesPanel({ holdId }: { holdId: number }) {
       )}
 
       {showAdd && (
-        <AddDrivingTableModal holdId={holdId} onClose={() => setShowAdd(false)} onAdded={load} />
+        <AddDrivingTableModal holdId={holdId} categoryIds={categoryIds} onClose={() => setShowAdd(false)} onAdded={load} />
       )}
     </div>
   );

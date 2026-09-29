@@ -14,11 +14,11 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const entityId = Number(params.entityId);
   if (!Number.isFinite(entityId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  const { keyAttributeId, cascadeEnabled, isMaster } = await req.json() as {
-    keyAttributeId: number | null; cascadeEnabled: boolean; isMaster?: boolean;
+  const { keyAttributeId, cascadeEnabled, isMaster, dateAttributeId } = await req.json() as {
+    keyAttributeId: number | null; cascadeEnabled: boolean; isMaster?: boolean; dateAttributeId?: number | null;
   };
 
-  await updateCategoryEntity(entityId, keyAttributeId ?? null, !!cascadeEnabled, !!isMaster);
+  await updateCategoryEntity(entityId, keyAttributeId ?? null, !!cascadeEnabled, !!isMaster, dateAttributeId ?? null);
   return NextResponse.json({ ok: true });
 }
 

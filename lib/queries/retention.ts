@@ -11,6 +11,8 @@ export type CategoryEntity = {
   keyAttributeName: string | null;
   cascadeEnabled: boolean;
   isMaster: boolean;
+  dateAttributeId: number | null;
+  dateAttributeName: string | null;
 };
 
 export async function getCategoryEntities(categoryId: number): Promise<CategoryEntity[]> {
@@ -20,11 +22,13 @@ export async function getCategoryEntities(categoryId: number): Promise<CategoryE
       s.schema_name_text AS "schemaName", ds.source_name_text AS "sourceName",
       e.retention_key_attribute_id AS "keyAttributeId", ka.physical_name_text AS "keyAttributeName",
       e.retention_cascade_enabled AS "cascadeEnabled",
-      e.retention_is_master AS "isMaster"
+      e.retention_is_master AS "isMaster",
+      e.retention_date_attribute_id AS "dateAttributeId", da.physical_name_text AS "dateAttributeName"
     FROM bayanat.data_entities e
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
     LEFT JOIN bayanat.data_attributes ka ON ka.attribute_id = e.retention_key_attribute_id
+    LEFT JOIN bayanat.data_attributes da ON da.attribute_id = e.retention_date_attribute_id
     WHERE e.retention_category_id = ${categoryId}
     ORDER BY e.retention_is_master DESC, e.entity_name_text
   `;
@@ -44,12 +48,14 @@ export async function assignCategoryEntity(
 
 export async function updateCategoryEntity(
   entityId: number, keyAttributeId: number | null, cascadeEnabled: boolean, isMaster: boolean,
+  dateAttributeId: number | null,
 ): Promise<void> {
   await sql`
     UPDATE bayanat.data_entities SET
-      retention_key_attribute_id = ${keyAttributeId},
-      retention_cascade_enabled  = ${cascadeEnabled},
-      retention_is_master        = ${isMaster}
+      retention_key_attribute_id  = ${keyAttributeId},
+      retention_cascade_enabled   = ${cascadeEnabled},
+      retention_is_master         = ${isMaster},
+      retention_date_attribute_id = ${dateAttributeId}
     WHERE entity_id = ${entityId}
   `;
 }
@@ -57,10 +63,11 @@ export async function updateCategoryEntity(
 export async function unassignCategoryEntity(categoryId: number, entityId: number): Promise<void> {
   await sql`
     UPDATE bayanat.data_entities SET
-      retention_category_id      = NULL,
-      retention_key_attribute_id = NULL,
-      retention_cascade_enabled  = FALSE,
-      retention_is_master        = FALSE
+      retention_category_id       = NULL,
+      retention_key_attribute_id  = NULL,
+      retention_cascade_enabled   = FALSE,
+      retention_is_master         = FALSE,
+      retention_date_attribute_id = NULL
     WHERE entity_id = ${entityId} AND retention_category_id = ${categoryId}
   `;
 }
@@ -172,6 +179,7 @@ export type ManifestTable = {
   dbTypeCode: string | null; hostAddress: string | null; databaseName: string | null; portNumber: number | null;
   keyAttributeId: number | null; keyAttributeName: string | null;
   isMaster: boolean; cascadeEnabled: boolean;
+  dateAttributeId: number | null; dateAttributeName: string | null;
 };
 
 export type ManifestHoldCondition = {
@@ -213,12 +221,14 @@ export async function getCategoryManifest(categoryId: number): Promise<CategoryM
         cr.db_type_code AS "dbTypeCode", cr.host_address AS "hostAddress",
         cr.database_name AS "databaseName", cr.port_number AS "portNumber",
         e.retention_key_attribute_id AS "keyAttributeId", ka.physical_name_text AS "keyAttributeName",
-        e.retention_is_master AS "isMaster", e.retention_cascade_enabled AS "cascadeEnabled"
+        e.retention_is_master AS "isMaster", e.retention_cascade_enabled AS "cascadeEnabled",
+        e.retention_date_attribute_id AS "dateAttributeId", da.physical_name_text AS "dateAttributeName"
       FROM bayanat.data_entities e
       JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
       JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
       LEFT JOIN bayanat.connection_registry cr ON cr.connection_id = ds.connection_id
       LEFT JOIN bayanat.data_attributes ka ON ka.attribute_id = e.retention_key_attribute_id
+      LEFT JOIN bayanat.data_attributes da ON da.attribute_id = e.retention_date_attribute_id
       WHERE e.retention_category_id = ${categoryId}
       ORDER BY e.retention_is_master DESC, e.entity_name_text
     `,
