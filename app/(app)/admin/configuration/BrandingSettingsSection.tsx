@@ -37,8 +37,8 @@ export function BrandingSettingsSection() {
     } finally { setSaving(false); }
   }
 
-  async function handleReset() {
-    if (!confirm("Remove the custom logo and go back to the default Bayanatix logo?")) return;
+  async function handleRemove() {
+    if (!confirm("Remove the customer logo? The Bayanatix logo is unaffected either way.")) return;
     setSaving(true);
     try {
       setInfo(await (await fetch("/api/admin/branding", { method: "DELETE" })).json());
@@ -57,21 +57,26 @@ export function BrandingSettingsSection() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-ink">Branding</h2>
+        <h2 className="text-lg font-bold text-ink">Customer Logo</h2>
         <p className="text-xs text-muted mt-1">
-          Replace the default Bayanatix logo shown in the sidebar and on the sign-in page — SVG, PNG, JPEG, or WebP, up to 2MB.
+          Shown alongside the Bayanatix logo (not instead of it) in the sidebar and on the sign-in page, so this stays
+          recognizable as your organization&apos;s own internal application. SVG, PNG, JPEG, or WebP, up to 2MB.
         </p>
       </div>
 
       <div className="bg-white border border-line rounded-xl p-6 max-w-lg space-y-5">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-lg border border-line bg-canvas-soft grid place-items-center overflow-hidden shrink-0">
-            <img src={preview ?? `/api/branding/logo?t=${info.updatedAt ?? ""}`} alt="Current logo" className="max-w-full max-h-full object-contain" />
+            {preview
+              ? <img src={preview} alt="Preview" className="max-w-full max-h-full object-contain" />
+              : info.hasCustomLogo
+              ? <img src={`/api/branding/logo?t=${info.updatedAt ?? ""}`} alt="Current customer logo" className="max-w-full max-h-full object-contain" />
+              : <span className="text-[10px] text-muted text-center px-1">None set</span>}
           </div>
           <div className="text-sm">
             {info.hasCustomLogo
-              ? <><div className="font-medium text-ink">Custom logo active</div><div className="text-[11px] text-muted mt-0.5 truncate max-w-[220px]">{info.logoFilename}</div></>
-              : <div className="text-muted">Using the default Bayanatix logo</div>}
+              ? <><div className="font-medium text-ink">Customer logo active</div><div className="text-[11px] text-muted mt-0.5 truncate max-w-[220px]">{info.logoFilename}</div></>
+              : <div className="text-muted">No customer logo set — only the Bayanatix logo is shown</div>}
           </div>
         </div>
 
@@ -86,7 +91,7 @@ export function BrandingSettingsSection() {
             {saving ? "Uploading…" : "Upload Logo"}
           </button>
           {info.hasCustomLogo && (
-            <button onClick={handleReset} disabled={saving} className="btn btn-sm text-red-600 hover:bg-red-50">Reset to Default</button>
+            <button onClick={handleRemove} disabled={saving} className="btn btn-sm text-red-600 hover:bg-red-50">Remove Customer Logo</button>
           )}
           {saved && <span className="text-xs text-green-600 font-medium">Saved</span>}
         </div>

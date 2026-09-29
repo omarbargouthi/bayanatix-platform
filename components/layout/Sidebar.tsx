@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
@@ -67,6 +67,14 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hasCustomerLogo, setHasCustomerLogo] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/branding")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setHasCustomerLogo(!!d?.hasCustomLogo))
+      .catch(() => {});
+  }, []);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
@@ -216,11 +224,17 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
         </div>
 
         <div className={`flex items-center mt-2 pt-3 border-t border-line ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
-          <img src="/api/branding/logo" alt="" className="w-5 h-6 shrink-0" />
+          <img src="/logo.svg" alt="" className="w-5 h-6 shrink-0" />
           {!collapsed && (
             <span className="text-xs font-bold tracking-[0.16em] text-brand-deep/70">BAYANATIX</span>
           )}
         </div>
+        {!collapsed && hasCustomerLogo && (
+          <div className="flex items-center gap-2 px-3 mt-1.5">
+            <span className="text-[9px] text-muted uppercase tracking-wider shrink-0">for</span>
+            <img src="/api/branding/logo" alt="Customer logo" className="h-5 max-w-[130px] object-contain object-left" />
+          </div>
+        )}
         {!collapsed && <EnvironmentBadge className="mx-3 mt-2" />}
       </div>
     </aside>

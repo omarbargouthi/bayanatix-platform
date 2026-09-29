@@ -5,8 +5,10 @@ import { getBrandingInfo, setLogo, clearLogo } from "@/lib/queries/branding";
 const ALLOWED_MIME = new Set(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]);
 const MAX_BYTES = 2 * 1024 * 1024; // 2MB — a logo has no business being larger than this
 
-// GET is open to any signed-in user — same reasoning as /api/admin/follow-settings:
-// every page rendering the logo (via /api/branding/logo) needs this, not just admins.
+// This is an ADDITIONAL customer logo shown alongside the Bayanatix logo, not a
+// replacement for it. GET is open to any signed-in user — same reasoning as
+// /api/admin/follow-settings: every page deciding whether to render the customer
+// logo (via /api/branding/logo) needs hasCustomLogo, not just admins.
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

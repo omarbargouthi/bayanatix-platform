@@ -3,6 +3,7 @@ import { LoginLangBar } from "./LoginLangBar";
 import { LoginGraphic } from "./LoginGraphic";
 import { IconDB, IconGlossary, IconLineage, IconShield } from "@/components/layout/icons";
 import { EnvironmentBadge } from "@/components/layout/EnvironmentBadge";
+import { getBrandingInfo } from "@/lib/queries/branding";
 
 export const metadata = { title: "Sign in · Bayanatix" };
 
@@ -13,8 +14,9 @@ const FEATURES = [
   { Icon: IconShield, title: "Compliance & Quality", desc: "NDMO and PDPL alignment with live data quality scoring, built in." },
 ];
 
-export default function LoginPage({ searchParams }: { searchParams: { from?: string; error?: string } }) {
+export default async function LoginPage({ searchParams }: { searchParams: { from?: string; error?: string } }) {
   const from = searchParams.from || "/dashboard";
+  const { hasCustomLogo } = await getBrandingInfo();
   return (
     <main className="min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-canvas">
       {/* Left: brand panel */}
@@ -24,10 +26,16 @@ export default function LoginPage({ searchParams }: { searchParams: { from?: str
         <LoginGraphic className="absolute top-1/2 -translate-y-1/2 -right-10 w-[30rem] h-[30rem] opacity-80" />
 
         <div className="relative flex items-center gap-3">
-          <img src="/api/branding/logo" alt="" className="w-10 h-12" />
+          <img src="/logo.svg" alt="" className="w-10 h-12" />
           <span className="text-lg font-bold tracking-[0.18em]">BAYANATIX</span>
           <EnvironmentBadge className="ml-2" />
         </div>
+        {hasCustomLogo && (
+          <div className="relative flex items-center gap-3 mt-3">
+            <span className="text-[10px] text-white/50 uppercase tracking-wider">for</span>
+            <img src="/api/branding/logo" alt="Customer logo" className="h-8 max-w-[160px] object-contain object-left" />
+          </div>
+        )}
 
         <div className="relative max-w-md">
           <p className="uppercase tracking-[0.2em] text-xs text-brand-light font-semibold mb-4">
@@ -66,8 +74,9 @@ export default function LoginPage({ searchParams }: { searchParams: { from?: str
         <div className="w-full max-w-sm">
           <LoginLangBar>
             <div className="lg:hidden flex items-center gap-2 mb-8">
-              <img src="/api/branding/logo" alt="" className="w-8 h-10" />
+              <img src="/logo.svg" alt="" className="w-8 h-10" />
               <span className="font-bold tracking-[0.18em] text-brand-deep">BAYANATIX</span>
+              {hasCustomLogo && <img src="/api/branding/logo" alt="Customer logo" className="h-6 max-w-[110px] object-contain object-left ml-2" />}
             </div>
 
             <h2 className="text-2xl font-bold text-ink mb-2">Sign in</h2>
