@@ -28,6 +28,7 @@ export type I18nStrings = {
     requestAccess:    string;
     // Admin section items
     userManagement:   string;
+    tags:             string;
     workflows:        string;
     dataSources:      string;
     auditLogs:        string;

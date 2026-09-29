@@ -21,6 +21,7 @@ export const ar: I18nStrings = {
     customAssets:      "الأصول المخصصة",
     requestAccess:     "طلب صلاحية وصول",
     userManagement:    "إدارة المستخدمين",
+    tags:              "الوسوم",
     workflows:         "سير العمل",
     dataSources:       "مصادر البيانات",
     auditLogs:         "التدقيق والسجلات",

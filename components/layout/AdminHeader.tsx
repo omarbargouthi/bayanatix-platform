@@ -13,7 +13,6 @@ const USER_MGMT_TABS: Record<string, string> = {
   users: "Users",
   roles: "Roles",
   teams: "Teams",
-  tags:  "Tags",
 };
 
 // Top-level admin section labels, keyed by the first path segment after /admin/.

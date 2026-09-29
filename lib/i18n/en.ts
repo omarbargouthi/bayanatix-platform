@@ -21,6 +21,7 @@ export const en: I18nStrings = {
     customAssets:      "Custom Assets",
     requestAccess:     "Request Access",
     userManagement:    "User Management",
+    tags:              "Tags",
     workflows:         "Workflows",
     dataSources:       "Data Sources",
     auditLogs:         "Audit & Logs",

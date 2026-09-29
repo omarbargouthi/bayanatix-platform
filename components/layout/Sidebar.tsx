@@ -12,7 +12,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconShield, IconHistory, IconFlag, IconAI,
-  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout, IconUserPlus,
+  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout, IconUserPlus, IconTag,
 } from "./icons";
 
 type Item = {
@@ -47,6 +47,7 @@ const NAV_DOMAINS_DEF = [
 
 const NAV_ADMIN_DEF = [
   { href: "/admin/user-management",      key: "userManagement"      as const, Icon: IconShield },
+  { href: "/admin/tags",                 key: "tags"                as const, Icon: IconTag },
   { href: "/bulk-operations",            key: "bulkOperations"      as const, Icon: IconBulk },
   { href: "/lineage",                    key: "lineage"             as const, Icon: IconLineage },
   { href: "/admin/workflows",            key: "workflows"           as const, Icon: IconLines },

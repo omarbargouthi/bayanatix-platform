@@ -4,8 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { UsersPageClient } from "@/app/(app)/admin/users/UsersPageClient";
-import { TagsClient } from "@/app/(app)/admin/tags/TagsClient";
-import type { AdminUser, TagRecord, Role, Team } from "@/lib/types";
+import type { AdminUser, Role, Team } from "@/lib/types";
 import { RoleForm } from "@/components/admin/RoleForm";
 import { TeamForm } from "@/components/admin/TeamForm";
 
@@ -171,16 +170,6 @@ function TeamsSection() {
   );
 }
 
-// ── Tags section ──────────────────────────────────────────────────────────────
-
-function TagsSection() {
-  const [tags, setTags] = useState<TagRecord[]>([]);
-  useEffect(() => {
-    fetch("/api/admin/tags").then(r => r.json()).then(setTags);
-  }, []);
-  return <TagsClient tags={tags} />;
-}
-
 // ── Shared stat card ──────────────────────────────────────────────────────────
 
 function StatCard({ label, value, color = "blue" }: { label: string; value: number; color?: "blue"|"green"|"purple" }) {
@@ -200,7 +189,6 @@ const SUB_TABS = [
   { id: "users", label: "Users" },
   { id: "roles", label: "Roles" },
   { id: "teams", label: "Teams" },
-  { id: "tags",  label: "Tags"  },
 ];
 
 function UserManagementInner() {
@@ -231,7 +219,6 @@ function UserManagementInner() {
       {tab === "users" && <UsersSection />}
       {tab === "roles" && <RolesSection />}
       {tab === "teams" && <TeamsSection />}
-      {tab === "tags"  && <TagsSection />}
     </div>
   );
 }

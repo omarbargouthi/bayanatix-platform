@@ -236,3 +236,10 @@ export const IconBulk = ({ className }: P) => (
     <path d="M4 19h16" />
   </svg>
 );
+
+export const IconTag = ({ className }: P) => (
+  <svg {...base(className)}>
+    <path d="M20.59 13.41 12 4.83A2 2 0 0 0 10.59 4.24L4 4a1 1 0 0 0-1 1l.24 6.59a2 2 0 0 0 .59 1.41l8.58 8.58a2 2 0 0 0 2.83 0l5.35-5.35a2 2 0 0 0 0-2.82z" />
+    <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+  </svg>
+);
