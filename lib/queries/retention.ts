@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import type { RetentionOverview } from "../types";
+import { getCategoryRelationships } from "./retention-relationships";
 
 export type CategoryEntity = {
   entityId: number;
@@ -9,6 +10,7 @@ export type CategoryEntity = {
   keyAttributeId: number | null;
   keyAttributeName: string | null;
   cascadeEnabled: boolean;
+  isMaster: boolean;
 };
 
 export async function getCategoryEntities(categoryId: number): Promise<CategoryEntity[]> {
@@ -17,13 +19,14 @@ export async function getCategoryEntities(categoryId: number): Promise<CategoryE
       e.entity_id AS "entityId", e.entity_name_text AS "entityName",
       s.schema_name_text AS "schemaName", ds.source_name_text AS "sourceName",
       e.retention_key_attribute_id AS "keyAttributeId", ka.physical_name_text AS "keyAttributeName",
-      e.retention_cascade_enabled AS "cascadeEnabled"
+      e.retention_cascade_enabled AS "cascadeEnabled",
+      e.retention_is_master AS "isMaster"
     FROM bayanat.data_entities e
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
     LEFT JOIN bayanat.data_attributes ka ON ka.attribute_id = e.retention_key_attribute_id
     WHERE e.retention_category_id = ${categoryId}
-    ORDER BY e.entity_name_text
+    ORDER BY e.retention_is_master DESC, e.entity_name_text
   `;
 }
 
@@ -40,12 +43,13 @@ export async function assignCategoryEntity(
 }
 
 export async function updateCategoryEntity(
-  entityId: number, keyAttributeId: number | null, cascadeEnabled: boolean,
+  entityId: number, keyAttributeId: number | null, cascadeEnabled: boolean, isMaster: boolean,
 ): Promise<void> {
   await sql`
     UPDATE bayanat.data_entities SET
       retention_key_attribute_id = ${keyAttributeId},
-      retention_cascade_enabled  = ${cascadeEnabled}
+      retention_cascade_enabled  = ${cascadeEnabled},
+      retention_is_master        = ${isMaster}
     WHERE entity_id = ${entityId}
   `;
 }
@@ -55,7 +59,8 @@ export async function unassignCategoryEntity(categoryId: number, entityId: numbe
     UPDATE bayanat.data_entities SET
       retention_category_id      = NULL,
       retention_key_attribute_id = NULL,
-      retention_cascade_enabled  = FALSE
+      retention_cascade_enabled  = FALSE,
+      retention_is_master        = FALSE
     WHERE entity_id = ${entityId} AND retention_category_id = ${categoryId}
   `;
 }
@@ -153,4 +158,92 @@ export async function getPurgeQueueByAction(): Promise<{ action: string; count: 
     GROUP BY COALESCE(rs.post_retention_action, 'UNSCHEDULED')
     ORDER BY count DESC
   `;
+}
+
+// ── Purge configuration manifest ────────────────────────────────────────────
+// Read-only bundle for an EXTERNAL retention/purge application to consume —
+// Bayanatix hosts this configuration but never executes any DELETE/UPDATE
+// against a source system itself. No credentials are included (host/db/
+// schema names only) — the external process is expected to hold its own
+// connection secrets.
+
+export type ManifestTable = {
+  entityId: number; entityName: string; schemaName: string; sourceName: string;
+  dbTypeCode: string | null; hostAddress: string | null; databaseName: string | null; portNumber: number | null;
+  keyAttributeId: number | null; keyAttributeName: string | null;
+  isMaster: boolean; cascadeEnabled: boolean;
+};
+
+export type ManifestHoldCondition = {
+  entityId: number; attributeId: number; attributeName: string;
+  operator: string; valueText: string; valueText2: string | null; logicOperator: "AND" | "OR";
+  holdId: number; caseReference: string;
+};
+
+export type CategoryManifest = {
+  categoryId: number; categoryName: string; sensitivity: string;
+  schedules: {
+    scheduleId: number; jurisdiction: string; triggerEvent: string;
+    retentionPeriod: number; retentionUnit: string; postRetentionAction: string;
+    automationConfigJson: { technique?: string; details?: string } | null;
+  }[];
+  tables: ManifestTable[];
+  relationships: Awaited<ReturnType<typeof getCategoryRelationships>>;
+  activeHoldConditions: ManifestHoldCondition[];
+};
+
+export async function getCategoryManifest(categoryId: number): Promise<CategoryManifest | null> {
+  const [category] = await sql<{ categoryName: string; sensitivity: string }[]>`
+    SELECT name AS "categoryName", sensitivity FROM bayanat.data_categories WHERE category_id = ${categoryId}
+  `;
+  if (!category) return null;
+
+  const [schedules, tables, relationships] = await Promise.all([
+    sql<CategoryManifest["schedules"]>`
+      SELECT schedule_id AS "scheduleId", jurisdiction, trigger_event AS "triggerEvent",
+        retention_period AS "retentionPeriod", retention_unit AS "retentionUnit",
+        post_retention_action AS "postRetentionAction", automation_config_json AS "automationConfigJson"
+      FROM bayanat.retention_schedules WHERE category_id = ${categoryId}
+      ORDER BY is_default DESC, jurisdiction
+    `,
+    sql<ManifestTable[]>`
+      SELECT
+        e.entity_id AS "entityId", e.entity_name_text AS "entityName",
+        s.schema_name_text AS "schemaName", ds.source_name_text AS "sourceName",
+        cr.db_type_code AS "dbTypeCode", cr.host_address AS "hostAddress",
+        cr.database_name AS "databaseName", cr.port_number AS "portNumber",
+        e.retention_key_attribute_id AS "keyAttributeId", ka.physical_name_text AS "keyAttributeName",
+        e.retention_is_master AS "isMaster", e.retention_cascade_enabled AS "cascadeEnabled"
+      FROM bayanat.data_entities e
+      JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+      JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
+      LEFT JOIN bayanat.connection_registry cr ON cr.connection_id = ds.connection_id
+      LEFT JOIN bayanat.data_attributes ka ON ka.attribute_id = e.retention_key_attribute_id
+      WHERE e.retention_category_id = ${categoryId}
+      ORDER BY e.retention_is_master DESC, e.entity_name_text
+    `,
+    getCategoryRelationships(categoryId),
+  ]);
+
+  const tableEntityIds = [
+    ...new Set([...tables.map((t) => t.entityId), ...relationships.flatMap((r) => [r.parentEntityId, r.childEntityId])]),
+  ];
+
+  const activeHoldConditions = tableEntityIds.length === 0 ? [] : await sql<ManifestHoldCondition[]>`
+    SELECT
+      lhe.entity_id AS "entityId", lhc.attribute_id AS "attributeId", a.physical_name_text AS "attributeName",
+      lhc.operator AS operator, lhc.value_text AS "valueText", lhc.value_text_2 AS "valueText2",
+      lhc.logic_operator AS "logicOperator", lh.hold_id AS "holdId", lh.case_reference AS "caseReference"
+    FROM bayanat.legal_hold_conditions lhc
+    JOIN bayanat.legal_hold_entities lhe ON lhe.hold_id = lhc.hold_id AND lhe.entity_id = lhc.entity_id
+    JOIN bayanat.legal_holds lh ON lh.hold_id = lhc.hold_id
+    JOIN bayanat.data_attributes a ON a.attribute_id = lhc.attribute_id
+    WHERE lh.hold_status = 'ACTIVE' AND lhe.entity_id = ANY(${tableEntityIds})
+    ORDER BY lhe.entity_id, lhc.created_at
+  `;
+
+  return {
+    categoryId, categoryName: category.categoryName, sensitivity: category.sensitivity,
+    schedules, tables, relationships, activeHoldConditions,
+  };
 }
