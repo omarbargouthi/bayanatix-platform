@@ -44,16 +44,26 @@ const DB_TYPES = [
   { value: "EXCEL",    label: "Excel Workbook(s)",    port: 0 },
   { value: "JSON",     label: "JSON File(s)",         port: 0 },
   { value: "PBIX_FOLDER", label: "Power BI Desktop Folder (.pbix)", port: 0 },
+  { value: "REST_API", label: "REST API (OpenAPI/Swagger)", port: 0 },
+  { value: "SOAP_API", label: "SOAP Web Service (WSDL)",    port: 0 },
 ];
 
 const DB_ICON: Record<string, string> = {
   POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶", CSV: "📄", EXCEL: "📊", JSON: "🗂️", PBIX_FOLDER: "📊",
+  REST_API: "🌐", SOAP_API: "🧼",
 };
 
 // CSV/EXCEL/JSON/PBIX_FOLDER are flat-file sources: no network host/port/credentials,
 // just a file or directory path (stored in hostAddress — repurposed for this case).
 const FILE_TYPES = ["CSV", "EXCEL", "JSON", "PBIX_FOLDER"];
 const isFileType = (dbTypeCode: string) => FILE_TYPES.includes(dbTypeCode);
+
+// REST_API/SOAP_API are spec-driven (OpenAPI/WSDL document, not a live DB): same
+// path-in-hostAddress idea as the file types, but the spec can also be a URL, and
+// — unlike file types — an optional username/password is kept for HTTP Basic Auth
+// when fetching a URL-based spec that's published behind auth.
+const SPEC_TYPES = ["REST_API", "SOAP_API"];
+const isSpecType = (dbTypeCode: string) => SPEC_TYPES.includes(dbTypeCode);
 
 // Database types the crawler can actually connect to (ORACLE has no working driver yet).
 const LINEAGE_APPLICABLE_TYPES = ["POSTGRES", "MYSQL", "MSSQL"];
@@ -459,7 +469,7 @@ export default function DataSourcesPage() {
                 <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[c.connectionStatus] ?? "bg-gray-300"}`} title={`Connection: ${c.connectionStatus}`} />
               </div>
               <div className="mt-1 pl-6 flex items-center gap-2">
-                <span className="text-[10px] text-muted truncate">{isFileType(c.dbTypeCode) ? c.hostAddress : `${c.hostAddress}/${c.databaseName || "—"}`}</span>
+                <span className="text-[10px] text-muted truncate">{(isFileType(c.dbTypeCode) || isSpecType(c.dbTypeCode)) ? c.hostAddress : `${c.hostAddress}/${c.databaseName || "—"}`}</span>
                 {c.crawlStatus !== "IDLE" && (
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CRAWL_DOT[c.crawlStatus] ?? "bg-gray-300"}`} title={`Crawl: ${c.crawlStatus}`} />
                 )}
@@ -520,6 +530,29 @@ export default function DataSourcesPage() {
                         : <>A single file is crawled as one table{form.dbTypeCode === "EXCEL" ? " per sheet" : ""}. A directory is crawled as one schema — every {form.dbTypeCode === "CSV" ? ".csv file" : ".xlsx/.xls workbook"} inside becomes its own table{form.dbTypeCode === "EXCEL" ? "(s)" : ""}. Server-side path — must be reachable by the app process.</>}
                     </p>
                   </div>
+                ) : isSpecType(form.dbTypeCode) ? (
+                  <>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-ink mb-1">{form.dbTypeCode === "SOAP_API" ? "WSDL File Path or URL *" : "OpenAPI/Swagger Spec File Path or URL *"}</label>
+                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.hostAddress} onChange={e => setForm(f => ({ ...f, hostAddress: e.target.value }))} placeholder={form.dbTypeCode === "SOAP_API" ? "https://service.example.com/api?wsdl or C:\\specs\\service.wsdl" : "https://api.example.com/openapi.json or C:\\specs\\openapi.yaml"} />
+                    <p className="text-[11px] text-muted mt-1">
+                      {form.dbTypeCode === "SOAP_API"
+                        ? "The spec is read, never the live service — each named complexType in the WSDL's embedded schema becomes one table, its elements become columns. A repeating element (maxOccurs > 1) is typed \"json\" rather than split out."
+                        : "The spec is read, never the live API — each schema object under components.schemas (or definitions, for Swagger 2.0) becomes one table, its properties become columns. JSON or YAML, local file or URL."}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1">Username <span className="text-muted font-normal">(optional)</span></label>
+                    <input autoComplete="off" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple" value={form.usernameText} onChange={e => setForm(f => ({ ...f, usernameText: e.target.value }))} placeholder="only if the spec URL needs HTTP Basic Auth" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1">Password {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
+                    <div className="relative">
+                      <input type={showPwd ? "text" : "password"} autoComplete="new-password" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} placeholder={isEditing ? "unchanged" : "optional"} />
+                      <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
+                    </div>
+                  </div>
+                  </>
                 ) : (
                 <>
                 <div>
@@ -975,6 +1008,11 @@ export default function DataSourcesPage() {
                     {(isFileType(selected.dbTypeCode) ? [
                       ["Type", DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
                       ["Path", selected.hostAddress],
+                      ["Added", new Date(selected.createdAtTimestamp).toLocaleDateString()],
+                    ] : isSpecType(selected.dbTypeCode) ? [
+                      ["Type", DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
+                      ["Spec Path / URL", selected.hostAddress],
+                      ["Username", selected.usernameText || "— (no auth)"],
                       ["Added", new Date(selected.createdAtTimestamp).toLocaleDateString()],
                     ] : [
                       ["Type",     DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],

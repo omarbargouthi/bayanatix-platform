@@ -838,6 +838,209 @@ async function crawlJson(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
   return summarise(tables.length > 0 ? [{ name: schemaName, tables }] : []);
 }
 
+// ── REST API (OpenAPI/Swagger) & SOAP API (WSDL) ─────────────────────────────
+// Both are spec-driven, not live-sampled: we catalog the API's DECLARED shape
+// (from its OpenAPI/WSDL document), never call the API's actual endpoints. This
+// keeps the crawl safe (no outbound calls to business data, no auth scope beyond
+// reading the spec itself) and fast, at the cost of the catalog only being as
+// accurate/current as the published spec. `hostAddress` holds the spec's location
+// — either a local file path or an http(s) URL; `usernameText`/`passwordText`
+// (both optional, unlike every other file/spec type) are sent as HTTP Basic Auth
+// when fetching a URL, for specs published behind auth.
+
+async function fetchSpecText(cfg: ConnCfg): Promise<string> {
+  const loc = cfg.hostAddress;
+  if (!loc) throw new Error("Spec file path or URL is required");
+  if (/^https?:\/\//i.test(loc)) {
+    const headers: Record<string, string> = {};
+    if (cfg.usernameText) headers["Authorization"] = "Basic " + Buffer.from(`${cfg.usernameText}:${cfg.passwordText ?? ""}`).toString("base64");
+    const res = await fetch(loc, { headers, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status} ${res.statusText}`);
+    return await res.text();
+  }
+  const fs = await import("node:fs");
+  if (!fs.existsSync(loc)) throw new Error(`Path not found: ${loc}`);
+  return fs.readFileSync(loc, "utf-8");
+}
+
+// ── OpenAPI / Swagger ─────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function parseOpenApiSpec(text: string): Promise<any> {
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("{")) return JSON.parse(text);
+  const yaml = await import("js-yaml");
+  return yaml.load(text);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractOpenApiSchemas(spec: any): Record<string, any> {
+  return spec?.components?.schemas ?? spec?.definitions ?? {};
+}
+
+// Deliberately does not resolve/flatten $ref or nested object/array properties
+// (same "type as json, don't deep-flatten" choice crawlJson makes) — a nested
+// object property is typed "json" rather than expanded into its own table, since
+// an OpenAPI schema property has no natural table identity of its own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function openApiTypeToDataType(schema: any): string {
+  if (!schema) return "text";
+  if (schema.$ref) return "json";
+  if (schema.type === "integer") return "integer";
+  if (schema.type === "number") return "numeric";
+  if (schema.type === "boolean") return "boolean";
+  if (schema.type === "string" && (schema.format === "date" || schema.format === "date-time")) return "date";
+  if (schema.type === "string") return "text";
+  if (schema.type === "array" || schema.type === "object") return "json";
+  return "text";
+}
+
+async function crawlRestApi(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLogger): Promise<CrawlResult> {
+  const text = await fetchSpecText(cfg);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let spec: any;
+  try { spec = await parseOpenApiSpec(text); }
+  catch (e) { throw new Error(`Failed to parse OpenAPI spec: ${(e as Error).message}`); }
+
+  const schemaName = String(spec?.info?.title ?? "api").trim().replace(/\s+/g, "_").toLowerCase() || "api";
+  await logger.info(`Parsed OpenAPI spec: ${spec?.info?.title ?? "(untitled)"} ${spec?.info?.version ?? ""}`.trim());
+  if (!schemaIncluded(schemaName, config)) {
+    await logger.info(`Skipping schema: ${schemaName} (excluded by config)`);
+    return summarise([]);
+  }
+
+  const schemas = extractOpenApiSchemas(spec);
+  const names = Object.keys(schemas);
+  await logger.info(`Found ${names.length} schema object(s) in the spec`);
+  if (names.length === 0) throw new Error("No component/definition schemas found in the OpenAPI spec — nothing to catalog");
+
+  const tables: CrawlTable[] = [];
+  for (const tableName of names) {
+    if (!tableIncluded(tableName, config)) continue;
+    const schema = schemas[tableName];
+    const props = schema?.properties ?? {};
+    const required = new Set<string>(schema?.required ?? []);
+    const propNames = Object.keys(props);
+    if (propNames.length === 0) { await logger.warn(`  ${tableName}: no properties, skipped`); continue; }
+
+    const columns: CrawlColumn[] = propNames.map(name => ({
+      name, dataType: openApiTypeToDataType(props[name]), isNullable: !required.has(name),
+      isPrimaryKey: false, isForeignKey: false,
+      defaultValue: props[name]?.default != null ? String(props[name].default) : null,
+      comment: props[name]?.description ?? null,
+    }));
+
+    tables.push({ name: tableName, isView: false, columns, comment: schema?.description ?? null });
+    await logger.info(`  → ${tableName}: ${columns.length} columns`);
+  }
+
+  return summarise(tables.length > 0 ? [{ name: schemaName, tables }] : []);
+}
+
+// ── SOAP / WSDL ───────────────────────────────────────────────────────────────
+// WSDL's data shapes live in its embedded XSD <types> section as named
+// complexTypes — everything else (portType/binding/service operations) describes
+// the API surface, not its data model, so it's read only to name the schema.
+// XML namespace prefixes for the XSD vocabulary vary by tool ("xsd:", "xs:", or
+// none under a default namespace), so tags are matched by local name only.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function localKey(k: string): string { return k.includes(":") ? k.split(":").pop()! : k; }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findAll(obj: any, tag: string): any[] {
+  if (!obj || typeof obj !== "object") return [];
+  const out: unknown[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (localKey(k) === tag) { if (Array.isArray(v)) out.push(...v); else out.push(v); }
+  }
+  return out;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findAllDeep(obj: any, tag: string): any[] {
+  const out: unknown[] = [];
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    if (node && typeof node === "object") {
+      for (const [k, v] of Object.entries(node)) {
+        if (localKey(k) === tag) { if (Array.isArray(v)) out.push(...v); else out.push(v); }
+        walk(v);
+      }
+    }
+  };
+  walk(obj);
+  return out;
+}
+
+// A repeating element (maxOccurs > 1 / "unbounded") has no single scalar shape,
+// so — same "don't deep-flatten, type as json" choice as the array-field case in
+// resolveJsonTables — it's typed "json" rather than spun into its own table.
+function xsdTypeToDataType(type: string | undefined, maxOccurs: string | undefined): string {
+  if (maxOccurs && (maxOccurs === "unbounded" || Number(maxOccurs) > 1)) return "json";
+  const t = localKey(type ?? "").toLowerCase();
+  if (["int", "integer", "long", "short", "byte", "unsignedint", "unsignedlong", "unsignedshort"].includes(t)) return "integer";
+  if (["decimal", "double", "float"].includes(t)) return "numeric";
+  if (t === "boolean") return "boolean";
+  if (["date", "datetime", "time"].includes(t)) return "date";
+  if (t === "string" || t === "") return "text";
+  return "json"; // an inline/unrecognized complex type
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadWsdlComplexTypes(text: string): Promise<{ schemaName: string; complexTypes: any[] }> {
+  const { XMLParser } = await import("fast-xml-parser");
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", allowBooleanAttributes: true });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let doc: any;
+  try { doc = parser.parse(text); }
+  catch (e) { throw new Error(`Failed to parse WSDL: ${(e as Error).message}`); }
+
+  const defsKey = Object.keys(doc).find(k => localKey(k) === "definitions");
+  const defs = defsKey ? doc[defsKey] : doc;
+  const serviceNode = findAllDeep(defs, "service")[0];
+  const schemaName = String(serviceNode?.name ?? "webservice").trim().replace(/\s+/g, "_").toLowerCase() || "webservice";
+  const complexTypes = findAllDeep(defs, "complexType").filter(ct => ct?.name);
+  return { schemaName, complexTypes };
+}
+
+async function crawlSoapApi(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLogger): Promise<CrawlResult> {
+  const text = await fetchSpecText(cfg);
+  const { schemaName, complexTypes } = await loadWsdlComplexTypes(text);
+  await logger.info(`Parsed WSDL: service "${schemaName}"`);
+
+  if (!schemaIncluded(schemaName, config)) {
+    await logger.info(`Skipping schema: ${schemaName} (excluded by config)`);
+    return summarise([]);
+  }
+
+  await logger.info(`Found ${complexTypes.length} named complexType definition(s) in the WSDL`);
+  if (complexTypes.length === 0) throw new Error("No named complexType definitions found in the WSDL's embedded schema — nothing to catalog");
+
+  const tables: CrawlTable[] = [];
+  for (const ct of complexTypes) {
+    const tableName = String(ct.name);
+    if (!tableIncluded(tableName, config)) continue;
+
+    const elements = [...findAll(ct, "sequence"), ...findAll(ct, "all"), ...findAll(ct, "choice")]
+      .flatMap(group => findAll(group, "element"))
+      .filter(el => el?.name);
+    if (elements.length === 0) { await logger.warn(`  ${tableName}: no elements, skipped`); continue; }
+
+    const columns: CrawlColumn[] = elements.map(el => ({
+      name: String(el.name), dataType: xsdTypeToDataType(el.type, el.maxOccurs != null ? String(el.maxOccurs) : undefined),
+      isNullable: String(el.minOccurs) === "0",
+      isPrimaryKey: false, isForeignKey: false,
+      defaultValue: el.default != null ? String(el.default) : null, comment: null,
+    }));
+
+    tables.push({ name: tableName, isView: false, columns, comment: null });
+    await logger.info(`  → ${tableName}: ${columns.length} columns`);
+  }
+
+  return summarise(tables.length > 0 ? [{ name: schemaName, tables }] : []);
+}
+
 // ── Oracle ────────────────────────────────────────────────────────────────────
 
 async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLogger): Promise<CrawlResult> {
@@ -994,6 +1197,21 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
       return files.length > 0
         ? { ok: true, message: `Found ${files.length} ${cfg.dbTypeCode} file(s)` }
         : { ok: false, message: `No ${extLabel} files found at that path` };
+    }
+    if (cfg.dbTypeCode === "REST_API") {
+      const text = await fetchSpecText(cfg);
+      const spec = await parseOpenApiSpec(text);
+      const count = Object.keys(extractOpenApiSchemas(spec)).length;
+      return count > 0
+        ? { ok: true, message: `OpenAPI spec parsed — ${count} schema object(s) found` }
+        : { ok: false, message: "OpenAPI spec parsed, but no component/definition schemas were found" };
+    }
+    if (cfg.dbTypeCode === "SOAP_API") {
+      const text = await fetchSpecText(cfg);
+      const { schemaName, complexTypes } = await loadWsdlComplexTypes(text);
+      return complexTypes.length > 0
+        ? { ok: true, message: `WSDL parsed — service "${schemaName}", ${complexTypes.length} complexType(s) found` }
+        : { ok: false, message: "WSDL parsed, but no named complexType definitions were found" };
     }
     return { ok: false, message: `Unknown DB type: ${cfg.dbTypeCode}` };
   } catch (e: unknown) {
@@ -1509,6 +1727,8 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     else if (cfgRow.dbTypeCode === "ORACLE")   result = await crawlOracle(cfgRow, config, logger);
     else if (cfgRow.dbTypeCode === "CSV" || cfgRow.dbTypeCode === "EXCEL") result = await crawlFile(cfgRow, config, logger);
     else if (cfgRow.dbTypeCode === "JSON") result = await crawlJson(cfgRow, config, logger);
+    else if (cfgRow.dbTypeCode === "REST_API") result = await crawlRestApi(cfgRow, config, logger);
+    else if (cfgRow.dbTypeCode === "SOAP_API") result = await crawlSoapApi(cfgRow, config, logger);
     else throw new Error(`Unsupported DB type: ${cfgRow.dbTypeCode}`);
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);
