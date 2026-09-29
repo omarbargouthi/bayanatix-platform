@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { LANGUAGE_REGISTRY } from "@/lib/lang-config";
 import { useLang } from "@/lib/lang-context";
+import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
 
 type Language = {
   languageCode: string; languageNameText: string; orientationCode: "LTR" | "RTL";
@@ -593,7 +594,8 @@ function ImportExportTab() {
   const [category, setCategory] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<{ updated: number; skippedEmpty: number; notFound: string[] } | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [latestJobId, setLatestJobId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/languages").then((r) => r.ok ? r.json() : []).then((langs: Language[]) => {
@@ -606,14 +608,27 @@ function ImportExportTab() {
   async function doImport() {
     if (!file || !lang) return;
     setImporting(true);
-    setResult(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("languageCode", lang);
       const r = await fetch("/api/admin/translations/import", { method: "POST", body: fd });
-      setResult(await r.json());
+      const data = await r.json();
+      if (r.ok) setLatestJobId(data.jobId);
     } finally { setImporting(false); }
+  }
+
+  async function doExport() {
+    if (!lang) return;
+    setExporting(true);
+    try {
+      const r = await fetch("/api/admin/translations/export", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ languageCode: lang, categoryCode: category || undefined }),
+      });
+      const data = await r.json();
+      if (r.ok) setLatestJobId(data.jobId);
+    } finally { setExporting(false); }
   }
 
   // No "!== en" filter — English can be a real target language for non-English-base content.
@@ -637,12 +652,9 @@ function ImportExportTab() {
       <div className="card p-5">
         <h3 className="text-sm font-bold text-ink mb-1">Export</h3>
         <p className="text-xs text-muted mb-3">Downloads key_code / category / base_text / context_note / translated_text / status columns for the selected language.</p>
-        <a
-          href={`/api/admin/translations/export?lang=${encodeURIComponent(lang)}${category ? `&category=${encodeURIComponent(category)}` : ""}`}
-          className="btn btn-sm"
-        >
-          ⭳ Export XLSX
-        </a>
+        <button onClick={doExport} disabled={!lang || exporting} className="btn btn-sm disabled:opacity-60">
+          {exporting ? "Starting…" : "⭳ Export XLSX"}
+        </button>
       </div>
 
       <div className="card p-5">
@@ -656,16 +668,9 @@ function ImportExportTab() {
             {importing ? "Importing…" : "Import"}
           </button>
         </div>
-        {result && (
-          <div className="mt-3 text-xs bg-canvas-soft border border-line rounded-md px-3 py-2">
-            <div className="text-emerald-700 font-semibold">{result.updated} translation(s) updated.</div>
-            {result.skippedEmpty > 0 && <div className="text-muted">{result.skippedEmpty} row(s) skipped (empty translated_text).</div>}
-            {result.notFound.length > 0 && (
-              <div className="text-amber-700">Unknown key_code, skipped: {result.notFound.slice(0, 10).join(", ")}{result.notFound.length > 10 ? "…" : ""}</div>
-            )}
-          </div>
-        )}
       </div>
+
+      <BackgroundJobsPanel jobTypeCodes={["TRANSLATIONS_EXPORT", "TRANSLATIONS_IMPORT"]} latestJobId={latestJobId} title="Translation Jobs" />
     </div>
   );
 }

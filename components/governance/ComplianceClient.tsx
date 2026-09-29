@@ -9,6 +9,7 @@ import type {
 import type { SessionUser } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
+import { BackgroundJobsPanel, usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
@@ -116,6 +117,10 @@ export function ComplianceClient({
   const [expanded, setExpanded]         = useState<number | null>(null);
   const [importing, setImporting]       = useState(false);
   const [importMsg, setImportMsg]       = useState("");
+  const [latestJobId, setLatestJobId]   = useState<number | null>(null);
+  const [exporting, setExporting]       = useState(false);
+  const latestJob = usePollBackgroundJob(latestJobId);
+  const handledJobIdRef = useRef<number | null>(null);
   const [levelWarning, setLevelWarning] = useState<{ std: string; newLevel: number } | null>(null);
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [collabCounts, setCollabCounts] = useState<Record<string, number>>({});
@@ -438,13 +443,46 @@ export function ComplianceClient({
   async function handleImport(file: File) {
     if (!fwId) return;
     setImporting(true); setImportMsg("");
-    const fd = new FormData(); fd.append("file", file);
-    const res = await fetch(`/api/governance/compliance/${fwId}/import`, { method: "POST", body: fd });
-    const data = await res.json();
-    setImportMsg(res.ok ? `✓ Imported ${data.imported} requirements` : `✗ ${data.error ?? "Import failed"}`);
-    setImporting(false);
-    if (res.ok) { resetAll(); router.refresh(); }
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const res = await fetch(`/api/governance/compliance/${fwId}/import`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok) setLatestJobId(data.jobId);
+      else setImportMsg(`✗ ${data.error ?? "Import failed"}`);
+    } finally {
+      setImporting(false);
+    }
   }
+
+  async function handleExport() {
+    if (!fwId) return;
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/governance/compliance/${fwId}/export`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) setLatestJobId(data.jobId);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // Once the latest tracked job (import or export) reaches a terminal status,
+  // refresh the requirement list exactly once per job — the import route's
+  // work (DELETE + re-INSERT all requirements) happens entirely in the
+  // background now, so this component's own state needs a nudge to pick up
+  // the new data instead of the old synchronous handleImport's inline reset.
+  useEffect(() => {
+    if (!latestJob || latestJob.status === "RUNNING") return;
+    if (handledJobIdRef.current === latestJob.jobId) return;
+    handledJobIdRef.current = latestJob.jobId;
+    if (latestJob.jobTypeCode === "GOV_COMPLIANCE_IMPORT") {
+      setImportMsg(latestJob.status === "COMPLETED"
+        ? `✓ Imported ${latestJob.resultJson?.imported ?? "?"} requirements`
+        : `✗ ${latestJob.errorText ?? "Import failed"}`);
+      if (latestJob.status === "COMPLETED") { resetAll(); router.refresh(); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestJob]);
 
   const { total, complete, na, notDone, pct } = overallStats;
   const selectedQuestion = selStandard
@@ -502,8 +540,8 @@ export function ComplianceClient({
             <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
               onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])} />
           </label>
-          <button onClick={() => fwId && window.open(`/api/governance/compliance/${fwId}/export`, "_blank")}
-            className="btn btn-sm btn-primary">Export Excel</button>
+          <button onClick={handleExport} disabled={exporting || !fwId}
+            className="btn btn-sm btn-primary disabled:opacity-60">{exporting ? "Starting…" : "Export Excel"}</button>
         </div>
       </div>
 
@@ -512,6 +550,8 @@ export function ComplianceClient({
           {importMsg}
         </div>
       )}
+
+      <BackgroundJobsPanel jobTypeCodes={["GOV_COMPLIANCE_EXPORT", "GOV_COMPLIANCE_IMPORT"]} latestJobId={latestJobId} title="Compliance Jobs" />
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-4">

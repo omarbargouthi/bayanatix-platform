@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import type { DomainScorecard } from "@/lib/queries/reports";
 import { getRagStatus, RAG_CLASSES } from "@/lib/reports/rag";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
+import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
 
 function formatValue(value: number, format: "PERCENT" | "NUMBER" | "DAYS"): string {
   if (format === "PERCENT") return `${value}%`;
@@ -31,6 +33,21 @@ function capabilityLabel(t: I18nStrings, reportCode: string): string {
 export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: DomainScorecard; glossaryId: number }) {
   const { t, lang } = useLang();
   const rd = t.reports.domain;
+  const [latestJobId, setLatestJobId] = useState<number | null>(null);
+  const [triggering, setTriggering] = useState(false);
+
+  async function exportPdf() {
+    setTriggering(true);
+    try {
+      const res = await fetch(`/api/reports/domain/${glossaryId}/export-pdf`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang }),
+      });
+      const data = await res.json();
+      if (res.ok) setLatestJobId(data.jobId);
+    } finally {
+      setTriggering(false);
+    }
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
@@ -46,13 +63,16 @@ export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: Do
           </h1>
           <p className="text-xs text-muted mt-0.5">{t.reports.index.scorecardsSubtitle}</p>
         </div>
-        <a
-          href={`/api/reports/domain/${glossaryId}/export-pdf?lang=${lang !== "en" ? lang : "en"}`}
-          className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5"
+        <button
+          onClick={exportPdf}
+          disabled={triggering}
+          className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5 disabled:opacity-60"
         >
-          {rd.exportBrief}
-        </a>
+          {triggering ? "Starting…" : rd.exportBrief}
+        </button>
       </div>
+
+      <BackgroundJobsPanel jobTypeCodes={["REPORT_EXPORT_PDF"]} latestJobId={latestJobId} title="Report Exports" />
 
       <div className="card-padded">
         <div className="text-sm font-semibold text-ink mb-3">{rd.capabilityScores}</div>

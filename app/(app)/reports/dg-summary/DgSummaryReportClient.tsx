@@ -8,6 +8,7 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DgGapGrid } from "@/components/reports/DgGapGrid";
+import { ReportExportButtons } from "@/components/reports/ReportExportButtons";
 import { useLang } from "@/lib/lang-context";
 
 const PAGE_SIZE = 25;
@@ -77,11 +78,6 @@ function DgSummaryReportContent({
     }
   }
 
-  const exportParams = new URLSearchParams();
-  if (domainId) exportParams.set("domain", domainId);
-  if (sourceId) exportParams.set("source", sourceId);
-  if (ownerId) exportParams.set("owner", ownerId);
-
   const openTasksKpi = data?.kpis.find((k) => k.kpiCode === "DG_OPEN_TASKS");
 
   return (
@@ -101,18 +97,7 @@ function DgSummaryReportContent({
               {capturing ? rc.capturing : rc.captureSnapshot}
             </button>
           )}
-          <a
-            href={`/api/reports/R8_DG_SUMMARY/export?${exportParams.toString()}`}
-            className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet"
-          >
-            {rc.exportXlsx}
-          </a>
-          <a
-            href={`/api/reports/R8_DG_SUMMARY/export-pdf?${exportParams.toString()}`}
-            className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5"
-          >
-            {rc.exportPdf}
-          </a>
+          <ReportExportButtons reportCode="R8_DG_SUMMARY" domainId={domainId} sourceId={sourceId} ownerId={ownerId} labelXlsx={rc.exportXlsx} labelPdf={rc.exportPdf} />
         </div>
       </div>
 

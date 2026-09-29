@@ -7,6 +7,7 @@ import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { KpiCard } from "@/components/reports/KpiCard";
 import { TrendChart } from "@/components/reports/TrendChart";
 import { DrillDownGrid, type GridColumn } from "@/components/reports/DrillDownGrid";
+import { ReportExportButtons } from "@/components/reports/ReportExportButtons";
 
 const PAGE_SIZE = 25;
 
@@ -76,11 +77,6 @@ function PiAccessReportContent({
     }
   }
 
-  const exportParams = new URLSearchParams();
-  if (domainId) exportParams.set("domain", domainId);
-  if (sourceId) exportParams.set("source", sourceId);
-  if (ownerId) exportParams.set("owner", ownerId);
-
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -94,8 +90,7 @@ function PiAccessReportContent({
               {capturing ? "Capturing…" : "Capture Snapshot"}
             </button>
           )}
-          <a href={`/api/reports/PI_ACCESS/export?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-violet">Export XLSX</a>
-          <a href={`/api/reports/PI_ACCESS/export-pdf?${exportParams.toString()}`} className="text-sm px-3 py-2 rounded-lg border border-brand-purple text-brand-purple hover:bg-brand-purple/5">Export PDF</a>
+          <ReportExportButtons reportCode="PI_ACCESS" domainId={domainId} sourceId={sourceId} ownerId={ownerId} labelXlsx="Export XLSX" labelPdf="Export PDF" />
         </div>
       </div>
 
