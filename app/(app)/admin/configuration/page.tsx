@@ -10,6 +10,7 @@ import { SampleDataConfigSection } from "./SampleDataConfigSection";
 import { FollowSettingsSection } from "./FollowSettingsSection";
 import { SitSettingsSection } from "./SitSettingsSection";
 import { AuthSettingsSection } from "./AuthSettingsSection";
+import { BrandingSettingsSection } from "./BrandingSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -48,6 +49,7 @@ export default function ConfigurationPage() {
   const [showFollowSettings, setShowFollowSettings] = useState(false);
   const [showSitSettings, setShowSitSettings] = useState(false);
   const [showAuthSettings, setShowAuthSettings] = useState(false);
+  const [showBrandingSettings, setShowBrandingSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -88,6 +90,7 @@ export default function ConfigurationPage() {
     setShowFollowSettings(false);
     setShowSitSettings(false);
     setShowAuthSettings(false);
+    setShowBrandingSettings(false);
     setAdding(false);
   }
 
@@ -168,7 +171,8 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
-    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings && !showAuthSettings;
+    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings && !showAuthSettings
+    && !showBrandingSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -248,6 +252,18 @@ export default function ConfigurationPage() {
             <div className="text-[10px] text-muted mt-0.5">Active region · SIT patterns</div>
           </button>
 
+          {/* ── Branding section */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
+            Branding
+          </div>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowBrandingSettings(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showBrandingSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Branding</div>
+            <div className="text-[10px] text-muted mt-0.5">Customer logo</div>
+          </button>
+
           {/* ── Security section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
             Security
@@ -309,6 +325,9 @@ export default function ConfigurationPage() {
 
         {/* ── Authentication panel ── */}
         {showAuthSettings && <AuthSettingsSection />}
+
+        {/* ── Branding panel ── */}
+        {showBrandingSettings && <BrandingSettingsSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (

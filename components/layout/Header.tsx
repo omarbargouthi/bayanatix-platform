@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconBell, IconSearch, IconMenu, IconHistory, IconCollaborate } from "./icons";
 import { LanguagePicker } from "./LanguagePicker";
+import { EnvironmentBadge } from "./EnvironmentBadge";
 import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useLang } from "@/lib/lang-context";
@@ -183,6 +184,8 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
       >
         <IconMenu className="w-[18px] h-[18px]" />
       </button>
+
+      <EnvironmentBadge className="hidden md:inline-flex shrink-0" />
 
       {/* Breadcrumb */}
       <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted shrink-0 min-w-0 overflow-hidden">

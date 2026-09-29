@@ -22,6 +22,7 @@ const PUBLIC_PREFIXES = [
   "/api/dq/scheduled-run",              // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
   "/api/languages",         // login page's language picker needs this before a session exists
   "/api/translations/bundle", // same reason — non-sensitive UI copy, needed pre-auth by login + public FOI pages
+  "/api/branding/logo",     // login page's logo needs this before a session exists, same reason as /api/languages
 ];
 
 function isPublic(pathname: string) {

@@ -2,6 +2,7 @@ import LoginForm from "./LoginForm";
 import { LoginLangBar } from "./LoginLangBar";
 import { LoginGraphic } from "./LoginGraphic";
 import { IconDB, IconGlossary, IconLineage, IconShield } from "@/components/layout/icons";
+import { EnvironmentBadge } from "@/components/layout/EnvironmentBadge";
 
 export const metadata = { title: "Sign in · Bayanatix" };
 
@@ -23,8 +24,9 @@ export default function LoginPage({ searchParams }: { searchParams: { from?: str
         <LoginGraphic className="absolute top-1/2 -translate-y-1/2 -right-10 w-[30rem] h-[30rem] opacity-80" />
 
         <div className="relative flex items-center gap-3">
-          <img src="/logo.svg" alt="" className="w-10 h-12" />
+          <img src="/api/branding/logo" alt="" className="w-10 h-12" />
           <span className="text-lg font-bold tracking-[0.18em]">BAYANATIX</span>
+          <EnvironmentBadge className="ml-2" />
         </div>
 
         <div className="relative max-w-md">
@@ -64,7 +66,7 @@ export default function LoginPage({ searchParams }: { searchParams: { from?: str
         <div className="w-full max-w-sm">
           <LoginLangBar>
             <div className="lg:hidden flex items-center gap-2 mb-8">
-              <img src="/logo.svg" alt="" className="w-8 h-10" />
+              <img src="/api/branding/logo" alt="" className="w-8 h-10" />
               <span className="font-bold tracking-[0.18em] text-brand-deep">BAYANATIX</span>
             </div>
 
