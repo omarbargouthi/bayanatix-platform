@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { isDataPrivacyOfficer } from "@/lib/can";
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const canSeeDeleted = session.role === "ADMIN" || await isDataPrivacyOfficer(session);
 
   const holds = await sql<{
     holdId: number;
@@ -20,6 +23,9 @@ export async function GET() {
     releaseJustification: string | null;
     notes: string | null;
     createdAt: string;
+    isDeleted: boolean;
+    deletedAt: string | null;
+    deletedByName: string | null;
   }[]>`
     SELECT
       lh.hold_id              AS "holdId",
@@ -34,10 +40,15 @@ export async function GET() {
       lh.release_authority    AS "releaseAuthority",
       lh.release_justification AS "releaseJustification",
       lh.notes                AS notes,
-      lh.created_at           AS "createdAt"
+      lh.created_at           AS "createdAt",
+      lh.is_deleted           AS "isDeleted",
+      lh.deleted_at           AS "deletedAt",
+      du.full_name            AS "deletedByName"
     FROM bayanat.legal_holds lh
     LEFT JOIN bayanat.users u ON u.user_id = lh.placed_by
-    ORDER BY lh.hold_status = 'ACTIVE' DESC, lh.hold_date DESC
+    LEFT JOIN bayanat.users du ON du.user_id = lh.deleted_by_user_id
+    ${canSeeDeleted ? sql`` : sql`WHERE lh.is_deleted = false`}
+    ORDER BY lh.is_deleted ASC, lh.hold_status = 'ACTIVE' DESC, lh.hold_date DESC
   `;
 
   // Fetch categories per hold

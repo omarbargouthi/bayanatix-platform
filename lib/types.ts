@@ -630,6 +630,9 @@ export type LegalHold = {
   createdAt:          string;
   categoryIds?:       number[];
   categoryNames?:     string[];
+  isDeleted:          boolean;
+  deletedAt:          string | null;
+  deletedByName:      string | null;
 };
 
 export type RetentionOverview = {

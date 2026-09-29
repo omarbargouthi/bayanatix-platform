@@ -97,9 +97,11 @@ function NewHoldModal({
             </div>
           </div>
 
-          {form.holdScopeType === "CATEGORY" && (
+          {(form.holdScopeType === "CATEGORY" || form.holdScopeType === "ENTITY") && (
             <div>
-              <label className="block text-[11px] text-muted mb-1">{r.affectedCategories}</label>
+              <label className="block text-[11px] text-muted mb-1">
+                {form.holdScopeType === "ENTITY" ? "Category (used to suggest driving tables)" : r.affectedCategories}
+              </label>
               <div className="max-h-40 overflow-y-auto border border-line rounded-lg p-2 space-y-1">
                 {allCats.map((c) => (
                   <label key={c.categoryId} className="flex items-center gap-2 cursor-pointer py-0.5 hover:bg-gray-50 rounded px-1">
@@ -198,6 +200,7 @@ export function LegalHoldsTab() {
   const [categories, setCategories] = useState<DataCategory[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [releasing, setReleasing] = useState<LegalHold | null>(null);
+  const [canManageDeletion, setCanManageDeletion] = useState(false);
 
   const load = useCallback(() => {
     fetch("/api/retention/legal-holds").then((res) => res.json()).then(setHolds).catch(() => setHolds([]));
@@ -207,6 +210,25 @@ export function LegalHoldsTab() {
   useEffect(() => {
     fetch("/api/retention/categories").then((res) => res.json()).then(setCategories).catch(() => {});
   }, []);
+  useEffect(() => {
+    fetch("/api/retention/legal-holds/access").then((res) => (res.ok ? res.json() : { canManageDeletion: false }))
+      .then((r) => setCanManageDeletion(!!r.canManageDeletion)).catch(() => {});
+  }, []);
+
+  async function deleteHold(hold: LegalHold) {
+    if (!confirm(`Delete legal hold "${hold.caseName}"? It will be hidden from the normal list but can be restored later by an Admin or Data Privacy Officer.`)) return;
+    const res = await fetch(`/api/retention/legal-holds/${hold.holdId}`, { method: "DELETE" });
+    if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? "Delete failed"); return; }
+    load();
+  }
+
+  async function restoreHold(hold: LegalHold) {
+    const res = await fetch(`/api/retention/legal-holds/${hold.holdId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restore: true }),
+    });
+    if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? "Restore failed"); return; }
+    load();
+  }
 
   const statusLabel: Record<string, string> = {
     ACTIVE: r.statusActive, RELEASED: r.statusReleased, EXPIRED: r.statusExpired,
@@ -232,13 +254,22 @@ export function LegalHoldsTab() {
         ) : (
           <div className="space-y-3">
             {holds.map((hold) => (
-              <div key={hold.holdId} className={`rounded-xl border p-4 ${hold.holdStatus === "ACTIVE" ? "border-red-200 bg-red-50/30" : "border-line bg-white"}`}>
+              <div
+                key={hold.holdId}
+                className={`rounded-xl border p-4 ${
+                  hold.isDeleted ? "border-line-soft bg-canvas opacity-60"
+                  : hold.holdStatus === "ACTIVE" ? "border-red-200 bg-red-50/30" : "border-line bg-white"
+                }`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-[13px] text-ink">{hold.caseName}</span>
                       <span className="text-[11px] font-mono text-muted">{hold.caseReference}</span>
                       <HoldStatusBadge status={hold.holdStatus} />
+                      {hold.isDeleted && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase bg-gray-200 text-gray-600">Deleted</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted flex-wrap">
                       <span>{r.holdDate}: {hold.holdDate}</span>
@@ -246,6 +277,11 @@ export function LegalHoldsTab() {
                       <span>{r.placedBy}: {hold.placedByName ?? hold.placedBy}</span>
                       <span className="capitalize">{hold.holdScopeType.toLowerCase()}</span>
                     </div>
+                    {hold.isDeleted && hold.deletedAt && (
+                      <div className="text-[11px] text-muted mt-0.5">
+                        Deleted {new Date(hold.deletedAt).toLocaleDateString()} by {hold.deletedByName ?? "—"}
+                      </div>
+                    )}
                     {hold.categoryNames && hold.categoryNames.length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {hold.categoryNames.map((name, i) => (
@@ -257,16 +293,35 @@ export function LegalHoldsTab() {
                     )}
                     {hold.notes && <p className="text-[11px] text-muted mt-1.5 italic">{hold.notes}</p>}
                   </div>
-                  {hold.holdStatus === "ACTIVE" && (
-                    <button
-                      className="shrink-0 text-[11px] px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                      onClick={() => setReleasing(hold)}
-                    >
-                      {r.releaseHold}
-                    </button>
-                  )}
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    {!hold.isDeleted && hold.holdStatus === "ACTIVE" && (
+                      <button
+                        className="text-[11px] px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                        onClick={() => setReleasing(hold)}
+                      >
+                        {r.releaseHold}
+                      </button>
+                    )}
+                    {canManageDeletion && (
+                      hold.isDeleted ? (
+                        <button
+                          className="text-[11px] px-3 py-1.5 rounded-lg border border-line text-muted hover:border-brand-purple hover:text-brand-purple"
+                          onClick={() => restoreHold(hold)}
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          className="text-[11px] text-muted hover:text-red-600"
+                          onClick={() => deleteHold(hold)}
+                        >
+                          Delete
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
-                {hold.holdScopeType === "ENTITY" && <LegalHoldEntitiesPanel holdId={hold.holdId} categoryIds={hold.categoryIds} />}
+                {hold.holdScopeType === "ENTITY" && !hold.isDeleted && <LegalHoldEntitiesPanel holdId={hold.holdId} categoryIds={hold.categoryIds} />}
               </div>
             ))}
           </div>
