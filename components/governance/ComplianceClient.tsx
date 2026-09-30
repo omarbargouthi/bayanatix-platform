@@ -10,6 +10,7 @@ import type { SessionUser } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
+import { HalfDonut } from "@/components/ui/HalfDonut";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
@@ -645,26 +646,25 @@ export function ComplianceClient({
           still drives the inline importMsg/refresh feedback right after a
           trigger, that's unrelated to the removed list-of-past-jobs panel. */}
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-4">
-        <StatCard label={ca.totalReqs}   value={total}    accent="#6366F1" />
-        <StatCard label={ca.complete}    value={complete} accent="#10B981" />
-        <StatCard label="N/A"            value={na}       accent="#6B7280" />
-        <StatCard label={ca.notCompleted} value={notDone} accent="#F59E0B" />
-      </div>
-
-      {/* Progress */}
-      <div className="card p-4 mb-5">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-ink">{ca.overallProgress}</span>
-          <span className="text-sm font-bold text-emerald-600">{pct}%</span>
+      {/* Compliance Score — same HalfDonut gauge as the Dashboard's "Overall
+          Compliance" card, scoped to this one regulation. Pure complete/total
+          ratio (overallStats.pct), same as everywhere else on this page — no
+          maturity-level weighting, since that's only meaningful for NDI_2026's
+          own 0-5 scale (see lib/queries/domains.ts), not a regulation like this. */}
+      <div className="card p-5 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-bold text-ink">{ca.complianceScore}</h3>
         </div>
-        <div className="h-3 bg-canvas rounded-full overflow-hidden flex">
-          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${Math.round(complete/Math.max(total,1)*100)}%` }} />
-          <div className="h-full bg-gray-400 transition-all"   style={{ width: `${Math.round(na/Math.max(total,1)*100)}%` }} />
-        </div>
-        <div className="flex items-center gap-5 mt-2 text-[11px] text-muted">
-          <Dot hex="#10B981" label={ca.complete} /><Dot hex="#6B7280" label="N/A" /><Dot hex="#E5E7EB" label={ca.notCompleted} />
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="shrink-0">
+            <HalfDonut value={pct} size={160} />
+          </div>
+          <div className="grid grid-cols-2 gap-4 flex-1 min-w-[220px]">
+            <StatCard label={ca.totalReqs}    value={total}    accent="#6366F1" />
+            <StatCard label={ca.complete}     value={complete} accent="#10B981" />
+            <StatCard label="N/A"             value={na}       accent="#6B7280" />
+            <StatCard label={ca.notCompleted} value={notDone}  accent="#F59E0B" />
+          </div>
         </div>
       </div>
 
@@ -1484,14 +1484,6 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
       <div className="text-2xl font-extrabold mb-0.5" style={{ color: accent }}>{value}</div>
       <div className="text-[11px] text-muted">{label}</div>
     </div>
-  );
-}
-function Dot({ hex, label }: { hex: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: hex }} />
-      {label}
-    </span>
   );
 }
 

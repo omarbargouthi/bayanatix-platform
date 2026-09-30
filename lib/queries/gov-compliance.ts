@@ -215,6 +215,12 @@ export async function createFramework(
         { code: "NA",            label: "N/A",            labelAr: "لا ينطبق",    color: "#6B7280", sort: 3 },
       ]
     : [
+        // A never-assessed requirement's submissionStatus defaults to
+        // NOT_COMPLETE (see listRequirements()'s COALESCE below) — this option
+        // has to exist here or StatusSelect's dropdown has nothing to match
+        // that value against and silently falls back to displaying its FIRST
+        // option (Compliance) as if selected, even though nothing was chosen.
+        { code: "NOT_COMPLETE",       label: "Not Started",        labelAr: "لم يبدأ",       color: "#6B7280", sort: 0 },
         { code: "COMPLIANCE",         label: "Compliance",         labelAr: "امتثال",        color: "#10B981", sort: 1 },
         { code: "PARTIAL_COMPLIANCE", label: "Partial Compliance", labelAr: "امتثال جزئي",   color: "#F59E0B", sort: 2 },
         { code: "NON_COMPLIANCE",     label: "Non Compliance",     labelAr: "عدم الامتثال",  color: "#EF4444", sort: 3 },

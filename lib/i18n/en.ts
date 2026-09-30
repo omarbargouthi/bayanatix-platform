@@ -343,6 +343,7 @@ export const en: I18nStrings = {
     },
     ca: {
       pageTitle:        "Compliance Assessment",
+      complianceScore:  "Compliance Score",
       overallProgress:  "Overall Progress",
       tabAssessment:    "Assessment",
       allDomains:       "All Domains",

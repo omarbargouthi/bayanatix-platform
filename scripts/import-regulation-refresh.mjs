@@ -75,6 +75,11 @@ async function seedNaiiMaturityLevels(fwId) {
 }
 
 const STATUS_COMPLIANCE_ONLY = [
+  // Matches lib/queries/gov-compliance.ts's createFramework() — see db/128's
+  // comment for why this has to exist (a never-assessed requirement's default
+  // submissionStatus is NOT_COMPLETE; without a matching option the status
+  // <select> silently fell back to showing "Compliance" as if selected).
+  { code: "NOT_COMPLETE", label: "Not Started", labelAr: "لم يبدأ", color: "#6B7280", sort: 0 },
   { code: "COMPLIANCE", label: "Compliance", labelAr: "امتثال", color: "#10B981", sort: 1 },
   { code: "PARTIAL_COMPLIANCE", label: "Partial Compliance", labelAr: "امتثال جزئي", color: "#F59E0B", sort: 2 },
   { code: "NON_COMPLIANCE", label: "Non Compliance", labelAr: "عدم الامتثال", color: "#EF4444", sort: 3 },

@@ -343,6 +343,7 @@ export const ar: I18nStrings = {
     },
     ca: {
       pageTitle:        "تقييم الامتثال",
+      complianceScore:  "درجة الامتثال",
       overallProgress:  "التقدم العام",
       tabAssessment:    "التقييم",
       allDomains:       "كل النطاقات",

@@ -363,6 +363,7 @@ export type I18nStrings = {
     // compliance assessment page
     ca: {
       pageTitle:        string;
+      complianceScore:  string;
       overallProgress:  string;
       tabAssessment:    string;
       // breadcrumb & step headers
