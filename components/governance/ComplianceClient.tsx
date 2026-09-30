@@ -194,14 +194,27 @@ export function ComplianceClient({
   }
 
   // ── Data derived ────────────────────────────────────────────────────────────
-  // Map Arabic domain key → English/Arabic display names (from domainConfig → fallbacks)
+  // Map Arabic domain key → English/Arabic display names (from domainConfig → fallbacks).
+  // NDI_2026's own gov_compliance_requirements.domain_code holds the FULL English
+  // domain name (e.g. "Data Sharing and Integration Domain (DSI)"), not the short
+  // code gov_compliance_domain_config.domain_code actually uses ("DSI") — same
+  // "domain_code means something different per framework" landmine documented in
+  // lib/queries/domains.ts. Deriving the short code from standard_code's prefix
+  // (split_part(standard_code,'.',1), e.g. "DSI.M.1" → "DSI") is the same reliable
+  // trick that file already uses, so try that BEFORE falling back to the raw
+  // (Arabic) key — without it, every NDI domain silently displayed in Arabic even
+  // when the UI's language was English.
+  function shortDomainCode(r: ComplianceRequirement): string {
+    if (r.domainCode && domainConfig.some((d) => d.domainCode === r.domainCode)) return r.domainCode;
+    return r.standardCode?.split(".")[0] ?? r.domainCode ?? "";
+  }
   const domainEnMap = useMemo(() => {
     const map = new Map<string, string>();
     const cfgByCode = new Map(domainConfig.map((d) => [d.domainCode, d]));
     reqs.forEach((r) => {
       const key = r.domain ?? "Other";
       if (!map.has(key)) {
-        const cfg = cfgByCode.get(r.domainCode ?? "");
+        const cfg = cfgByCode.get(shortDomainCode(r));
         map.set(key, cfg?.nameEn ?? r.domainEn ?? DOMAIN_EN_BY_CODE[r.domainCode ?? ""] ?? key);
       }
     });
@@ -214,7 +227,7 @@ export function ComplianceClient({
     reqs.forEach((r) => {
       const key = r.domain ?? "Other";
       if (!map.has(key)) {
-        const cfg = cfgByCode.get(r.domainCode ?? "");
+        const cfg = cfgByCode.get(shortDomainCode(r));
         map.set(key, cfg ? pickTranslation(cfg.nameEn, cfg.nameTranslations, "ar") : key);
       }
     });
@@ -311,7 +324,22 @@ export function ComplianceClient({
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   function selectDomain(d: string)   { setSelDomain(d); setSelStandard(null); setSelLevel(null); setExpanded(null); }
-  function selectStandard(s: string) { setSelStandard(s); setSelLevel(isComplianceOnly ? 0 : null); setExpanded(null); }
+  function selectStandard(s: string) {
+    setSelStandard(s);
+    if (isComplianceOnly) { setSelLevel(0); setExpanded(null); return; }
+    // Real NDI data mostly has exactly one populated maturity level per
+    // standard (e.g. "DSI.M.1" only ever has a level-1 row) — the level
+    // picker (Step 3) would then show one enabled card and five disabled
+    // ones for no real choice to make. Skip straight to it when that's the
+    // case; only show the picker when a standard genuinely spans >1 level.
+    const levelsWithData = new Set(
+      reqs.filter((r) => (r.domain ?? "Other") === selDomain && deriveStandard(r) === s)
+          .map((r) => parseLevelNum(r.maturityLevel))
+          .filter((lvl): lvl is number => lvl !== null)
+    );
+    setSelLevel(levelsWithData.size === 1 ? [...levelsWithData][0] : null);
+    setExpanded(null);
+  }
   function resetAll()                { setSelDomain(null); setSelStandard(null); setSelLevel(null); setExpanded(null); }
   function backToStandards()         { setSelStandard(null); setSelLevel(null); setExpanded(null); }
   function backToLevels()            { setSelLevel(null); setExpanded(null); }
@@ -720,7 +748,7 @@ export function ComplianceClient({
                     {domains.map((domain) => {
                       const s = domainStats(domain);
                       const rep = reqs.find((r) => (r.domain ?? "Other") === domain);
-                      const dc = rep?.domainCode ?? "";
+                      const dc = rep ? shortDomainCode(rep) : "";
                       const enName = domainEnMap.get(domain) ?? domain;
                       const arName = domainArMap.get(domain) ?? domain;
                       const displayName = isRtl ? arName : enName;
