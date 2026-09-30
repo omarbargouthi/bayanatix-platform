@@ -157,6 +157,17 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
               </svg>
               Asset Requests
             </Link>
+            <Link
+              href="/about"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-left px-3 py-2 text-sm text-ink-soft hover:bg-canvas flex items-center gap-2"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-2.92 3-2.92 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Help &amp; About
+            </Link>
             <div className="border-t border-line my-1" />
             <button
               onMouseDown={(e) => e.preventDefault()}
