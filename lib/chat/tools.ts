@@ -18,6 +18,9 @@ import { getGlossaryTerms, getGlossaryTermById } from "@/lib/queries/glossary";
 import { listOpenDatasets, getDatasetColumns } from "@/lib/queries/open-data";
 import { listDsas } from "@/lib/queries/sharing";
 import { listFoiRequests, getFoiCase, getFoiStats } from "@/lib/queries/foi";
+import { listFrameworks } from "@/lib/queries/gov-compliance";
+import { getRetentionOverview } from "@/lib/queries/retention";
+import { getUpstreamImpact, getDownstreamImpact } from "@/lib/queries/lineage";
 import type { SourceRef, ToolDefinition, ToolResult } from "./types";
 
 function ok(data: unknown, sources: SourceRef[] = []): ToolResult {
@@ -306,6 +309,141 @@ const getSharingAgreements: ToolDefinition = {
   },
 };
 
+// ── get_compliance_status ────────────────────────────────────────────────────
+const getComplianceStatus: ToolDefinition = {
+  name: "get_compliance_status",
+  description: "Get compliance status for a regulation/framework by name (e.g. 'PDPL', 'BCBS239', 'PIPEDA', 'National Data Index'): requirement counts and overall compliance percentage.",
+  inputSchema: {
+    type: "object",
+    properties: { regulationName: { type: "string" } },
+    required: ["regulationName"],
+  },
+  run: async (args) => {
+    const name = String(args.regulationName ?? "").trim();
+    if (!name) return { ok: false, error: "regulationName is required" };
+    const frameworks = await listFrameworks(false);
+    const matches = frameworks.filter(
+      (f) => f.name.toLowerCase().includes(name.toLowerCase()) || f.code.toLowerCase().includes(name.toLowerCase())
+    );
+    if (matches.length === 0) return notFound();
+    let match = matches[0];
+    if (matches.length > 1) {
+      const exact = matches.find((m) => m.name.toLowerCase() === name.toLowerCase() || m.code.toLowerCase() === name.toLowerCase());
+      if (!exact) return ambiguous(matches.map((m) => m.name));
+      match = exact;
+    }
+    // Pure complete/total ratio — never level-weighted, same as everywhere else
+    // this is shown in the app (the maturity-level scale only ever applies to
+    // NDI_2026's own dashboard rollup, never to a regulation's own % like this).
+    const compliancePct = Math.round((match.completeCount / Math.max(match.reqCount, 1)) * 100);
+    return ok(
+      {
+        name: match.name, assessmentMode: match.assessmentMode,
+        totalRequirements: match.reqCount, completeCount: match.completeCount,
+        naCount: match.naCount, notCompleteCount: match.notCompleteCount, compliancePct,
+      },
+      [{ assetType: "COMPLIANCE_FRAMEWORK", assetId: match.frameworkId, label: match.name, href: `/governance/compliance?fw=${match.frameworkId}` }],
+    );
+  },
+};
+
+// ── get_retention_overview ───────────────────────────────────────────────────
+const getRetentionOverviewTool: ToolDefinition = {
+  name: "get_retention_overview",
+  description: "Get org-wide data retention statistics: total categories, schedules, active legal holds, classified entities, and how many are expiring soon or overdue.",
+  inputSchema: { type: "object", properties: {} },
+  run: async () => {
+    const overview = await getRetentionOverview();
+    return ok(overview, [{ assetType: "RETENTION", assetId: 0, label: "Retention overview", href: "/privacy" }]);
+  },
+};
+
+// ── get_retention_status ─────────────────────────────────────────────────────
+const getRetentionStatus: ToolDefinition = {
+  name: "get_retention_status",
+  description: "Get retention status for a specific table by name: its retention category, status, expiry date, and whether it's under an active legal hold.",
+  inputSchema: {
+    type: "object",
+    properties: { tableName: { type: "string" } },
+    required: ["tableName"],
+  },
+  run: async (args) => {
+    const tableName = String(args.tableName ?? "").trim();
+    if (!tableName) return { ok: false, error: "tableName is required" };
+    const rows = await sql<{ id: number; name: string; schemaId: number }[]>`
+      SELECT entity_id AS id, entity_name_text AS name, schema_id AS "schemaId" FROM bayanat.data_entities
+      WHERE entity_name_text ILIKE ${`%${tableName}%`} ORDER BY entity_name_text LIMIT 5
+    `;
+    if (rows.length === 0) return notFound();
+    if (rows.length > 1) return ambiguous(rows.map((r) => r.name));
+    const entity = rows[0];
+    const [[retention], [holdRow]] = await Promise.all([
+      sql<{ categoryName: string | null; sensitivity: string | null; retentionStatus: string | null; effectiveExpiryDate: string | null }[]>`
+        SELECT dc.name AS "categoryName", dc.sensitivity, e.retention_status AS "retentionStatus", e.effective_expiry_date::text AS "effectiveExpiryDate"
+        FROM bayanat.data_entities e LEFT JOIN bayanat.data_categories dc ON dc.category_id = e.retention_category_id
+        WHERE e.entity_id = ${entity.id}
+      `,
+      // Deliberately reports only whether a hold is active and how many, never
+      // the case reference/name or condition details — those are litigation-
+      // sensitive and this tool runs at the same coarse, no-extra-permission-
+      // check level as every other chat tool.
+      sql<{ activeHoldCount: number }[]>`
+        SELECT count(DISTINCT lh.hold_id)::int AS "activeHoldCount"
+        FROM bayanat.legal_hold_entities lhe JOIN bayanat.legal_holds lh ON lh.hold_id = lhe.hold_id
+        WHERE lhe.entity_id = ${entity.id} AND lh.hold_status = 'ACTIVE'
+      `,
+    ]);
+    return ok(
+      {
+        table: entity.name,
+        retentionCategory: retention?.categoryName ?? null,
+        sensitivity: retention?.sensitivity ?? null,
+        retentionStatus: retention?.retentionStatus ?? "not classified",
+        effectiveExpiryDate: retention?.effectiveExpiryDate ?? null,
+        underActiveLegalHold: (holdRow?.activeHoldCount ?? 0) > 0,
+        activeHoldCount: holdRow?.activeHoldCount ?? 0,
+      },
+      [{ assetType: "DATA_ENTITIES", assetId: entity.id, label: entity.name, href: `/catalog/${entity.schemaId}/tables/${entity.id}` }],
+    );
+  },
+};
+
+// ── get_lineage_summary ──────────────────────────────────────────────────────
+const getLineageSummary: ToolDefinition = {
+  name: "get_lineage_summary",
+  description: "Get upstream and downstream lineage summary for a table by name: how many assets feed into it and how many depend on it, with the immediate (one-hop) names.",
+  inputSchema: {
+    type: "object",
+    properties: { tableName: { type: "string" } },
+    required: ["tableName"],
+  },
+  run: async (args) => {
+    const tableName = String(args.tableName ?? "").trim();
+    if (!tableName) return { ok: false, error: "tableName is required" };
+    const rows = await sql<{ id: number; name: string; schemaId: number }[]>`
+      SELECT entity_id AS id, entity_name_text AS name, schema_id AS "schemaId" FROM bayanat.data_entities
+      WHERE entity_name_text ILIKE ${`%${tableName}%`} ORDER BY entity_name_text LIMIT 5
+    `;
+    if (rows.length === 0) return notFound();
+    if (rows.length > 1) return ambiguous(rows.map((r) => r.name));
+    const entity = rows[0];
+    const [upstream, downstream] = await Promise.all([
+      getUpstreamImpact("DATA_ENTITIES", entity.id),
+      getDownstreamImpact("DATA_ENTITIES", entity.id),
+    ]);
+    const immediateNames = (report: typeof upstream) => (report.levels.find((l) => l.depth === 1)?.assets ?? []).map((a) => a.name);
+    return ok(
+      {
+        table: entity.name,
+        upstreamCount: upstream.summary.totalImpacted, upstreamImmediate: immediateNames(upstream),
+        downstreamCount: downstream.summary.totalImpacted, downstreamImmediate: immediateNames(downstream),
+        downstreamWithDqIssues: downstream.summary.withDqIssues,
+      },
+      [{ assetType: "DATA_ENTITIES", assetId: entity.id, label: entity.name, href: `/catalog/${entity.schemaId}/tables/${entity.id}` }],
+    );
+  },
+};
+
 // ── get_foi_stats ────────────────────────────────────────────────────────────
 const getFoiStatsTool: ToolDefinition = {
   name: "get_foi_stats",
@@ -345,6 +483,7 @@ export const TOOL_REGISTRY: Record<string, ToolDefinition> = Object.fromEntries(
   [
     searchAssets, getAsset, getAssetChildren, getClassificationSummary, getDqStatus,
     getDefinitions, getOpenData, getSharingAgreements, getFoiStatsTool, getFoiRequestTool,
+    getComplianceStatus, getRetentionOverviewTool, getRetentionStatus, getLineageSummary,
   ].map((t) => [t.name, t]),
 );
 
