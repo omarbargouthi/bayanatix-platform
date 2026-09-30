@@ -132,6 +132,37 @@ export function ComplianceClient({
   // maturity tier — skip the level-picker step (Step 3) entirely.
   const isComplianceOnly = activeFramework?.assessmentMode === "COMPLIANCE_ONLY";
 
+  // ── New regulation/framework ────────────────────────────────────────────────
+  // A brand-new regulation needs its own framework row *before* anything gets
+  // imported into it — Import Excel always targets whichever framework is
+  // currently selected in the dropdown above, so creating the framework first
+  // is the only way to avoid an upload landing inside an unrelated existing one.
+  const [showNewFw, setShowNewFw]   = useState(false);
+  const [newFwForm, setNewFwForm]   = useState({ name: "", code: "", description: "", assessmentMode: "COMPLIANCE_ONLY", regulationGroupCode: "" });
+  const [creatingFw, setCreatingFw] = useState(false);
+  const [newFwError, setNewFwError] = useState("");
+
+  async function handleCreateFramework() {
+    if (!newFwForm.name.trim() || !newFwForm.code.trim()) { setNewFwError("Name and Code are required"); return; }
+    setCreatingFw(true); setNewFwError("");
+    try {
+      const res = await fetch("/api/governance/compliance", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newFwForm.name.trim(), code: newFwForm.code.trim(),
+          description: newFwForm.description.trim() || null,
+          assessmentMode: newFwForm.assessmentMode,
+          regulationGroupCode: newFwForm.regulationGroupCode || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setNewFwError(data.error ?? "Could not create regulation"); return; }
+      setShowNewFw(false);
+      setNewFwForm({ name: "", code: "", description: "", assessmentMode: "COMPLIANCE_ONLY", regulationGroupCode: "" });
+      router.push(`/governance/compliance?fw=${data.frameworkId}`);
+    } finally { setCreatingFw(false); }
+  }
+
   const lvlColor = (n: number) => levelCfg.find((c) => c.levelNum === n)?.colorHex ?? DEFAULT_LEVEL_COLORS[n] ?? "#888";
   const lvlName  = (n: number) => {
     const cfg = levelCfg.find((c) => c.levelNum === n);
@@ -492,6 +523,61 @@ export function ComplianceClient({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div>
+      {/* New Regulation modal */}
+      {showNewFw && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <h3 className="font-bold text-brand-deep text-lg mb-1">New Regulation</h3>
+            <p className="text-xs text-ink-soft mb-4">
+              Creates an empty regulation with its own requirement list — Import Excel will target this new one once selected above, never an existing regulation.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold text-muted uppercase mb-1 block">Name *</label>
+                <input className="field w-full text-sm" placeholder="e.g. PIPEDA" value={newFwForm.name}
+                  onChange={(e) => setNewFwForm((f) => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-muted uppercase mb-1 block">Code * <span className="font-normal">(short, unique — e.g. PIPEDA)</span></label>
+                <input className="field w-full text-sm font-mono" placeholder="PIPEDA" value={newFwForm.code}
+                  onChange={(e) => setNewFwForm((f) => ({ ...f, code: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-muted uppercase mb-1 block">Description</label>
+                <input className="field w-full text-sm" placeholder="Optional" value={newFwForm.description}
+                  onChange={(e) => setNewFwForm((f) => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-muted uppercase mb-1 block">Assessment Mode</label>
+                  <select className="field w-full text-sm" value={newFwForm.assessmentMode}
+                    onChange={(e) => setNewFwForm((f) => ({ ...f, assessmentMode: e.target.value }))}>
+                    <option value="COMPLIANCE_ONLY">Compliance checklist</option>
+                    <option value="MATURITY">Maturity (0-5 levels)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-muted uppercase mb-1 block">Group</label>
+                  <select className="field w-full text-sm" value={newFwForm.regulationGroupCode}
+                    onChange={(e) => setNewFwForm((f) => ({ ...f, regulationGroupCode: e.target.value }))}>
+                    <option value="">—</option>
+                    <option value="KSA_REGULATIONS">KSA Regulations</option>
+                    <option value="INTERNATIONAL_STANDARDS">International Standards</option>
+                  </select>
+                </div>
+              </div>
+              {newFwError && <p className="text-xs text-red-600">{newFwError}</p>}
+            </div>
+            <div className="flex gap-3 justify-end mt-5">
+              <button onClick={() => { setShowNewFw(false); setNewFwError(""); }} className="btn btn-sm">{t.common.cancel}</button>
+              <button onClick={handleCreateFramework} disabled={creatingFw} className="btn btn-sm btn-primary">
+                {creatingFw ? "Creating…" : "Create Regulation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-xl flex items-center gap-2">
@@ -535,6 +621,9 @@ export function ComplianceClient({
               {frameworks.map((f) => <option key={f.frameworkId} value={f.frameworkId}>{f.name}</option>)}
             </select>
           )}
+          <button onClick={() => setShowNewFw(true)} className="btn btn-sm" title="Create a new regulation before importing its requirements — Import Excel always targets whichever regulation is selected above">
+            + New Regulation
+          </button>
           <label className={`btn btn-sm cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
             {importing ? "Importing…" : "Import Excel"}
             <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"

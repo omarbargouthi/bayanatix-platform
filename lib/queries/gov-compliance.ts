@@ -162,15 +162,82 @@ export async function getFramework(frameworkId: number): Promise<ComplianceFrame
   return rows.find((f) => f.frameworkId === frameworkId) ?? null;
 }
 
+// Matches ComplianceClient.tsx's own DEFAULT_LEVEL_NAMES/DEFAULT_LEVEL_COLORS —
+// the 6-level (0-5) scale every existing MATURITY-mode framework (NDI_2026,
+// NAII, NDI_OPS_EXCELLENCE) uses, so a newly-created MATURITY framework's
+// level chips render identically rather than needing bespoke level config.
+const DEFAULT_MATURITY_LEVELS: { num: number; name: string; color: string }[] = [
+  { num: 0, name: "No Capability", color: "#D84848" },
+  { num: 1, name: "Build",         color: "#E88030" },
+  { num: 2, name: "Definition",    color: "#2D4AA0" },
+  { num: 3, name: "Activation",    color: "#3D7EC8" },
+  { num: 4, name: "Managed",       color: "#1E8C76" },
+  { num: 5, name: "Innovation",    color: "#5CA85C" },
+];
+
+// A framework row alone isn't enough to actually assess against — without
+// level_config the level chips have no labels/colors, and without
+// compliance_config_items::STATUS the per-requirement status dropdown has no
+// options at all. Mirrors exactly what scripts/import-regulation-refresh.mjs's
+// upsertFramework + seedComplianceOnlyLevel/seedNaiiMaturityLevels +
+// seedStatusConfig do for every existing framework, so a framework created
+// through this path is immediately usable, not half-configured.
 export async function createFramework(
-  name: string, code: string, version: string | null, description: string | null
+  name: string, code: string, version: string | null, description: string | null,
+  assessmentMode: "COMPLIANCE_ONLY" | "MATURITY" = "COMPLIANCE_ONLY",
+  regulationGroupCode: string | null = null,
 ): Promise<number> {
   const rows = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.gov_compliance_frameworks (name, code, version, description)
-    VALUES (${name}, ${code}, ${version}, ${description})
+    INSERT INTO bayanat.gov_compliance_frameworks (name, code, version, description, assessment_mode, regulation_group_code)
+    VALUES (${name}, ${code}, ${version}, ${description}, ${assessmentMode}, ${regulationGroupCode})
     RETURNING framework_id AS id
   `;
-  return rows[0].id;
+  const frameworkId = rows[0].id;
+
+  if (assessmentMode === "COMPLIANCE_ONLY") {
+    await sql`
+      INSERT INTO bayanat.gov_compliance_level_config (framework_id, level_num, name, color_hex, description)
+      VALUES (${frameworkId}, 0, 'Requirement', '#2D4AA0', 'Every requirement in this framework — assessed individually, not against a maturity scale.')
+    `;
+  } else {
+    for (const l of DEFAULT_MATURITY_LEVELS) {
+      await sql`
+        INSERT INTO bayanat.gov_compliance_level_config (framework_id, level_num, name, color_hex)
+        VALUES (${frameworkId}, ${l.num}, ${l.name}, ${l.color})
+      `;
+    }
+  }
+
+  const statuses = assessmentMode === "MATURITY"
+    ? [
+        { code: "COMPLETE",      label: "Complete",       labelAr: "مكتمل",       color: "#10B981", sort: 1 },
+        { code: "NOT_COMPLETE",  label: "Not Completed",  labelAr: "غير مكتمل",   color: "#F59E0B", sort: 2 },
+        { code: "NA",            label: "N/A",            labelAr: "لا ينطبق",    color: "#6B7280", sort: 3 },
+      ]
+    : [
+        { code: "COMPLIANCE",         label: "Compliance",         labelAr: "امتثال",        color: "#10B981", sort: 1 },
+        { code: "PARTIAL_COMPLIANCE", label: "Partial Compliance", labelAr: "امتثال جزئي",   color: "#F59E0B", sort: 2 },
+        { code: "NON_COMPLIANCE",     label: "Non Compliance",     labelAr: "عدم الامتثال",  color: "#EF4444", sort: 3 },
+        { code: "NA",                 label: "N/A",                labelAr: "لا ينطبق",      color: "#6B7280", sort: 4 },
+      ];
+  for (const s of statuses) {
+    await sql`
+      INSERT INTO bayanat.compliance_config_items (framework_id, config_group, code, label, label_ar, color_hex, sort_order)
+      VALUES (${frameworkId}, 'STATUS', ${s.code}, ${s.label}, ${s.labelAr}, ${s.color}, ${s.sort})
+    `;
+  }
+  await sql`
+    INSERT INTO bayanat.compliance_config_items (framework_id, config_group, code, label, label_ar, color_hex, sort_order)
+    VALUES (${frameworkId}, 'COMPLIANCE_TYPE', 'امتثال', 'Compliance', 'امتثال', '#2D4AA0', 1)
+  `;
+  if (assessmentMode === "MATURITY") {
+    await sql`
+      INSERT INTO bayanat.compliance_config_items (framework_id, config_group, code, label, label_ar, color_hex, sort_order)
+      VALUES (${frameworkId}, 'COMPLIANCE_TYPE', 'نضج', 'Maturity', 'نضج', '#5CA85C', 2)
+    `;
+  }
+
+  return frameworkId;
 }
 
 export async function updateFrameworkApplicability(frameworkId: number, isApplicable: boolean, userId: string): Promise<void> {
