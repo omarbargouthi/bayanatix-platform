@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { createNotification } from "./notifications";
 
 export type BackgroundJobStatus = "RUNNING" | "COMPLETED" | "FAILED";
 
@@ -82,18 +83,15 @@ async function notifyJobFinished(jobId: number, status: "COMPLETED" | "FAILED", 
     `;
     if (!job?.createdByUserId) return;
     const label = JOB_TYPE_LABELS[job.jobTypeCode] ?? job.jobTypeCode;
-    await sql`
-      INSERT INTO bayanat.notifications (user_id, type, title, body, severity, action_label, action_href)
-      VALUES (
-        ${job.createdByUserId},
-        'JOB',
-        ${status === "COMPLETED" ? `${label} completed` : `${label} failed`},
-        ${status === "COMPLETED" ? `Job #${jobId} finished successfully.` : `Job #${jobId} failed: ${errorText ?? "unknown error"}`},
-        ${status === "COMPLETED" ? "SUCCESS" : "ERROR"},
-        'View Job Details',
-        '/admin/audit-logs?tab=job-logs'
-      )
-    `;
+    await createNotification({
+      userId: job.createdByUserId,
+      type: "JOB",
+      title: status === "COMPLETED" ? `${label} completed` : `${label} failed`,
+      body: status === "COMPLETED" ? `Job #${jobId} finished successfully.` : `Job #${jobId} failed: ${errorText ?? "unknown error"}`,
+      severity: status === "COMPLETED" ? "SUCCESS" : "ERROR",
+      actionLabel: "View Job Details",
+      actionHref: "/admin/audit-logs?tab=job-logs",
+    });
   } catch (e) {
     console.error("[notifyJobFinished] failed to create notification", e);
   }

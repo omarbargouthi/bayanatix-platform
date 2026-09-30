@@ -11,6 +11,7 @@
 // Vercel serverless, this needs `unstable_after()` or a real queue instead).
 
 import { sql } from "../db";
+import { createNotification } from "./notifications";
 
 export type JobType = "DOWNLOAD" | "UPLOAD";
 export type JobStatus = "RUNNING" | "VALIDATED" | "AWAITING_CONFIRM" | "COMMITTED" | "FAILED" | "CANCELLED";
@@ -63,12 +64,35 @@ export async function createDownloadJob(scope: unknown, userId: string): Promise
   return row.id;
 }
 
+// Best-effort — a notification failure must never fail the bulk job itself.
+async function notifyBulkJobFinished(jobId: number, status: "COMMITTED" | "FAILED", errorText?: string): Promise<void> {
+  try {
+    const [job] = await sql<{ jobTypeCode: JobType; createdByUserId: string | null }[]>`
+      SELECT job_type_code AS "jobTypeCode", created_by_user_id AS "createdByUserId" FROM bayanat.bulk_jobs WHERE job_id = ${jobId}
+    `;
+    if (!job?.createdByUserId) return;
+    const label = job.jobTypeCode === "DOWNLOAD" ? "Bulk Download" : "Bulk Upload";
+    await createNotification({
+      userId: job.createdByUserId,
+      type: "JOB",
+      title: status === "COMMITTED" ? `${label} completed` : `${label} failed`,
+      body: status === "COMMITTED" ? `Job #${jobId} finished successfully.` : `Job #${jobId} failed: ${errorText ?? "unknown error"}`,
+      severity: status === "COMMITTED" ? "SUCCESS" : "ERROR",
+      actionLabel: "View Job Details",
+      actionHref: "/bulk-operations?tab=jobs",
+    });
+  } catch (e) {
+    console.error("[notifyBulkJobFinished] failed to create notification", e);
+  }
+}
+
 export async function finishDownloadJob(jobId: number, fileName: string, fileData: Buffer, logFile: Buffer, totals: unknown): Promise<void> {
   await sql`
     UPDATE bayanat.bulk_jobs SET status_code = 'COMMITTED', file_name_text = ${fileName}, file_data = ${fileData},
       log_file_data = ${logFile}, totals_json = ${sql.json(totals as any)}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;
+  await notifyBulkJobFinished(jobId, "COMMITTED");
 }
 
 // Uploads auto-commit end to end (no manual review/approve step) — the job starts
@@ -123,10 +147,12 @@ export async function finishUploadCommit(jobId: number, totals: unknown, resultF
       result_file_data = ${resultFile}, log_file_data = ${logFile}, rejected_file_data = ${rejectedFile}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;
+  await notifyBulkJobFinished(jobId, "COMMITTED");
 }
 
 export async function failJob(jobId: number, errorText: string): Promise<void> {
   await sql`UPDATE bayanat.bulk_jobs SET status_code = 'FAILED', error_text = ${errorText}, finished_at = NOW() WHERE job_id = ${jobId}`;
+  await notifyBulkJobFinished(jobId, "FAILED", errorText);
 }
 
 export async function listBulkJobs(userId?: string): Promise<BulkJob[]> {

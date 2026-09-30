@@ -3,6 +3,7 @@ import { sql } from "./db";
 import { applyGovernanceDefaults } from "./queries/stakeholders";
 import { logUpdate, logCreate } from "./audit";
 import { startWorkflow } from "./workflow";
+import { createNotification } from "./queries/notifications";
 
 // Actor id used for audit_logs entries the crawler writes on its own (table-type
 // suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
@@ -143,10 +144,10 @@ type JobLogger = {
   error(msg: string): Promise<void>;
 };
 
-async function makeJobLogger(connectionId: number, connectionName: string): Promise<JobLogger> {
+async function makeJobLogger(connectionId: number, connectionName: string, triggeredByUserId: string | null): Promise<JobLogger> {
   const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.crawl_jobs (connection_id, connection_name)
-    VALUES (${connectionId}, ${connectionName}) RETURNING job_id AS id
+    INSERT INTO bayanat.crawl_jobs (connection_id, connection_name, triggered_by_user_id)
+    VALUES (${connectionId}, ${connectionName}, ${triggeredByUserId}) RETURNING job_id AS id
   `;
   const jobId = row.id;
   const log = async (level: string, msg: string) =>
@@ -155,15 +156,40 @@ async function makeJobLogger(connectionId: number, connectionName: string): Prom
   return { jobId, info: m => log("INFO", m), warn: m => log("WARN", m), error: m => log("ERROR", m) };
 }
 
-async function finishJob(jobId: number, result: CrawlResult): Promise<void> {
+// Best-effort — a notification failure must never fail the crawl it's
+// reporting on. No triggeredByUserId (e.g. scripts/scheduler.mjs's own
+// scheduled crawls) means no one to notify, not an error.
+async function notifyCrawlFinished(
+  connectionName: string, triggeredByUserId: string | null, status: "COMPLETED" | "FAILED", detail: string,
+): Promise<void> {
+  if (!triggeredByUserId) return;
+  try {
+    await createNotification({
+      userId: triggeredByUserId,
+      type: "JOB",
+      title: status === "COMPLETED" ? `Crawl completed: ${connectionName}` : `Crawl failed: ${connectionName}`,
+      body: detail,
+      severity: status === "COMPLETED" ? "SUCCESS" : "ERROR",
+      actionLabel: "View Job Details",
+      actionHref: "/admin/audit-logs?tab=job-logs",
+    });
+  } catch (e) {
+    console.error("[notifyCrawlFinished] failed to create notification", e);
+  }
+}
+
+async function finishJob(jobId: number, result: CrawlResult, connectionName: string, triggeredByUserId: string | null): Promise<void> {
   await sql`UPDATE bayanat.crawl_jobs SET status='COMPLETED', finished_at=NOW(),
     schema_count=${result.schemaCount}, table_count=${result.tableCount},
     column_count=${result.columnCount} WHERE job_id=${jobId}`;
+  await notifyCrawlFinished(connectionName, triggeredByUserId, "COMPLETED",
+    `${result.schemaCount} schema(s), ${result.tableCount} table(s), ${result.columnCount} column(s).`);
 }
 
-async function failJob(jobId: number, errorText: string): Promise<void> {
+async function failJob(jobId: number, errorText: string, connectionName: string, triggeredByUserId: string | null): Promise<void> {
   await sql`UPDATE bayanat.crawl_jobs SET status='FAILED', finished_at=NOW(),
     error_text=${errorText} WHERE job_id=${jobId}`;
+  await notifyCrawlFinished(connectionName, triggeredByUserId, "FAILED", errorText);
 }
 
 // ── Schema / table filtering helpers ─────────────────────────────────────────
@@ -1673,7 +1699,7 @@ async function persistForeignKeys(sourceId: number, foreignKeys: CrawlFk[]): Pro
 
 // ── Main orchestrator ─────────────────────────────────────────────────────────
 
-export async function crawlDataSource(connectionId: number): Promise<void> {
+export async function crawlDataSource(connectionId: number, triggeredByUserId: string | null = null): Promise<void> {
   const [cfgRow] = await sql<(ConnCfg & { connectionName: string })[]>`
     SELECT connection_name AS "connectionName", db_type_code AS "dbTypeCode",
            host_address AS "hostAddress", port_number AS "portNumber",
@@ -1710,7 +1736,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
     defaultTechStewardId: configRow?.defaultTechStewardId ?? null,
   };
 
-  const logger = await makeJobLogger(connectionId, cfgRow.connectionName);
+  const logger = await makeJobLogger(connectionId, cfgRow.connectionName, triggeredByUserId);
   await logger.info(`Starting crawl of ${cfgRow.connectionName} (${cfgRow.dbTypeCode})`);
   if (config) {
     if (config.schemaIncludeList?.length) await logger.info(`Schema include: ${config.schemaIncludeList.join(", ")}`);
@@ -1769,7 +1795,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
       }
     }
 
-    await finishJob(logger.jobId, result);
+    await finishJob(logger.jobId, result, cfgRow.connectionName, triggeredByUserId);
 
     await sql`
       UPDATE bayanat.connection_registry SET
@@ -1784,7 +1810,7 @@ export async function crawlDataSource(connectionId: number): Promise<void> {
   } catch (e: unknown) {
     const msg = (e as Error).message;
     await logger.error(`Crawl failed: ${msg}`);
-    await failJob(logger.jobId, msg);
+    await failJob(logger.jobId, msg, cfgRow.connectionName, triggeredByUserId);
     await sql`UPDATE bayanat.connection_registry SET crawl_status='FAILED', crawl_error_text=${msg} WHERE connection_id=${connectionId}`;
     throw e;
   }

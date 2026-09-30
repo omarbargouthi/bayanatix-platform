@@ -18,6 +18,14 @@ const CREATABLE_SHEETS = [
 export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [tab, setTab] = useState<"download" | "upload" | "jobs">("download");
 
+  // A job-completion notification links here with ?tab=jobs so it actually
+  // lands on the Jobs tab — avoided useSearchParams (would need a Suspense
+  // boundary this page doesn't have) since this only needs to run once on mount.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested === "download" || requested === "upload" || requested === "jobs") setTab(requested);
+  }, []);
+
   // ── Download panel ──────────────────────────────────────────────────────────
   const [sources, setSources] = useState<SourceOption[]>([]);
   const [domains, setDomains] = useState<DomainOption[]>([]);

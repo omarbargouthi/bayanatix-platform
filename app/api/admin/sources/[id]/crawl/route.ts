@@ -21,7 +21,7 @@ export async function POST(_: Request, { params }: Params) {
   // reuses the exact same status/job-log plumbing so the UI needs no changes.
   const task = conn.dbTypeCode === "PBIX_FOLDER"
     ? scanPbixFolder(connectionId, session.userId, { force: true })
-    : crawlDataSource(connectionId);
+    : crawlDataSource(connectionId, session.userId);
   void task.catch(async (err: unknown) => {
     await updateCrawlStatus(connectionId, "FAILED", (err as Error).message);
   });

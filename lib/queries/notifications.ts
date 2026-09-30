@@ -43,3 +43,20 @@ export async function markAllRead(userId: string): Promise<void> {
     WHERE user_id = ${userId} AND is_read = FALSE
   `;
 }
+
+// Shared insert used by every "a background job finished" notifier —
+// lib/queries/background-jobs.ts (compliance/report/translation exports),
+// lib/crawler.ts (data source crawls), lib/queries/bulk-jobs.ts (Bulk
+// Operations download/upload) all call this on completion/failure so a
+// notification-format change only needs to happen in one place. Callers are
+// expected to swallow their own errors around this (best-effort — a failed
+// notification insert must never fail the job it's reporting on).
+export async function createNotification(n: {
+  userId: string; type: string; title: string; body?: string | null;
+  severity?: "INFO" | "SUCCESS" | "WARNING" | "ERROR"; actionLabel?: string | null; actionHref?: string | null;
+}): Promise<void> {
+  await sql`
+    INSERT INTO bayanat.notifications (user_id, type, title, body, severity, action_label, action_href)
+    VALUES (${n.userId}, ${n.type}, ${n.title}, ${n.body ?? null}, ${n.severity ?? "INFO"}, ${n.actionLabel ?? null}, ${n.actionHref ?? null})
+  `;
+}
