@@ -66,14 +66,31 @@ function ProgressBar({ job }: { job: BackgroundJob }) {
   );
 }
 
-function JobRow({ job }: { job: BackgroundJob }) {
+// Short "what was this job actually about" line built from whatever
+// paramsJson happens to carry — every job type stashes different keys
+// (frameworkId, languageCode, reportCode, fileName...), so this just prints
+// whichever of the common ones are present rather than needing a per-type
+// formatter.
+function paramsSummary(paramsJson: Record<string, unknown> | null): string | null {
+  if (!paramsJson) return null;
+  const keys = ["frameworkId", "languageCode", "reportCode", "glossaryId", "fileName"];
+  const parts = keys
+    .filter((k) => paramsJson[k] != null && paramsJson[k] !== "")
+    .map((k) => `${k}: ${paramsJson[k]}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function JobRow({ job, typeLabel }: { job: BackgroundJob; typeLabel?: string }) {
+  const summary = paramsSummary(job.paramsJson);
   return (
-    <div className="border border-line rounded-lg px-4 py-3">
+    <div id={`job-${job.jobId}`} className="border border-line rounded-lg px-4 py-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[job.status]}`}>{STATUS_LABEL[job.status]}</span>
+        {typeLabel && <span className="text-[11px] font-semibold text-brand-deep">{typeLabel}</span>}
         <span className="text-[11px] text-muted">Job #{job.jobId}</span>
         <span className="text-[11px] text-muted">{new Date(job.createdAt).toLocaleString()}</span>
       </div>
+      {summary && <div className="text-[11px] text-muted mt-1">{summary}</div>}
       {job.status === "RUNNING" && <ProgressBar job={job} />}
       {job.status === "FAILED" && job.errorText && (
         <div className="text-[12px] text-red-600 mt-1.5">{job.errorText}</div>
@@ -102,8 +119,10 @@ function JobRow({ job }: { job: BackgroundJob }) {
 // progress/result for each, with download links once finished. Pass
 // `latestJobId` (the id just returned by a trigger POST) so a brand-new job
 // shows up immediately rather than waiting for the next list poll.
-export function BackgroundJobsPanel({ jobTypeCodes, latestJobId, title = "Jobs" }: {
+export function BackgroundJobsPanel({ jobTypeCodes, latestJobId, title = "Jobs", jobTypeLabels }: {
   jobTypeCodes: string[]; latestJobId?: number | null; title?: string;
+  /** Friendly label per job_type_code — useful when the panel lists more than one type together. */
+  jobTypeLabels?: Record<string, string>;
 }) {
   const [jobs, setJobs] = useState<BackgroundJob[] | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -139,7 +158,7 @@ export function BackgroundJobsPanel({ jobTypeCodes, latestJobId, title = "Jobs" 
     <div className="mt-4">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">{title}</div>
       <div className="space-y-2">
-        {jobs.map((j) => <JobRow key={j.jobId} job={j} />)}
+        {jobs.map((j) => <JobRow key={j.jobId} job={j} typeLabel={jobTypeLabels?.[j.jobTypeCode]} />)}
       </div>
     </div>
   );

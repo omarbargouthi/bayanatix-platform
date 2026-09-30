@@ -4,6 +4,24 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuditLogClient } from "@/app/(app)/admin/audit-log/AuditLogClient";
 import type { AdminUser } from "@/lib/types";
+import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
+
+// Every job_type_code any feature creates via lib/queries/background-jobs.ts's
+// createJob() — kept here (not imported from that file) since this is a client
+// component and that file pulls in the server-only postgres.js driver.
+const BACKGROUND_JOB_TYPES = [
+  "GOV_COMPLIANCE_EXPORT", "GOV_COMPLIANCE_IMPORT",
+  "REPORT_EXPORT_XLSX", "REPORT_EXPORT_PDF",
+  "TRANSLATIONS_EXPORT", "TRANSLATIONS_IMPORT",
+];
+const BACKGROUND_JOB_LABELS: Record<string, string> = {
+  GOV_COMPLIANCE_EXPORT: "Compliance Export",
+  GOV_COMPLIANCE_IMPORT: "Compliance Import",
+  REPORT_EXPORT_XLSX: "Report Export (Excel)",
+  REPORT_EXPORT_PDF: "Report Export (PDF)",
+  TRANSLATIONS_EXPORT: "Translations Export",
+  TRANSLATIONS_IMPORT: "Translations Import",
+};
 
 // ── Audit log section ─────────────────────────────────────────────────────────
 
@@ -121,6 +139,14 @@ function JobLogsSection() {
           )}
         </div>
       ))}
+
+      {/* Compliance/Reports/Translations export+import jobs — moved here from
+          each feature's own page so every background job's history lives in
+          one place, matching this page's existing Crawl Job History above. */}
+      <div className="mt-8">
+        <h2 className="text-base font-bold text-ink mb-3">Background Jobs</h2>
+        <BackgroundJobsPanel jobTypeCodes={BACKGROUND_JOB_TYPES} jobTypeLabels={BACKGROUND_JOB_LABELS} title="Compliance · Reports · Translations" />
+      </div>
     </main>
   );
 }

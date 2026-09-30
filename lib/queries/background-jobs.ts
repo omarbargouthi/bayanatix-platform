@@ -56,6 +56,49 @@ export async function updateJobProgress(jobId: number, processed: number, total:
   `;
 }
 
+// Friendly label per job_type_code for notification text — kept here (server
+// side) separately from components/shared/BackgroundJobsPanel.tsx's own copy
+// of the same map, since that file is a client component and can't import
+// anything from this one (postgres.js is server-only).
+const JOB_TYPE_LABELS: Record<string, string> = {
+  GOV_COMPLIANCE_EXPORT: "Compliance Export",
+  GOV_COMPLIANCE_IMPORT: "Compliance Import",
+  REPORT_EXPORT_XLSX: "Report Export (Excel)",
+  REPORT_EXPORT_PDF: "Report Export (PDF)",
+  TRANSLATIONS_EXPORT: "Translations Export",
+  TRANSLATIONS_IMPORT: "Translations Import",
+};
+
+// Every background job's completion (success or failure) notifies whoever
+// triggered it, with a link to Admin > Audit Log > Job Logs — the one place
+// all background job history now lives (see that page's "Background Jobs"
+// section). Best-effort: a notification failure must never fail the job
+// itself, so this only logs and swallows.
+async function notifyJobFinished(jobId: number, status: "COMPLETED" | "FAILED", errorText?: string): Promise<void> {
+  try {
+    const [job] = await sql<{ jobTypeCode: string; createdByUserId: string | null }[]>`
+      SELECT job_type_code AS "jobTypeCode", created_by_user_id AS "createdByUserId"
+      FROM bayanat.background_jobs WHERE job_id = ${jobId}
+    `;
+    if (!job?.createdByUserId) return;
+    const label = JOB_TYPE_LABELS[job.jobTypeCode] ?? job.jobTypeCode;
+    await sql`
+      INSERT INTO bayanat.notifications (user_id, type, title, body, severity, action_label, action_href)
+      VALUES (
+        ${job.createdByUserId},
+        'JOB',
+        ${status === "COMPLETED" ? `${label} completed` : `${label} failed`},
+        ${status === "COMPLETED" ? `Job #${jobId} finished successfully.` : `Job #${jobId} failed: ${errorText ?? "unknown error"}`},
+        ${status === "COMPLETED" ? "SUCCESS" : "ERROR"},
+        'View Job Details',
+        '/admin/audit-logs?tab=job-logs'
+      )
+    `;
+  } catch (e) {
+    console.error("[notifyJobFinished] failed to create notification", e);
+  }
+}
+
 export async function finishJob(jobId: number, result: {
   resultFileData?: Buffer;
   resultFileName?: string;
@@ -74,6 +117,7 @@ export async function finishJob(jobId: number, result: {
       finished_at              = NOW()
     WHERE job_id = ${jobId}
   `;
+  await notifyJobFinished(jobId, "COMPLETED");
 }
 
 export async function failJob(jobId: number, errorText: string, logFileData?: Buffer): Promise<void> {
@@ -82,6 +126,7 @@ export async function failJob(jobId: number, errorText: string, logFileData?: Bu
       status_code = 'FAILED', error_text = ${errorText}, log_file_data = ${logFileData ?? null}, finished_at = NOW()
     WHERE job_id = ${jobId}
   `;
+  await notifyJobFinished(jobId, "FAILED", errorText);
 }
 
 export async function getJob(jobId: number): Promise<BackgroundJob | null> {

@@ -9,7 +9,7 @@ import type {
 import type { SessionUser } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
-import { BackgroundJobsPanel, usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
+import { usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
@@ -640,7 +640,10 @@ export function ComplianceClient({
         </div>
       )}
 
-      <BackgroundJobsPanel jobTypeCodes={["GOV_COMPLIANCE_EXPORT", "GOV_COMPLIANCE_IMPORT"]} latestJobId={latestJobId} title="Compliance Jobs" />
+      {/* Job history moved to Admin > Audit Log > Job Logs (see that page's
+          "Background Jobs" section) — latestJobId/usePollBackgroundJob above
+          still drives the inline importMsg/refresh feedback right after a
+          trigger, that's unrelated to the removed list-of-past-jobs panel. */}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-4">

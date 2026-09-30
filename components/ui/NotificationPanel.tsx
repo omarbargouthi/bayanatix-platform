@@ -23,6 +23,7 @@ const TYPE_LABEL: Record<string, string> = {
   QUALITY:        "Quality",
   WORKFLOW:       "Workflow",
   COMPLIANCE:     "Compliance",
+  JOB:            "Job",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -32,6 +33,7 @@ const TYPE_COLOR: Record<string, string> = {
   QUALITY:        "bg-red-50 text-red-700",
   WORKFLOW:       "bg-amber-50 text-amber-700",
   COMPLIANCE:     "bg-teal-50 text-teal-700",
+  JOB:            "bg-indigo-50 text-indigo-700",
 };
 
 function timeAgo(iso: string) {
@@ -45,10 +47,19 @@ function timeAgo(iso: string) {
   return `${days}d ago`;
 }
 
+// "Jobs" (background export/import completions — see lib/queries/background-jobs.ts's
+// notifyJobFinished) vs. everything else ("Operational Activity" — workflow
+// assignments, reviews, certifications, classification flags, DQ issues,
+// compliance reminders...). Split into two tabs so a burst of job-completion
+// noise doesn't bury the activity a user actually needs to act on, and vice versa.
+const JOB_NOTIFICATION_TYPE = "JOB";
+type NotifTab = "activity" | "jobs";
+
 export function NotificationPanel({ open, onClose }: Props) {
   const [items, setItems]       = useState<Notification[]>([]);
   const [loading, setLoading]   = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
+  const [tab, setTab]           = useState<NotifTab>("activity");
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +78,12 @@ export function NotificationPanel({ open, onClose }: Props) {
     setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setHasUnread(false);
   }
+
+  const jobItems      = items.filter((n) => n.type === JOB_NOTIFICATION_TYPE);
+  const activityItems = items.filter((n) => n.type !== JOB_NOTIFICATION_TYPE);
+  const visibleItems  = tab === "jobs" ? jobItems : activityItems;
+  const jobUnread      = jobItems.filter((n) => !n.isRead).length;
+  const activityUnread = activityItems.filter((n) => !n.isRead).length;
 
   return (
     <>
@@ -118,6 +135,30 @@ export function NotificationPanel({ open, onClose }: Props) {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex border-b border-line shrink-0">
+          {([
+            ["activity", "Activity", activityUnread],
+            ["jobs", "Jobs", jobUnread],
+          ] as const).map(([id, label, unread]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={[
+                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[13px] font-semibold border-b-2 transition-colors",
+                tab === id ? "text-brand-purple border-brand-purple" : "text-ink-soft border-transparent hover:text-brand-deep",
+              ].join(" ")}
+            >
+              {label}
+              {unread > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab === id ? "bg-brand-purple text-white" : "bg-gray-200 text-gray-700"}`}>
+                  {unread}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto nice-scroll">
           {loading && (
@@ -125,16 +166,16 @@ export function NotificationPanel({ open, onClose }: Props) {
               Loading…
             </div>
           )}
-          {!loading && items.length === 0 && (
+          {!loading && visibleItems.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 gap-2 text-muted">
               <svg viewBox="0 0 24 24" className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
                 <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
-              <span className="text-sm">No notifications</span>
+              <span className="text-sm">{tab === "jobs" ? "No job notifications" : "No activity notifications"}</span>
             </div>
           )}
-          {!loading && items.map((n) => (
+          {!loading && visibleItems.map((n) => (
             <div
               key={n.notificationId}
               className={[

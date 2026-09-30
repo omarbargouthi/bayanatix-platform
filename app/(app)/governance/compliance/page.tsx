@@ -49,6 +49,11 @@ export default async function CompliancePage({
       />
       <main className="px-8 py-7 pb-14">
         <ComplianceClient
+          // Forces a full remount on framework switch — ComplianceClient's many
+          // useState(initial...) hooks otherwise keep their FIRST-mount values
+          // forever, since React reuses the component instance across re-renders
+          // at the same tree position even when these initial* props change.
+          key={fwId ?? "none"}
           frameworks={frameworks}
           activeFramework={activeFramework}
           initialRequirements={requirements}
