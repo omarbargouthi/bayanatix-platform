@@ -344,6 +344,8 @@ export const ar: I18nStrings = {
     ca: {
       pageTitle:        "تقييم الامتثال",
       complianceScore:  "درجة الامتثال",
+      complianceTrend:        "اتجاه الامتثال (آخر 12 شهرًا)",
+      complianceTrendNoData:  "لا تتوفر بيانات اتجاه حتى الآن — يرجى التحقق بعد عملية الرصد المجدولة التالية.",
       overallProgress:  "التقدم العام",
       tabAssessment:    "التقييم",
       allDomains:       "كل النطاقات",

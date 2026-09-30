@@ -364,6 +364,8 @@ export type I18nStrings = {
     ca: {
       pageTitle:        string;
       complianceScore:  string;
+      complianceTrend:        string;
+      complianceTrendNoData: string;
       overallProgress:  string;
       tabAssessment:    string;
       // breadcrumb & step headers

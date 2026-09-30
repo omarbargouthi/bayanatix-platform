@@ -198,6 +198,14 @@ export type TrendPoint = {
   maturityScore: number;
 };
 
+// Rolling last-N-months compliance % trend for one regulation (see
+// lib/queries/gov-compliance.ts::getComplianceTrend) -- periodDate rather than
+// month+year since the window can cross a calendar-year boundary.
+export type ComplianceTrendPoint = {
+  periodDate:     string;
+  compliancePct:  number;
+};
+
 export type RecentAsset = {
   assetType: "TABLE" | "COLUMN" | "GLOSSARY" | "SCHEMA" | "TERM" | "SOURCE";
   assetId:   string;

@@ -2,6 +2,7 @@ import { sql } from "../db";
 import { logUpdate } from "../audit";
 import { startWorkflow } from "../workflow";
 import { translatedColumnSql } from "../i18n-admin/translated-column";
+import type { ComplianceTrendPoint } from "../types";
 
 export type ComplianceFramework = {
   frameworkId:         number;
@@ -160,6 +161,46 @@ export async function listFrameworks(includeInactive = true): Promise<Compliance
 export async function getFramework(frameworkId: number): Promise<ComplianceFramework | null> {
   const rows = await listFrameworks();
   return rows.find((f) => f.frameworkId === frameworkId) ?? null;
+}
+
+// ── Compliance trend (Regulation scheduled area, see lib/queries/scheduling.ts) ──
+
+/** Rolling last-N-months window, chronological order (oldest first) for charting. */
+export async function getComplianceTrend(frameworkId: number, months = 12): Promise<ComplianceTrendPoint[]> {
+  const rows = await sql<ComplianceTrendPoint[]>`
+    SELECT period_date::text AS "periodDate", compliance_pct::float8 AS "compliancePct"
+    FROM bayanat.compliance_trends
+    WHERE framework_id = ${frameworkId}
+    ORDER BY period_date DESC
+    LIMIT ${months}
+  `;
+  return rows.reverse();
+}
+
+// Called by the REGULATION_TREND scheduled area (app/api/admin/scheduled-jobs/run)
+// to record each applicable framework's current compliance % as this month's
+// trend point -- pure complete/total ratio, same rule used everywhere else on
+// the Compliance Assessment page (never level-weighted -- that only applies to
+// NDI's own 0-5 maturity scale, captured separately by captureMaturityTrendSnapshot).
+export async function captureComplianceTrendSnapshot(): Promise<{ frameworkCount: number }> {
+  const frameworks = await listFrameworks(false); // only regulations marked applicable
+  const periodDate = new Date();
+  periodDate.setUTCDate(1);
+  const periodDateStr = periodDate.toISOString().slice(0, 10);
+
+  for (const f of frameworks) {
+    const compliancePct = Math.round((f.completeCount / Math.max(f.reqCount, 1)) * 10000) / 100;
+    await sql`
+      INSERT INTO bayanat.compliance_trends (framework_id, period_date, compliance_pct, req_count, complete_count)
+      VALUES (${f.frameworkId}, ${periodDateStr}, ${compliancePct}, ${f.reqCount}, ${f.completeCount})
+      ON CONFLICT (framework_id, period_date) DO UPDATE SET
+        compliance_pct = EXCLUDED.compliance_pct,
+        req_count      = EXCLUDED.req_count,
+        complete_count = EXCLUDED.complete_count,
+        captured_at    = now()
+    `;
+  }
+  return { frameworkCount: frameworks.length };
 }
 
 // Matches ComplianceClient.tsx's own DEFAULT_LEVEL_NAMES/DEFAULT_LEVEL_COLORS —

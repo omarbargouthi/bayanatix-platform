@@ -344,6 +344,8 @@ export const en: I18nStrings = {
     ca: {
       pageTitle:        "Compliance Assessment",
       complianceScore:  "Compliance Score",
+      complianceTrend:        "Compliance Trend (Last 12 Months)",
+      complianceTrendNoData:  "No trend data yet — check back after the next scheduled capture.",
       overallProgress:  "Overall Progress",
       tabAssessment:    "Assessment",
       allDomains:       "All Domains",

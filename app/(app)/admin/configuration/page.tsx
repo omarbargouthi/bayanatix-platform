@@ -11,6 +11,7 @@ import { FollowSettingsSection } from "./FollowSettingsSection";
 import { SitSettingsSection } from "./SitSettingsSection";
 import { AuthSettingsSection } from "./AuthSettingsSection";
 import { BrandingSettingsSection } from "./BrandingSettingsSection";
+import { SchedulingConfigSection } from "./SchedulingConfigSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -50,6 +51,7 @@ export default function ConfigurationPage() {
   const [showSitSettings, setShowSitSettings] = useState(false);
   const [showAuthSettings, setShowAuthSettings] = useState(false);
   const [showBrandingSettings, setShowBrandingSettings] = useState(false);
+  const [showScheduling, setShowScheduling] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -91,6 +93,7 @@ export default function ConfigurationPage() {
     setShowSitSettings(false);
     setShowAuthSettings(false);
     setShowBrandingSettings(false);
+    setShowScheduling(false);
     setAdding(false);
   }
 
@@ -172,7 +175,7 @@ export default function ConfigurationPage() {
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
     && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings && !showAuthSettings
-    && !showBrandingSettings;
+    && !showBrandingSettings && !showScheduling;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -264,6 +267,18 @@ export default function ConfigurationPage() {
             <div className="text-[10px] text-muted mt-0.5">Customer logo</div>
           </button>
 
+          {/* ── Scheduling section */}
+          <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
+            Scheduling
+          </div>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowScheduling(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showScheduling ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Scheduled Jobs</div>
+            <div className="text-[10px] text-muted mt-0.5">Reports · Regulation</div>
+          </button>
+
           {/* ── Security section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
             Security
@@ -328,6 +343,9 @@ export default function ConfigurationPage() {
 
         {/* ── Branding panel ── */}
         {showBrandingSettings && <BrandingSettingsSection />}
+
+        {/* ── Scheduling panel ── */}
+        {showScheduling && <SchedulingConfigSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (

@@ -1,17 +1,21 @@
 #!/usr/bin/env node
-// Standalone scheduler for catalog-crawl and DQ-rule schedules — run alongside
-// `npm run dev` / `next start`:
+// Standalone scheduler for catalog-crawl, DQ-rule, and area-level (Reports /
+// Regulation) schedules — run alongside `npm run dev` / `next start`:
 //   node scripts/scheduler.mjs
 //
 // Structurally different from scripts/pbix-scheduler.mjs: that script's cron
 // expression IS the schedule (one global schedule for every PBIX_FOLDER
-// connection). Here, each connection/rule has its OWN cron expression stored in
-// the DB (crawl_config.schedule_cron / dq_rules.schedule_cron), so this script's
-// own cron expression is just the polling interval — every tick asks the two
-// "scheduled-*" API routes "is anything due yet?" (they compare each item's cron
-// expression against its own last-run time via lib/scheduler-utils.ts). Same
-// separate-plain-Node-process rationale as pbix-scheduler.mjs (node-cron +
-// postgres.js break Next 14's edge-runtime instrumentation.ts bundling).
+// connection). Here, each connection/rule/area has its OWN cron expression
+// stored in the DB (crawl_config.schedule_cron / dq_rules.schedule_cron /
+// scheduled_job_areas.schedule_cron), so this script's own cron expression is
+// just the polling interval — every tick asks the "scheduled-*" API routes "is
+// anything due yet?" (they compare each item's cron expression against its own
+// last-run time via lib/scheduler-utils.ts). Same separate-plain-Node-process
+// rationale as pbix-scheduler.mjs (node-cron + postgres.js break Next 14's
+// edge-runtime instrumentation.ts bundling).
+//
+// The area-level route (scheduled-jobs/run, added for Reports/Regulation trend
+// capture) is additive only — it does not change how crawl or DQ scheduling works.
 import cron from "node-cron";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -51,8 +55,9 @@ async function hit(label, route) {
 }
 
 async function tick() {
-  await hit("crawl", "/api/admin/sources/scheduled-crawl");
-  await hit("dq",    "/api/dq/scheduled-run");
+  await hit("crawl",         "/api/admin/sources/scheduled-crawl");
+  await hit("dq",            "/api/dq/scheduled-run");
+  await hit("scheduledJobs", "/api/admin/scheduled-jobs/run");
 }
 
 cron.schedule(POLL_SCHEDULE, tick);

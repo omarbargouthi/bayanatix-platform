@@ -6,11 +6,12 @@ import type {
   ComplianceFramework, ComplianceRequirement,
   LevelConfig, UserOption, ConfigItem, MaturitySelection, DomainConfig,
 } from "@/lib/queries/gov-compliance";
-import type { SessionUser } from "@/lib/types";
+import type { SessionUser, ComplianceTrendPoint } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 import { HalfDonut } from "@/components/ui/HalfDonut";
+import { ComplianceTrendChart } from "@/components/governance/ComplianceTrendChart";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Props = {
@@ -18,6 +19,7 @@ type Props = {
   initialRequirements: ComplianceRequirement[]; initialLevelConfig: LevelConfig[];
   users: UserOption[]; initialMaturitySelections: MaturitySelection[];
   initialConfigItems: ConfigItem[]; initialDomainConfig: DomainConfig[];
+  trend: ComplianceTrendPoint[];
   currentUser: SessionUser;
 };
 type HistoryEntry = {
@@ -99,7 +101,7 @@ function complianceTypeLabel(raw: string | null | undefined): { label: string; i
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function ComplianceClient({
   frameworks, activeFramework, initialRequirements, initialLevelConfig,
-  users, initialMaturitySelections, initialConfigItems, initialDomainConfig, currentUser,
+  users, initialMaturitySelections, initialConfigItems, initialDomainConfig, trend, currentUser,
 }: Props) {
   const router = useRouter();
   const { isRtl, t, lang } = useLang();
@@ -694,6 +696,18 @@ export function ComplianceClient({
             <StatCard label={ca.notCompleted} value={notDone}  accent="#F59E0B" />
           </div>
         </div>
+      </div>
+
+      {/* Compliance Trend — last 12 months, captured monthly by the
+          REGULATION_TREND scheduled area (Admin > Configuration > Scheduling).
+          Same pure-ratio % as the Compliance Score card above. */}
+      <div className="card p-5 mb-5">
+        <h3 className="text-base font-bold text-ink mb-3">{ca.complianceTrend}</h3>
+        <ComplianceTrendChart
+          data={trend}
+          legendLabel={activeFramework?.name ?? ""}
+          noDataLabel={ca.complianceTrendNoData}
+        />
       </div>
 
       {/* ── Assessment ─────────────────────────────────────────────────────── */}
