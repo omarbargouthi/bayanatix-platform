@@ -7,3 +7,6 @@ node_modules/
 *.log
 .DS_Store
 next-env.d.ts
+
+# Vendor-only license signing key -- never ship this, never commit it.
+*license-private-key*.pem

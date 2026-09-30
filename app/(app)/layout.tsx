@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { getLanguages } from "@/lib/queries/languages";
 import { getDomainAccess, type DomainCode } from "@/lib/can";
+import { verifyLicense } from "@/lib/license/verify";
 import { AppShell } from "@/components/layout/AppShell";
 import type { Lang } from "@/lib/lang-context";
 
@@ -34,5 +35,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
   const domainAccess = Object.fromEntries(domainEntries) as Record<DomainCode, "WRITE" | "READ" | "NONE">;
 
-  return <AppShell user={user} initialLang={initialLang} domainAccess={domainAccess}>{children}</AppShell>;
+  // Hard-block already happened in middleware; this is only for the grace-period
+  // warning banner, so an admin sees the countdown before it becomes a lockout.
+  const licenseStatus = await verifyLicense(process.env.LICENSE_KEY);
+
+  return <AppShell user={user} initialLang={initialLang} domainAccess={domainAccess} licenseStatus={licenseStatus}>{children}</AppShell>;
 }

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { verifyLicense, isLicenseBlocked } from "@/lib/license/verify";
 
 const PUBLIC_PREFIXES = [
+  "/license-expired",   // must stay reachable even when the license check below blocks everything else
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
@@ -31,6 +33,19 @@ function isPublic(pathname: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (pathname !== "/license-expired") {
+    const licenseStatus = await verifyLicense(process.env.LICENSE_KEY);
+    if (isLicenseBlocked(licenseStatus)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: `LICENSE_${licenseStatus.state.toUpperCase()}` }, { status: 403 });
+      }
+      const url = req.nextUrl.clone();
+      url.pathname = "/license-expired";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (isPublic(pathname)) return NextResponse.next();
 
   const token = req.cookies.get("bayanatix_session")?.value;

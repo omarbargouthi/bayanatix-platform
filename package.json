@@ -9,7 +9,9 @@
     "lint": "next lint",
     "db:migrate": "node scripts/migrate.mjs",
     "scheduler:pbix": "node scripts/pbix-scheduler.mjs",
-    "scheduler": "node scripts/scheduler.mjs"
+    "scheduler": "node scripts/scheduler.mjs",
+    "license:generate-keys": "node scripts/license/generate-keypair.mjs",
+    "license:issue": "node scripts/license/issue-license.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
