@@ -10,7 +10,10 @@ type Settings = {
 };
 
 type Region = { regionCode: string; regionNameText: string };
-type SitType = { sitTypeId: number; sitName: string; classificationCode: string | null; description: string | null; patternCount: number };
+type SitType = {
+  sitTypeId: number; sitName: string; classificationCode: string | null; description: string | null;
+  patternCount: number; isEnabled: boolean; regions: string[];
+};
 type PatternType = "NAME_REGEX" | "VALUE_REGEX" | "CHECKSUM";
 type Pattern = {
   patternId: number; sitTypeId: number; regionCode: string; patternType: PatternType;
@@ -213,7 +216,31 @@ export function SitSettingsSection() {
     await load();
   }
 
+  async function patchType(sitTypeId: number, body: Record<string, unknown>) {
+    await fetch(`/api/sit/types/${sitTypeId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    await load();
+  }
+
+  async function setRegionEnabled(regionCode: string, isEnabled: boolean) {
+    await fetch("/api/sit/types/by-region", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ region_code: regionCode, is_enabled: isEnabled }),
+    });
+    await load();
+  }
+
   if (!settings) return <div className="text-sm text-muted">Loading…</div>;
+
+  // Segregate the catalog by country: a type lands under every non-GLOBAL region
+  // it has a pattern for (a shared concept like National ID can appear under more
+  // than one country), plus a trailing "Global" group for region-agnostic types
+  // (Email Address, Credit Card Details, ...). Group order follows `regions`
+  // (KSA/GLOBAL today, Canada added alongside it) rather than hardcoding countries.
+  const countryGroups = regions.filter((r) => r.regionCode !== "GLOBAL");
+  const typesByRegion = (regionCode: string) => types.filter((t) => t.regions.includes(regionCode));
+  const globalOnlyTypes = types.filter((t) => t.regions.length === 0);
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setSettings((s) => (s ? { ...s, [key]: value } : s));
 
@@ -227,7 +254,9 @@ export function SitSettingsSection() {
           own Term Edit page — that association is what makes a term eligible for automatic pattern-based
           column detection, once it's confirmed a Business asset. Switching the active region changes which
           pattern set applies without touching any association — Canada (or any other region) is added as new
-          pattern rows against the same catalog values.
+          pattern rows against the same catalog values. The catalog below is grouped by country; the checkbox
+          on each type is a separate, coarser switch for "not relevant to this customer at all" — use it (or a
+          group's Enable/Disable all) to turn off a whole country's types rather than every pattern one by one.
         </p>
       </div>
 
@@ -298,27 +327,93 @@ export function SitSettingsSection() {
           </div>
         )}
 
-        <div className="bg-white border border-line rounded-xl divide-y divide-line-soft">
-          {types.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-muted">No SIT types defined yet — create one above.</div>
-          ) : types.map((t) => (
-            <div key={t.sitTypeId}>
-              <button
-                onClick={() => setExpandedId(expandedId === t.sitTypeId ? null : t.sitTypeId)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-canvas-soft"
-              >
-                <span className="text-sm text-ink">{t.sitName}</span>
-                <div className="flex items-center gap-3">
-                  {t.classificationCode && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted">{t.classificationCode}</span>}
-                  <span className="text-[11px] text-muted">{t.patternCount} pattern{t.patternCount !== 1 ? "s" : ""}</span>
-                  <span onClick={(e) => { e.stopPropagation(); void removeType(t.sitTypeId); }} className="text-[11px] text-red-600 hover:underline">Delete</span>
-                  <span className="text-muted text-[11px]">{expandedId === t.sitTypeId ? "▲" : "▼"}</span>
-                </div>
-              </button>
-              {expandedId === t.sitTypeId && <SitTypePatternEditor sitType={t} regions={regions} />}
+        {types.length === 0 ? (
+          <div className="bg-white border border-line rounded-xl px-4 py-3 text-xs text-muted">No SIT types defined yet — create one above.</div>
+        ) : (
+          <div className="space-y-4">
+            {countryGroups.map((region) => (
+              <TypeGroup
+                key={region.regionCode}
+                title={region.regionNameText}
+                types={typesByRegion(region.regionCode)}
+                regions={regions}
+                expandedId={expandedId}
+                onToggleExpand={(id) => setExpandedId(expandedId === id ? null : id)}
+                onPatchType={patchType}
+                onRemoveType={removeType}
+                onBulkSetEnabled={(enabled) => setRegionEnabled(region.regionCode, enabled)}
+              />
+            ))}
+            {globalOnlyTypes.length > 0 && (
+              <TypeGroup
+                title="Global (all regions)"
+                types={globalOnlyTypes}
+                regions={regions}
+                expandedId={expandedId}
+                onToggleExpand={(id) => setExpandedId(expandedId === id ? null : id)}
+                onPatchType={patchType}
+                onRemoveType={removeType}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TypeGroup({ title, types, regions, expandedId, onToggleExpand, onPatchType, onRemoveType, onBulkSetEnabled }: {
+  title: string; types: SitType[]; regions: Region[]; expandedId: number | null;
+  onToggleExpand: (id: number) => void;
+  onPatchType: (id: number, body: Record<string, unknown>) => void;
+  onRemoveType: (id: number) => void;
+  onBulkSetEnabled?: (enabled: boolean) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5 px-1">
+        <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{title} ({types.length})</div>
+        {onBulkSetEnabled && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => onBulkSetEnabled(true)} className="text-[11px] text-brand-purple hover:underline">Enable all</button>
+            <span className="text-muted text-[11px]">·</span>
+            <button onClick={() => onBulkSetEnabled(false)} className="text-[11px] text-muted hover:underline">Disable all</button>
+          </div>
+        )}
+      </div>
+      <div className="bg-white border border-line rounded-xl divide-y divide-line-soft">
+        {types.map((t) => (
+          <div key={t.sitTypeId}>
+            <div
+              onClick={() => onToggleExpand(t.sitTypeId)}
+              className={`w-full flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-canvas-soft ${!t.isEnabled ? "opacity-50" : ""}`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <input
+                  type="checkbox" checked={t.isEnabled}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => onPatchType(t.sitTypeId, { is_enabled: e.target.checked })}
+                  className="w-3.5 h-3.5 accent-brand-purple shrink-0" title="Relevant to this customer"
+                />
+                <span className="text-sm text-ink truncate">{t.sitName}</span>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <select
+                  value={t.classificationCode ?? ""}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => onPatchType(t.sitTypeId, { classification_code: e.target.value || null })}
+                  className="text-[10px] font-semibold border border-line rounded-full px-1.5 py-0.5 bg-canvas-soft text-muted"
+                >
+                  {CLASSIFICATION_OPTIONS.map((c) => <option key={c} value={c}>{c || "— none —"}</option>)}
+                </select>
+                <span className="text-[11px] text-muted">{t.patternCount} pattern{t.patternCount !== 1 ? "s" : ""}</span>
+                <span onClick={(e) => { e.stopPropagation(); onRemoveType(t.sitTypeId); }} className="text-[11px] text-red-600 hover:underline">Delete</span>
+                <span className="text-muted text-[11px]">{expandedId === t.sitTypeId ? "▲" : "▼"}</span>
+              </div>
             </div>
-          ))}
-        </div>
+            {expandedId === t.sitTypeId && <SitTypePatternEditor sitType={t} regions={regions} />}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -101,7 +101,8 @@ async function loadPatterns(activeRegion: string): Promise<Map<number, SitPatter
     SELECT bts.glossary_id AS "glossaryId", sp.pattern_type AS "patternType", sp.pattern_text AS "patternText", sp.confidence_weight AS "confidenceWeight"
     FROM bayanat.sit_patterns sp
     JOIN bayanat.business_term_sit_types bts ON bts.sit_type_id = sp.sit_type_id
-    WHERE sp.is_enabled = true AND sp.region_code IN (${activeRegion}, 'GLOBAL')
+    JOIN bayanat.sit_types st ON st.sit_type_id = sp.sit_type_id
+    WHERE sp.is_enabled = true AND st.is_enabled = true AND sp.region_code IN (${activeRegion}, 'GLOBAL')
   `;
   const byTerm = new Map<number, SitPattern[]>();
   for (const r of rows) {

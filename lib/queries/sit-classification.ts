@@ -216,15 +216,22 @@ export async function getSitRegions(): Promise<SitRegion[]> {
 // Business Glossary terms and from any tag. "Adding SIT to a business term" means
 // creating a row in business_term_sit_types below, NOT tagging with a fixed name.
 
-export type SitType = { sitTypeId: number; sitName: string; classificationCode: string | null; description: string | null; patternCount: number };
+export type SitType = {
+  sitTypeId: number; sitName: string; classificationCode: string | null; description: string | null;
+  patternCount: number; isEnabled: boolean;
+  /** Distinct non-GLOBAL regions this type has at least one pattern for — drives the
+   *  admin UI's "segregated by country" grouping. Empty means GLOBAL-only (or no patterns yet). */
+  regions: string[];
+};
 
 export async function getSitTypes(): Promise<SitType[]> {
   return sql<SitType[]>`
     SELECT st.sit_type_id AS "sitTypeId", st.sit_name AS "sitName", st.classification_code AS "classificationCode",
-           st.description, count(sp.pattern_id)::int AS "patternCount"
+           st.description, st.is_enabled AS "isEnabled", count(sp.pattern_id)::int AS "patternCount",
+           coalesce(array_agg(DISTINCT sp.region_code) FILTER (WHERE sp.region_code != 'GLOBAL'), '{}') AS "regions"
     FROM bayanat.sit_types st
     LEFT JOIN bayanat.sit_patterns sp ON sp.sit_type_id = st.sit_type_id
-    GROUP BY st.sit_type_id, st.sit_name, st.classification_code, st.description
+    GROUP BY st.sit_type_id, st.sit_name, st.classification_code, st.description, st.is_enabled
     ORDER BY st.sit_name
   `;
 }
@@ -238,13 +245,26 @@ export async function createSitType(input: { sitName: string; classificationCode
   return row.id;
 }
 
-export async function updateSitType(sitTypeId: number, patch: { sitName?: string; classificationCode?: string | null; description?: string | null }): Promise<void> {
+export async function updateSitType(sitTypeId: number, patch: { sitName?: string; classificationCode?: string | null; description?: string | null; isEnabled?: boolean }): Promise<void> {
   await sql`
     UPDATE bayanat.sit_types SET
       sit_name             = coalesce(${patch.sitName ?? null}, sit_name),
       classification_code  = CASE WHEN ${patch.classificationCode !== undefined} THEN ${patch.classificationCode ?? null} ELSE classification_code END,
-      description          = CASE WHEN ${patch.description !== undefined} THEN ${patch.description ?? null} ELSE description END
+      description          = CASE WHEN ${patch.description !== undefined} THEN ${patch.description ?? null} ELSE description END,
+      is_enabled            = coalesce(${patch.isEnabled ?? null}, is_enabled)
     WHERE sit_type_id = ${sitTypeId}
+  `;
+}
+
+/** Bulk enable/disable every SIT type currently grouped under one region (the admin
+ *  UI's per-country "Enable all" / "Disable all" action) — GLOBAL types are never
+ *  included since a region group only ever lists types with a pattern in that region. */
+export async function setSitTypesEnabledForRegion(regionCode: string, isEnabled: boolean): Promise<void> {
+  await sql`
+    UPDATE bayanat.sit_types SET is_enabled = ${isEnabled}
+    WHERE sit_type_id IN (
+      SELECT DISTINCT sit_type_id FROM bayanat.sit_patterns WHERE region_code = ${regionCode}
+    )
   `;
 }
 
@@ -390,15 +410,18 @@ export async function suggestSitTypesForTerm(glossaryId: number): Promise<SitTyp
 export type SitTermOption = { glossaryId: number; termName: string; classificationCode: string | null; patternCount: number };
 
 // Business terms eligible for the steward "reassign" dropdown on a column
-// suggestion — terms associated with a SIT type that has >=1 enabled pattern for
-// the given region (GLOBAL patterns always count), per "region controls which
-// list of terms."
+// suggestion — terms associated with an ENABLED SIT type that has >=1 enabled
+// pattern for the given region (GLOBAL patterns always count), per "region
+// controls which list of terms." A type-level disable (the admin catalog's
+// "not relevant to this customer" switch) excludes it here too, same as the
+// classification runner.
 export async function getSitTermsForRegion(regionCode: string): Promise<SitTermOption[]> {
   return sql<SitTermOption[]>`
     SELECT g.glossary_id AS "glossaryId", g.term_name_text AS "termName", g.classification_code AS "classificationCode",
            count(p.pattern_id)::int AS "patternCount"
     FROM bayanat.business_glossaries g
     JOIN bayanat.business_term_sit_types bts ON bts.glossary_id = g.glossary_id
+    JOIN bayanat.sit_types st ON st.sit_type_id = bts.sit_type_id AND st.is_enabled = true
     JOIN bayanat.sit_patterns p ON p.sit_type_id = bts.sit_type_id AND p.is_enabled = true AND p.region_code IN (${regionCode}, 'GLOBAL')
     GROUP BY g.glossary_id, g.term_name_text, g.classification_code
     HAVING count(p.pattern_id) > 0

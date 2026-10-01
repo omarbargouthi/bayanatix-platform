@@ -14,6 +14,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     sitName: typeof body.sit_name === "string" ? body.sit_name.trim() : undefined,
     classificationCode: "classification_code" in body ? body.classification_code : undefined,
     description: "description" in body ? body.description : undefined,
+    isEnabled: typeof body.is_enabled === "boolean" ? body.is_enabled : undefined,
   });
   return NextResponse.json({ ok: true });
 }
