@@ -7,7 +7,7 @@ import { TrendChart } from "@/components/reports/TrendChart";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
-import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
+import { usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 
 function formatValue(value: number, format: "PERCENT" | "NUMBER" | "DAYS"): string {
   if (format === "PERCENT") return `${value}%`;
@@ -35,6 +35,7 @@ export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: Do
   const rd = t.reports.domain;
   const [latestJobId, setLatestJobId] = useState<number | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const latestJob = usePollBackgroundJob(latestJobId);
 
   async function exportPdf() {
     setTriggering(true);
@@ -72,7 +73,15 @@ export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: Do
         </button>
       </div>
 
-      <BackgroundJobsPanel jobTypeCodes={["REPORT_EXPORT_PDF"]} latestJobId={latestJobId} title="Report Exports" />
+      {latestJob && latestJob.status !== "COMPLETED" && latestJob.status !== "FAILED" && (
+        <div className="text-xs text-muted">Export started — track progress and download from Notifications &rarr; Jobs.</div>
+      )}
+      {latestJob?.status === "COMPLETED" && (
+        <div className="text-xs text-emerald-700">✓ Export ready — download it from Notifications &rarr; Jobs.</div>
+      )}
+      {latestJob?.status === "FAILED" && (
+        <div className="text-xs text-red-600">Export failed{latestJob.errorText ? `: ${latestJob.errorText}` : "."} See Notifications &rarr; Jobs for details.</div>
+      )}
 
       <div className="card-padded">
         <div className="text-sm font-semibold text-ink mb-3">{rd.capabilityScores}</div>
@@ -127,11 +136,15 @@ export function DomainScorecardClient({ scorecard, glossaryId }: { scorecard: Do
       </div>
 
       <div className="card-padded">
-        <div className="text-sm font-semibold text-ink mb-2">{capabilityLabel(t, "R8_DG_SUMMARY")} — {t.reports.common.trend}</div>
-        <TrendChart
-          data={scorecard.capabilities.find((c) => c.reportCode === "R8_DG_SUMMARY")?.trend ?? []}
-          target={scorecard.capabilities.find((c) => c.reportCode === "R8_DG_SUMMARY")?.targetValue ?? null}
-        />
+        {(() => {
+          const cap = scorecard.capabilities.find((c) => c.reportCode === "R8_DG_SUMMARY");
+          return (
+            <TrendChart
+              data={cap?.trend ?? []}
+              kpi={cap ? { nameEn: cap.kpiName, nameTranslations: cap.kpiNameTranslations, targetValue: cap.targetValue, format: cap.format } : null}
+            />
+          );
+        })()}
       </div>
     </div>
   );

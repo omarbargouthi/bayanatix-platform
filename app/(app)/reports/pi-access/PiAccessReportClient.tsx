@@ -104,8 +104,7 @@ function PiAccessReportContent({
             {data.kpis.map((k) => <KpiCard key={k.kpiCode} kpi={k} />)}
           </div>
           <div className="card-padded">
-            <div className="text-sm font-semibold text-ink mb-2">Trend</div>
-            <TrendChart data={data.trend} target={data.kpis[0]?.targetValue ?? null} />
+            <TrendChart data={data.trend} kpi={data.kpis[0]} />
           </div>
           <div className="card-padded">
             <div className="text-sm font-semibold text-ink mb-3">Access Grants</div>

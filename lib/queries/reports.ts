@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { KPI_REGISTRY, type ReportFilters, type KpiResult } from "../reports/kpi-registry";
+import { KPI_REGISTRY, ownerFilter, type ReportFilters, type KpiResult } from "../reports/kpi-registry";
 import { runCustomKpiSql } from "../reports/kpi-sandbox";
 import { translatedColumnSql } from "../i18n-admin/translated-column";
 
@@ -290,6 +290,7 @@ async function getDqDrillDown(f: ReportFilters, page: Page): Promise<{ rows: DqD
     WHERE res.status_code IN ('FAILED', 'ERROR')
       AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
       AND (${f.domainGlossaryId ?? null}::int IS NULL OR dom.domain_glossary_id = ${f.domainGlossaryId ?? null})
+      ${ownerFilter(f, "e.entity_id")}
     ORDER BY res.execution_timestamp DESC
     LIMIT ${page.limit} OFFSET ${page.offset}
   `;
@@ -358,6 +359,7 @@ async function getDgGaps(f: ReportFilters, page: Page): Promise<{ rows: DgGapRow
       WHERE e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR dom.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       entity_id          AS "entityId",
@@ -434,6 +436,7 @@ async function getMcmGaps(f: ReportFilters, page: Page): Promise<{ rows: McmGapR
       WHERE e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR dom.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       entity_id AS "entityId", entity_name_text AS "entityName", schema_id AS "schemaId",
@@ -501,6 +504,7 @@ async function getDcBacklog(f: ReportFilters, page: Page): Promise<{ rows: DcBac
       WHERE bg.classification_code IS NULL AND a.suggestion_status_code = 'PENDING'
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR dom.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       attribute_id AS "attributeId", physical_name_text AS "physicalName",
@@ -561,7 +565,7 @@ async function getDsiAgreements(f: ReportFilters, page: Page): Promise<{ rows: D
       count(*) OVER ()::int AS "totalCount"
     FROM bayanat.data_sharing_agreements dsa
     WHERE (
-      (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL)
+      (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL AND ${f.ownerId ?? null}::text IS NULL)
       OR EXISTS (
         SELECT 1 FROM bayanat.dsa_datasets dd
         JOIN bayanat.data_entities e ON e.entity_id = dd.entity_id
@@ -570,6 +574,7 @@ async function getDsiAgreements(f: ReportFilters, page: Page): Promise<{ rows: D
         WHERE dd.dsa_id = dsa.dsa_id
           AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
           AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+          ${ownerFilter(f, "e.entity_id")}
       )
     )
     ORDER BY dsa.submitted_at DESC NULLS LAST
@@ -621,7 +626,7 @@ async function getOdDatasets(f: ReportFilters, page: Page): Promise<{ rows: OdDa
     LEFT JOIN bayanat.users u ON u.user_id = od.raised_by_user_id
     WHERE od.deleted_at IS NULL
       AND (
-        (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL)
+        (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL AND ${f.ownerId ?? null}::text IS NULL)
         OR EXISTS (
           SELECT 1 FROM bayanat.open_dataset_columns odc
           JOIN bayanat.data_attributes a ON a.attribute_id = odc.attribute_id
@@ -631,6 +636,7 @@ async function getOdDatasets(f: ReportFilters, page: Page): Promise<{ rows: OdDa
           WHERE odc.dataset_id = od.dataset_id
             AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
             AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+            ${ownerFilter(f, "e.entity_id")}
         )
       )
     ORDER BY od.created_at DESC
@@ -751,6 +757,7 @@ async function getPdpColumns(f: ReportFilters, page: Page): Promise<{ rows: PdpC
       LEFT JOIN bayanat.pi_category_types pct ON pct.category_code = bg.pi_category_code
       WHERE (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR dom.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       attribute_id AS "attributeId", physical_name_text AS "physicalName",
@@ -890,6 +897,7 @@ async function getPiAccessRows(filters: ReportFilters, page: Page): Promise<{ ro
     LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = e.entity_id
     WHERE (${filters.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${filters.domainGlossaryId ?? null})
       AND (${filters.sourceId ?? null}::int IS NULL OR ds.data_source_id = ${filters.sourceId ?? null})
+      ${ownerFilter(filters, "e.entity_id")}
     ORDER BY role.asset_name_text, a.physical_name_text
     LIMIT ${page.limit} OFFSET ${page.offset}
   `;

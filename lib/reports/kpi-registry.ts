@@ -16,6 +16,23 @@ export type KpiResult = {
 
 type MetricFn = (filters: ReportFilters) => Promise<KpiResult>;
 
+// Shared "owner" filter fragment: scopes to tables whose asset_stakeholders OWNER
+// row matches f.ownerId, same role_code every other owner-coverage check in this
+// file already reads (dgGovernanceCoveragePct, mcmTablesWithOwnerPct, ...). Was
+// missing entirely from most KPI/drill-down queries -- the owner dropdown in the
+// Reports filter bar changed the request param but most queries never read it.
+// entityIdCol is a literal column reference (e.g. "e.entity_id", "sr.entity_id"),
+// never user input -- sql.unsafe is safe here, it's always one of a fixed set of
+// strings this file writes itself, never passed through from a request.
+export function ownerFilter(f: ReportFilters, entityIdCol: string) {
+  if (f.ownerId == null) return sql``;
+  return sql`AND EXISTS (
+    SELECT 1 FROM bayanat.asset_stakeholders st
+    WHERE st.asset_type_code = 'DATA_ENTITIES' AND st.asset_id = ${sql.unsafe(entityIdCol)}
+      AND st.role_code = 'OWNER' AND st.user_id = ${f.ownerId}
+  )`;
+}
+
 // DQ rules can target either a table (DATA_ENTITIES) or a column (DATA_ATTRIBUTES) —
 // this CTE resolves the owning table either way (10 of the 12 seeded rules are
 // column-level, so both branches matter) so every metric below scopes correctly by
@@ -49,6 +66,7 @@ const dqAssetsWithRulesPct: MetricFn = async (f) => {
       WHERE  e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       source_name AS "sourceName",
@@ -86,6 +104,7 @@ const dqScheduledRulesPct: MetricFn = async (f) => {
       WHERE  sr.is_active_indicator = true
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "sr.entity_id")}
     )
     SELECT source_name AS "sourceName", count(*)::int AS total,
            count(*) FILTER (WHERE schedule_cron IS NOT NULL)::int AS scheduled
@@ -113,6 +132,7 @@ const dqPassRateByDimension: MetricFn = async (f) => {
       LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = sr.entity_id
       WHERE  (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "sr.entity_id")}
     )
     SELECT dimension_name AS "dimensionName", count(*)::int AS total,
            count(*) FILTER (WHERE status_code = 'PASSED')::int AS passed
@@ -138,6 +158,7 @@ const dqOpenIssuesBySeverity: MetricFn = async (f) => {
     WHERE  sr.last_status_code IN ('FAILED', 'ERROR')
       AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
       AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+      ${ownerFilter(f, "sr.entity_id")}
     GROUP BY COALESCE(sr.severity_level_code, 'UNSPECIFIED')
   `;
   return {
@@ -157,6 +178,7 @@ const dqScoreByDomain: MetricFn = async (f) => {
       LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = e.entity_id
       WHERE  (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT domain_name AS "domainName", AVG(overall_score)::numeric AS "avgScore", count(*)::int AS "entityCount"
     FROM scoped
@@ -185,6 +207,7 @@ const dgGovernanceCoveragePct: MetricFn = async (f) => {
       WHERE  e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       domain_name AS "domainName",
@@ -215,6 +238,7 @@ const dgCertificationPct: MetricFn = async (f) => {
       WHERE  e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       domain_name AS "domainName",
@@ -249,6 +273,7 @@ const dgCompletenessPct: MetricFn = async (f) => {
       WHERE  a.attribute_class_code = 'BUSINESS'
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT domain_name AS "domainName", count(*)::int AS total,
            count(*) FILTER (WHERE description_text IS NOT NULL AND length(trim(description_text)) > 0)::int AS described
@@ -310,6 +335,7 @@ const mcmTablesCataloged: MetricFn = async (f) => {
       WHERE  e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT source_name AS "sourceName", count(*)::int AS count
     FROM scoped
@@ -331,6 +357,7 @@ const mcmTablesWithOwnerPct: MetricFn = async (f) => {
       WHERE  e.is_view_indicator = false
         AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT
       domain_name AS "domainName",
@@ -362,6 +389,7 @@ const mcmTermLinkPct: MetricFn = async (f) => {
       LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = e.entity_id
       WHERE  (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT domain_name AS "domainName", count(*)::int AS total,
            count(*) FILTER (
@@ -417,6 +445,7 @@ function dcScopeFilter(f: ReportFilters) {
   return sql`
     AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
     AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+    ${ownerFilter(f, "e.entity_id")}
   `;
 }
 
@@ -501,7 +530,7 @@ const DSI_SCOPED_CTE = sql`
 function dsiScopeFilter(f: ReportFilters) {
   return sql`
     AND (
-      (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL)
+      (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL AND ${f.ownerId ?? null}::text IS NULL)
       OR EXISTS (
         SELECT 1 FROM bayanat.dsa_datasets dd
         JOIN bayanat.data_entities e ON e.entity_id = dd.entity_id
@@ -510,6 +539,7 @@ function dsiScopeFilter(f: ReportFilters) {
         WHERE dd.dsa_id = dsa.dsa_id
           AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
           AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+          ${ownerFilter(f, "e.entity_id")}
       )
     )
   `;
@@ -583,6 +613,7 @@ const dsiSharingEligiblePct: MetricFn = async (f) => {
       LEFT JOIN bayanat.v_entity_business_domain d ON d.entity_id = e.entity_id
       WHERE  (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
         AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+        ${ownerFilter(f, "e.entity_id")}
     )
     SELECT domain_name AS "domainName", count(*)::int AS total,
            count(*) FILTER (
@@ -614,7 +645,7 @@ const OD_SCOPED_CTE = sql`
 function odScopeFilter(f: ReportFilters) {
   return sql`
     AND (
-      (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL)
+      (${f.sourceId ?? null}::int IS NULL AND ${f.domainGlossaryId ?? null}::int IS NULL AND ${f.ownerId ?? null}::text IS NULL)
       OR EXISTS (
         SELECT 1 FROM bayanat.open_dataset_columns odc
         JOIN bayanat.data_attributes a ON a.attribute_id = odc.attribute_id
@@ -624,6 +655,7 @@ function odScopeFilter(f: ReportFilters) {
         WHERE odc.dataset_id = od.dataset_id
           AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
           AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+          ${ownerFilter(f, "e.entity_id")}
       )
     )
   `;
@@ -811,6 +843,7 @@ function pdpScopeFilter(f: ReportFilters) {
   return sql`
     AND (${f.sourceId ?? null}::int IS NULL OR s.data_source_id = ${f.sourceId ?? null})
     AND (${f.domainGlossaryId ?? null}::int IS NULL OR d.domain_glossary_id = ${f.domainGlossaryId ?? null})
+    ${ownerFilter(f, "e.entity_id")}
   `;
 }
 
@@ -942,6 +975,7 @@ const piAccessLinkCount: MetricFn = async (f) => {
     SELECT count(*)::int AS count FROM pi_access_scoped
     WHERE (${f.domainGlossaryId ?? null}::int IS NULL OR domain_glossary_id = ${f.domainGlossaryId ?? null})
       AND (${f.sourceId ?? null}::int IS NULL OR data_source_id = ${f.sourceId ?? null})
+      ${ownerFilter(f, "entity_id")}
   `;
   return { value: rows[0]?.count ?? 0, breakdown: [] };
 };
@@ -952,6 +986,7 @@ const piAccessRolesCount: MetricFn = async (f) => {
     SELECT count(DISTINCT role_id)::int AS count FROM pi_access_scoped
     WHERE (${f.domainGlossaryId ?? null}::int IS NULL OR domain_glossary_id = ${f.domainGlossaryId ?? null})
       AND (${f.sourceId ?? null}::int IS NULL OR data_source_id = ${f.sourceId ?? null})
+      ${ownerFilter(f, "entity_id")}
   `;
   return { value: rows[0]?.count ?? 0, breakdown: [] };
 };

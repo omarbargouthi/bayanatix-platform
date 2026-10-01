@@ -5,7 +5,7 @@ import type { KpiCardData } from "@/lib/queries/reports";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
-function formatValue(value: number, format: KpiCardData["format"]): string {
+export function formatValue(value: number, format: KpiCardData["format"]): string {
   if (format === "PERCENT") return `${value}%`;
   if (format === "DAYS") return `${value}d`;
   return String(value);
