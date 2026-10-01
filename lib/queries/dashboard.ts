@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import type { ComplianceSnapshot, TrendPoint, RecentAsset } from "../types";
+import { computeFrameworkMaturityScore } from "./gov-compliance";
 
 const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -38,37 +39,12 @@ export async function getMaturityTrends(year: number): Promise<TrendPoint[]> {
 // The single live number every trend point (and the top-of-dashboard
 // compliance/maturity cards) is ultimately derived from: NDI's weighted
 // overall maturity score (0-5), weighted by each domain's configured share
-// (Configuration → NDI 2026 → Domain Configuration). Mirrors the
-// weighted_maturity CTE in lib/queries/domains.ts::getComplianceSummary.
+// (Configuration → NDI 2026 → Domain Configuration). Delegates to the
+// generalized version (also used by the Compliance Assessment page's own
+// score, so both pages compute it identically) with NDI's framework_id
+// hardcoded, preserving this function's existing signature/callers.
 export async function computeCurrentMaturityScore(): Promise<number> {
-  const rows = await sql<{ score: string }[]>`
-    WITH maturity_raw AS (
-      SELECT DISTINCT
-             split_part(r.standard_code, '.', 1) AS ndi_domain_code,
-             r.standard_code,
-             COALESCE(s.selected_level, 0)       AS selected_level
-      FROM   bayanat.gov_compliance_requirements r
-      LEFT   JOIN bayanat.compliance_maturity_selections s
-        ON   s.framework_id  = r.framework_id
-        AND  s.standard_code = r.standard_code
-      WHERE  r.compliance_or_maturity = 'نضج'
-        AND  r.framework_id = 1
-    ),
-    domain_avg AS (
-      SELECT ndi_domain_code, AVG(selected_level) AS avg_level
-      FROM   maturity_raw
-      GROUP  BY ndi_domain_code
-    ),
-    weighted AS (
-      SELECT SUM(da.avg_level * cfg.weight) AS weighted_sum, SUM(cfg.weight) AS weight_sum
-      FROM   domain_avg da
-      JOIN   bayanat.gov_compliance_domain_config cfg
-        ON   cfg.domain_code = da.ndi_domain_code AND cfg.framework_id = 1
-    )
-    SELECT COALESCE(ROUND(weighted_sum / NULLIF(weight_sum, 0), 2), 0)::text AS score
-    FROM weighted
-  `;
-  return parseFloat(rows[0]?.score ?? "0");
+  return computeFrameworkMaturityScore(1);
 }
 
 // Called by the monthly cron (app/api/governance/cron/maturity-trend) to

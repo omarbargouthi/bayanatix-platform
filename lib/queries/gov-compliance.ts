@@ -163,6 +163,67 @@ export async function getFramework(frameworkId: number): Promise<ComplianceFrame
   return rows.find((f) => f.frameworkId === frameworkId) ?? null;
 }
 
+// ── Weighted domain maturity score (MATURITY-mode frameworks) ─────────────────
+// Generalizes lib/queries/dashboard.ts's original computeCurrentMaturityScore()
+// (which was hardcoded to framework_id=1) so the Compliance Assessment page's
+// own score can use the exact same methodology as the Dashboard, instead of a
+// plain complete/total ratio that ignores domain weights entirely.
+//
+// Different MATURITY frameworks resolve a requirement's domain two different
+// ways -- NDI_2026's gov_compliance_domain_config.domain_code is the standard_code
+// PREFIX ("DO", "BIA", ...; requirements.domain_code is unrelated full-name text),
+// while NAII's domain_config.domain_code matches requirements.domain_code
+// DIRECTLY ("Direction"/"Enablers"/"Outputs", no dot-separated standard_code
+// scheme at all). Rather than hardcoding per-framework branches, this tries
+// both candidate keys in one JOIN (`cfg.domain_code IN (prefix, domain_code)`)
+// -- for any given row, at most one of the two actually matches a real
+// domain_code, so there's no double-counting risk either way.
+//
+// If every matched domain has a real (>0) weight configured, this is the true
+// weighted average (same as the dashboard). If none do -- e.g. NAII today has
+// no domain weights configured at all -- it falls back to a plain equal-weight
+// average across domains instead of silently returning 0, which is what the
+// un-generalized, weight-only formula did before this.
+export async function computeFrameworkMaturityScore(frameworkId: number): Promise<number> {
+  const rows = await sql<{ score: string }[]>`
+    WITH maturity_raw AS (
+      SELECT DISTINCT
+             r.standard_code,
+             split_part(r.standard_code, '.', 1) AS code_key_a,
+             r.domain_code                       AS code_key_b,
+             COALESCE(s.selected_level, 0)       AS selected_level
+      FROM   bayanat.gov_compliance_requirements r
+      LEFT   JOIN bayanat.compliance_maturity_selections s
+        ON   s.framework_id  = r.framework_id
+        AND  s.standard_code = r.standard_code
+      WHERE  r.compliance_or_maturity = 'نضج'
+        AND  r.framework_id = ${frameworkId}
+    ),
+    matched AS (
+      SELECT mr.selected_level, cfg.domain_code AS resolved_domain_code, cfg.weight
+      FROM   maturity_raw mr
+      JOIN   bayanat.gov_compliance_domain_config cfg
+        ON   cfg.framework_id = ${frameworkId}
+        AND  cfg.domain_code IN (mr.code_key_a, mr.code_key_b)
+    ),
+    domain_avg AS (
+      SELECT resolved_domain_code, AVG(selected_level) AS avg_level, MAX(weight) AS weight
+      FROM   matched
+      GROUP  BY resolved_domain_code
+    )
+    SELECT
+      CASE
+        WHEN count(*) FILTER (WHERE weight IS NULL OR weight <= 0) = 0 AND count(*) > 0
+          THEN ROUND(SUM(avg_level * weight) / SUM(weight), 2)
+        WHEN count(*) > 0
+          THEN ROUND(AVG(avg_level), 2)
+        ELSE 0
+      END::text AS score
+    FROM domain_avg
+  `;
+  return parseFloat(rows[0]?.score ?? "0");
+}
+
 // ── Compliance trend (Regulation scheduled area, see lib/queries/scheduling.ts) ──
 
 /** Rolling last-N-months window, chronological order (oldest first) for charting. */
@@ -189,7 +250,14 @@ export async function captureComplianceTrendSnapshot(): Promise<{ frameworkCount
   const periodDateStr = periodDate.toISOString().slice(0, 10);
 
   for (const f of frameworks) {
-    const compliancePct = Math.round((f.completeCount / Math.max(f.reqCount, 1)) * 10000) / 100;
+    // MATURITY-mode frameworks track history on the same weighted-domain-maturity
+    // basis their Compliance Assessment score now uses (see
+    // computeFrameworkMaturityScore above) -- otherwise the trend line and the
+    // current score dot would be on two different scales. COMPLIANCE_ONLY
+    // frameworks keep the plain ratio, which is the only meaningful number there.
+    const compliancePct = f.assessmentMode === "MATURITY"
+      ? Math.round((await computeFrameworkMaturityScore(f.frameworkId)) / 5 * 10000) / 100
+      : Math.round((f.completeCount / Math.max(f.reqCount, 1)) * 10000) / 100;
     await sql`
       INSERT INTO bayanat.compliance_trends (framework_id, period_date, compliance_pct, req_count, complete_count)
       VALUES (${f.frameworkId}, ${periodDateStr}, ${compliancePct}, ${f.reqCount}, ${f.completeCount})

@@ -10,6 +10,7 @@ import {
   getConfigItems,
   listDomainConfig,
   getComplianceTrend,
+  computeFrameworkMaturityScore,
 } from "@/lib/queries/gov-compliance";
 import { ComplianceClient } from "@/components/governance/ComplianceClient";
 import { getServerT } from "@/lib/i18n/server";
@@ -28,7 +29,9 @@ export default async function CompliancePage({
   const fwId            = searchParams.fw ? Number(searchParams.fw) : (frameworks[0]?.frameworkId ?? null);
   const activeFramework = frameworks.find((f) => f.frameworkId === fwId) ?? frameworks[0] ?? null;
 
-  const [requirements, levelConfig, users, maturitySelections, configItems, domainConfig, trend] = await Promise.all([
+  const isMaturityMode = activeFramework?.assessmentMode === "MATURITY";
+
+  const [requirements, levelConfig, users, maturitySelections, configItems, domainConfig, trend, maturityScore] = await Promise.all([
     fwId ? listRequirements(fwId)          : Promise.resolve([]),
     fwId ? getLevelConfig(fwId)            : Promise.resolve([]),
     listUsers(),
@@ -36,6 +39,11 @@ export default async function CompliancePage({
     fwId ? getConfigItems(fwId)            : Promise.resolve([]),
     fwId ? listDomainConfig(fwId)          : Promise.resolve([]),
     fwId ? getComplianceTrend(fwId, 12)    : Promise.resolve([]),
+    // Same weighted-domain-maturity methodology the Dashboard uses for its
+    // overall/per-domain numbers, so this page's Compliance Score agrees with
+    // it for frameworks that have real domain weighting (NDI_2026, NAII) —
+    // a plain complete/total ratio ignores weights/levels entirely.
+    fwId && isMaturityMode ? computeFrameworkMaturityScore(fwId) : Promise.resolve(null),
   ]);
   const t = await getServerT(user);
 
@@ -65,6 +73,7 @@ export default async function CompliancePage({
           initialConfigItems={configItems}
           initialDomainConfig={domainConfig}
           trend={trend}
+          maturityScore={maturityScore}
           currentUser={user}
         />
       </main>

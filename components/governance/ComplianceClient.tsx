@@ -20,6 +20,9 @@ type Props = {
   users: UserOption[]; initialMaturitySelections: MaturitySelection[];
   initialConfigItems: ConfigItem[]; initialDomainConfig: DomainConfig[];
   trend: ComplianceTrendPoint[];
+  /** Weighted domain-maturity score (0-5), same methodology the Dashboard uses —
+   *  present only for MATURITY-mode frameworks with real domain weighting. */
+  maturityScore: number | null;
   currentUser: SessionUser;
 };
 type HistoryEntry = {
@@ -101,7 +104,7 @@ function complianceTypeLabel(raw: string | null | undefined): { label: string; i
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function ComplianceClient({
   frameworks, activeFramework, initialRequirements, initialLevelConfig,
-  users, initialMaturitySelections, initialConfigItems, initialDomainConfig, trend, currentUser,
+  users, initialMaturitySelections, initialConfigItems, initialDomainConfig, trend, maturityScore, currentUser,
 }: Props) {
   const router = useRouter();
   const { isRtl, t, lang } = useLang();
@@ -546,7 +549,11 @@ export function ComplianceClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestJob]);
 
-  const { total, complete, na, notDone, pct } = overallStats;
+  const { total, complete, na, notDone, pct: ratioPct } = overallStats;
+  // Weighted domain-maturity score (same methodology the Dashboard uses) wins for
+  // MATURITY-mode frameworks that have it; the plain complete/total ratio is the
+  // right (and only meaningful) number for COMPLIANCE_ONLY frameworks.
+  const pct = maturityScore != null ? Math.round((maturityScore / 5) * 100) : ratioPct;
   const selectedQuestion = selStandard
     ? (() => { const r = reqs.find((x) => deriveStandard(x) === selStandard); return r ? dispT(r.questionEn ?? r.question, r.questionTranslations) : ""; })()
     : "";
@@ -678,14 +685,20 @@ export function ComplianceClient({
 
       {/* Compliance Score + Trend — same two-card grid alignment as the
           Dashboard's "Overall Compliance" / "Overall Maturity" section
-          (grid grid-cols-2 gap-5), scoped to this one regulation. Pure
-          complete/total ratio throughout — no maturity-level weighting,
-          since that's only meaningful for NDI_2026's own 0-5 scale (see
-          lib/queries/domains.ts), not a regulation like this. */}
+          (grid grid-cols-2 gap-5), scoped to this one regulation. For
+          MATURITY-mode frameworks with real domain weighting (NDI_2026, NAII),
+          this is the same weighted-domain-maturity score the Dashboard shows
+          (computeFrameworkMaturityScore) — not a plain complete/total ratio,
+          which would ignore domain weights/levels entirely. COMPLIANCE_ONLY
+          frameworks (no maturity scale at all) keep the plain ratio, the only
+          meaningful number there. */}
       <section className="grid grid-cols-2 gap-5 mb-5">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-bold text-ink">{ca.complianceScore}</h3>
+            {maturityScore != null && (
+              <span className="text-sm font-bold text-brand-purple">{maturityScore.toFixed(2)} / 5</span>
+            )}
           </div>
           <div className="flex items-center gap-6 flex-wrap">
             <div className="shrink-0">
