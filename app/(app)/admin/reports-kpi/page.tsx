@@ -40,6 +40,11 @@ export default function ReportsKpiAdminPage() {
   const [testing, setTesting] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
+  const [showAiAssist, setShowAiAssist] = useState(false);
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const [exports, setExports] = useState<ExportAuditRow[]>([]);
 
   const load = useCallback(async () => {
@@ -88,6 +93,25 @@ export default function ReportsKpiAdminPage() {
       body: JSON.stringify({ isActive: !k.isActive }),
     });
     await load();
+  }
+
+  async function generateSqlWithAi() {
+    setAiError(null);
+    if (!aiDescription.trim()) { setAiError("Describe what the KPI should calculate first"); return; }
+    setAiLoading(true);
+    try {
+      const r = await fetch("/api/admin/reports-kpi/ai-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportCode: addForm.reportCode, description: aiDescription.trim() }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) { setAiError(body.error ?? "Failed to generate SQL"); return; }
+      setAddForm((f) => ({ ...f, customSql: body.sql }));
+      setTestResult(null);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function testSql() {
@@ -177,6 +201,31 @@ export default function ReportsKpiAdminPage() {
             <input className="field-input" type="number" placeholder="Target (optional)" value={addForm.targetValue}
               onChange={(e) => setAddForm({ ...addForm, targetValue: e.target.value })} />
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-ink">Custom SQL</span>
+            <button type="button" onClick={() => setShowAiAssist((v) => !v)} className="text-[11px] font-semibold text-brand-purple hover:underline">
+              {showAiAssist ? "Hide AI Assist" : "✨ AI Assist"}
+            </button>
+          </div>
+          {showAiAssist && (
+            <div className="bg-canvas border border-dashed border-line rounded-lg p-3 space-y-2">
+              <p className="text-[11px] text-muted">
+                Describe what this KPI should calculate — the AI drafts a query below using the {REPORT_LABELS[addForm.reportCode] ?? addForm.reportCode} domain's
+                tables/relationships. Always review and Test Query before saving; nothing is run automatically.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text" className="field-input flex-1 text-xs" placeholder="e.g. Count of tables with no business glossary term linked"
+                  value={aiDescription} onChange={(e) => setAiDescription(e.target.value)}
+                />
+                <button type="button" onClick={generateSqlWithAi} disabled={aiLoading}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-brand-purple text-white hover:bg-brand-violet disabled:opacity-50 shrink-0">
+                  {aiLoading ? "Generating…" : "Generate SQL"}
+                </button>
+              </div>
+              {aiError && <div className="text-[11px] text-red-600">{aiError}</div>}
+            </div>
+          )}
           <textarea
             className="field-input font-mono text-xs" rows={4}
             placeholder="SELECT count(*) AS value FROM bayanat.data_sources"

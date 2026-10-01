@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { listCapabilityRoutes, upsertCapabilityRoute, type Capability } from "@/lib/queries/llm-providers";
 
-const VALID_CAPABILITIES: Capability[] = ["DESCRIBE", "REPHRASE", "DQ_SEMANTIC", "CHAT"];
+const VALID_CAPABILITIES: Capability[] = ["DESCRIBE", "REPHRASE", "DQ_SEMANTIC", "CHAT", "KPI_SQL"];
 
 export async function GET() {
   const session = await getSession();
