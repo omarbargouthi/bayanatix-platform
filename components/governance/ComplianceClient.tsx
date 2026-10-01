@@ -523,7 +523,9 @@ export function ComplianceClient({
     if (!fwId) return;
     setExporting(true);
     try {
-      const res = await fetch(`/api/governance/compliance/${fwId}/export`, { method: "POST" });
+      const res = await fetch(`/api/governance/compliance/${fwId}/export`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang }),
+      });
       const data = await res.json();
       if (res.ok) setLatestJobId(data.jobId);
     } finally {

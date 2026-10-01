@@ -498,7 +498,8 @@ export async function importRequirements(
         (framework_id, req_code, standard, standard_code, req_text, domain, domain_code,
          maturity_level, supporting_evidence, admission_criteria, directory_code, directory_type,
          compliance_or_maturity, operational_excellence, evident_administrator,
-         domain_owner, management_sector, sort_order)
+         domain_owner, management_sector, sort_order,
+         question_en, supporting_evidence_en, admission_criteria_en, management_sector_en, directory_type_en)
       VALUES (
         ${frameworkId}, ${r.reqCode}, ${r.standard || null}, ${r.standardCode || null},
         ${r.question}, ${r.domain || null}, ${r.domainCode || null},
@@ -506,7 +507,16 @@ export async function importRequirements(
         ${r.admissionCriteria || null}, ${r.directoryCode || null}, ${r.directoryType || null},
         ${r.complianceOrMaturity || null}, ${r.operationalExcellence || null},
         ${r.evidentAdministrator || null}, ${r.domainOwner || null},
-        ${r.managementSector || null}, ${r.sortOrder}
+        ${r.managementSector || null}, ${r.sortOrder},
+        -- Also seed the canonical *_en columns from the same imported text, so
+        -- the Maturity Index Setup edit form (which reads only these columns,
+        -- never the legacy ones) isn't blank the moment a new regulation is
+        -- imported -- previously only some one-off migration/backfill script
+        -- populated these for the originally-seeded frameworks, so every
+        -- framework imported through this route (e.g. PIPEDA) ended up with
+        -- real content in the legacy columns but nothing here at all.
+        ${r.question || null}, ${r.supportingEvidence || null},
+        ${r.admissionCriteria || null}, ${r.managementSector || null}, ${r.directoryType || null}
       )
     `;
   }
