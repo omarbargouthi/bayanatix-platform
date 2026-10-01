@@ -1,17 +1,46 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canAccessDomain } from "@/lib/can";
-import { listRequirements, getFramework } from "@/lib/queries/gov-compliance";
+import { listRequirements, getFramework, getConfigItems, type ConfigItem } from "@/lib/queries/gov-compliance";
 import { createJob, finishJob, failJob } from "@/lib/queries/background-jobs";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import * as XLSX from "xlsx";
 
 const JOB_TYPE_GOV_COMPLIANCE_EXPORT = "GOV_COMPLIANCE_EXPORT";
 
+// Same raw-text sniffing ComplianceClient.tsx's complianceTypeLabel() falls
+// back to when a framework has no COMPLIANCE_TYPE config items of its own --
+// only ever used as a last resort below, same as on the page.
+function complianceTypeFallbackLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.includes("امتثال") || raw.toLowerCase().includes("compliance")) return "Compliance";
+  if (raw.includes("نضج") || raw.toLowerCase().includes("maturity")) return "Maturity";
+  return null;
+}
+
 async function runExport(jobId: number, fwId: number, lang: string): Promise<void> {
   try {
-    const [framework, requirements] = await Promise.all([getFramework(fwId), listRequirements(fwId)]);
+    const [framework, requirements, configItems] = await Promise.all([
+      getFramework(fwId), listRequirements(fwId), getConfigItems(fwId),
+    ]);
     if (!framework) throw new Error("Framework not found");
+
+    // Same lookup ComplianceClient.tsx's complianceTypeMap builds: an
+    // admin-configured COMPLIANCE_TYPE item (with its own real translations),
+    // keyed by every raw value it could show up as (its code, its English
+    // label, or any of its translated labels).
+    const complianceTypeMap = new Map<string, ConfigItem>();
+    configItems.filter((i) => i.configGroup === "COMPLIANCE_TYPE").forEach((item) => {
+      complianceTypeMap.set(item.label, item);
+      complianceTypeMap.set(item.code, item);
+      Object.values(item.labelTranslations ?? {}).forEach((v) => { if (v) complianceTypeMap.set(v, item); });
+    });
+    function resolveComplianceType(raw: string | null | undefined): string {
+      if (!raw) return "";
+      const cfgItem = complianceTypeMap.get(raw);
+      if (cfgItem) return pickTranslation(cfgItem.label, cfgItem.labelTranslations, lang);
+      return complianceTypeFallbackLabel(raw) ?? raw;
+    }
 
     // Same resolution the Compliance Assessment page itself uses for every
     // translatable field (dispT in ComplianceClient.tsx): canonical English
@@ -23,10 +52,17 @@ async function runExport(jobId: number, fwId: number, lang: string): Promise<voi
     // that happened to look right only when the export was implicitly in
     // Arabic; for PIPEDA (legacy columns are English) it only ever exported
     // in English even if the viewer was in Arabic.
+    //
+    // "Directory Type" is deliberately left as *_en-falls-back-to-legacy only
+    // (no pickTranslation) -- there's no Workbench translation key for it,
+    // same as the page's own display, so a framework missing its
+    // directory_type_en backfill (NDI itself, confirmed live) shows the
+    // legacy text here exactly as it does on the page. That's a real content
+    // gap to close via a migration/backfill, not an export bug.
     const exportRows = requirements.map((r) => ({
       "Standard":                            pickTranslation(r.standard, r.standardTranslations, lang) || "",
       "Standard Code":                       r.standardCode     ?? "",
-      "Domain":                              r.domain           ?? "",
+      "Domain":                              (lang === "en" ? (r.domainEn ?? r.domain) : r.domain) ?? "",
       "Domain Code":                         r.domainCode       ?? "",
       "Standard Number":                     r.reqCode,
       "Question":                            pickTranslation(r.questionEn ?? r.question, r.questionTranslations, lang),
@@ -35,7 +71,7 @@ async function runExport(jobId: number, fwId: number, lang: string): Promise<voi
       "Admission Criteria":                  pickTranslation(r.admissionCriteriaEn ?? r.admissionCriteria, r.admissionCriteriaTranslations, lang) || "",
       "Directory Code":                      r.directoryCode    ?? "",
       "Directory Type":                      r.directoryTypeEn  ?? r.directoryType ?? "",
-      "Compliance or Maturity?":             r.complianceOrMaturity ?? "",
+      "Compliance or Maturity?":             resolveComplianceType(r.complianceOrMaturity),
       "Operational Excellence?":             r.operationalExcellence ?? "",
       "Evident Administrator":               r.evidentAdminOverride ?? r.evidentAdministrator ?? "",
       "Domain Owner":                        r.domainOwnerOverride  ?? r.domainOwner  ?? "",
