@@ -100,6 +100,19 @@ function complianceTypeLabel(raw: string | null | undefined): { label: string; i
   if (!isCompliance && !isMaturity) return null;
   return { label: isCompliance ? "Compliance" : "Maturity", isCompliance };
 }
+// operationalExcellence has no config-item lookup and no *_en column at all --
+// it's a closed 3-value set ("نعم"/"لا"/"N/A"), so a raw-text sniff (same
+// restraint complianceTypeLabel uses) is the right tool rather than wiring up
+// a whole config group for a single yes/no answer. Returns null for "N/A" or
+// anything unrecognized -- callers that only want to highlight a "Yes" answer
+// check isYes rather than string-matching the raw value.
+function resolveYesNo(raw: string | null | undefined, lang: string): { label: string; isYes: boolean } | null {
+  if (!raw) return null;
+  const isYes = raw === "نعم" || raw.toLowerCase() === "yes";
+  const isNo  = raw === "لا"  || raw.toLowerCase() === "no";
+  if (!isYes && !isNo) return null;
+  return { label: lang === "ar" ? (isYes ? "نعم" : "لا") : (isYes ? "Yes" : "No"), isYes };
+}
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function ComplianceClient({
@@ -299,6 +312,26 @@ export function ComplianceClient({
     });
     return map;
   }, [configItems]);
+
+  // Same shape as complianceTypeMap, for "Evidence Type" (directoryType) --
+  // most of its raw values are covered by the framework's own EVIDENCE_TYPE
+  // config items (e.g. "قائمة" -> "List"), same real translations already
+  // used nowhere on this page until now; directoryType was always shown raw.
+  const evidenceTypeMap = useMemo(() => {
+    const map = new Map<string, ConfigItem>();
+    configItems.filter((i) => i.configGroup === "EVIDENCE_TYPE").forEach((item) => {
+      map.set(item.label, item);
+      Object.values(item.labelTranslations ?? {}).forEach((v) => { if (v) map.set(v, item); });
+      map.set(item.code, item);
+    });
+    return map;
+  }, [configItems]);
+  function resolveEvidenceType(raw: string | null | undefined): string {
+    if (!raw) return "";
+    const cfgItem = evidenceTypeMap.get(raw);
+    if (cfgItem) return pickTranslation(cfgItem.label, cfgItem.labelTranslations, lang);
+    return disp(null, raw); // uncovered long-tail value -- show raw rather than hide it
+  }
 
   function domainStats(domain: string) {
     const d = reqs.filter((r) => (r.domain ?? "Other") === domain);
@@ -1018,8 +1051,8 @@ export function ComplianceClient({
                                             title="Endorsed">✓</span>
                                         )}
                                       </div>
-                                      {disp(req.directoryTypeEn, req.directoryType) && (
-                                        <div className="text-[10px] text-muted mt-0.5">{disp(req.directoryTypeEn, req.directoryType)}</div>
+                                      {resolveEvidenceType(req.directoryTypeEn ?? req.directoryType) && (
+                                        <div className="text-[10px] text-muted mt-0.5">{resolveEvidenceType(req.directoryTypeEn ?? req.directoryType)}</div>
                                       )}
                                     </td>
 
@@ -1134,6 +1167,7 @@ export function ComplianceClient({
                                           onPatch={(updates) => patch(req, updates)}
                                           onWorkflow={(action) => advanceWorkflow(req, action)}
                                           translations={translations}
+                                          evidenceTypeMap={evidenceTypeMap}
                                         />
                                       </td>
                                     </tr>
@@ -1173,17 +1207,24 @@ function WorkflowBadge({ status }: { status: string }) {
 
 // ── Evidence expanded row ─────────────────────────────────────────────────────
 function EvidenceExpanded({
-  req, fwId, role, onPatch, onWorkflow, translations,
+  req, fwId, role, onPatch, onWorkflow, translations, evidenceTypeMap,
 }: {
   req: ComplianceRequirement; fwId: number; role: string;
   onPatch: (u: Partial<ComplianceRequirement>) => void;
   onWorkflow: (action: "submit"|"confirm"|"endorse"|"reject") => void;
   translations: Record<string, string>;
+  evidenceTypeMap: Map<string, ConfigItem>;
 }) {
   const { isRtl, t, lang } = useLang();
   const ca = t.governance.ca;
   function d(en: string | null | undefined, ar: string | null | undefined) {
     return isRtl ? (ar ?? en ?? "") : (en ?? ar ?? "");
+  }
+  function resolveEvidenceType(raw: string | null | undefined): string {
+    if (!raw) return "";
+    const cfgItem = evidenceTypeMap.get(raw);
+    if (cfgItem) return pickTranslation(cfgItem.label, cfgItem.labelTranslations, lang);
+    return d(null, raw);
   }
   const mgmtT = (r: ComplianceRequirement) => pickTranslation(r.managementSectorEn ?? r.managementSector, r.managementSectorTranslations, lang);
   const evidenceT = (r: ComplianceRequirement) => pickTranslation(r.supportingEvidenceEn ?? r.supportingEvidence, r.supportingEvidenceTranslations, lang);
@@ -1218,7 +1259,8 @@ function EvidenceExpanded({
   const canReject  = (status === "SUBMITTED" && (role === "ADMIN" || role === "STEWARD")) || (status === "CONFIRMED" && role === "ADMIN");
 
   const admissionCriteria = pickTranslation(req.admissionCriteriaEn ?? req.admissionCriteria, req.admissionCriteriaTranslations, lang);
-  const directoryType     = d(req.directoryTypeEn,     req.directoryType);
+  const directoryType     = resolveEvidenceType(req.directoryTypeEn ?? req.directoryType);
+  const operationalExcellence = resolveYesNo(req.operationalExcellence, lang);
 
   return (
     <div className="space-y-4">
@@ -1244,10 +1286,10 @@ function EvidenceExpanded({
             <div className="text-ink">{directoryType}</div>
           </div>
         )}
-        {req.operationalExcellence && req.operationalExcellence !== "N/A" && req.operationalExcellence !== "لا" && (
+        {operationalExcellence?.isYes && (
           <div>
             <div className="text-[10px] uppercase tracking-wide text-muted font-semibold mb-0.5">{ca.opExcellence}</div>
-            <div className="text-ink">{req.operationalExcellence}</div>
+            <div className="text-ink">{operationalExcellence.label}</div>
           </div>
         )}
       </div>

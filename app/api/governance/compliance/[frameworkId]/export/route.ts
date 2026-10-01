@@ -18,6 +18,19 @@ function complianceTypeFallbackLabel(raw: string | null | undefined): string | n
   return null;
 }
 
+// Same closed 3-value (Yes/No/N/A) resolution ComplianceClient.tsx's
+// resolveYesNo() uses for operational_excellence -- no *_en column or
+// Workbench translation key exists for this field, so the only two real
+// values are resolved by raw-text match and re-rendered in the requested
+// export language.
+function resolveYesNo(raw: string | null | undefined, lang: string): string {
+  if (!raw) return "";
+  const isYes = raw === "نعم" || raw.toLowerCase() === "yes";
+  const isNo = raw === "لا" || raw.toLowerCase() === "no";
+  if (!isYes && !isNo) return raw;
+  return lang === "ar" ? (isYes ? "نعم" : "لا") : (isYes ? "Yes" : "No");
+}
+
 async function runExport(jobId: number, fwId: number, lang: string): Promise<void> {
   try {
     const [framework, requirements, configItems] = await Promise.all([
@@ -42,6 +55,24 @@ async function runExport(jobId: number, fwId: number, lang: string): Promise<voi
       return complianceTypeFallbackLabel(raw) ?? raw;
     }
 
+    // Same lookup ComplianceClient.tsx's evidenceTypeMap builds, for the
+    // EVIDENCE_TYPE config group (directory_type's real values, e.g.
+    // "قائمة" -> "List"). NDI's directory_type has ~15 long-tail raw values
+    // with no matching config item -- those fall through to the raw text,
+    // same as the page.
+    const evidenceTypeMap = new Map<string, ConfigItem>();
+    configItems.filter((i) => i.configGroup === "EVIDENCE_TYPE").forEach((item) => {
+      evidenceTypeMap.set(item.label, item);
+      evidenceTypeMap.set(item.code, item);
+      Object.values(item.labelTranslations ?? {}).forEach((v) => { if (v) evidenceTypeMap.set(v, item); });
+    });
+    function resolveEvidenceType(raw: string | null | undefined): string {
+      if (!raw) return "";
+      const cfgItem = evidenceTypeMap.get(raw);
+      if (cfgItem) return pickTranslation(cfgItem.label, cfgItem.labelTranslations, lang);
+      return raw;
+    }
+
     // Same resolution the Compliance Assessment page itself uses for every
     // translatable field (dispT in ComplianceClient.tsx): canonical English
     // (*_en, falling back to the legacy pre-migration column for a framework
@@ -53,12 +84,12 @@ async function runExport(jobId: number, fwId: number, lang: string): Promise<voi
     // Arabic; for PIPEDA (legacy columns are English) it only ever exported
     // in English even if the viewer was in Arabic.
     //
-    // "Directory Type" is deliberately left as *_en-falls-back-to-legacy only
-    // (no pickTranslation) -- there's no Workbench translation key for it,
-    // same as the page's own display, so a framework missing its
-    // directory_type_en backfill (NDI itself, confirmed live) shows the
-    // legacy text here exactly as it does on the page. That's a real content
-    // gap to close via a migration/backfill, not an export bug.
+    // "Directory Type" is resolved via the EVIDENCE_TYPE config-item lookup
+    // above, same as the page -- any raw value with no matching config item
+    // (NDI's ~15 long-tail directory_type values, or any framework missing
+    // its directory_type_en backfill) falls through to the raw legacy/*_en
+    // text, same fallback the page itself uses. That long-tail gap is a
+    // real content gap to close via config items, not an export bug.
     const exportRows = requirements.map((r) => ({
       "Standard":                            pickTranslation(r.standard, r.standardTranslations, lang) || "",
       "Standard Code":                       r.standardCode     ?? "",
@@ -70,9 +101,9 @@ async function runExport(jobId: number, fwId: number, lang: string): Promise<voi
       "Supporting Evidence":                 pickTranslation(r.supportingEvidenceEn ?? r.supportingEvidence, r.supportingEvidenceTranslations, lang) || "",
       "Admission Criteria":                  pickTranslation(r.admissionCriteriaEn ?? r.admissionCriteria, r.admissionCriteriaTranslations, lang) || "",
       "Directory Code":                      r.directoryCode    ?? "",
-      "Directory Type":                      r.directoryTypeEn  ?? r.directoryType ?? "",
+      "Directory Type":                      resolveEvidenceType(r.directoryTypeEn ?? r.directoryType),
       "Compliance or Maturity?":             resolveComplianceType(r.complianceOrMaturity),
-      "Operational Excellence?":             r.operationalExcellence ?? "",
+      "Operational Excellence?":             resolveYesNo(r.operationalExcellence, lang),
       "Evident Administrator":               r.evidentAdminOverride ?? r.evidentAdministrator ?? "",
       "Domain Owner":                        r.domainOwnerOverride  ?? r.domainOwner  ?? "",
       "Management and Supporting Sector":    pickTranslation(r.managementSectorEn ?? r.managementSector, r.managementSectorTranslations, lang) || "",
