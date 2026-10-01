@@ -676,39 +676,39 @@ export function ComplianceClient({
           still drives the inline importMsg/refresh feedback right after a
           trigger, that's unrelated to the removed list-of-past-jobs panel. */}
 
-      {/* Compliance Score — same HalfDonut gauge as the Dashboard's "Overall
-          Compliance" card, scoped to this one regulation. Pure complete/total
-          ratio (overallStats.pct), same as everywhere else on this page — no
-          maturity-level weighting, since that's only meaningful for NDI_2026's
-          own 0-5 scale (see lib/queries/domains.ts), not a regulation like this. */}
-      <div className="card p-5 mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold text-ink">{ca.complianceScore}</h3>
-        </div>
-        <div className="flex items-center gap-6 flex-wrap">
-          <div className="shrink-0">
-            <HalfDonut value={pct} size={160} />
+      {/* Compliance Score + Trend — same two-card grid alignment as the
+          Dashboard's "Overall Compliance" / "Overall Maturity" section
+          (grid grid-cols-2 gap-5), scoped to this one regulation. Pure
+          complete/total ratio throughout — no maturity-level weighting,
+          since that's only meaningful for NDI_2026's own 0-5 scale (see
+          lib/queries/domains.ts), not a regulation like this. */}
+      <section className="grid grid-cols-2 gap-5 mb-5">
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-bold text-ink">{ca.complianceScore}</h3>
           </div>
-          <div className="grid grid-cols-2 gap-4 flex-1 min-w-[220px]">
-            <StatCard label={ca.totalReqs}    value={total}    accent="#6366F1" />
-            <StatCard label={ca.complete}     value={complete} accent="#10B981" />
-            <StatCard label="N/A"             value={na}       accent="#6B7280" />
-            <StatCard label={ca.notCompleted} value={notDone}  accent="#F59E0B" />
+          <div className="flex items-center gap-6 flex-wrap">
+            <div className="shrink-0">
+              <HalfDonut value={pct} size={160} />
+            </div>
+            <div className="grid grid-cols-2 gap-4 flex-1 min-w-[220px]">
+              <StatCard label={ca.totalReqs}    value={total}    accent="#6366F1" />
+              <StatCard label={ca.complete}     value={complete} accent="#10B981" />
+              <StatCard label="N/A"             value={na}       accent="#6B7280" />
+              <StatCard label={ca.notCompleted} value={notDone}  accent="#F59E0B" />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Compliance Trend — last 12 months, captured monthly by the
-          REGULATION_TREND scheduled area (Admin > Configuration > Scheduling).
-          Same pure-ratio % as the Compliance Score card above. */}
-      <div className="card p-5 mb-5">
-        <h3 className="text-base font-bold text-ink mb-3">{ca.complianceTrend}</h3>
-        <ComplianceTrendChart
-          data={trend}
-          legendLabel={activeFramework?.name ?? ""}
-          noDataLabel={ca.complianceTrendNoData}
-        />
-      </div>
+        <div className="card p-5">
+          <h3 className="text-base font-bold text-ink mb-3">{ca.complianceTrend}</h3>
+          <ComplianceTrendChart
+            data={trend}
+            legendLabel={activeFramework?.name ?? ""}
+            noDataLabel={ca.complianceTrendNoData}
+          />
+        </div>
+      </section>
 
       {/* ── Assessment ─────────────────────────────────────────────────────── */}
       <>
