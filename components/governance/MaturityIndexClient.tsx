@@ -6,7 +6,6 @@ import type {
   ComplianceFramework, ComplianceRequirement,
   LevelConfig, UserOption, ConfigItem, DomainConfig,
 } from "@/lib/queries/gov-compliance";
-import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function parseLevelNum(ml: string | null): number | null {
@@ -419,11 +418,6 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
                                       <span className="text-[11px] font-bold uppercase tracking-wide">
                                         {cfg ? cfg.name : `Level ${lev.levelNum}`}
                                       </span>
-                                      {cfg && pickTranslation(cfg.name, cfg.nameTranslations, "ar") !== cfg.name && (
-                                        <span className="text-[11px] opacity-60 ml-1" dir="rtl">
-                                          {pickTranslation(cfg.name, cfg.nameTranslations, "ar")}
-                                        </span>
-                                      )}
                                       <span className="ml-auto text-[10px] opacity-50">
                                         {lev.questions.length} question{lev.questions.length !== 1 ? "s" : ""}
                                       </span>
@@ -542,11 +536,6 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
     setV(p => ({ ...p, complianceOrMaturity: item?.label ?? code }));
   }
 
-  const selectedCompItem = complianceTypeItems.find(i => i.code === compCode);
-  const selectedLevel    = levelCfg.find(lc => String(lc.levelNum) === v.maturityLevel);
-  const selectedCompItemAr = selectedCompItem ? pickTranslation(selectedCompItem.label, selectedCompItem.labelTranslations, "ar") : "";
-  const selectedLevelAr    = selectedLevel ? pickTranslation(selectedLevel.name, selectedLevel.nameTranslations, "ar") : "";
-
   function save() {
     const original = {
       ...req,
@@ -603,51 +592,29 @@ function EditRequirementDialog({ req, saving, onSave, onClose, levelCfg, complia
 
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">Compliance or Maturity</label>
-              <div className="grid grid-cols-2 gap-x-4">
-                <div>
-                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block">English (EN)</label>
-                  {complianceTypeItems.length > 0 ? (
-                    <select value={compCode} onChange={e => handleCompCodeChange(e.target.value)} className="field text-sm w-full">
-                      <option value="">— Select type —</option>
-                      {complianceTypeItems.map(item => (
-                        <option key={item.code} value={item.code}>{item.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input value={v.complianceOrMaturity} onChange={e => set("complianceOrMaturity", e.target.value)}
-                      className="field text-sm w-full" placeholder="e.g. Compliance or Maturity" />
-                  )}
-                </div>
-                <div>
-                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block text-right" dir="rtl">العربية (AR)</label>
-                  <div className="field text-sm w-full text-right bg-canvas-soft text-ink-soft min-h-[38px] flex items-center justify-end px-3" dir="rtl">
-                    {selectedCompItemAr || <span className="italic text-muted/60 text-[11px]">—</span>}
-                  </div>
-                </div>
-              </div>
+              {complianceTypeItems.length > 0 ? (
+                <select value={compCode} onChange={e => handleCompCodeChange(e.target.value)} className="field text-sm w-full">
+                  <option value="">— Select type —</option>
+                  {complianceTypeItems.map(item => (
+                    <option key={item.code} value={item.code}>{item.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={v.complianceOrMaturity} onChange={e => set("complianceOrMaturity", e.target.value)}
+                  className="field text-sm w-full" placeholder="e.g. Compliance or Maturity" />
+              )}
             </div>
 
             <div>
               <label className="block text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">Maturity Level</label>
-              <div className="grid grid-cols-2 gap-x-4">
-                <div>
-                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block">English (EN)</label>
-                  <select value={v.maturityLevel} onChange={e => set("maturityLevel", e.target.value)} className="field text-sm w-full">
-                    <option value="">— Select level —</option>
-                    {levelCfg.map(lc => (
-                      <option key={lc.levelNum} value={String(lc.levelNum)}>
-                        Level {lc.levelNum} — {lc.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] text-brand-purple font-bold uppercase tracking-wide mb-1 block text-right" dir="rtl">العربية (AR)</label>
-                  <div className="field text-sm w-full text-right bg-canvas-soft text-ink-soft min-h-[38px] flex items-center justify-end px-3" dir="rtl">
-                    {selectedLevelAr || <span className="italic text-muted/60 text-[11px]">—</span>}
-                  </div>
-                </div>
-              </div>
+              <select value={v.maturityLevel} onChange={e => set("maturityLevel", e.target.value)} className="field text-sm w-full">
+                <option value="">— Select level —</option>
+                {levelCfg.map(lc => (
+                  <option key={lc.levelNum} value={String(lc.levelNum)}>
+                    Level {lc.levelNum} — {lc.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
