@@ -64,10 +64,14 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
         <StatCard label={g.stats.frameworksTracked} value={frameworks.length}  sub={g.stats.complianceFrameworks} color="amber" />
       </div>
 
-      {/* Category cards */}
+      {/* Category cards — fixed height, not stretched to match whichever area has
+          the most content (Compliance can have 10+ frameworks): each area's own
+          list scrolls internally past that height instead of growing the card,
+          so the other areas don't end up with a tall gap between their
+          description and their (short) list. */}
       <div className="grid grid-cols-3 gap-6">
         {/* Governance Framework */}
-        <div className="card p-6 flex flex-col">
+        <div className="card p-6 flex flex-col h-[460px]">
           <div className="flex items-center gap-3 mb-3">
             <span className="w-10 h-10 rounded-xl bg-brand-purple/10 flex items-center justify-center"><FwIcon /></span>
             <div>
@@ -75,8 +79,8 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
               <p className="text-[12px] text-muted">{fwSub}</p>
             </div>
           </div>
-          <p className="text-sm text-ink-soft mb-4 flex-1">{g.frameworkDesc}</p>
-          <div className="space-y-1.5 mb-5">
+          <p className="text-sm text-ink-soft mb-4">{g.frameworkDesc}</p>
+          <div className="space-y-1.5 mb-5 flex-1 overflow-y-auto">
             {FW_SECTION_CODES.map((code) => (
               <Link key={code} href={`/governance/framework/${code.toLowerCase()}`}
                 className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-canvas transition-colors group">
@@ -89,7 +93,7 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
         </div>
 
         {/* Registers */}
-        <div className="card p-6 flex flex-col">
+        <div className="card p-6 flex flex-col h-[460px]">
           <div className="flex items-center gap-3 mb-3">
             <span className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><RegIcon /></span>
             <div>
@@ -97,8 +101,8 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
               <p className="text-[12px] text-muted">{regSub}</p>
             </div>
           </div>
-          <p className="text-sm text-ink-soft mb-4 flex-1">{g.registersDesc}</p>
-          <div className="space-y-1.5 mb-5">
+          <p className="text-sm text-ink-soft mb-4">{g.registersDesc}</p>
+          <div className="space-y-1.5 mb-5 flex-1 overflow-y-auto">
             {registers.map((r) => (
               <Link key={r.registerId} href={`/governance/registers/${r.registerId}`}
                 className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-canvas transition-colors group">
@@ -113,7 +117,7 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
         </div>
 
         {/* Compliance */}
-        <div className="card p-6 flex flex-col">
+        <div className="card p-6 flex flex-col h-[460px]">
           <div className="flex items-center gap-3 mb-3">
             <span className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><CompIcon /></span>
             <div>
@@ -121,9 +125,9 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
               <p className="text-[12px] text-muted">{compSub}</p>
             </div>
           </div>
-          <p className="text-sm text-ink-soft mb-4 flex-1">{g.complianceDesc}</p>
+          <p className="text-sm text-ink-soft mb-4">{g.complianceDesc}</p>
           {frameworks.length > 0 && (
-            <div className="space-y-2 mb-5">
+            <div className="space-y-2 mb-5 flex-1 overflow-y-auto">
               {frameworks.map((f) => {
                 const pct = Math.round((f.completeCount / Math.max(f.reqCount, 1)) * 100);
                 return (
