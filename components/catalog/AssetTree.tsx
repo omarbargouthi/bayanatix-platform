@@ -59,8 +59,12 @@ function SourceRow({
               its own line. min-w-0 is what actually lets `truncate` take effect. */}
           {/* dir="auto" so an English source name inside an Arabic (dir="rtl") page
               truncates from its own trailing edge instead of the page's leading edge —
-              otherwise the identifying start of the name gets clipped, not the end. */}
-          <span className="flex-1 min-w-0 font-semibold text-ink truncate text-start" dir="auto" title={src.sourceName}>{src.sourceName}</span>
+              otherwise the identifying start of the name gets clipped, not the end.
+              Alignment has to be the page's physical edge, not `text-start`: with
+              dir="auto" an English name makes this span LTR, so "start" would resolve
+              to the left and strand the name at the far side of the row, away from
+              its icon. */}
+          <span className={`flex-1 min-w-0 font-semibold text-ink truncate ${isRtl ? "text-right" : "text-left"}`} dir="auto" title={src.sourceName}>{src.sourceName}</span>
           <span className="text-xs text-muted shrink-0">
             {src.schemas.length} schemas · {tableTotal.toLocaleString()} tables
           </span>
@@ -89,7 +93,7 @@ function SourceRow({
               className={`flex items-center gap-2.5 min-w-0 ${isRtl ? "pr-9 pl-3" : "pl-9 pr-3"} py-2 rounded-md hover:bg-canvas transition-colors`}
             >
               <IconDB className="w-[18px] h-[18px] text-brand-navy shrink-0" />
-              <span className="flex-1 min-w-0 truncate" dir="auto" title={sc.schemaName}>{sc.schemaName}</span>
+              <span className={`flex-1 min-w-0 truncate ${isRtl ? "text-right" : "text-left"}`} dir="auto" title={sc.schemaName}>{sc.schemaName}</span>
               <span className="text-xs text-muted shrink-0">
                 {sc.tableCount ?? 0} tables · {sc.viewCount ?? 0} views
               </span>

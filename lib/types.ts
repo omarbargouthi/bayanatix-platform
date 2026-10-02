@@ -398,6 +398,8 @@ export type Notification = {
   domainCode:     string | null;
   actionLabel:    string | null;
   actionHref:     string | null;
+  downloadHref:   string | null;
+  downloadLabel:  string | null;
   createdAt:      string;
   actioned:       boolean;
 };

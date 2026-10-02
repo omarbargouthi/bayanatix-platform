@@ -67,11 +67,15 @@ export async function createDownloadJob(scope: unknown, userId: string): Promise
 // Best-effort — a notification failure must never fail the bulk job itself.
 async function notifyBulkJobFinished(jobId: number, status: "COMMITTED" | "FAILED", errorText?: string): Promise<void> {
   try {
-    const [job] = await sql<{ jobTypeCode: JobType; createdByUserId: string | null }[]>`
-      SELECT job_type_code AS "jobTypeCode", created_by_user_id AS "createdByUserId" FROM bayanat.bulk_jobs WHERE job_id = ${jobId}
+    const [job] = await sql<{ jobTypeCode: JobType; createdByUserId: string | null; fileName: string | null }[]>`
+      SELECT job_type_code AS "jobTypeCode", created_by_user_id AS "createdByUserId", file_name_text AS "fileName"
+      FROM bayanat.bulk_jobs WHERE job_id = ${jobId}
     `;
     if (!job?.createdByUserId) return;
     const label = job.jobTypeCode === "DOWNLOAD" ? "Bulk Download" : "Bulk Upload";
+    // Only a finished download has a file worth linking — an upload job's file_data
+    // is just the workbook the user uploaded themselves.
+    const hasDownload = job.jobTypeCode === "DOWNLOAD" && status === "COMMITTED";
     await createNotification({
       userId: job.createdByUserId,
       type: "JOB",
@@ -80,6 +84,8 @@ async function notifyBulkJobFinished(jobId: number, status: "COMMITTED" | "FAILE
       severity: status === "COMMITTED" ? "SUCCESS" : "ERROR",
       actionLabel: "View Job Details",
       actionHref: "/bulk-operations?tab=jobs",
+      downloadHref: hasDownload ? `/api/bulk/jobs/${jobId}/file` : null,
+      downloadLabel: hasDownload ? job.fileName : null,
     });
   } catch (e) {
     console.error("[notifyBulkJobFinished] failed to create notification", e);
@@ -165,6 +171,12 @@ export async function purgeExpiredJobFiles(): Promise<number> {
   const result = await sql`
     UPDATE bayanat.bulk_jobs SET file_data = NULL, result_file_data = NULL, log_file_data = NULL, rejected_file_data = NULL
     WHERE purge_after IS NOT NULL AND purge_after < NOW() AND (file_data IS NOT NULL OR result_file_data IS NOT NULL OR log_file_data IS NOT NULL OR rejected_file_data IS NOT NULL)
+  `;
+  // A notification's download link would now 404 — drop it rather than leave it dangling.
+  await sql`
+    UPDATE bayanat.notifications n SET download_href = NULL, download_label = NULL
+    FROM bayanat.bulk_jobs j
+    WHERE n.download_href = '/api/bulk/jobs/' || j.job_id || '/file' AND j.file_data IS NULL
   `;
   return result.count;
 }

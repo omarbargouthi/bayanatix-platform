@@ -3,43 +3,9 @@
 import { useState, useCallback } from "react";
 import type { AuditSearchEntry } from "@/lib/audit";
 import type { AdminUser } from "@/lib/types";
+import { useLang } from "@/lib/lang-context";
 
-const ASSET_TYPE_OPTIONS = [
-  { value: "",                   label: "All Asset Types" },
-  { value: "DATA_SOURCES",       label: "Data Sources" },
-  { value: "DATA_SCHEMAS",       label: "Schemas" },
-  { value: "DATA_ENTITIES",      label: "Tables / Views" },
-  { value: "DATA_ATTRIBUTES",    label: "Columns" },
-  { value: "BUSINESS_GLOSSARIES",label: "Glossary Terms" },
-];
-
-const ASSET_TYPE_LABEL: Record<string, string> = {
-  DATA_SOURCES:        "Data Source",
-  DATA_SCHEMAS:        "Schema",
-  DATA_ENTITIES:       "Table",
-  DATA_ATTRIBUTES:     "Column",
-  BUSINESS_GLOSSARIES: "Glossary Term",
-};
-
-const FIELD_LABEL: Record<string, string> = {
-  description_text:     "Description",
-  friendly_name_text:   "Friendly Name",
-  definition_text:      "Definition",
-  format_text:          "Format",
-  business_rules_text:  "Business Rules",
-  classification_code:  "Classification",
-  is_pii_indicator:     "PII Flag",
-  pi_category_code:     "PI Category",
-  example_text:         "Example",
-  term_type:            "Term Type",
-  is_encrypted:         "Encrypted",
-  attribute_class_code: "Column Type",
-  glossary_term_text:   "Business Term",
-  entity_category_code: "Table Type",
-  suggested_category_code: "Table Type (Suggested)",
-  category_is_confirmed:   "Table Type Confirmed",
-  business_app_name:    "Business App",
-};
+const ASSET_TYPE_CODES = ["DATA_SOURCES", "DATA_SCHEMAS", "DATA_ENTITIES", "DATA_ATTRIBUTES", "BUSINESS_GLOSSARIES"] as const;
 
 function fmt(ts: string) {
   const d = new Date(ts);
@@ -55,12 +21,9 @@ function initials(name: string | null, id: string) {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
-function actorLabel(name: string | null, id: string) {
-  if (id === "SYSTEM") return "Bayanatix Crawler";
-  return name ?? id;
-}
-
 export function AuditLogClient({ users }: { users: AdminUser[] }) {
+  const { t } = useLang();
+  const a = t.auditLog;
   const [assetType, setAssetType] = useState("");
   const [userId,    setUserId]    = useState("");
   const [from,      setFrom]      = useState("");
@@ -87,7 +50,7 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
       if (q)         sp.set("q",         q);
       sp.set("page", String(pg));
       const res = await fetch(`/api/admin/audit-log?${sp}`);
-      if (!res.ok) throw new Error("Failed to load audit log");
+      if (!res.ok) throw new Error(a.loadFailed);
       const data = await res.json();
       setEntries(data.entries);
       setTotal(data.total);
@@ -97,7 +60,7 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
     } finally {
       setLoading(false);
     }
-  }, [assetType, userId, from, to, q]);
+  }, [assetType, userId, from, to, q, a.loadFailed]);
 
   const PAGE_SIZE = 50;
   const totalPages = total != null ? Math.ceil(total / PAGE_SIZE) : 1;
@@ -108,43 +71,44 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
       <div className="card p-5 mb-6">
         <div className="grid grid-cols-[1fr_1fr_auto_auto_1fr] gap-3 items-end">
           <div>
-            <label className="field-label">Asset Type</label>
+            <label className="field-label">{a.assetType}</label>
             <select value={assetType} onChange={(e) => setAssetType(e.target.value)} className="input-field">
-              {ASSET_TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+              <option value="">{a.allAssetTypes}</option>
+              {ASSET_TYPE_CODES.map((code) => (
+                <option key={code} value={code}>{a.assetTypesPlural[code]}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="field-label">User</label>
+            <label className="field-label">{a.user}</label>
             <select value={userId} onChange={(e) => setUserId(e.target.value)} className="input-field">
-              <option value="">All Users</option>
+              <option value="">{a.allUsers}</option>
               {users.map((u) => (
                 <option key={u.userId} value={u.userId}>{u.fullName}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="field-label">From</label>
+            <label className="field-label">{a.from}</label>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input-field" />
           </div>
           <div>
-            <label className="field-label">To</label>
+            <label className="field-label">{a.to}</label>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input-field" />
           </div>
           <div>
-            <label className="field-label">Search (field / value)</label>
+            <label className="field-label">{a.searchLabel}</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && search(1)}
-                placeholder="e.g. description, Customer…"
+                placeholder={a.searchPlaceholder}
                 className="input-field flex-1"
               />
               <button onClick={() => search(1)} disabled={loading} className="btn btn-primary shrink-0">
-                {loading ? "…" : "Search"}
+                {loading ? "…" : a.searchBtn}
               </button>
             </div>
           </div>
@@ -158,7 +122,7 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
       {/* Results */}
       {!searched && !loading && (
         <div className="card py-16 text-center text-muted text-sm">
-          Set filters above and press <strong>Search</strong> to view the audit log.
+          {a.emptyPrompt}
         </div>
       )}
 
@@ -166,7 +130,7 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
         <>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted">
-              {total != null ? <><strong className="text-ink">{total.toLocaleString()}</strong> audit events found</> : ""}
+              {total != null ? <><strong className="text-ink">{total.toLocaleString()}</strong> {a.eventsFound}</> : ""}
             </p>
             {totalPages > 1 && (
               <div className="flex items-center gap-2">
@@ -174,13 +138,13 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
                   disabled={page <= 1}
                   onClick={() => search(page - 1)}
                   className="btn btn-sm"
-                >← Prev</button>
-                <span className="text-sm text-muted">Page {page} of {totalPages}</span>
+                >{a.prev}</button>
+                <span className="text-sm text-muted">{a.pageOf.replace("{page}", String(page)).replace("{total}", String(totalPages))}</span>
                 <button
                   disabled={page >= totalPages}
                   onClick={() => search(page + 1)}
                   className="btn btn-sm"
-                >Next →</button>
+                >{a.next}</button>
               </div>
             )}
           </div>
@@ -188,14 +152,14 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
           <div className="card overflow-hidden">
             {/* Header */}
             <div className="grid grid-cols-[180px_180px_160px_1fr] gap-3 px-5 py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
-              <div className="min-w-0 truncate">Timestamp</div>
-              <div className="min-w-0 truncate">User</div>
-              <div className="min-w-0 truncate">Asset</div>
-              <div className="min-w-0 truncate">Changes</div>
+              <div className="min-w-0 truncate">{a.colTimestamp}</div>
+              <div className="min-w-0 truncate">{a.colUser}</div>
+              <div className="min-w-0 truncate">{a.colAsset}</div>
+              <div className="min-w-0 truncate">{a.colChanges}</div>
             </div>
 
             {entries.length === 0 && (
-              <div className="py-12 text-center text-muted text-sm">No audit events match the filters.</div>
+              <div className="py-12 text-center text-muted text-sm">{a.noMatches}</div>
             )}
 
             {entries.map((e) => (
@@ -208,13 +172,13 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
                   <span className="w-6 h-6 rounded-full bg-brand-purple/15 text-brand-purple text-[10px] font-bold grid place-items-center shrink-0">
                     {initials(e.userName, e.userId)}
                   </span>
-                  <span className="text-sm text-ink truncate">{actorLabel(e.userName, e.userId)}</span>
+                  <span className="text-sm text-ink truncate">{e.userId === "SYSTEM" ? a.systemActor : e.userName ?? e.userId}</span>
                 </div>
 
                 {/* Asset */}
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold text-brand-purple truncate">
-                    {ASSET_TYPE_LABEL[e.assetType] ?? e.assetType}
+                    {(a.assetTypes as Record<string, string>)[e.assetType] ?? e.assetType}
                   </div>
                   <div className="text-[11px] text-muted font-mono truncate">#{e.assetId}</div>
                 </div>
@@ -222,20 +186,20 @@ export function AuditLogClient({ users }: { users: AdminUser[] }) {
                 {/* Changes */}
                 <div className="min-w-0 space-y-1.5">
                   {e.changes.length === 0 && (
-                    <span className="text-[12px] text-muted italic">No field details recorded</span>
+                    <span className="text-[12px] text-muted italic">{a.noFieldDetails}</span>
                   )}
                   {e.changes.map((c, i) => (
                     <div key={i} className="flex items-start gap-2 text-[12px]">
                       <span className="font-semibold text-ink-soft w-36 shrink-0 pt-0.5">
-                        {FIELD_LABEL[c.field] ?? c.field}
+                        {(a.fields as Record<string, string>)[c.field] ?? c.field}
                       </span>
                       <div className="flex items-start gap-1.5 min-w-0">
                         <span className="line-through text-red-500 bg-red-50 px-1.5 py-0.5 rounded max-w-[200px] truncate">
-                          {c.from ?? <em className="not-italic text-muted">empty</em>}
+                          {c.from ?? <em className="not-italic text-muted">{a.emptyValue}</em>}
                         </span>
                         <span className="text-muted shrink-0">→</span>
                         <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded max-w-[200px] truncate">
-                          {c.to ?? <em className="not-italic text-muted">empty</em>}
+                          {c.to ?? <em className="not-italic text-muted">{a.emptyValue}</em>}
                         </span>
                       </div>
                     </div>

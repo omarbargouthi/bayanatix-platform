@@ -2537,4 +2537,132 @@ export type I18nStrings = {
       };
     };
   };
+
+  // ── Notification panel (components/ui/NotificationPanel.tsx) ─────────────────
+  notifications: {
+    title:            string;
+    markAllRead:      string;
+    closeAria:        string;
+    tabActivity:      string;
+    tabJobs:          string;
+    noActivity:       string;
+    noJobs:           string;
+    actionTaken:      string;
+    downloadFile:     string;   // "Download {name}"
+    // System-generated job notification text — stored in English at insert time,
+    // re-rendered in the viewer's language by the panel (see localizeJobNotification).
+    viewJobDetails:   string;
+    jobCompleted:     string;   // "{label} completed"
+    jobFailed:        string;   // "{label} failed"
+    crawlCompleted:   string;   // "Crawl completed: {name}"
+    crawlFailed:      string;   // "Crawl failed: {name}"
+    jobSucceededBody: string;   // "Job #{id} finished successfully."
+    jobFailedBody:    string;   // "Job #{id} failed: {error}"
+    crawlSummary:     string;   // "{schemas} schema(s), {tables} table(s), {columns} column(s)."
+    types: {
+      REVIEW:         string;
+      CERTIFICATION:  string;
+      CLASSIFICATION: string;
+      QUALITY:        string;
+      WORKFLOW:       string;
+      COMPLIANCE:     string;
+      COLLABORATION:  string;
+      JOB:            string;
+    };
+  };
+
+  // ── Admin > Audit & Logs > Audit Log (AuditLogClient.tsx) ────────────────────
+  auditLog: {
+    tabAudit:          string;
+    tabJobLogs:        string;
+    assetType:         string;
+    allAssetTypes:     string;
+    user:              string;
+    allUsers:          string;
+    from:              string;
+    to:                string;
+    searchLabel:       string;
+    searchPlaceholder: string;
+    searchBtn:         string;
+    loadFailed:        string;
+    emptyPrompt:       string;
+    eventsFound:       string;   // follows the bold count: "{n} audit events found"
+    prev:              string;
+    next:              string;
+    pageOf:            string;   // "Page {page} of {total}"
+    colTimestamp:      string;
+    colUser:           string;
+    colAsset:          string;
+    colChanges:        string;
+    noMatches:         string;
+    noFieldDetails:    string;
+    emptyValue:        string;
+    systemActor:       string;
+    assetTypesPlural: {
+      DATA_SOURCES:        string;
+      DATA_SCHEMAS:        string;
+      DATA_ENTITIES:       string;
+      DATA_ATTRIBUTES:     string;
+      BUSINESS_GLOSSARIES: string;
+    };
+    assetTypes: {
+      DATA_SOURCES:        string;
+      DATA_SCHEMAS:        string;
+      DATA_ENTITIES:       string;
+      DATA_ATTRIBUTES:     string;
+      BUSINESS_GLOSSARIES: string;
+    };
+    fields: {
+      description_text:        string;
+      friendly_name_text:      string;
+      definition_text:         string;
+      format_text:             string;
+      business_rules_text:     string;
+      classification_code:     string;
+      is_pii_indicator:        string;
+      pi_category_code:        string;
+      example_text:            string;
+      term_type:               string;
+      is_encrypted:            string;
+      attribute_class_code:    string;
+      glossary_term_text:      string;
+      entity_category_code:    string;
+      suggested_category_code: string;
+      category_is_confirmed:   string;
+      business_app_name:       string;
+    };
+  };
+
+  // ── Admin > Audit & Logs > Job Logs + shared BackgroundJobsPanel ─────────────
+  jobLogs: {
+    crawlHistory:           string;
+    refresh:                string;
+    noCrawlJobs:            string;
+    jobNumber:              string;   // "Job #{id}"
+    duration:               string;   // "Duration: {value}"
+    schemas:                string;
+    tables:                 string;
+    cols:                   string;
+    loadingLogs:            string;
+    noLogEntries:           string;
+    backgroundJobs:         string;
+    backgroundJobsSubtitle: string;
+    jobsTitle:              string;
+    statusRunning:          string;
+    statusCompleted:        string;
+    statusFailed:           string;
+    downloadFile:           string;   // "Download {name}"
+    fileFallback:           string;
+    downloadLog:            string;
+    types: {
+      GOV_COMPLIANCE_EXPORT: string;
+      GOV_COMPLIANCE_IMPORT: string;
+      REPORT_EXPORT_XLSX:    string;
+      REPORT_EXPORT_PDF:     string;
+      TRANSLATIONS_EXPORT:   string;
+      TRANSLATIONS_IMPORT:   string;
+      BULK_DOWNLOAD:         string;
+      BULK_UPLOAD:           string;
+    };
+  };
 };

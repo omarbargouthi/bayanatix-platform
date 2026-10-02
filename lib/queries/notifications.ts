@@ -13,6 +13,8 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
       n.domain_code     AS "domainCode",
       n.action_label    AS "actionLabel",
       n.action_href     AS "actionHref",
+      n.download_href   AS "downloadHref",
+      n.download_label  AS "downloadLabel",
       n.created_at      AS "createdAt",
       -- Workflow notifications point at /requests/{id}; mark them actioned once this
       -- user has completed a stage on that request's workflow since the notification fired.
@@ -54,9 +56,12 @@ export async function markAllRead(userId: string): Promise<void> {
 export async function createNotification(n: {
   userId: string; type: string; title: string; body?: string | null;
   severity?: "INFO" | "SUCCESS" | "WARNING" | "ERROR"; actionLabel?: string | null; actionHref?: string | null;
+  /** Direct link to the file a job produced (plus its file name), shown under the notification. */
+  downloadHref?: string | null; downloadLabel?: string | null;
 }): Promise<void> {
   await sql`
-    INSERT INTO bayanat.notifications (user_id, type, title, body, severity, action_label, action_href)
-    VALUES (${n.userId}, ${n.type}, ${n.title}, ${n.body ?? null}, ${n.severity ?? "INFO"}, ${n.actionLabel ?? null}, ${n.actionHref ?? null})
+    INSERT INTO bayanat.notifications (user_id, type, title, body, severity, action_label, action_href, download_href, download_label)
+    VALUES (${n.userId}, ${n.type}, ${n.title}, ${n.body ?? null}, ${n.severity ?? "INFO"}, ${n.actionLabel ?? null}, ${n.actionHref ?? null},
+      ${n.downloadHref ?? null}, ${n.downloadLabel ?? null})
   `;
 }

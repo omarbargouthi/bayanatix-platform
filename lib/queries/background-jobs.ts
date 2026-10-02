@@ -77,12 +77,15 @@ const JOB_TYPE_LABELS: Record<string, string> = {
 // itself, so this only logs and swallows.
 async function notifyJobFinished(jobId: number, status: "COMPLETED" | "FAILED", errorText?: string): Promise<void> {
   try {
-    const [job] = await sql<{ jobTypeCode: string; createdByUserId: string | null }[]>`
-      SELECT job_type_code AS "jobTypeCode", created_by_user_id AS "createdByUserId"
+    const [job] = await sql<{ jobTypeCode: string; createdByUserId: string | null; resultFileName: string | null; hasResultFile: boolean }[]>`
+      SELECT job_type_code AS "jobTypeCode", created_by_user_id AS "createdByUserId",
+             result_file_name AS "resultFileName", (result_file_data IS NOT NULL) AS "hasResultFile"
       FROM bayanat.background_jobs WHERE job_id = ${jobId}
     `;
     if (!job?.createdByUserId) return;
     const label = JOB_TYPE_LABELS[job.jobTypeCode] ?? job.jobTypeCode;
+    // Exports produce a file; imports don't — only link one that actually exists.
+    const hasDownload = status === "COMPLETED" && job.hasResultFile;
     await createNotification({
       userId: job.createdByUserId,
       type: "JOB",
@@ -91,6 +94,8 @@ async function notifyJobFinished(jobId: number, status: "COMPLETED" | "FAILED", 
       severity: status === "COMPLETED" ? "SUCCESS" : "ERROR",
       actionLabel: "View Job Details",
       actionHref: "/admin/audit-logs?tab=job-logs",
+      downloadHref: hasDownload ? `/api/jobs/${jobId}/file` : null,
+      downloadLabel: hasDownload ? job.resultFileName : null,
     });
   } catch (e) {
     console.error("[notifyJobFinished] failed to create notification", e);
