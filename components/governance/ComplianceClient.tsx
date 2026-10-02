@@ -1230,25 +1230,21 @@ function EvidenceExpanded({
   const evidenceT = (r: ComplianceRequirement) => pickTranslation(r.supportingEvidenceEn ?? r.supportingEvidence, r.supportingEvidenceTranslations, lang);
 
   const mgmtImported = mgmtT(req);
-  const evidenceImported = evidenceT(req);
+  const evidenceImported = req.supportingEvidenceOverride || evidenceT(req);
   const [mgmt,     setMgmt]     = useState(req.managementNotes ?? mgmtImported);
-  const [evidence, setEvidence] = useState(req.supportingEvidenceOverride ?? evidenceImported);
   const [comments, setComments] = useState(req.comments ?? "");
   const [saving,   setSaving]   = useState(false);
 
   useEffect(() => { setMgmt(req.managementNotes ?? mgmtT(req)); },
     [req.managementNotes, req.managementSectorEn, req.managementSector, req.managementSectorTranslations, lang]); // eslint-disable-line
-  useEffect(() => { setEvidence(req.supportingEvidenceOverride ?? evidenceT(req)); },
-    [req.supportingEvidenceOverride, req.supportingEvidenceEn, req.supportingEvidence, req.supportingEvidenceTranslations, lang]); // eslint-disable-line
   useEffect(() => { setComments(req.comments ?? ""); }, [req.comments]);
 
   const isDirty = mgmt   !== (req.managementNotes ?? mgmtT(req)) ||
-                  evidence !== (req.supportingEvidenceOverride ?? evidenceT(req)) ||
                   comments !== (req.comments ?? "");
 
   async function saveAll() {
     setSaving(true);
-    await onPatch({ managementNotes: mgmt || null, supportingEvidenceOverride: evidence || null, comments: comments || null });
+    await onPatch({ managementNotes: mgmt || null, comments: comments || null });
     setSaving(false);
   }
 
@@ -1294,20 +1290,14 @@ function EvidenceExpanded({
         )}
       </div>
 
-      {/* Supporting Evidence — the assessing user's own text, not fixed admin guidance */}
+      {/* Supporting Evidence — fixed admin/regulation guidance, read-only */}
       <div>
         <label className="block text-[11px] font-semibold text-ink-soft uppercase tracking-wide mb-1">
           {ca.colEvidence}
         </label>
-        {evidenceImported && !req.supportingEvidenceOverride && (
-          <div className={`text-[11px] bg-canvas border border-line rounded px-2 py-1.5 mb-1.5 ${isRtl ? "text-right" : ""}`}
-            dir={isRtl ? "rtl" : undefined}>
-            <span className="text-muted/70">{evidenceImported}</span>
-            <span className="ml-2 text-[10px] text-muted italic">(imported)</span>
-          </div>
-        )}
-        <textarea value={evidence} onChange={(e) => setEvidence(e.target.value)} rows={2}
-          className="field text-[12px] w-full" placeholder="Describe or reference the supporting evidence…" />
+        <div className={`text-[12px] text-ink leading-snug ${isRtl ? "text-right" : ""}`} dir={isRtl ? "rtl" : undefined}>
+          {evidenceImported || <span className="text-muted italic">—</span>}
+        </div>
       </div>
 
       {/* Management & Supporting Sector */}
