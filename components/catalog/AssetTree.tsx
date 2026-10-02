@@ -33,7 +33,8 @@ function SourceRow({
   defaultOpen?: boolean;
   canEdit: boolean;
 }) {
-  const { isRtl } = useLang();
+  const { isRtl, t } = useLang();
+  const a = t.assetTree;
   const [open,       setOpen]       = useState(!!defaultOpen);
   const [editing,    setEditing]    = useState(false);
   const tableTotal = src.schemas.reduce((s, sc) => s + (sc.tableCount ?? 0), 0);
@@ -66,7 +67,7 @@ function SourceRow({
               its icon. */}
           <span className={`flex-1 min-w-0 font-semibold text-ink truncate ${isRtl ? "text-right" : "text-left"}`} dir="auto" title={src.sourceName}>{src.sourceName}</span>
           <span className="text-xs text-muted shrink-0">
-            {src.schemas.length} schemas · {tableTotal.toLocaleString()} tables
+            {a.sourceCounts.replace("{schemas}", String(src.schemas.length)).replace("{tables}", tableTotal.toLocaleString())}
           </span>
         </button>
         <FollowButton assetType="DATA_SOURCES" assetId={src.dataSourceId} iconOnly size="sm" />
@@ -74,7 +75,7 @@ function SourceRow({
           <button
             onClick={() => setEditing(true)}
             className="opacity-0 group-hover:opacity-100 mr-2 w-6 h-6 grid place-items-center rounded hover:bg-brand-purple/10 text-muted hover:text-brand-purple transition-all"
-            title="Edit data source"
+            title={a.editDataSource}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -95,7 +96,7 @@ function SourceRow({
               <IconDB className="w-[18px] h-[18px] text-brand-navy shrink-0" />
               <span className={`flex-1 min-w-0 truncate ${isRtl ? "text-right" : "text-left"}`} dir="auto" title={sc.schemaName}>{sc.schemaName}</span>
               <span className="text-xs text-muted shrink-0">
-                {sc.tableCount ?? 0} tables · {sc.viewCount ?? 0} views
+                {a.schemaCounts.replace("{tables}", String(sc.tableCount ?? 0)).replace("{views}", String(sc.viewCount ?? 0))}
               </span>
             </Link>
           ))}

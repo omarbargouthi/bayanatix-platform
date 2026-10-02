@@ -30,7 +30,8 @@ function SectionCard({ title, description, children }: { title: string; descript
 
 export function ProfilePageClient({ fullName, email, role, userId, avatarColorCode, disabledNotificationTypes }: Props) {
   const router = useRouter();
-  const { lang, setLang, languages } = useLang();
+  const { lang, setLang, languages, t } = useLang();
+  const p = t.profile;
 
   // Avatar
   const [colorCode, setColorCode] = useState(avatarColorCode);
@@ -81,8 +82,8 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
   async function changePassword() {
     setPwError(null);
     setPwSuccess(false);
-    if (newPassword !== confirmPassword) { setPwError("New password and confirmation do not match."); return; }
-    if (newPassword.length < 8) { setPwError("New password must be at least 8 characters."); return; }
+    if (newPassword !== confirmPassword) { setPwError(p.passwordMismatch); return; }
+    if (newPassword.length < 8) { setPwError(p.passwordTooShort); return; }
     setPwSaving(true);
     try {
       const r = await fetch("/api/users/me/password", {
@@ -90,8 +91,8 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       if (!r.ok) {
-        const d = await r.json().catch(() => ({ error: "Failed to change password" }));
-        setPwError(d.error ?? "Failed to change password");
+        const d = await r.json().catch(() => ({ error: p.passwordChangeFailed }));
+        setPwError(d.error ?? p.passwordChangeFailed);
         return;
       }
       setPwSuccess(true);
@@ -109,27 +110,27 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
         <div>
           <h1 className="text-2xl font-extrabold text-brand-deep">{fullName}</h1>
           <p className="text-sm text-muted">{email}</p>
-          <span className="tag tag-purple mt-2 inline-block">{role}</span>
+          <span className="tag tag-purple mt-2 inline-block">{(t.roles as Record<string, string>)[role] ?? role}</span>
         </div>
       </div>
 
       {/* Pointer to Homepage for requests/activity */}
       <div className="rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-5 py-3.5 flex items-center justify-between gap-4">
         <p className="text-[13px] text-ink-soft">
-          Looking for your requests, activity, or steward domains? Those now live on your Homepage.
+          {p.homepagePointer}
         </p>
-        <Link href="/homepage" className="btn btn-sm shrink-0">Go to Homepage →</Link>
+        <Link href="/homepage" className="btn btn-sm shrink-0">{p.goToHomepage}</Link>
       </div>
 
       {/* Avatar */}
-      <SectionCard title="Avatar" description="Choose a color for your avatar badge.">
+      <SectionCard title={p.avatarTitle} description={p.avatarDesc}>
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => pickColor(null)}
             className={`w-9 h-9 rounded-full border-2 grid place-items-center text-[10px] font-bold text-muted ${!colorCode ? "border-brand-purple" : "border-line"}`}
-            title="Default (based on your user ID)"
+            title={p.avatarAutoTitle}
           >
-            Auto
+            {p.avatarAuto}
           </button>
           {AVATAR_COLOR_CODES.map((code) => (
             <button
@@ -146,7 +147,7 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
       </SectionCard>
 
       {/* Preferences */}
-      <SectionCard title="Language">
+      <SectionCard title={p.languageTitle}>
         <select
           value={lang}
           onChange={(e) => setLang(e.target.value)}
@@ -159,7 +160,7 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
       </SectionCard>
 
       {/* Notification preferences */}
-      <SectionCard title="Notification Preferences" description="Choose which kinds of activity notify you.">
+      <SectionCard title={p.notifPrefsTitle} description={p.notifPrefsDesc}>
         <div className="space-y-3">
           {NOTIFICATION_TYPES.map((n) => (
             <label key={n.code} className="flex items-start gap-3 cursor-pointer">
@@ -170,39 +171,39 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
                 className="w-4 h-4 mt-0.5 rounded accent-brand-purple"
               />
               <div>
-                <div className="text-sm font-medium text-ink">{n.label}</div>
-                <div className="text-[12px] text-muted">{n.description}</div>
+                <div className="text-sm font-medium text-ink">{p.notifTypes[n.code]}</div>
+                <div className="text-[12px] text-muted">{p.notifTypeDescs[n.code]}</div>
               </div>
             </label>
           ))}
         </div>
-        {savingNotifs && <p className="text-[11px] text-muted mt-3">Saving…</p>}
-        {!savingNotifs && notifsSaved && <p className="text-[11px] text-emerald-600 mt-3">Saved.</p>}
+        {savingNotifs && <p className="text-[11px] text-muted mt-3">{t.common.saving}</p>}
+        {!savingNotifs && notifsSaved && <p className="text-[11px] text-emerald-600 mt-3">{p.saved}</p>}
       </SectionCard>
 
       {/* Change password */}
-      <SectionCard title="Change Password">
+      <SectionCard title={p.changePassword}>
         <div className="space-y-3 max-w-sm">
           <div>
-            <label className="field-label">Current Password</label>
+            <label className="field-label">{p.currentPassword}</label>
             <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-field" />
           </div>
           <div>
-            <label className="field-label">New Password</label>
+            <label className="field-label">{p.newPassword}</label>
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-field" />
           </div>
           <div>
-            <label className="field-label">Confirm New Password</label>
+            <label className="field-label">{p.confirmNewPassword}</label>
             <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input-field" />
           </div>
           {pwError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{pwError}</p>}
-          {pwSuccess && <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">Password updated.</p>}
+          {pwSuccess && <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{p.passwordUpdated}</p>}
           <button
             onClick={changePassword}
             disabled={pwSaving || !currentPassword || !newPassword || !confirmPassword}
             className="btn btn-primary"
           >
-            {pwSaving ? "Saving…" : "Update Password"}
+            {pwSaving ? t.common.saving : p.updatePassword}
           </button>
         </div>
       </SectionCard>

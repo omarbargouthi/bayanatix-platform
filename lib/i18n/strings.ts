@@ -2665,4 +2665,52 @@ export type I18nStrings = {
       BULK_UPLOAD:           string;
     };
   };
+
+  // ── Data Assets tree (components/catalog/AssetTree.tsx) ──────────────────────
+  assetTree: {
+    sourceCounts:   string;   // "{schemas} schemas · {tables} tables"
+    schemaCounts:   string;   // "{tables} tables · {views} views"
+    editDataSource: string;
+  };
+
+  // ── Profile page (app/(app)/profile/ProfilePageClient.tsx) ───────────────────
+  profile: {
+    homepagePointer:      string;
+    goToHomepage:         string;
+    avatarTitle:          string;
+    avatarDesc:           string;
+    avatarAuto:           string;
+    avatarAutoTitle:      string;
+    languageTitle:        string;
+    notifPrefsTitle:      string;
+    notifPrefsDesc:       string;
+    saved:                string;
+    changePassword:       string;
+    currentPassword:      string;
+    newPassword:          string;
+    confirmNewPassword:   string;
+    passwordMismatch:     string;
+    passwordTooShort:     string;
+    passwordChangeFailed: string;
+    passwordUpdated:      string;
+    updatePassword:       string;
+    notifTypes: {
+      WORKFLOW        : string;
+      COLLABORATION   : string;
+      COMPLIANCE      : string;
+      REVIEW          : string;
+      CLASSIFICATION  : string;
+      QUALITY         : string;
+      CERTIFICATION   : string;
+    };
+    notifTypeDescs: {
+      WORKFLOW        : string;
+      COLLABORATION   : string;
+      COMPLIANCE      : string;
+      REVIEW          : string;
+      CLASSIFICATION  : string;
+      QUALITY         : string;
+      CERTIFICATION   : string;
+    };
+  };
 };

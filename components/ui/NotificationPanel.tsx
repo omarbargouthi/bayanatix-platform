@@ -140,9 +140,11 @@ export function NotificationPanel({ open, onClose }: Props) {
       {/* Panel */}
       <aside
         className={[
-          "fixed top-0 right-0 z-50 h-full w-[380px] bg-white shadow-2xl border-l border-line",
+          // Opens on the side the bell sits on — the header actions move to the left in RTL.
+          "fixed top-0 z-50 h-full w-[380px] bg-white shadow-2xl border-line",
+          isRtl ? "left-0 border-r" : "right-0 border-l",
           "flex flex-col transition-transform duration-300 ease-in-out",
-          open ? "translate-x-0" : "translate-x-full",
+          open ? "translate-x-0" : isRtl ? "-translate-x-full" : "translate-x-full",
         ].join(" ")}
       >
         {/* Header */}

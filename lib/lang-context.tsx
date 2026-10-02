@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { en } from "./i18n/en";
 import type { I18nStrings } from "./i18n/strings";
 
@@ -102,6 +103,7 @@ async function fetchLookupCache(): Promise<LookupCache> {
 }
 
 export function LangProvider({ children, initialLang }: { children: ReactNode; initialLang?: Lang }) {
+  const router = useRouter();
   const [lang, setLangState] = useState<Lang>(initialLang ?? "en");
   const [languages, setLanguages] = useState<RuntimeLanguage[]>(DEFAULT_LANGUAGES);
   const [bundle, setBundle] = useState<Record<string, string>>({});
@@ -135,7 +137,12 @@ export function LangProvider({ children, initialLang }: { children: ReactNode; i
     fetchBundle(l).then(setBundle);
     fetch("/api/users/me/language", {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ languageCode: l }),
-    }).catch(() => {}); // best-effort cross-device persistence; no session (e.g. login page) just 401s silently
+    }).catch(() => {}) // best-effort cross-device persistence; no session (e.g. login page) just 401s silently
+      // Server Components pick their language from the saved preference/cookie (see
+      // lib/i18n/server.ts), so breadcrumbs and other server-rendered text stay in the
+      // old language until they're re-rendered — and only after the PATCH has landed,
+      // since the saved preference outranks the cookie.
+      .finally(() => router.refresh());
   }
 
   function reloadBundle() {
