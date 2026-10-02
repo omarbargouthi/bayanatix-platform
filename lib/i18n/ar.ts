@@ -1917,7 +1917,7 @@ export const ar: I18nStrings = {
   },
 
   chat: {
-    headerTitle:        "مساعد بياناتكس",
+    headerTitle:        "مساعد بيانس",
     headerSubtitle:     "ذكاء اصطناعي لحوكمة البيانات",
     placeholder:        "اسأل عن أصول البيانات…",
     greeting:           "مرحباً! يمكنني مساعدتك في التنقل بين أصول البيانات، وشرح سياسات الحوكمة، أو العثور على الجداول والأعمدة. كيف يمكنني مساعدتك؟",
@@ -2463,7 +2463,7 @@ export const ar: I18nStrings = {
     noMatches:         "لا توجد أحداث تدقيق مطابقة لعوامل التصفية.",
     noFieldDetails:    "لم تُسجَّل تفاصيل الحقول",
     emptyValue:        "فارغ",
-    systemActor:       "زاحف بياناتكس",
+    systemActor:       "زاحف بيانس",
     assetTypesPlural: {
       DATA_SOURCES:        "مصادر البيانات",
       DATA_SCHEMAS:        "المخططات",

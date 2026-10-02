@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }, { status: 400 });
   }
   if (Object.keys(parsed.sheets).length === 0) {
-    return NextResponse.json({ error: "No recognizable sheets/columns found — is this a Bayanatix export file?" }, { status: 400 });
+    return NextResponse.json({ error: "No recognizable sheets/columns found — is this a Bayanis export file?" }, { status: 400 });
   }
 
   const exportSnapshotAt = parsed.meta?.exportedAt ? new Date(parsed.meta.exportedAt) : null;

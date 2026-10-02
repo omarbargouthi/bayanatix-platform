@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="bayanatix-upload-rejected-${jobId}.xlsx"`,
+      "Content-Disposition": `attachment; filename="bayanis-upload-rejected-${jobId}.xlsx"`,
     },
   });
 }

@@ -1,6 +1,6 @@
 // AI Assist for Report KPI Admin's custom-SQL KPI form: given a plain-English
 // description of what a KPI should calculate, drafts a candidate SELECT query
-// grounded in the real Bayanatix schema (table/column/FK metadata, introspected
+// grounded in the real Bayanis schema (table/column/FK metadata, introspected
 // live from information_schema -- never hand-maintained, so it can't go stale
 // the way a written-out schema doc would). The admin reviews/edits the result
 // and still has to run it through the existing Test Query step before saving --
@@ -129,7 +129,7 @@ export async function generateKpiSql(reportCode: string, description: string): P
   const schemaRef = await getSchemaReferenceText(reportCode);
 
   const prompt = [
-    "You are a PostgreSQL assistant drafting ONE read-only query for a custom KPI in the Bayanatix data governance platform's Reports module.",
+    "You are a PostgreSQL assistant drafting ONE read-only query for a custom KPI in the Bayanis data governance platform's Reports module.",
     "",
     "Output contract (strict):",
     "- Exactly one SELECT (or WITH ... SELECT) statement, no trailing semicolon.",

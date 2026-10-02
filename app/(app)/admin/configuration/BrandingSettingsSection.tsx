@@ -38,7 +38,7 @@ export function BrandingSettingsSection() {
   }
 
   async function handleRemove() {
-    if (!confirm("Remove the customer logo? The Bayanatix logo is unaffected either way.")) return;
+    if (!confirm("Remove the customer logo? The Bayanis logo is unaffected either way.")) return;
     setSaving(true);
     try {
       setInfo(await (await fetch("/api/admin/branding", { method: "DELETE" })).json());
@@ -59,7 +59,7 @@ export function BrandingSettingsSection() {
       <div className="mb-6">
         <h2 className="text-lg font-bold text-ink">Customer Logo</h2>
         <p className="text-xs text-muted mt-1">
-          Shown alongside the Bayanatix logo (not instead of it) in the sidebar and on the sign-in page, so this stays
+          Shown alongside the Bayanis logo (not instead of it) in the sidebar and on the sign-in page, so this stays
           recognizable as your organization&apos;s own internal application. SVG, PNG, JPEG, or WebP, up to 2MB.
         </p>
       </div>
@@ -76,7 +76,7 @@ export function BrandingSettingsSection() {
           <div className="text-sm">
             {info.hasCustomLogo
               ? <><div className="font-medium text-ink">Customer logo active</div><div className="text-[11px] text-muted mt-0.5 truncate max-w-[220px]">{info.logoFilename}</div></>
-              : <div className="text-muted">No customer logo set — only the Bayanatix logo is shown</div>}
+              : <div className="text-muted">No customer logo set — only the Bayanis logo is shown</div>}
           </div>
         </div>
 

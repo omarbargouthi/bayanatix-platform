@@ -15,7 +15,7 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 function actorLabel(userName: string | null, userId: string) {
-  if (userId === "SYSTEM") return "Bayanatix Crawler";
+  if (userId === "SYSTEM") return "Bayanis Crawler";
   return userName ?? userId;
 }
 

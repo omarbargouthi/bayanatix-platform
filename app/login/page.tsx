@@ -5,7 +5,7 @@ import { IconDB, IconGlossary, IconLineage, IconShield } from "@/components/layo
 import { EnvironmentBadge } from "@/components/layout/EnvironmentBadge";
 import { getBrandingInfo } from "@/lib/queries/branding";
 
-export const metadata = { title: "Sign in · Bayanatix" };
+export const metadata = { title: "Sign in · Bayanis" };
 
 const FEATURES = [
   { Icon: IconDB, title: "Unified Data Catalog", desc: "Every source, schema, table and column — searchable in one inventory." },
@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { from
 
         <div className="relative flex items-center gap-3">
           <img src="/logo.svg" alt="" className="w-10 h-12" />
-          <span className="text-lg font-bold tracking-[0.18em]">BAYANATIX</span>
+          <span className="text-lg font-bold tracking-[0.18em]">BAYANIS</span>
           <EnvironmentBadge className="ml-2" />
         </div>
         {hasCustomLogo && (
@@ -45,7 +45,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { from
             One platform to know, trust, and govern your data.
           </h1>
           <p className="text-white/75 text-sm leading-relaxed">
-            Bayanatix connects your catalog, glossary, lineage, and compliance into a single
+            Bayanis connects your catalog, glossary, lineage, and compliance into a single
             source of truth — so every team works from the same trusted view of the data.
           </p>
 
@@ -65,7 +65,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { from
         </div>
 
         <p className="relative text-xs text-white/50">
-          © {new Date().getFullYear()} Bayanatix · Riyadh, Kingdom of Saudi Arabia
+          © {new Date().getFullYear()} Bayanis · Riyadh, Kingdom of Saudi Arabia
         </p>
       </section>
 
@@ -75,7 +75,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { from
           <LoginLangBar>
             <div className="lg:hidden flex items-center gap-2 mb-8">
               <img src="/logo.svg" alt="" className="w-8 h-10" />
-              <span className="font-bold tracking-[0.18em] text-brand-deep">BAYANATIX</span>
+              <span className="font-bold tracking-[0.18em] text-brand-deep">BAYANIS</span>
               {hasCustomLogo && <img src="/api/branding/logo" alt="Customer logo" className="h-6 max-w-[110px] object-contain object-left ml-2" />}
             </div>
 
@@ -87,7 +87,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { from
             <LoginForm redirectTo={from} initialError={searchParams.error} />
 
             <p className="mt-8 text-xs text-muted text-center">
-              By signing in you agree to the Bayanatix acceptable use policy.
+              By signing in you agree to the Bayanis acceptable use policy.
             </p>
           </LoginLangBar>
         </div>

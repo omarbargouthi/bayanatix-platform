@@ -5,10 +5,10 @@ export default async function LicenseExpiredPage() {
 
   const detail =
     status.state === "expired"
-      ? `Your Bayanatix license expired on ${new Date(status.expiresAt).toLocaleDateString()}.`
+      ? `Your Bayanis license expired on ${new Date(status.expiresAt).toLocaleDateString()}.`
       : status.state === "invalid"
-      ? "Your Bayanatix license key is invalid for this deployment."
-      : "No Bayanatix license key was found for this deployment.";
+      ? "Your Bayanis license key is invalid for this deployment."
+      : "No Bayanis license key was found for this deployment.";
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-canvas px-4">
@@ -16,7 +16,7 @@ export default async function LicenseExpiredPage() {
         <h1 className="text-xl font-bold text-ink">License required</h1>
         <p className="text-sm text-ink-soft">{detail}</p>
         <p className="text-sm text-ink-soft">
-          Please contact Bayanatix to renew your subscription and restore access.
+          Please contact Bayanis to renew your subscription and restore access.
         </p>
       </div>
     </main>

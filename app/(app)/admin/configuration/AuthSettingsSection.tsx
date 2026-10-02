@@ -152,7 +152,7 @@ export function AuthSettingsSection() {
             Use StartTLS (for a plain <code className="font-mono text-xs">ldap://</code> URL — not needed for <code className="font-mono text-xs">ldaps://</code>)
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Bind DN (service account)" placeholder="CN=svc-bayanatix,OU=Service Accounts,DC=corp,DC=example,DC=com"
+            <Field label="Bind DN (service account)" placeholder="CN=svc-bayanis,OU=Service Accounts,DC=corp,DC=example,DC=com"
               value={form.ldapBindDn ?? ""} onChange={(v) => setForm({ ...form, ldapBindDn: v || null })} />
             <Field label={`Bind password ${settings.ldapHasBindCredential ? "(set — leave blank to keep)" : ""}`}
               type="password" placeholder={settings.ldapHasBindCredential ? "••••••••" : ""}

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bayanatix — Data Governance Platform",
+  title: "Bayanis — Data Governance Platform",
   description:
-    "Bayanatix is the data governance and catalog platform for NDMO, NDI, and PDPL compliance.",
+    "Bayanis is the data governance and catalog platform for NDMO, NDI, and PDPL compliance.",
   icons: { icon: "/logo.svg" },
 };
 

@@ -1917,7 +1917,7 @@ export const en: I18nStrings = {
   },
 
   chat: {
-    headerTitle:        "Bayanatix Assistant",
+    headerTitle:        "Bayanis Assistant",
     headerSubtitle:     "Data Governance AI",
     placeholder:        "Ask about data assets…",
     greeting:           "Hello! I can help you navigate data assets, explain governance policies, or find tables and columns. What do you need?",
@@ -2463,7 +2463,7 @@ export const en: I18nStrings = {
     noMatches:         "No audit events match the filters.",
     noFieldDetails:    "No field details recorded",
     emptyValue:        "empty",
-    systemActor:       "Bayanatix Crawler",
+    systemActor:       "Bayanis Crawler",
     assetTypesPlural: {
       DATA_SOURCES:        "Data Sources",
       DATA_SCHEMAS:        "Schemas",

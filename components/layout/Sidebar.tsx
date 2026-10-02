@@ -237,7 +237,7 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
         <div className={`flex items-center mt-2 pt-3 border-t border-line ${collapsed ? "justify-center" : "gap-2 px-3"}`}>
           <img src="/logo.svg" alt="" className="w-5 h-6 shrink-0" />
           {!collapsed && (
-            <span className="text-xs font-bold tracking-[0.16em] text-brand-deep/70">BAYANATIX</span>
+            <span className="text-xs font-bold tracking-[0.16em] text-brand-deep/70">BAYANIS</span>
           )}
         </div>
         {!collapsed && hasCustomerLogo && (

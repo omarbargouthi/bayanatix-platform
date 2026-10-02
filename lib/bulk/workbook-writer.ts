@@ -73,7 +73,7 @@ async function buildOneWorkbook(
   extendedFields: Partial<Record<SheetName, FieldDef[]>>,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Bayanatix";
+  workbook.creator = "Bayanis";
   workbook.created = meta.exportedAt;
 
   // ── _Lists — dropdown source ranges for every ENUM/TERM column ────────────────

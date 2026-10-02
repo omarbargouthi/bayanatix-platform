@@ -100,7 +100,7 @@ export function buildReportPdfHtml(opts: {
 <body>
   <div class="header">
     <div>
-      <div class="brand">BAYANATIX</div>
+      <div class="brand">BAYANIS</div>
       <div class="title">${escapeHtml(opts.reportLabel)}</div>
     </div>
     <div class="meta">

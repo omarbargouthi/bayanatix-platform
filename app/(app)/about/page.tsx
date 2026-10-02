@@ -20,7 +20,7 @@ const FEATURES = [
   "Bulk Metadata Operations",
   "Role-Based Access Control & Audit Logging",
   "Bilingual Interface (English / Arabic)",
-  "AI Chat Assistant (\"Ask Bayanatix\")",
+  "AI Chat Assistant (\"Ask Bayanis\")",
 ];
 
 export default async function AboutPage() {
@@ -32,7 +32,7 @@ export default async function AboutPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-ink">About Bayanatix</h1>
+        <h1 className="text-xl font-bold text-ink">About Bayanis</h1>
         <p className="text-sm text-ink-soft mt-1">Data Governance Platform</p>
       </div>
 
