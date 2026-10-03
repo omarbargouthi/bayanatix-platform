@@ -3,7 +3,7 @@
 // the per-asset-instance values for them. See db/090_custom_attributes.sql.
 
 import { sql } from "../db";
-import type { CustomAttributeDefinition, CustomAttributeAssetType } from "../types";
+import type { CustomAttributeDefinition, CustomAttributeAssetType, CustomAttributeSourceMapping } from "../types";
 import { translatedColumnSql } from "../i18n-admin/translated-column";
 
 const DEF_COLS = `
@@ -21,9 +21,31 @@ const DEF_COLS = `
 
 export async function listAllCustomAttributeDefinitions(): Promise<CustomAttributeDefinition[]> {
   return sql<CustomAttributeDefinition[]>`
-    SELECT ${sql.unsafe(DEF_COLS)} FROM bayanat.custom_attribute_definitions
+    SELECT ${sql.unsafe(DEF_COLS)},
+      COALESCE((
+        SELECT json_agg(json_build_object('sourceTypeCode', m.source_type_code, 'methodCode', m.method_code, 'sourceKey', m.source_key_text)
+                        ORDER BY m.source_type_code)
+        FROM bayanat.custom_attribute_source_mappings m WHERE m.attr_def_id = custom_attribute_definitions.attr_def_id
+      ), '[]'::json) AS "sourceMappings"
+    FROM bayanat.custom_attribute_definitions
     ORDER BY asset_type_code, display_order_int, attr_name_text
   `;
+}
+
+// Replaces an attribute's source mappings (one per source type). SQL Server can
+// read a named extended property; every source type can read a key from the comment.
+export async function setCustomAttributeSourceMappings(
+  attrDefId: number, mappings: CustomAttributeSourceMapping[], userId: string,
+): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`DELETE FROM bayanat.custom_attribute_source_mappings WHERE attr_def_id = ${attrDefId}`;
+    for (const m of mappings) {
+      await tx`
+        INSERT INTO bayanat.custom_attribute_source_mappings (attr_def_id, source_type_code, method_code, source_key_text, created_by_user_id)
+        VALUES (${attrDefId}, ${m.sourceTypeCode}, ${m.methodCode}, ${m.sourceKey}, ${userId})
+      `;
+    }
+  });
 }
 
 export async function listCustomAttributeDefinitions(assetType: CustomAttributeAssetType): Promise<CustomAttributeDefinition[]> {
@@ -71,15 +93,15 @@ export async function deleteCustomAttributeDefinition(attrDefId: number): Promis
 
 export async function getCustomAttributeValues(
   assetType: CustomAttributeAssetType, assetId: number,
-): Promise<{ definitions: CustomAttributeDefinition[]; values: Record<string, unknown> }> {
+): Promise<{ definitions: CustomAttributeDefinition[]; values: Record<string, unknown>; sourceSynced: Record<string, unknown> }> {
   const [definitions, [row]] = await Promise.all([
     listCustomAttributeDefinitions(assetType),
-    sql<{ valuesJson: Record<string, unknown> }[]>`
-      SELECT values_json AS "valuesJson" FROM bayanat.custom_attribute_values
+    sql<{ valuesJson: Record<string, unknown>; synced: Record<string, unknown> }[]>`
+      SELECT values_json AS "valuesJson", source_synced_json AS synced FROM bayanat.custom_attribute_values
       WHERE asset_type_code = ${assetType} AND asset_id = ${assetId}
     `,
   ]);
-  return { definitions, values: row?.valuesJson ?? {} };
+  return { definitions, values: row?.valuesJson ?? {}, sourceSynced: row?.synced ?? {} };
 }
 
 /** Batched current-values lookup for many assets at once — used by the bulk

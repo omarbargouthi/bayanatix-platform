@@ -4,6 +4,7 @@ import { applyGovernanceDefaults } from "./queries/stakeholders";
 import { logUpdate, logCreate } from "./audit";
 import { startWorkflow } from "./workflow";
 import { createNotification } from "./queries/notifications";
+import { applySourceAttributes, type AttributeChange } from "./source-attributes";
 
 // Actor id used for audit_logs entries the crawler writes on its own (table-type
 // suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
@@ -34,10 +35,12 @@ type CrawlColumn = {
   name: string; dataType: string; isNullable: boolean;
   isPrimaryKey: boolean; isForeignKey: boolean; defaultValue: string | null;
   comment?: string | null;
+  // SQL Server extended properties on this column (name -> value), for Custom Attribute source mappings.
+  extProps?: Record<string, string>;
   profile?: ColProfile;
 };
 
-type CrawlTable  = { name: string; isView: boolean; columns: CrawlColumn[]; comment?: string | null; rowCount?: number; sampleSize?: number };
+type CrawlTable  = { name: string; isView: boolean; columns: CrawlColumn[]; comment?: string | null; extProps?: Record<string, string>; rowCount?: number; sampleSize?: number };
 type CrawlSchema = { name: string; tables: CrawlTable[] };
 
 // FK topology harvested alongside columns — feeds bayanat.attribute_reference_links,
@@ -557,6 +560,24 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
         fkColsByTable.set(fk.table_name, set);
       }
 
+      // Every extended property on the schema's tables/columns in one query —
+      // feeds Custom Attribute source mappings (lib/source-attributes.ts).
+      const epr = await pool.request().input("s",mssql.VarChar,sname).query(`
+        SELECT o.name AS t, c.name AS col, ep.name AS p, CAST(ep.value AS NVARCHAR(4000)) AS v
+        FROM sys.extended_properties ep
+        JOIN sys.objects o ON o.object_id = ep.major_id
+        JOIN sys.schemas sc ON sc.schema_id = o.schema_id
+        LEFT JOIN sys.columns c ON c.object_id = ep.major_id AND c.column_id = ep.minor_id AND ep.minor_id > 0
+        WHERE ep.class = 1 AND sc.name = @s`);
+      const tableProps = new Map<string, Record<string, string>>();
+      const colProps = new Map<string, Record<string, string>>();
+      for (const r of epr.recordset as { t: string; col: string | null; p: string; v: string | null }[]) {
+        if (r.v == null) continue;
+        const key = r.col ? `${r.t}|${r.col}` : r.t;
+        const map = r.col ? colProps : tableProps;
+        map.set(key, { ...(map.get(key) ?? {}), [r.p]: r.v });
+      }
+
       const tables: CrawlTable[] = [];
       for (const trow of tr.recordset) {
         if (!tableIncluded(trow.table_name, config)) continue;
@@ -587,10 +608,12 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
         tables.push({
           name: trow.table_name, isView: trow.table_type === "VIEW",
           comment: tcmt.recordset[0]?.cmt ?? null,
+          extProps: tableProps.get(trow.table_name),
           columns: cr.recordset.map((c: Record<string, string|boolean|null>) => ({
             name: c.cn as string, dataType: c.dt as string,
             isNullable: !!c.nl, isPrimaryKey: pk.has(c.cn as string), isForeignKey: fkCols.has(c.cn as string), defaultValue: null,
             comment: c.cmt as string | null ?? null,
+            extProps: colProps.get(`${trow.table_name}|${c.cn as string}`),
           })),
         });
       }
@@ -1267,11 +1290,14 @@ export type EntityChange = {
   addedColumns:    ColumnRef[];
   modifiedColumns: ColumnRef[];
   removedColumns:  ColumnRef[];
+  // Custom Attribute values that changed because the source changed them (lib/source-attributes.ts).
+  attributeChanges?: AttributeChange[];
 };
 
 function hasAnyChange(c: EntityChange): boolean {
   return c.isNewEntity || c.isRemovedEntity
-    || c.addedColumns.length > 0 || c.modifiedColumns.length > 0 || c.removedColumns.length > 0;
+    || c.addedColumns.length > 0 || c.modifiedColumns.length > 0 || c.removedColumns.length > 0
+    || (c.attributeChanges?.length ?? 0) > 0;
 }
 
 // Non-destructive, idempotent sync (find-or-create + update-in-place, matched by name),
@@ -1591,11 +1617,14 @@ async function processEntityChanges(changes: EntityChange[], isFirstCrawl: boole
       await logUpdate("DATA_ENTITIES", c.entityId, SYSTEM_ACTOR, [{ field: "lifecycle_status_code", oldVal: "ACTIVE", newVal: "DEPRECATED" }]);
     }
 
+    const schemaChanged = c.addedColumns.length > 0 || c.modifiedColumns.length > 0 || c.removedColumns.length > 0;
     const title = c.isNewEntity
       ? `New table discovered: ${c.entityName}`
       : c.isRemovedEntity
       ? `Table removed from source: ${c.entityName}`
-      : `Schema change detected: ${c.entityName}`;
+      : schemaChanged
+      ? `Schema change detected: ${c.entityName}`
+      : `Metadata changed at source: ${c.entityName}`;
 
     const descParts: string[] = [];
     if (c.isNewEntity)     descParts.push("Table newly discovered on rescan.");
@@ -1603,6 +1632,10 @@ async function processEntityChanges(changes: EntityChange[], isFirstCrawl: boole
     if (c.addedColumns.length)    descParts.push(`Added: ${c.addedColumns.map((x) => x.name).join(", ")}`);
     if (c.modifiedColumns.length) descParts.push(`Type changed: ${c.modifiedColumns.map((x) => `${x.name} (${x.oldValue} → ${x.newValue})`).join(", ")}`);
     if (c.removedColumns.length)  descParts.push(`Removed: ${c.removedColumns.map((x) => x.name).join(", ")}`);
+    if (c.attributeChanges?.length) {
+      descParts.push(`Custom attributes changed at the source: ${c.attributeChanges.slice(0, 20)
+        .map((x) => `${x.attrName} on ${x.asset} (${x.oldValue ?? "empty"} → ${x.newValue ?? "empty"})`).join("; ")}${c.attributeChanges.length > 20 ? ` (+${c.attributeChanges.length - 20} more)` : ""}.`);
+    }
 
     // Dedupe against an existing OPEN/IN_PROGRESS METADATA_UPDATE request for
     // this exact table — a table that keeps drifting across rescans before
@@ -1618,7 +1651,17 @@ async function processEntityChanges(changes: EntityChange[], isFirstCrawl: boole
         AND art.asset_id = ${c.entityId}
       LIMIT 1
     `;
-    if (existingReq.length > 0) continue;
+    if (existingReq.length > 0) {
+      // Still under review: add what this crawl found to that request rather than
+      // dropping it, so reviewers see every change (e.g. a value changed twice).
+      await sql`
+        UPDATE bayanat.asset_requests
+        SET description_text = concat_ws(E'\n\n', description_text, ${`Later crawl (${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC): ${descParts.join(" ")}`}::text),
+            updated_at = NOW()
+        WHERE request_id = ${existingReq[0].id}
+      `;
+      continue;
+    }
 
     // "Workflow enabled" == an admin has actually mapped one via
     // /admin/workflows — if not, skip creating a request entirely rather than
@@ -1759,6 +1802,25 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
 
     await logger.info(`Crawl complete: ${result.schemaCount} schemas, ${result.tableCount} tables, ${result.columnCount} columns`);
     const { sourceId, isFirstCrawl, changes } = await saveCrawlResults(connectionId, cfgRow.connectionName, cfgRow.dbTypeCode, cfgRow.hostAddress, cfgRow.databaseName, result, logger.jobId, govDefaults);
+
+    // Custom attributes mapped to extended properties / comment keys. The source
+    // wins; value changes join the table's metadata-update review below.
+    try {
+      await applySourceAttributes({
+        sourceId, dbTypeCode: cfgRow.dbTypeCode, schemas: result.schemas, isFirstCrawl, actor: SYSTEM_ACTOR,
+        log: (m) => logger.info(m),
+        onChange: (entityId, entityName, schemaId, change) => {
+          let c = changes.find((x) => x.entityId === entityId);
+          if (!c) {
+            c = { entityId, entityName, schemaId, isNewEntity: false, isRemovedEntity: false, addedColumns: [], modifiedColumns: [], removedColumns: [] };
+            changes.push(c);
+          }
+          (c.attributeChanges ??= []).push(change);
+        },
+      });
+    } catch (e) {
+      await logger.warn(`Custom attributes from source failed: ${(e as Error).message}`);
+    }
 
     if (changes.length > 0) {
       await logger.info(`Schema changes detected: ${changes.length} table(s)${isFirstCrawl ? " (first crawl — no notifications/workflow)" : ""}`);

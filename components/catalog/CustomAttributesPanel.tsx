@@ -16,7 +16,7 @@ type Props = {
   showEmptyState?: boolean;
 };
 
-type ValuesResponse = { definitions: CustomAttributeDefinition[]; values: Record<string, unknown> };
+type ValuesResponse = { definitions: CustomAttributeDefinition[]; values: Record<string, unknown>; sourceSynced?: Record<string, { sourceKey?: string; method?: string; crawledAt?: string }> };
 
 function ValueDisplay({ def, value }: { def: CustomAttributeDefinition; value: unknown }) {
   if (value === undefined || value === null || value === "") {
@@ -141,6 +141,9 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">
                 {label(def)}{def.isRequired && " *"}
               </label>
+              {data.sourceSynced?.[def.attrCode] && (
+                <p className="text-[11px] text-amber-700 mb-1">Set at the source system — the next crawl will replace any change made here.</p>
+              )}
               <ValueInput def={def} value={draft[def.attrCode]} onChange={(v) => setDraft((p) => ({ ...p, [def.attrCode]: v }))} />
             </div>
           ))}
@@ -154,7 +157,17 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
           {data.definitions.map((def) => (
             <div key={def.attrDefId} className="flex items-start gap-3">
               <dt className="text-[11px] uppercase tracking-wider text-muted w-32 shrink-0 pt-0.5">{label(def)}</dt>
-              <dd className="flex-1 text-sm text-ink"><ValueDisplay def={def} value={data.values[def.attrCode]} /></dd>
+              <dd className="flex-1 text-sm text-ink flex items-start gap-2 flex-wrap">
+                <ValueDisplay def={def} value={data.values[def.attrCode]} />
+                {data.sourceSynced?.[def.attrCode] && (
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700"
+                    title={`From the source system (${data.sourceSynced[def.attrCode].method === "EXTENDED_PROPERTY" ? "extended property" : "comment key"} "${data.sourceSynced[def.attrCode].sourceKey ?? ""}")`}
+                  >
+                    from source
+                  </span>
+                )}
+              </dd>
             </div>
           ))}
         </dl>

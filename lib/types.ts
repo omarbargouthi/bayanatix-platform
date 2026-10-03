@@ -246,6 +246,14 @@ export type CustomAttributeDefinition = {
   isRequired:   boolean;
   isEnabled:    boolean;
   displayOrder: number;
+  // Where a crawl reads this attribute's value from, per source type (tables/columns only; db/141).
+  sourceMappings?: CustomAttributeSourceMapping[];
+};
+
+export type CustomAttributeSourceMapping = {
+  sourceTypeCode: "MSSQL" | "POSTGRES" | "ORACLE" | "MYSQL";
+  methodCode: "EXTENDED_PROPERTY" | "COMMENT_KEY";
+  sourceKey: string;
 };
 
 export type Role = {
