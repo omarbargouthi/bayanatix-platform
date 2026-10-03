@@ -484,7 +484,7 @@ function LineageGraphInner({
             </div>
 
             {/* Not right? Ask the owners to review it — links aren't confirmed or deleted in place.
-                Manual links are edited/removed (with approval) in the Mapping Register. */}
+                Manual links are edited/removed (with approval) in the Mapping Asset view. */}
             <div className="flex items-center justify-between gap-3 pt-2 border-t border-line-soft">
               <Link href={`/lineage?view=register&q=${encodeURIComponent(selectedEdge.targetColumnName ?? graph?.nodes.find((n) => n.entityId === selectedEdge.targetEntityId)?.entityName ?? "")}`} className="text-[12px] text-ink-soft hover:text-brand-purple hover:underline">
                 {t.lineageRegister.openInRegister}

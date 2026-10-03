@@ -162,7 +162,7 @@ export async function submitLineageChanges(
     const summary = [
       `${rows.filter((r) => r.op === "CREATE").length} to add, ${rows.filter((r) => r.op === "UPDATE").length} to edit, ${rows.filter((r) => r.op === "DELETE").length} to remove.`,
       meta.note?.trim() ? `Note: ${meta.note.trim()}` : null,
-      "Review the proposed links in Data Lineage › Mapping Register (filter: Pending approval).",
+      "Review the proposed links in Data Lineage › Mapping Asset (filter: Pending approval).",
     ].filter(Boolean).join(" ");
     const [req] = await sql<{ requestId: number }[]>`
       INSERT INTO bayanat.asset_requests (request_type_code, title, description_text, priority_code, raised_by_user_id)
