@@ -30,6 +30,21 @@ const SOURCE_TYPES: { code: CustomAttributeSourceMapping["sourceTypeCode"]; labe
 const SOURCE_SHORT: Record<string, string> = { MSSQL: "SQL Server", POSTGRES: "PostgreSQL", ORACLE: "Oracle", MYSQL: "MySQL" };
 const MAPPABLE: CustomAttributeAssetType[] = ["DATA_ENTITIES", "DATA_ATTRIBUTES"];
 
+function ActionIcon({ title, onClick, danger, children }: { title: string; onClick: () => void; danger?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={`w-8 h-8 grid place-items-center rounded-md border border-line transition-colors ${
+        danger ? "text-red-600 hover:bg-red-50 hover:border-red-200" : "text-ink-soft hover:text-brand-purple hover:bg-brand-purple/5 hover:border-brand-purple/30"
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+    </button>
+  );
+}
+
 type MappingDraft = Record<string, { methodCode: CustomAttributeSourceMapping["methodCode"]; sourceKey: string }>;
 
 const BLANK = {
@@ -42,6 +57,8 @@ export function CustomAttributesConfigSection() {
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState<CustomAttributeAssetType>("DATA_ENTITIES");
   const [adding, setAdding] = useState(false);
+  // Set when the form edits an existing field instead of adding one.
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ ...BLANK });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -68,7 +85,13 @@ export function CustomAttributesConfigSection() {
 
     setSaving(true);
     try {
-      const r = await fetch("/api/admin/custom-attributes", {
+      const r = editingId != null
+        // Code and type stay fixed once created: saved values are keyed by the code and stored in that type.
+        ? await fetch(`/api/admin/custom-attributes/${editingId}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ attrName: form.attrName.trim(), enumValues, isRequired: form.isRequired, displayOrder: form.displayOrder }),
+          })
+        : await fetch("/api/admin/custom-attributes", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           assetType: activeType,
@@ -80,11 +103,22 @@ export function CustomAttributesConfigSection() {
           displayOrder: form.displayOrder,
         }),
       });
-      if (!r.ok) { const e = await r.json(); setErr(e.error ?? "Failed to add field"); return; }
+      if (!r.ok) { const e = await r.json().catch(() => ({})); setErr(e.error ?? (editingId != null ? "Failed to save field" : "Failed to add field")); return; }
       setAdding(false);
+      setEditingId(null);
       setForm({ ...BLANK });
       await load();
     } finally { setSaving(false); }
+  }
+
+  function startEdit(d: CustomAttributeDefinition) {
+    setForm({
+      attrCode: d.attrCode, attrName: d.attrName, dataType: d.dataType,
+      enumValuesText: (d.enumValues ?? []).join(", "), isRequired: d.isRequired, displayOrder: d.displayOrder,
+    });
+    setEditingId(d.attrDefId);
+    setErr("");
+    setAdding(true);
   }
 
   async function handleToggleEnabled(d: CustomAttributeDefinition) {
@@ -120,7 +154,7 @@ export function CustomAttributesConfigSection() {
   }
 
   const mappable = MAPPABLE.includes(activeType);
-  const cols = mappable ? "grid-cols-[100px_1fr_100px_70px_1.2fr_130px]" : "grid-cols-[100px_1fr_110px_70px_80px]";
+  const cols = mappable ? "grid-cols-[100px_1fr_100px_70px_1.2fr_150px]" : "grid-cols-[100px_1fr_110px_70px_120px]";
 
   async function handleDelete(d: CustomAttributeDefinition) {
     if (!confirm(`Delete "${d.attrName}"? Any values already saved for it will no longer be shown.`)) return;
@@ -143,7 +177,7 @@ export function CustomAttributesConfigSection() {
         {ASSET_TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { setActiveType(t); setAdding(false); }}
+            onClick={() => { setActiveType(t); setAdding(false); setEditingId(null); }}
             className={`px-4 py-2.5 text-sm font-semibold transition-colors -mb-px border-b-2 ${
               activeType === t ? "text-brand-purple border-brand-purple" : "text-ink-soft border-transparent hover:text-brand-purple"
             }`}
@@ -155,22 +189,25 @@ export function CustomAttributesConfigSection() {
 
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-muted font-mono">{activeType} · {inType.length} field{inType.length === 1 ? "" : "s"}</p>
-        <button onClick={() => { setAdding(true); setForm({ ...BLANK }); setErr(""); }} className="btn btn-primary btn-sm">+ Add Field</button>
+        <button onClick={() => { setAdding(true); setEditingId(null); setForm({ ...BLANK }); setErr(""); }} className="btn btn-primary btn-sm">+ Add Field</button>
       </div>
 
       {adding && (
         <div className="bg-white border border-brand-purple rounded-xl p-5 mb-4 space-y-4">
-          <h3 className="text-sm font-semibold text-ink">New Field on {ASSET_TYPE_LABELS[activeType]}</h3>
+          <h3 className="text-sm font-semibold text-ink">{editingId != null ? `Edit Field on ${ASSET_TYPE_LABELS[activeType]}` : `New Field on ${ASSET_TYPE_LABELS[activeType]}`}</h3>
+          {editingId != null && (
+            <p className="text-[11px] text-muted -mt-2">Code and type can’t change after a field is created — saved values are stored under them.</p>
+          )}
           {err && <p className="text-red-600 text-xs bg-red-50 px-3 py-2 rounded-md">{err}</p>}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Code *</label>
-              <input className="input w-full font-mono" placeholder="OWNER_TEAM" value={form.attrCode}
+              <input className="input w-full font-mono disabled:bg-canvas-soft disabled:text-muted" placeholder="OWNER_TEAM" value={form.attrCode} disabled={editingId != null}
                 onChange={(e) => setForm((f) => ({ ...f, attrCode: e.target.value }))} />
             </div>
             <div>
               <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Type *</label>
-              <select className="input w-full" value={form.dataType}
+              <select className="input w-full disabled:bg-canvas-soft disabled:text-muted" value={form.dataType} disabled={editingId != null}
                 onChange={(e) => setForm((f) => ({ ...f, dataType: e.target.value as CustomAttributeDataType }))}>
                 {DATA_TYPES.map((t) => <option key={t} value={t}>{DATA_TYPE_LABELS[t]}</option>)}
               </select>
@@ -203,8 +240,8 @@ export function CustomAttributesConfigSection() {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={handleAdd} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : "Add"}</button>
-            <button onClick={() => setAdding(false)} className="btn btn-sm">Cancel</button>
+            <button onClick={handleAdd} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : editingId != null ? "Save" : "Add"}</button>
+            <button onClick={() => { setAdding(false); setEditingId(null); }} className="btn btn-sm">Cancel</button>
           </div>
         </div>
       )}
@@ -289,10 +326,23 @@ COMMENT ON COLUMN crm.customer.email IS 'Customer email address {"owner": "Finan
                 ))}
               </div>
             )}
-            <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
-              {mappable && <button onClick={() => openMapping(d)} className="btn btn-sm text-xs">Source…</button>}
-              <button onClick={() => handleToggleEnabled(d)} className="btn btn-sm text-xs">{d.isEnabled ? "Disable" : "Enable"}</button>
-              <button onClick={() => handleDelete(d)} className="btn btn-sm text-xs text-red-600 hover:bg-red-50">Del</button>
+            <div className="min-w-0 flex items-center gap-1.5">
+              <ActionIcon title="Edit field" onClick={() => startEdit(d)}>
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </ActionIcon>
+              {mappable && (
+                <ActionIcon title="Fill from source system" onClick={() => openMapping(d)}>
+                  <ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" /><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+                </ActionIcon>
+              )}
+              <ActionIcon title={d.isEnabled ? "Disable field" : "Enable field"} onClick={() => handleToggleEnabled(d)}>
+                {d.isEnabled
+                  ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><path d="M1 1l22 22" /></>
+                  : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>}
+              </ActionIcon>
+              <ActionIcon title="Delete field" danger onClick={() => handleDelete(d)}>
+                <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              </ActionIcon>
             </div>
           </div>
         ))}
