@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MarkerType,
-  useNodesState, useEdgesState, type Node, type Edge,
+  useNodesState, useEdgesState, type Node, type Edge, type Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { LineageNodeCard, layerLabels, LAYER_DOT, EngineGlyph, engineLabels, type LineageNodeData } from "./LineageNode";
 import { ImpactReportPanel } from "./ImpactReportPanel";
+import { AddLineageModal, type PickedTable } from "./AddLineageModal";
 import { useLang } from "@/lib/lang-context";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
@@ -117,6 +118,16 @@ function LineageGraphInner({
   const [confirming, setConfirming] = useState(false);
   const [impactDirection, setImpactDirection] = useState<"UP" | "DOWN" | null>(null);
 
+  // Manual lineage editing (stewards/admins): the Add Lineage dialog — opened from
+  // the toolbar or by dragging between two nodes — and edit/delete on an edge.
+  const [addLineage, setAddLineage] = useState<{ source: PickedTable | null; target: PickedTable | null } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [edgeTypes, setEdgeTypes] = useState<{ code: string; name: string }[]>([]);
+  const [editingEdge, setEditingEdge] = useState<{ typeCode: string; logic: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [edgeBusy, setEdgeBusy] = useState(false);
+  const [edgeError, setEdgeError] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -142,7 +153,15 @@ function LineageGraphInner({
     const params = new URLSearchParams({ ...preserveParams, assetType: focus.assetType, assetId: String(focus.assetId) });
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus, scope, upDepth, downDepth]);
+  }, [focus, scope, upDepth, downDepth, reloadKey]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    fetch("/api/lineage/transformation-types").then((r) => (r.ok ? r.json() : [])).then(setEdgeTypes).catch(() => {});
+  }, [canManage]);
+
+  // Reset the edge popover's edit/delete state whenever a different edge is picked.
+  useEffect(() => { setEditingEdge(null); setConfirmDelete(false); setEdgeError(null); }, [selectedEdge?.lineageId]);
 
   // ── Build React Flow nodes/edges whenever graph changes ─────────────────
   const refocusToColumn = useCallback((entityId: number, attributeId: number, name: string) => {
@@ -206,6 +225,49 @@ function LineageGraphInner({
     if (Number(node.id) !== graph?.focus.entityId) {
       setFocus({ assetType: "DATA_ENTITIES", assetId: Number(node.id) });
       setScope("ENTITY_LEVEL");
+    }
+  }
+
+  const pickedTable = useCallback((entityId: number | null | undefined): PickedTable | null => {
+    const n = graph?.nodes.find((x) => x.entityId === entityId);
+    return n ? { entityId: n.entityId, name: n.entityName, schemaName: n.schemaName } : null;
+  }, [graph]);
+
+  // Dragging from one node's right handle onto another opens the dialog prefilled.
+  function onConnect(conn: Connection) {
+    if (!canManage || !conn.source || !conn.target || conn.source === conn.target) return;
+    setAddLineage({ source: pickedTable(Number(conn.source)), target: pickedTable(Number(conn.target)) });
+  }
+
+  async function saveEdgeEdit() {
+    if (!selectedEdge || !editingEdge) return;
+    setEdgeBusy(true); setEdgeError(null);
+    try {
+      const r = await fetch(`/api/lineage/edges/${selectedEdge.lineageId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transformationTypeCode: editingEdge.typeCode, transformationLogicText: editingEdge.logic }),
+      });
+      if (!r.ok) { setEdgeError((await r.json().catch(() => ({}))).error ?? t.lineageEditor.actionFailed); return; }
+      const name = edgeTypes.find((x) => x.code === editingEdge.typeCode)?.name ?? editingEdge.typeCode;
+      const patched = { ...selectedEdge, transformationTypeCode: editingEdge.typeCode, transformationTypeName: name, transformationLogicText: editingEdge.logic || null };
+      setSelectedEdge(patched);
+      setGraph((g) => g ? { ...g, edges: g.edges.map((e) => e.lineageId === patched.lineageId ? patched : e) } : g);
+      setEditingEdge(null);
+    } finally {
+      setEdgeBusy(false);
+    }
+  }
+
+  async function deleteEdge() {
+    if (!selectedEdge) return;
+    setEdgeBusy(true); setEdgeError(null);
+    try {
+      const r = await fetch(`/api/lineage/edges/${selectedEdge.lineageId}`, { method: "DELETE" });
+      if (!r.ok) { setEdgeError((await r.json().catch(() => ({}))).error ?? t.lineageEditor.actionFailed); return; }
+      setSelectedEdge(null);
+      setReloadKey((k) => k + 1);
+    } finally {
+      setEdgeBusy(false);
     }
   }
 
@@ -316,6 +378,16 @@ function LineageGraphInner({
           </button>
         )}
 
+        {canManage && (
+          <button
+            onClick={() => setAddLineage({ source: pickedTable(graph?.focus.entityId), target: null })}
+            className="btn btn-primary btn-sm text-xs"
+            title={t.lineageEditor.dragHint}
+          >
+            + {t.lineageEditor.addLineage}
+          </button>
+        )}
+
         <div className="flex items-center gap-3 ml-auto text-[11px] text-muted">
           {LEGEND_ITEMS.map((code) => (
             <span key={code} className="flex items-center gap-1">
@@ -340,6 +412,8 @@ function LineageGraphInner({
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onConnect={onConnect}
+          nodesConnectable={canManage}
           onPaneClick={() => { setSelectedEdge(null); }}
           nodeTypes={nodeTypes}
           fitView
@@ -418,9 +492,58 @@ function LineageGraphInner({
               )}
               {selectedEdge.isConfirmed && <span className="text-[11px] text-emerald-600 font-medium">{t.lineage.edge.confirmed}</span>}
             </div>
+
+            {canManage && editingEdge && (
+              <div className="space-y-2 pt-1 border-t border-line-soft">
+                <select className="input-field w-full text-[12px] mt-2" value={editingEdge.typeCode} onChange={(e) => setEditingEdge({ ...editingEdge, typeCode: e.target.value })}>
+                  {edgeTypes.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
+                </select>
+                <textarea className="input-field w-full font-mono text-[11px]" rows={3} placeholder={t.lineageEditor.logicPh} value={editingEdge.logic} onChange={(e) => setEditingEdge({ ...editingEdge, logic: e.target.value })} />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setEditingEdge(null)} className="btn btn-sm text-[11px]">{t.common.cancel}</button>
+                  <button onClick={saveEdgeEdit} disabled={edgeBusy} className="btn btn-primary btn-sm text-[11px]">{edgeBusy ? t.lineageEditor.saving : t.lineageEditor.saveEdge}</button>
+                </div>
+              </div>
+            )}
+
+            {canManage && !editingEdge && confirmDelete && (
+              <div className="pt-2 border-t border-line-soft space-y-2">
+                <div className="text-[12px] font-semibold text-ink">{t.lineageEditor.deleteConfirm}</div>
+                {selectedEdge.provenanceCode === "SCANNED" && <div className="text-[11px] text-muted">{t.lineageEditor.deleteScannedNote}</div>}
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setConfirmDelete(false)} className="btn btn-sm text-[11px]">{t.common.cancel}</button>
+                  <button onClick={deleteEdge} disabled={edgeBusy} className="btn btn-sm text-[11px] !bg-red-600 !text-white !border-red-600">{t.lineageEditor.yesDelete}</button>
+                </div>
+              </div>
+            )}
+
+            {canManage && !editingEdge && !confirmDelete && (
+              <div className="flex justify-end gap-3 pt-2 border-t border-line-soft">
+                {selectedEdge.provenanceCode === "MANUAL" && (
+                  <button
+                    onClick={() => setEditingEdge({ typeCode: selectedEdge.transformationTypeCode ?? "MANUAL", logic: selectedEdge.transformationLogicText ?? "" })}
+                    className="text-[12px] font-medium text-brand-purple hover:underline"
+                  >
+                    {t.lineageEditor.editEdge}
+                  </button>
+                )}
+                <button onClick={() => setConfirmDelete(true)} className="text-[12px] font-medium text-red-600 hover:underline">{t.lineageEditor.deleteEdge}</button>
+              </div>
+            )}
+
+            {edgeError && <div className="text-[11px] text-red-600">{edgeError}</div>}
           </div>
         )}
       </div>
+
+      {addLineage && (
+        <AddLineageModal
+          initialSource={addLineage.source}
+          initialTarget={addLineage.target}
+          onClose={() => setAddLineage(null)}
+          onSaved={() => { setAddLineage(null); setReloadKey((k) => k + 1); }}
+        />
+      )}
 
       {impactDirection && graph && (
         <ImpactReportPanel

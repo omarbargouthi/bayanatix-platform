@@ -2713,4 +2713,47 @@ export type I18nStrings = {
       CERTIFICATION   : string;
     };
   };
+
+  // ── Manual lineage editor (components/lineage/AddLineageModal.tsx + graph edge actions) ──
+  lineageEditor: {
+    addLineage:        string;
+    title:             string;
+    desc:              string;
+    source:            string;
+    target:            string;
+    searchTable:       string;
+    noTables:          string;
+    externalToggle:    string;
+    backToCatalog:     string;
+    externalName:      string;
+    externalNamePh:    string;
+    externalBadge:     string;
+    layer:             string;
+    change:            string;
+    transformation:    string;
+    logic:             string;
+    logicPh:           string;
+    columnMapping:     string;
+    columnMappingHint: string;
+    autoMatch:         string;
+    targetColumn:      string;
+    sourceColumn:      string;
+    expression:        string;
+    notMapped:         string;
+    mappedCount:       string;
+    columnsNeedTables: string;
+    save:              string;
+    saving:            string;
+    saveFailed:        string;
+    pickBoth:          string;
+    sameAsset:         string;
+    editEdge:          string;
+    deleteEdge:        string;
+    deleteConfirm:     string;
+    deleteScannedNote: string;
+    yesDelete:         string;
+    saveEdge:          string;
+    actionFailed:      string;
+    dragHint:          string;
+  };
 };
