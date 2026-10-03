@@ -58,22 +58,12 @@ function better(terms: Map<number, Term>, a: Inherit, b: Inherit | undefined): b
   return a.hop < b.hop;
 }
 
-export async function runPropagation(opts: { log?: (m: string) => Promise<void> | void } = {}): Promise<PropagationSummary> {
-  const log = async (m: string) => { await opts.log?.(m); };
-  const summary: PropagationSummary = { applied: 0, removed: 0, suggested: 0, superseded: 0, columnsClassified: 0 };
+type ClassificationGraph = {
+  edges: Edge[]; modes: Map<number, EdgeMode>; terms: Map<number, Term>;
+  manual: Map<number, number>; inherited: Map<number, { term: number; propagationId: number }>;
+};
 
-  // Inherited links removed outside the engine (e.g. a steward re-saving the
-  // column's terms with a different classification) leave their record behind:
-  // close those first so "Applied automatically" only lists links that exist.
-  const orphaned = await sql`
-    UPDATE bayanat.lineage_propagations p SET status_code = 'SUPERSEDED', decided_at = now(),
-      reason_text = 'Classification changed by hand on the target'
-    WHERE p.mode_code = 'AUTO' AND p.status_code = 'APPLIED'
-      AND NOT EXISTS (SELECT 1 FROM bayanat.asset_business_terms abt WHERE abt.propagation_id = p.propagation_id)
-  `;
-  summary.removed += orphaned.count;
-
-  // ── Load the graph and current state ─────────────────────────────────────
+async function loadClassificationGraph(): Promise<ClassificationGraph> {
   const edges = (await sql<Edge[]>`
     SELECT dl.lineage_id AS id, dl.source_asset_id AS source, dl.target_asset_id AS target,
            dl.transformation_type_code AS "typeCode", dl.transformation_logic_text AS logic,
@@ -107,9 +97,12 @@ export async function runPropagation(opts: { log?: (m: string) => Promise<void> 
       inherited.set(col, { term, propagationId: Number(l.propagationId) });
     }
   }
+  return { edges, modes, terms, manual, inherited };
+}
 
-  // ── AUTO: classification, to a fixed point, starting from manual roots only
-  //    (so a value can never keep itself alive around a cycle) ──────────────────
+// Fixed point starting from manual roots only, so a value can never keep itself
+// alive around a cycle. Returns the effective classification of every column.
+function computeInheritance(edges: Edge[], modes: Map<number, EdgeMode>, terms: Map<number, Term>, manual: Map<number, number>): Map<number, Inherit> {
   let eff = new Map<number, Inherit>([...manual].map(([col, term]) => [col, { term, root: col, hop: 0, via: 0 }]));
   for (let i = 0; i < 40; i++) {
     const next = new Map(eff);
@@ -124,6 +117,29 @@ export async function runPropagation(opts: { log?: (m: string) => Promise<void> 
     eff = next;
     if (!changed) break;
   }
+  return eff;
+}
+
+export async function runPropagation(opts: { log?: (m: string) => Promise<void> | void } = {}): Promise<PropagationSummary> {
+  const log = async (m: string) => { await opts.log?.(m); };
+  const summary: PropagationSummary = { applied: 0, removed: 0, suggested: 0, superseded: 0, columnsClassified: 0 };
+
+  // Inherited links removed outside the engine (e.g. a steward re-saving the
+  // column's terms with a different classification) leave their record behind:
+  // close those first so "Applied automatically" only lists links that exist.
+  const orphaned = await sql`
+    UPDATE bayanat.lineage_propagations p SET status_code = 'SUPERSEDED', decided_at = now(),
+      reason_text = 'Classification changed by hand on the target'
+    WHERE p.mode_code = 'AUTO' AND p.status_code = 'APPLIED'
+      AND NOT EXISTS (SELECT 1 FROM bayanat.asset_business_terms abt WHERE abt.propagation_id = p.propagation_id)
+  `;
+  summary.removed += orphaned.count;
+
+  // ── Load the graph and current state ─────────────────────────────────────
+  const { edges, modes, terms, manual, inherited } = await loadClassificationGraph();
+
+  // ── AUTO: classification, to a fixed point ───────────────────────────────
+  const eff = computeInheritance(edges, modes, terms, manual);
 
   const affected = new Set<number>([...inherited.keys(), ...[...eff.keys()].filter((c) => !manual.has(c))]);
   for (const col of affected) {
@@ -262,6 +278,144 @@ export async function runPropagation(opts: { log?: (m: string) => Promise<void> 
 
   await log(`Propagation: ${summary.applied} classification(s) applied, ${summary.removed} removed/replaced, ${summary.suggested} new suggestion(s), ${summary.superseded} suggestion(s) no longer applicable; ${summary.columnsClassified} column(s) inherit a classification.`);
   return summary;
+}
+
+// ── Preview for "Assess a change" (read-only) ──────────────────────────────
+// Runs the same AUTO rules on an in-memory copy of the graph: today's state vs.
+// the planned change (the focus columns removed, or given another classification).
+
+export type PreviewScenario = "NONE" | "REMOVE" | "RECLASSIFY";
+type TermRef = { id: number; name: string; isPii: boolean };
+type ColRef = { columnId: number; columnName: string; entityId: number; entityName: string; schemaId: number | null; schemaName: string | null; hop: number };
+export type PropagationPreview = {
+  focus: {
+    columnId: number; columnName: string;
+    current: (TermRef & { inherited: boolean }) | null;
+    after: (TermRef & { inherited: boolean }) | null; // after the planned change (same as current for NONE / REMOVE)
+  }[];
+  options: TermRef[];
+  currentFlows: (ColRef & { term: TermRef })[];
+  changes: (ColRef & { before: TermRef | null; after: TermRef | null })[];
+  protectedColumns: (ColRef & { own: TermRef })[];
+  newSuggestions: (ColRef & { term: TermRef })[];
+  openSuggestions: (ColRef & { propagationId: number; field: PropagationField; value: string | null })[];
+};
+
+export async function previewPropagation(input: { columns: number[]; scenario: PreviewScenario; newTerm: number | null }): Promise<PropagationPreview> {
+  const g = await loadClassificationGraph();
+  const focus = new Set(input.columns);
+  const ref = (id: number | undefined): TermRef | null => {
+    const t = id == null ? undefined : g.terms.get(id);
+    return t ? { id: t.id, name: t.name, isPii: t.isPii } : null;
+  };
+
+  const before = computeInheritance(g.edges, g.modes, g.terms, g.manual);
+  let after = before;
+  let afterManual = g.manual;
+  if (input.scenario !== "NONE") {
+    afterManual = new Map(g.manual);
+    let edges = g.edges;
+    if (input.scenario === "REMOVE") {
+      edges = edges.filter((e) => !focus.has(e.source) && !focus.has(e.target));
+      for (const c of focus) afterManual.delete(c);
+    } else {
+      for (const c of focus) input.newTerm == null ? afterManual.delete(c) : afterManual.set(c, input.newTerm);
+    }
+    after = computeInheritance(edges, g.modes, g.terms, afterManual);
+  }
+
+  // Everything downstream of the focus over links propagation looks at, with the
+  // nearest hop; and the part classification can actually flow through (FULL, unmasked).
+  const reach = (pred: (e: Edge) => boolean) => {
+    const hops = new Map<number, number>();
+    let frontier = [...focus];
+    for (let hop = 1; frontier.length && hop <= 40; hop++) {
+      const next: number[] = [];
+      for (const e of g.edges) {
+        if (!frontier.includes(e.source) || focus.has(e.target) || hops.has(e.target) || !pred(e)) continue;
+        hops.set(e.target, hop); next.push(e.target);
+      }
+      frontier = next;
+    }
+    return hops;
+  };
+  const downstream = reach((e) => g.modes.get(e.id) !== "SKIP");
+  const flowReach = reach((e) => g.modes.get(e.id) === "FULL" && !isMasked(e));
+
+  const changes: { col: number; before: TermRef | null; after: TermRef | null }[] = [];
+  const currentFlows: { col: number; term: TermRef }[] = [];
+  const protectedCols: { col: number; own: TermRef }[] = [];
+  for (const col of downstream.keys()) {
+    if (g.manual.has(col)) {
+      if (flowReach.has(col)) protectedCols.push({ col, own: ref(g.manual.get(col))! });
+      continue;
+    }
+    const b = before.get(col), a = after.get(col);
+    if (b && focus.has(b.root)) currentFlows.push({ col, term: ref(b.term)! });
+    if ((b?.term ?? null) !== (a?.term ?? null)) changes.push({ col, before: ref(b?.term), after: ref(a?.term) });
+  }
+
+  // Classification over calculated / medium-confidence links becomes a suggestion.
+  const newSuggestions: { col: number; term: TermRef }[] = [];
+  if (input.scenario === "RECLASSIFY" && input.newTerm != null) {
+    for (const e of g.edges) {
+      if (!focus.has(e.source) || g.modes.get(e.id) !== "SUGGEST" || isMasked(e)) continue;
+      if (afterManual.has(e.target) || after.has(e.target)) continue;
+      const t = ref(after.get(e.source)?.term);
+      if (t && !newSuggestions.some((s) => s.col === e.target)) newSuggestions.push({ col: e.target, term: t });
+    }
+  }
+
+  const open = focus.size === 0 ? [] : await sql<{ id: number; field: PropagationField; target: number; value: string | null }[]>`
+    SELECT p.propagation_id AS id, p.field_code AS field, p.target_asset_id AS target,
+           coalesce(bg.term_name_text, tg.tag_name, left(p.value_text, 120)) AS value
+    FROM bayanat.lineage_propagations p
+    LEFT JOIN bayanat.business_glossaries bg ON p.field_code IN ('CLASSIFICATION', 'BUSINESS_TERM') AND bg.glossary_id = p.value_ref_id
+    LEFT JOIN bayanat.tags tg ON p.field_code = 'TAG' AND tg.tag_id = p.value_ref_id
+    WHERE p.mode_code = 'SUGGEST' AND p.status_code = 'SUGGESTED'
+      AND p.source_asset_type = 'DATA_ATTRIBUTES' AND p.source_asset_id = ANY(${[...focus]})
+      AND p.target_asset_type = 'DATA_ATTRIBUTES'
+    ORDER BY p.propagation_id
+  `;
+
+  const ids = [...new Set([...focus, ...downstream.keys(), ...open.map((o) => Number(o.target))])];
+  const names = ids.length === 0 ? [] : await sql<{ id: number; columnName: string; entityId: number; entityName: string; schemaId: number | null; schemaName: string | null }[]>`
+    SELECT a.attribute_id AS id, a.physical_name_text AS "columnName", e.entity_id AS "entityId", e.entity_name_text AS "entityName",
+           s.schema_id AS "schemaId", s.schema_name_text AS "schemaName"
+    FROM bayanat.data_attributes a
+    JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
+    LEFT JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    WHERE a.attribute_id = ANY(${ids})
+  `;
+  const nameOf = new Map(names.map((n) => [Number(n.id), n]));
+  const col = (id: number): ColRef => {
+    const n = nameOf.get(id);
+    return {
+      columnId: id, columnName: n?.columnName ?? `#${id}`, entityId: Number(n?.entityId ?? 0), entityName: n?.entityName ?? "",
+      schemaId: n?.schemaId == null ? null : Number(n.schemaId), schemaName: n?.schemaName ?? null, hop: downstream.get(id) ?? 1,
+    };
+  };
+  const byHop = <T extends { hop: number; entityName: string; columnName: string }>(rows: T[]) =>
+    rows.sort((a, b) => a.hop - b.hop || a.entityName.localeCompare(b.entityName) || a.columnName.localeCompare(b.columnName));
+
+  return {
+    focus: [...focus].map((id) => {
+      const t = ref(before.get(id)?.term);
+      const ta = input.scenario === "RECLASSIFY" ? ref(after.get(id)?.term) : t;
+      const manualAfter = input.scenario === "RECLASSIFY" ? afterManual : g.manual;
+      return {
+        columnId: id, columnName: nameOf.get(id)?.columnName ?? `#${id}`,
+        current: t ? { ...t, inherited: !g.manual.has(id) } : null,
+        after: ta ? { ...ta, inherited: !manualAfter.has(id) } : null,
+      };
+    }),
+    options: [...g.terms.values()].sort((a, b) => b.rank - a.rank || a.name.localeCompare(b.name)).map((t) => ({ id: t.id, name: t.name, isPii: t.isPii })),
+    currentFlows: byHop(currentFlows.map((r) => ({ ...col(r.col), term: r.term }))),
+    changes: byHop(changes.map((r) => ({ ...col(r.col), before: r.before, after: r.after }))),
+    protectedColumns: byHop(protectedCols.map((r) => ({ ...col(r.col), own: r.own }))),
+    newSuggestions: byHop(newSuggestions.map((r) => ({ ...col(r.col), term: r.term }))),
+    openSuggestions: open.map((o) => ({ ...col(Number(o.target)), propagationId: Number(o.id), field: o.field, value: o.value })),
+  };
 }
 
 // ── Triggering: debounced, one run at a time ───────────────────────────────

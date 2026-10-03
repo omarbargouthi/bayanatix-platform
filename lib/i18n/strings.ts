@@ -3008,4 +3008,35 @@ export type I18nStrings = {
     emptyPending:    string;
     viewRegister:    string;
   };
+  propagationPreview: {
+    title:           string;
+    desc:            string;
+    plannedClass:    string;
+    noChange:        string;
+    removeClass:     string;
+    current:         string;
+    after:           string;
+    none:            string;
+    inherited:       string;
+    pi:              string;
+    tableNote:       string;
+    flowsTitle:      string;
+    noFlows:         string;
+    changesTitle:    string;
+    noChanges:       string;
+    protectedTitle:  string;
+    newSuggTitle:    string;
+    openTitle:       string;
+    openRemoveNote:  string;
+    hop:             string;
+    loading:         string;
+    requestNote:     string;
+    fields: {
+      CLASSIFICATION:  string;
+      BUSINESS_TERM:   string;
+      DESCRIPTION:     string;
+      TAG:             string;
+      RETENTION:       string;
+    };
+  };
 };

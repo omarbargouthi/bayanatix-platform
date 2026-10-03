@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import { layerLabels } from "./LineageNode";
+import { PropagationPreview, type Preview } from "./PropagationPreview";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
 type ImpactAsset = {
@@ -44,6 +45,7 @@ export function ChangeImpactPanel({
   const [raising, setRaising] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ created: { requestId: number; entityName: string; notified: number }[]; workflowMapped: boolean } | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
 
   useEffect(() => {
     fetch(`/api/lineage/entities/${entityId}/columns`).then((r) => (r.ok ? r.json() : [])).then(setColumns).catch(() => {});
@@ -78,13 +80,24 @@ export function ChangeImpactPanel({
     setSelected((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
   }
 
+  // Classification changes the planned change would cause downstream, written into
+  // the review requests so owners see them too.
+  function propagationNote(): string {
+    if (!preview || preview.changes.length === 0) return "";
+    const pp = t.propagationPreview;
+    const name = (x: { name: string } | null) => x?.name ?? pp.none;
+    const lines = preview.changes.slice(0, 25).map((c) => `- ${c.entityName}.${c.columnName}: ${name(c.before)} → ${name(c.after)}`);
+    if (preview.changes.length > 25) lines.push(`- … +${preview.changes.length - 25}`);
+    return `\n\n${fill(pp.requestNote, { n: preview.changes.length })}:\n${lines.join("\n")}`;
+  }
+
   async function raise() {
     setRaising(true); setError(null);
     try {
       const r = await fetch("/api/lineage/change-impact", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...focus, changeType, description: details, priority,
+          ...focus, changeType, description: (details + propagationNote()).trim(), priority,
           targets: assets.filter((a) => selected.has(keyOf(a))).map((a) => ({ assetType: a.assetType, assetId: a.assetId })),
         }),
       });
@@ -134,6 +147,7 @@ export function ChangeImpactPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto nice-scroll">
+          <PropagationPreview assetType={focus.assetType} assetId={focus.assetId} removing={changeType === "REMOVE"} onPreview={setPreview} />
           {loading && <div className="py-12 text-center text-sm text-muted">{lt.loading}</div>}
           {!loading && assets.length === 0 && (
             <div className="m-5 text-[13px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-3">{lt.noImpact}</div>
