@@ -42,7 +42,7 @@ type Graph = {
 
 type SearchResult = { assetType: AssetType; assetId: number; name: string; entityName: string | null; schemaName: string | null; attributeClassCode: string | null };
 
-const NODE_W = 210, NODE_H = 92;
+const NODE_W = 210, NODE_H = 106;
 
 function layoutNodes(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
@@ -175,7 +175,8 @@ function LineageGraphInner({
       type: "lineageNode",
       position: { x: 0, y: 0 },
       data: {
-        entityId: n.entityId, entityName: n.entityName, layerCode: n.layerCode, sourceTypeCode: n.sourceTypeCode,
+        entityId: n.entityId, entityName: n.entityName, sourceName: n.sourceName, schemaName: n.schemaName,
+        layerCode: n.layerCode, sourceTypeCode: n.sourceTypeCode,
         qualityStatus: n.qualityStatus, hasUpstreamIssue: n.hasUpstreamIssue, isCurrent: n.isCurrent,
         columnCount: n.columnCount, columns: n.columns, scope, onSelectColumn: refocusToColumn, t: t.lineage,
       } satisfies LineageNodeData,
@@ -429,7 +430,10 @@ function LineageGraphInner({
               <EngineGlyph engineCode={selectedNode.sourceTypeCode} label={engineLabels(t.lineage)[selectedNode.sourceTypeCode ?? ""]} />
             </div>
             <div>
-              <div className="text-sm font-bold text-brand-purple">{selectedNode.entityName}</div>
+              <div className="text-sm font-bold text-brand-purple" dir="auto">{selectedNode.entityName}</div>
+              {(selectedNode.sourceName || selectedNode.schemaName) && (
+                <div className="text-[11px] text-muted mt-0.5" dir="auto">{[selectedNode.sourceName, selectedNode.schemaName].filter(Boolean).join(" › ")}</div>
+              )}
               {scope === "ATTRIBUTE_LEVEL" && selectedNode.columns[0] && (
                 <div className="text-xs text-muted mt-0.5">{selectedNode.columns[0].name}</div>
               )}

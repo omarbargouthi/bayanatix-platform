@@ -63,6 +63,8 @@ export type LineageNodeColumn = { attributeId: number; name: string };
 export type LineageNodeData = {
   entityId: number;
   entityName: string;
+  sourceName: string | null;
+  schemaName: string | null;
   layerCode: string | null;
   sourceTypeCode: string | null;
   qualityStatus: string;
@@ -92,6 +94,10 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
   }, [expanded]);
 
   const focusedColumn = data.scope === "ATTRIBUTE_LEVEL" ? data.columns[0] : null;
+  // Same tables exist in several systems/schemas (stg_customers in two lakehouses…),
+  // so the card names where the table lives, like the table view does.
+  const location = [data.sourceName, data.schemaName].filter(Boolean).join(" › ");
+  const fullPath = [data.sourceName, data.schemaName, data.entityName].filter(Boolean).join(" › ");
 
   return (
     <div
@@ -108,14 +114,15 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 mb-1 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0" title={fullPath}>
         <span className="text-sky-500 text-sm shrink-0">▤</span>
-        <span className="text-sm font-semibold text-brand-purple truncate flex-1 min-w-0">{data.entityName}</span>
+        <span className="text-sm font-semibold text-brand-purple truncate flex-1 min-w-0" dir="auto">{data.entityName}</span>
         <EngineGlyph engineCode={data.sourceTypeCode} label={engineLabels(data.t)[data.sourceTypeCode ?? ""]} />
         <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${LAYER_COLORS[data.layerCode ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
           {labels[data.layerCode ?? ""] ?? data.layerCode ?? "—"}
         </span>
       </div>
+      <div className="text-[10px] text-slate-500 truncate ps-5 mb-1 min-h-[14px]" title={fullPath} dir="auto">{location || "—"}</div>
 
       {focusedColumn && (
         <div className="text-[11px] text-slate-400 mb-1.5 truncate">{focusedColumn.name}</div>
