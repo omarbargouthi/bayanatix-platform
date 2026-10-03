@@ -3,14 +3,13 @@
 //    cleared (attribute_profile, attribute_profile_results);
 //  * data-quality sample values recorded against personal-data columns are
 //    replaced with a marker (counts and pass/fail are kept);
-//  * data-quality samples are kept for SAMPLE_RETENTION_DAYS only.
+//  (How long data-quality samples are kept is a retention setting — lib/privacy/retention.ts.)
 // "Personal-data column" = its classification term is flagged PI — the same
 // truth source the PII badge and sample-data masking use, including
 // classifications inherited through lineage.
 // Runs after crawls (profiling), DQ rule runs and propagation runs; idempotent.
 import { sql } from "../db";
 
-export const SAMPLE_RETENTION_DAYS = 90;
 export const MASKED_SAMPLE = "[masked: personal data]";
 
 const PI_COLUMNS = sql`
@@ -19,7 +18,7 @@ const PI_COLUMNS = sql`
   WHERE abt.asset_type_code = 'DATA_ATTRIBUTES' AND abt.term_role = 'CLASSIFICATION' AND bg.is_pii_indicator
 `;
 
-export async function maskStoredPersonalData(): Promise<{ profiles: number; profileResults: number; dqSamplesMasked: number; dqSamplesPurged: number }> {
+export async function maskStoredPersonalData(): Promise<{ profiles: number; profileResults: number; dqSamplesMasked: number }> {
   const profiles = await sql`
     UPDATE bayanat.attribute_profile SET min_value = NULL, max_value = NULL, top_values = NULL, values_masked = true
     WHERE attribute_id IN (${PI_COLUMNS})
@@ -36,16 +35,13 @@ export async function maskStoredPersonalData(): Promise<{ profiles: number; prof
     WHERE s.result_id = r.result_id AND s.sample_value IS DISTINCT FROM ${MASKED_SAMPLE}
       AND dr.asset_type_code = 'DATA_ATTRIBUTES' AND dr.asset_id IN (${PI_COLUMNS})
   `;
-  const dqSamplesPurged = await sql`
-    DELETE FROM bayanat.dq_run_samples WHERE created_at < now() - make_interval(days => ${SAMPLE_RETENTION_DAYS})
-  `;
-  return { profiles: profiles.count, profileResults: profileResults.count, dqSamplesMasked: dqSamplesMasked.count, dqSamplesPurged: dqSamplesPurged.count };
+  return { profiles: profiles.count, profileResults: profileResults.count, dqSamplesMasked: dqSamplesMasked.count };
 }
 
 /** Fire-and-forget wrapper for hooks that must never fail their caller. */
 export function maskStoredPersonalDataQuietly(context: string): void {
   void maskStoredPersonalData()
-    .then((r) => { if (r.profiles + r.profileResults + r.dqSamplesMasked + r.dqSamplesPurged > 0) console.log(`[pi-housekeeping:${context}]`, r); })
+    .then((r) => { if (r.profiles + r.profileResults + r.dqSamplesMasked > 0) console.log(`[pi-housekeeping:${context}]`, r); })
     .catch((e) => console.error(`[pi-housekeeping:${context}] failed`, e));
 }
 

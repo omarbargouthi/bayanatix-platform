@@ -54,6 +54,7 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
       { text: "Role-based access at domain, source, schema, table and column level; single sign-on with LDAP / Active Directory and OpenID Connect." },
       { text: "Security headers on every page, including a Content-Security-Policy, HSTS, clickjacking protection and a strict referrer policy." },
       { text: "Retention schedules drive deletion, with legal holds that block it where required.", href: "/privacy" },
+      { text: "Bayanis's own records (audit log, data access log, job logs, notifications, data-quality samples) are deleted automatically after the retention periods set by the administrator.", href: "/admin/configuration" },
     ],
   },
   {
@@ -64,6 +65,7 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
       { text: "Data access log of every view of live data, recording whether personal-data columns were masked or shown in clear text.", href: "/admin/audit-logs?tab=data-access" },
       { text: "Manual lineage changes go through approval and keep a full history; inherited classifications show where they came from.", href: "/lineage?view=register" },
       { text: "Every background job (crawls, imports, exports, propagation) keeps a log.", href: "/admin/audit-logs?tab=job-logs" },
+      { text: "When enabled by the administrator, users accept an activity-monitoring notice after signing in, explaining what is recorded and why; every decision is kept as evidence." },
     ],
   },
   {
@@ -81,7 +83,6 @@ const GAPS = [
   "Data-subject requests for Bayanis's own user accounts (export or erase a user's profile and activity) are handled manually.",
   "The Content-Security-Policy still allows inline scripts (needed by the framework); nonce-based scripts are planned.",
   "Encryption keys are rotated manually; there is no built-in key-rotation tool yet.",
-  "Retention for Bayanis's own logs (audit, access and job logs) is not automated yet.",
 ];
 
 export default function PrivacyByDesignPage() {

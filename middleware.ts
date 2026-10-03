@@ -23,6 +23,7 @@ const PUBLIC_PREFIXES = [
   "/api/admin/sources/scheduled-crawl", // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
   "/api/dq/scheduled-run",              // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
   "/api/admin/scheduled-jobs/run",      // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
+  "/api/admin/retention/run",           // scripts/scheduler.mjs (CRON_SECRET bearer) — also accepts an admin session itself
                                          // (NOT /api/admin/scheduled-jobs itself — that one stays session-protected)
   "/api/languages",         // login page's language picker needs this before a session exists
   "/api/translations/bundle", // same reason — non-sensitive UI copy, needed pre-auth by login + public FOI pages

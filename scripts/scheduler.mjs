@@ -58,6 +58,7 @@ async function tick() {
   await hit("crawl",         "/api/admin/sources/scheduled-crawl");
   await hit("dq",            "/api/dq/scheduled-run");
   await hit("scheduledJobs", "/api/admin/scheduled-jobs/run");
+  await hit("retention",     "/api/admin/retention/run"); // runs at most once a day (lib/privacy/retention.ts)
 }
 
 cron.schedule(POLL_SCHEDULE, tick);

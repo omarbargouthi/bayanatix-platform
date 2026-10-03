@@ -7,6 +7,7 @@ import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
 import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
 import { SampleDataConfigSection } from "./SampleDataConfigSection";
+import { PrivacyRetentionSection } from "./PrivacyRetentionSection";
 import { FollowSettingsSection } from "./FollowSettingsSection";
 import { SitSettingsSection } from "./SitSettingsSection";
 import { AuthSettingsSection } from "./AuthSettingsSection";
@@ -48,6 +49,7 @@ export default function ConfigurationPage() {
   const [showCustomAttributes, setShowCustomAttributes] = useState(false);
   const [showSampleData, setShowSampleData] = useState(false);
   const [showFollowSettings, setShowFollowSettings] = useState(false);
+  const [showPrivacyRetention, setShowPrivacyRetention] = useState(false);
   const [showSitSettings, setShowSitSettings] = useState(false);
   const [showAuthSettings, setShowAuthSettings] = useState(false);
   const [showBrandingSettings, setShowBrandingSettings] = useState(false);
@@ -90,6 +92,7 @@ export default function ConfigurationPage() {
     setShowCustomAttributes(false);
     setShowSampleData(false);
     setShowFollowSettings(false);
+    setShowPrivacyRetention(false);
     setShowSitSettings(false);
     setShowAuthSettings(false);
     setShowBrandingSettings(false);
@@ -174,7 +177,7 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
-    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showSitSettings && !showAuthSettings
+    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showAuthSettings
     && !showBrandingSettings && !showScheduling;
 
   return (
@@ -239,6 +242,13 @@ export default function ConfigurationPage() {
           >
             <div className="font-medium text-ink">Sample Data</div>
             <div className="text-[10px] text-muted mt-0.5">Record count shown on table pages</div>
+          </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowPrivacyRetention(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showPrivacyRetention ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Privacy &amp; Retention</div>
+            <div className="text-[10px] text-muted mt-0.5">Record retention · User consent notice</div>
           </button>
           <button
             onClick={() => { resetNav(); setSelectedGroup(null); setShowFollowSettings(true); }}
@@ -334,6 +344,7 @@ export default function ConfigurationPage() {
 
         {/* ── Follow Settings panel ── */}
         {showFollowSettings && <FollowSettingsSection />}
+        {showPrivacyRetention && <PrivacyRetentionSection />}
 
         {/* ── Sensitive Information Types panel ── */}
         {showSitSettings && <SitSettingsSection />}

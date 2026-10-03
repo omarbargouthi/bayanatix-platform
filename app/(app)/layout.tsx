@@ -5,6 +5,7 @@ import { getLanguages } from "@/lib/queries/languages";
 import { getDomainAccess, type DomainCode } from "@/lib/can";
 import { verifyLicense } from "@/lib/license/verify";
 import { AppShell } from "@/components/layout/AppShell";
+import { needsConsent } from "@/lib/privacy/policy-settings";
 import type { Lang } from "@/lib/lang-context";
 
 const NAV_DOMAINS: DomainCode[] = ["GOVERNANCE", "DATA_QUALITY", "DATA_PRIVACY", "SHARING", "FOI", "OPEN_DATA"];
@@ -16,6 +17,8 @@ const NAV_DOMAINS: DomainCode[] = ["GOVERNANCE", "DATA_QUALITY", "DATA_PRIVACY",
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getSession();
   if (!user) redirect("/login");
+  // Consent notice switched on by an administrator and not yet accepted (this version).
+  if (await needsConsent(user.userId)) redirect("/consent");
 
   let initialLang: Lang;
   if (user.preferredLanguageCode) {
