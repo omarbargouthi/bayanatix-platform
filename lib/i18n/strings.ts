@@ -1353,15 +1353,17 @@ export type I18nStrings = {
     canvasHint:          string;
     currentAsset:        string;
     loadingColumns:      string;
-    layers: {
-      source:        string;
-      raw:           string;
-      staging:       string;
-      table:         string;
-      view:          string;
-      lakehouse:     string;
-      semanticModel: string;
-      report:        string;
+    objectTypes: {
+      TABLE:              string;
+      VIEW:               string;
+      MATERIALIZED_VIEW:  string;
+      FOREIGN_TABLE:      string;
+      LAKEHOUSE_TABLE:    string;
+      FILE:               string;
+      API_RESOURCE:       string;
+      SEMANTIC_MODEL:     string;
+      REPORT:             string;
+      UNKNOWN:            string;
     };
     engines: {
       oracle:   string;

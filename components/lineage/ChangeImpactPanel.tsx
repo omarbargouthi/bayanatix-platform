@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
-import { layerLabels } from "./LineageNode";
+import { objectTypeLabels } from "./LineageNode";
 import { PropagationPreview, type Preview } from "./PropagationPreview";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
 type ImpactAsset = {
   depth: number; assetId: number; assetType: AssetType; name: string;
-  parentEntityName: string | null; schemaName: string | null; layerCode: string | null;
+  parentEntityName: string | null; schemaName: string | null; objectTypeCode: string | null;
   ownerName: string | null; qualityStatus: string;
 };
 type ImpactReport = { levels: { depth: number; assets: ImpactAsset[] }[] };
@@ -32,7 +32,7 @@ export function ChangeImpactPanel({
 }) {
   const { t } = useLang();
   const lt = t.lineageTools;
-  const layers = layerLabels(t.lineage);
+  const types = objectTypeLabels(t.lineage);
 
   const [columns, setColumns] = useState<{ attributeId: number; name: string }[]>([]);
   const [columnId, setColumnId] = useState<number | null>(initialColumnId);
@@ -184,7 +184,7 @@ export function ChangeImpactPanel({
                         {a.schemaName && <div className="text-[11px] text-muted truncate" dir="auto">{a.schemaName}</div>}
                       </div>
                       <div className="text-ink-soft">{a.depth}</div>
-                      <div className="text-ink-soft truncate">{layers[a.layerCode ?? ""] ?? "—"}</div>
+                      <div className="text-ink-soft truncate">{types[a.objectTypeCode ?? ""] ?? "—"}</div>
                       <div className={`truncate ${a.ownerName ? "text-ink-soft" : "text-amber-700"}`}>{a.ownerName ?? lt.noOwner}</div>
                     </label>
                   );

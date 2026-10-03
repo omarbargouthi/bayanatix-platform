@@ -2,17 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/lang-context";
-import { layerLabels } from "./LineageNode";
+import { objectTypeLabels } from "./LineageNode";
+import { MANUAL_OBJECT_TYPES } from "@/lib/object-types";
 
 export type PickedTable = { entityId: number; name: string; schemaName: string | null };
 type Endpoint =
   | { mode: "catalog"; table: PickedTable | null }
-  | { mode: "external"; name: string; layerCode: string };
+  | { mode: "external"; name: string; objectTypeCode: string };
 type Column = { attributeId: number; name: string };
 type TransformationType = { code: string; name: string };
 type Mapping = { sourceAttributeId: number | null; transformationTypeCode: string; expression: string };
 
-const EXTERNAL_LAYERS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"];
 
 function fill(template: string, vars: Record<string, string | number>) {
   return template.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
@@ -23,7 +23,7 @@ function fill(template: string, vars: Record<string, string | number>) {
 function EndpointPicker({ label, value, onChange }: { label: string; value: Endpoint; onChange: (v: Endpoint) => void }) {
   const { t } = useLang();
   const le = t.lineageEditor;
-  const layers = layerLabels(t.lineage);
+  const types = objectTypeLabels(t.lineage);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PickedTable[]>([]);
   const [open, setOpen] = useState(false);
@@ -80,7 +80,7 @@ function EndpointPicker({ label, value, onChange }: { label: string; value: Endp
               ))}
             </div>
           )}
-          <button type="button" onClick={() => onChange({ mode: "external", name: "", layerCode: "SOURCE" })} className="mt-1.5 text-[12px] text-brand-purple hover:underline">
+          <button type="button" onClick={() => onChange({ mode: "external", name: "", objectTypeCode: "UNKNOWN" })} className="mt-1.5 text-[12px] text-brand-purple hover:underline">
             {le.externalToggle}
           </button>
         </div>
@@ -94,8 +94,8 @@ function EndpointPicker({ label, value, onChange }: { label: string; value: Endp
             value={value.name}
             onChange={(e) => onChange({ ...value, name: e.target.value })}
           />
-          <select className="input-field w-full" aria-label={le.layer} value={value.layerCode} onChange={(e) => onChange({ ...value, layerCode: e.target.value })}>
-            {EXTERNAL_LAYERS.map((code) => <option key={code} value={code}>{layers[code] ?? code}</option>)}
+          <select className="input-field w-full" aria-label={le.layer} value={value.objectTypeCode} onChange={(e) => onChange({ ...value, objectTypeCode: e.target.value })}>
+            {MANUAL_OBJECT_TYPES.map((code) => <option key={code} value={code}>{types[code] ?? code}</option>)}
           </select>
           <button type="button" onClick={() => onChange({ mode: "catalog", table: null })} className="text-[12px] text-brand-purple hover:underline">{le.backToCatalog}</button>
         </div>
@@ -161,7 +161,7 @@ export function AddLineageModal({ initialSource, initialTarget, onClose, onSaved
     });
   }
 
-  const endpointBody = (e: Endpoint) => e.mode === "catalog" ? { entityId: e.table?.entityId ?? null } : { external: { name: e.name, layerCode: e.layerCode } };
+  const endpointBody = (e: Endpoint) => e.mode === "catalog" ? { entityId: e.table?.entityId ?? null } : { external: { name: e.name, objectTypeCode: e.objectTypeCode } };
   const ready = (e: Endpoint) => e.mode === "catalog" ? e.table != null : e.name.trim() !== "";
 
   async function save() {

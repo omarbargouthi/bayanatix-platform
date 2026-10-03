@@ -149,7 +149,7 @@ async function makeResolver(): Promise<Resolver> {
       if (entityCache.has(key)) return entityCache.get(key)!;
       let result: number | string;
       if (system.toLowerCase() === EXTERNAL_SOURCE_NAME.toLowerCase()) {
-        result = await ensureExternalEntity(table, "SOURCE");
+        result = await ensureExternalEntity(table);
       } else {
         const matches = await sql<{ id: number }[]>`
           SELECT e.entity_id AS id

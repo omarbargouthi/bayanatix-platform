@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { layerLabels } from "./LineageNode";
+import { objectTypeLabels } from "./LineageNode";
 import type { I18nStrings } from "@/lib/i18n/strings";
 
 type ImpactAsset = {
   depth: number; assetId: number; assetType: string; name: string;
-  parentEntityName: string | null; schemaName: string | null; layerCode: string | null;
+  parentEntityName: string | null; schemaName: string | null; objectTypeCode: string | null;
   ownerName: string | null; qualityStatus: string; transformationTypeName: string | null;
   transformationLogicText: string | null; processName: string | null;
 };
@@ -22,14 +22,14 @@ const QUALITY_COLORS: Record<string, string> = {
 };
 
 function toCsv(report: ImpactReport, t: I18nStrings["lineage"]): string {
-  const labels = layerLabels(t);
-  const header = ["Hop", "Asset", "Type", "Layer", "Schema", "Owner", "Quality", "Transformation", "Process"];
+  const labels = objectTypeLabels(t);
+  const header = ["Hop", "Asset", "Level", "Object type", "Schema", "Owner", "Quality", "Transformation", "Process"];
   const rows = report.levels.flatMap((lvl) =>
     lvl.assets.map((a) => [
       String(lvl.depth),
       a.assetType === "DATA_ATTRIBUTES" ? `${a.parentEntityName}.${a.name}` : a.name,
       a.assetType === "DATA_ATTRIBUTES" ? "Column" : "Table",
-      labels[a.layerCode ?? ""] ?? a.layerCode ?? "",
+      labels[a.objectTypeCode ?? ""] ?? a.objectTypeCode ?? "",
       a.schemaName ?? "",
       a.ownerName ?? "",
       a.qualityStatus,
@@ -117,7 +117,7 @@ export function ImpactReportPanel({
                             {a.assetType === "DATA_ATTRIBUTES" ? `${a.parentEntityName}.${a.name}` : a.name}
                           </span>
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
-                            {layerLabels(t)[a.layerCode ?? ""] ?? a.layerCode ?? "—"}
+                            {objectTypeLabels(t)[a.objectTypeCode ?? ""] ?? a.objectTypeCode ?? "—"}
                           </span>
                           <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${QUALITY_COLORS[a.qualityStatus]}`}>{a.qualityStatus}</span>
                         </div>

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { ensureExternalEntity, LINEAGE_LAYERS } from "@/lib/lineage/manual-edges";
+import { ensureExternalEntity } from "@/lib/lineage/manual-edges";
+import { MANUAL_OBJECT_TYPES } from "@/lib/object-types";
 import { submitLineageChanges, describeEdge, type LineageOp } from "@/lib/lineage/changes";
 
-type Endpoint = { entityId?: number | null; external?: { name: string; layerCode: string } | null };
+type Endpoint = { entityId?: number | null; external?: { name: string; objectTypeCode: string } | null };
 type Body = {
   source: Endpoint;
   target: Endpoint;
@@ -22,9 +23,9 @@ async function resolveEndpoint(ep: Endpoint): Promise<number | { error: string }
   const name = ep.external?.name?.trim();
   if (!name) return { error: "Pick a table or name an external asset for both sides" };
   if (name.length > 200) return { error: "External asset name is too long" };
-  const layer = ep.external?.layerCode ?? "SOURCE";
-  if (!(LINEAGE_LAYERS as readonly string[]).includes(layer)) return { error: "Invalid layer" };
-  return ensureExternalEntity(name, layer);
+  const objectType = ep.external?.objectTypeCode ?? "UNKNOWN";
+  if (!(MANUAL_OBJECT_TYPES as string[]).includes(objectType)) return { error: "Invalid object type" };
+  return ensureExternalEntity(name, objectType);
 }
 
 // POST — propose a manual lineage link between two tables (or external assets),

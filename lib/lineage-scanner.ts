@@ -4,6 +4,7 @@ import { parse as pgParse } from "libpg-query";
 import { sql } from "./db";
 import { openSecret } from "./secrets";
 import { ensureSchema, ensureEntity, ensureAttribute } from "./lineage/catalog-upsert";
+import { objectTypeFromRelkind, type ObjectTypeCode } from "./object-types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -481,6 +482,13 @@ export async function runLineageScan(connectionId: number, triggeredByUserId: st
       WHERE ${conn.defaultSchema ? pg`table_schema = ${conn.defaultSchema}` : pg`table_schema NOT IN ('pg_catalog', 'information_schema')`}
     `;
     const colTypeMap = new Map(colTypeRows.map((c) => [`${c.schema}.${c.table}.${c.column}`, c.dataType]));
+    // What each relation really is (table / view / materialized view / foreign table).
+    const relkindRows = await pg<{ schema: string; name: string; relkind: string }[]>`
+      SELECT n.nspname AS schema, c.relname AS name, c.relkind::text AS relkind
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f') AND ${schemaFilter}
+    `;
+    const objectTypeOf = new Map(relkindRows.map((r) => [`${r.schema}.${r.name}`, objectTypeFromRelkind(r.relkind)]));
     const tableColumnsMap = new Map<string, string[]>();
     for (const c of colTypeRows) {
       const key = `${c.schema}.${c.table}`;
@@ -527,8 +535,9 @@ export async function runLineageScan(connectionId: number, triggeredByUserId: st
       for (const stmtLineage of statementLineages) {
         const targetSchema = stmtLineage.targetSchema ?? obj.schemaName;
         const targetSchemaId = await ensureSchema(dataSource.id, targetSchema);
-        const targetIsView = obj.processType === "VIEW" || obj.processType === "MATVIEW";
-        const targetEntityId = await ensureEntity(targetSchemaId, stmtLineage.targetTable, targetIsView);
+        const targetType: ObjectTypeCode = obj.processType === "MATVIEW" ? "MATERIALIZED_VIEW" : obj.processType === "VIEW" ? "VIEW"
+          : objectTypeOf.get(`${targetSchema}.${stmtLineage.targetTable}`) ?? "UNKNOWN";
+        const targetEntityId = await ensureEntity(targetSchemaId, stmtLineage.targetTable, targetType);
 
         const attributeEdges: { sourceAttrId: number; targetAttrId: number; mapping: ExtractedMapping }[] = [];
 
@@ -543,7 +552,7 @@ export async function runLineageScan(connectionId: number, triggeredByUserId: st
           const found = findSourceTable(tableName);
           const srcSchemaName = found?.schemaName ?? targetSchema;
           const srcSchemaId = await ensureSchema(dataSource.id, srcSchemaName);
-          const srcEntityId = await ensureEntity(srcSchemaId, tableName, false);
+          const srcEntityId = await ensureEntity(srcSchemaId, tableName, objectTypeOf.get(`${srcSchemaName}.${tableName}`) ?? "UNKNOWN");
           return ensureAttribute(srcEntityId, columnName, colTypeMap.get(`${srcSchemaName}.${tableName}.${columnName}`) ?? null);
         };
 

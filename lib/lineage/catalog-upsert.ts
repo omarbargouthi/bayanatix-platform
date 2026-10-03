@@ -4,19 +4,7 @@
 // through the exact same non-destructive upsert-by-natural-key pattern v1 uses,
 // instead of duplicating it a third time.
 import { sql } from "../db";
-import type { LineageLayerCode } from "../queries/lineage";
-
-// Layer classification heuristic per v1 §6.5: name-prefix conventions for
-// RAW/STAGING, is_view_indicator for VIEW, else TABLE. Connectors that already
-// know an asset's layer (SSIS destinations, Power BI datasets/reports, Fabric
-// items) should pass layerCodeOverride to ensureEntity instead of relying on this.
-export function classifyLayer(tableName: string, isView: boolean): LineageLayerCode {
-  if (isView) return "VIEW";
-  const n = tableName.toLowerCase();
-  if (n.startsWith("raw_") || n.endsWith("_raw")) return "RAW";
-  if (n.startsWith("stg_") || n.endsWith("_stg")) return "STAGING";
-  return "TABLE";
-}
+import { isViewType, type ObjectTypeCode } from "../object-types";
 
 export async function ensureDataSource(
   sourceName: string,
@@ -56,23 +44,25 @@ export async function ensureSchema(dataSourceId: number, schemaName: string): Pr
 export async function ensureEntity(
   schemaId: number,
   tableName: string,
-  isView: boolean,
-  opts: { layerCodeOverride?: LineageLayerCode; displayName?: string; description?: string; placeholder?: boolean } = {},
+  // What the object really is in its source (lib/object-types.ts) — never guessed
+  // from its name. UNKNOWN when the caller only saw a reference to it.
+  objectType: ObjectTypeCode,
+  opts: { displayName?: string; description?: string; placeholder?: boolean } = {},
 ): Promise<number> {
-  const layerCode = opts.layerCodeOverride ?? classifyLayer(tableName, isView);
+  const isView = isViewType(objectType);
   const [existing] = await sql<{ id: number }[]>`
     SELECT entity_id AS id FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${tableName}
   `;
   if (existing) {
     await sql`
-      UPDATE bayanat.data_entities SET layer_code = ${layerCode}
-      WHERE entity_id = ${existing.id} AND layer_code IS NULL
+      UPDATE bayanat.data_entities SET object_type_code = ${objectType}, is_view_indicator = ${isView}
+      WHERE entity_id = ${existing.id} AND ${objectType} <> 'UNKNOWN' AND object_type_code <> ${objectType}
     `;
     return existing.id;
   }
   const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.data_entities (schema_id, entity_name_text, display_name_text, is_view_indicator, layer_code, description_text)
-    VALUES (${schemaId}, ${tableName}, ${opts.displayName ?? tableName}, ${isView}, ${layerCode},
+    INSERT INTO bayanat.data_entities (schema_id, entity_name_text, display_name_text, is_view_indicator, object_type_code, description_text)
+    VALUES (${schemaId}, ${tableName}, ${opts.displayName ?? tableName}, ${isView}, ${objectType},
       ${opts.placeholder ? (opts.description ?? "Auto-created — unresolved connection reference, pending stewardship review") : (opts.description ?? null)})
     RETURNING entity_id AS id
   `;

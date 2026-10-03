@@ -1,11 +1,11 @@
 import { sql } from "../db";
+import type { ObjectTypeCode } from "../object-types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type LineageScopeCode = "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
 export type LineageAssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
 export type LineageQualityStatus = "CRITICAL" | "WARNING" | "GOOD" | "UNKNOWN";
-export type LineageLayerCode = "SOURCE" | "RAW" | "STAGING" | "TABLE" | "VIEW" | "LAKEHOUSE" | "SEMANTIC_MODEL" | "REPORT";
 
 export type ImpactAssetRow = {
   depth:                    number;
@@ -16,7 +16,7 @@ export type ImpactAssetRow = {
   parentEntityName:         string | null;
   schemaName:               string | null;
   sourceName:               string | null;
-  layerCode:                LineageLayerCode | null;
+  objectTypeCode:                ObjectTypeCode | null;
   ownerName:                string | null;
   qualityStatus:            LineageQualityStatus;
   dqTagCount:                number;
@@ -65,7 +65,7 @@ async function resolveImpactAssets(rows: RawImpactRow[], assetType: LineageAsset
 
   type AssetDetail = {
     assetId: number; name: string; parentEntityName: string | null; schemaName: string | null;
-    sourceName: string | null; layerCode: LineageLayerCode | null; ownerName: string | null;
+    sourceName: string | null; objectTypeCode: ObjectTypeCode | null; ownerName: string | null;
     qualityStatus: LineageQualityStatus; dqTagCount: number;
   };
 
@@ -77,7 +77,7 @@ async function resolveImpactAssets(rows: RawImpactRow[], assetType: LineageAsset
           NULL::text                               AS "parentEntityName",
           s.schema_name_text                      AS "schemaName",
           src.source_name_text                    AS "sourceName",
-          e.layer_code                            AS "layerCode",
+          e.object_type_code                            AS "objectTypeCode",
           owner.full_name                         AS "ownerName",
           COALESCE(qual.status, 'UNKNOWN')        AS "qualityStatus",
           (SELECT COUNT(*)::int FROM bayanat.asset_tags at WHERE at.asset_type_code = 'DATA_ENTITIES' AND at.asset_id = e.entity_id) AS "dqTagCount"
@@ -118,7 +118,7 @@ async function resolveImpactAssets(rows: RawImpactRow[], assetType: LineageAsset
           e.entity_name_text                      AS "parentEntityName",
           s.schema_name_text                      AS "schemaName",
           src.source_name_text                    AS "sourceName",
-          e.layer_code                            AS "layerCode",
+          e.object_type_code                            AS "objectTypeCode",
           owner.full_name                         AS "ownerName",
           CASE
             WHEN EXISTS (SELECT 1 FROM bayanat.dq_rules r WHERE r.asset_type_code = 'DATA_ATTRIBUTES' AND r.asset_id = a.attribute_id AND r.is_active_indicator = true AND r.severity_level_code = 'CRITICAL' AND r.last_status_code = 'FAILED')
@@ -158,7 +158,7 @@ async function resolveImpactAssets(rows: RawImpactRow[], assetType: LineageAsset
       parentEntityName:         asset?.parentEntityName ?? null,
       schemaName:               asset?.schemaName ?? null,
       sourceName:               asset?.sourceName ?? null,
-      layerCode:                asset?.layerCode ?? null,
+      objectTypeCode:                asset?.objectTypeCode ?? null,
       ownerName:                asset?.ownerName ?? null,
       qualityStatus:            asset?.qualityStatus ?? "UNKNOWN",
       dqTagCount:               asset?.dqTagCount ?? 0,
@@ -176,7 +176,7 @@ function buildReport(assets: ImpactAssetRow[]): ImpactReport {
   const dqAssetIds = new Set<number>();
   for (const id of distinctAssetIds) {
     const a = assets.find(x => x.assetId === id)!;
-    const layer = a.layerCode ?? "UNKNOWN";
+    const layer = a.objectTypeCode ?? "UNKNOWN";
     byLayer[layer] = (byLayer[layer] ?? 0) + 1;
     if (a.qualityStatus === "CRITICAL" || a.qualityStatus === "WARNING") dqAssetIds.add(id);
   }
@@ -236,7 +236,7 @@ export async function getUpstreamImpact(assetType: LineageAssetType, assetId: nu
 export type LineageGraphNode = {
   entityId:          number;
   entityName:        string;
-  layerCode:         LineageLayerCode | null;
+  objectTypeCode:         ObjectTypeCode | null;
   schemaName:        string | null;
   sourceName:        string | null;
   sourceTypeCode:    string | null;
@@ -277,14 +277,14 @@ export type LineageGraph = {
 async function resolveEntityNodes(entityIds: number[], currentEntityId: number): Promise<Map<number, LineageGraphNode>> {
   if (entityIds.length === 0) return new Map();
   const rows = await sql<{
-    entityId: number; entityName: string; layerCode: LineageLayerCode | null;
+    entityId: number; entityName: string; objectTypeCode: ObjectTypeCode | null;
     schemaName: string | null; sourceName: string | null; sourceTypeCode: string | null; ownerName: string | null;
     qualityStatus: LineageQualityStatus; dqTagCount: number; columnCount: number; rowCountEstimate: number | null;
   }[]>`
     SELECT
       e.entity_id                               AS "entityId",
       e.entity_name_text                        AS "entityName",
-      e.layer_code                              AS "layerCode",
+      e.object_type_code                              AS "objectTypeCode",
       s.schema_name_text                        AS "schemaName",
       src.source_name_text                      AS "sourceName",
       src.source_type_code                      AS "sourceTypeCode",
@@ -325,7 +325,7 @@ async function resolveEntityNodes(entityIds: number[], currentEntityId: number):
   return new Map(rows.map((r) => [
     Number(r.entityId),
     {
-      entityId: Number(r.entityId), entityName: r.entityName, layerCode: r.layerCode,
+      entityId: Number(r.entityId), entityName: r.entityName, objectTypeCode: r.objectTypeCode,
       schemaName: r.schemaName, sourceName: r.sourceName, sourceTypeCode: r.sourceTypeCode, ownerName: r.ownerName,
       qualityStatus: r.qualityStatus, dqTagCount: Number(r.dqTagCount), columnCount: Number(r.columnCount),
       rowCountEstimate: r.rowCountEstimate != null ? Number(r.rowCountEstimate) : null,

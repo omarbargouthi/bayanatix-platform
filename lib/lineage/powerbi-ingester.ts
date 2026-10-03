@@ -71,14 +71,14 @@ function extractDaxColumnRefs(dax: string): { table: string | null; column: stri
 
 async function ensureEntityByExternalId(
   systemCode: string, externalIdText: string,
-  schemaId: number, tableName: string, layerCode: "SEMANTIC_MODEL" | "REPORT" | "LAKEHOUSE",
+  schemaId: number, tableName: string, objectType: "SEMANTIC_MODEL" | "REPORT" | "LAKEHOUSE_TABLE",
   displayName?: string,
 ): Promise<number> {
   const [existing] = await sql<{ entityId: number }[]>`
     SELECT asset_id AS "entityId" FROM bayanat.asset_external_ids WHERE system_code = ${systemCode} AND external_id_text = ${externalIdText} AND asset_type_code = 'DATA_ENTITIES'
   `;
   if (existing) return existing.entityId;
-  const entityId = await ensureEntity(schemaId, tableName, false, { layerCodeOverride: layerCode, displayName });
+  const entityId = await ensureEntity(schemaId, tableName, objectType, { displayName });
   await sql`
     INSERT INTO bayanat.asset_external_ids (asset_type_code, asset_id, system_code, external_id_text)
     VALUES ('DATA_ENTITIES', ${entityId}, ${systemCode}, ${externalIdText})
@@ -154,7 +154,7 @@ export async function ingestPowerBiScanResult(scanResult: ScanResult, connection
       for (const lh of ws.Lakehouse ?? []) {
         for (const t of lh.extendedProperties?.tables ?? []) {
           const extId = `${lh.id}/${t.name}`;
-          const entityId = await ensureEntityByExternalId(systemCode, extId, schemaId, `${lh.name}.${t.name}`, "LAKEHOUSE", `Lakehouse: ${t.name}`);
+          const entityId = await ensureEntityByExternalId(systemCode, extId, schemaId, `${lh.name}.${t.name}`, "LAKEHOUSE_TABLE", `Lakehouse: ${t.name}`);
           lakehouseTableEntity.set(extId, entityId);
           for (const col of t.columns) await ensureAttribute(entityId, col.name, col.dataType ?? null);
         }

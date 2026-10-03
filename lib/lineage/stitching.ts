@@ -113,8 +113,8 @@ async function enqueueStitch(ref: ExternalRef, scanRunId: number | null): Promis
   const placeholderSourceName = rawSourceName.length > 100 ? `${rawSourceName.slice(0, 97)}...` : rawSourceName;
   const dataSourceId = await ensureDataSource(placeholderSourceName, ref.engine, ref.host, ref.database, { placeholder: true });
   const schemaId = await ensureSchema(dataSourceId, ref.schema ?? "(unknown)");
-  const placeholderEntityId = await ensureEntity(schemaId, ref.object, false, {
-    layerCodeOverride: "SOURCE",
+  // Only a reference was seen — the real object type is known once its source is crawled.
+  const placeholderEntityId = await ensureEntity(schemaId, ref.object, "UNKNOWN", {
     placeholder: true,
     description: `Auto-created by the lineage scanner — reference "${ref.engine}:${ref.host ?? "?"}/${ref.database ?? "?"}/${ref.schema ?? "?"}/${ref.object}" did not match any registered connection. Bind it from the Stitching Review page.`,
   });

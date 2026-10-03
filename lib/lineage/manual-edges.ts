@@ -3,20 +3,18 @@
 // create exactly the same rows.
 import { sql } from "../db";
 import { ensureDataSource, ensureSchema, ensureEntity } from "./catalog-upsert";
-import type { LineageLayerCode } from "../queries/lineage";
+import { MANUAL_OBJECT_TYPES, type ObjectTypeCode } from "../object-types";
 
-export const LINEAGE_LAYERS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"] as const;
 export const EXTERNAL_SOURCE_NAME = "External systems";
 
 // Endpoints that aren't in the catalog (an application, a file feed, a report
 // tool) are recorded as entities under one "External systems" source, so the
 // graph, impact analysis and propagation treat them like any other node.
-export async function ensureExternalEntity(name: string, layerCode: string = "SOURCE"): Promise<number> {
-  const layer = (LINEAGE_LAYERS as readonly string[]).includes(layerCode) ? layerCode : "SOURCE";
+export async function ensureExternalEntity(name: string, objectType: string = "UNKNOWN"): Promise<number> {
+  const type = ((MANUAL_OBJECT_TYPES as string[]).includes(objectType) ? objectType : "UNKNOWN") as ObjectTypeCode;
   const dsId = await ensureDataSource(EXTERNAL_SOURCE_NAME, "EXTERNAL", null, "external");
   const schemaId = await ensureSchema(dsId, "manual");
-  return ensureEntity(schemaId, name, layer === "VIEW", {
-    layerCodeOverride: layer as LineageLayerCode,
+  return ensureEntity(schemaId, name, type, {
     description: "Added manually as a lineage endpoint",
   });
 }

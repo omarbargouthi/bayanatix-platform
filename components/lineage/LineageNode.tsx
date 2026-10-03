@@ -4,28 +4,28 @@ import { useState, useEffect } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { I18nStrings } from "@/lib/i18n/strings";
 
-export function layerLabels(t: I18nStrings["lineage"]): Record<string, string> {
-  return {
-    SOURCE: t.layers.source, RAW: t.layers.raw, STAGING: t.layers.staging,
-    TABLE: t.layers.table, VIEW: t.layers.view, LAKEHOUSE: t.layers.lakehouse,
-    SEMANTIC_MODEL: t.layers.semanticModel, REPORT: t.layers.report,
-  };
+// Object type labels (lib/object-types.ts) — the real type from the source catalog.
+export function objectTypeLabels(t: I18nStrings["lineage"]): Record<string, string> {
+  return t.objectTypes;
 }
 
-export const LAYER_COLORS: Record<string, string> = {
-  SOURCE:          "bg-slate-100 text-slate-600",
-  RAW:             "bg-sky-100 text-sky-700",
-  STAGING:         "bg-purple-100 text-purple-700",
-  TABLE:           "bg-indigo-100 text-indigo-700",
-  VIEW:            "bg-teal-100 text-teal-700",
-  LAKEHOUSE:       "bg-cyan-100 text-cyan-700",
-  SEMANTIC_MODEL:  "bg-amber-100 text-amber-700",
-  REPORT:          "bg-orange-100 text-orange-700",
+export const TYPE_COLORS: Record<string, string> = {
+  TABLE:             "bg-indigo-100 text-indigo-700",
+  VIEW:              "bg-teal-100 text-teal-700",
+  MATERIALIZED_VIEW: "bg-emerald-100 text-emerald-700",
+  FOREIGN_TABLE:     "bg-sky-100 text-sky-700",
+  LAKEHOUSE_TABLE:   "bg-cyan-100 text-cyan-700",
+  FILE:              "bg-lime-100 text-lime-800",
+  API_RESOURCE:      "bg-violet-100 text-violet-700",
+  SEMANTIC_MODEL:    "bg-amber-100 text-amber-700",
+  REPORT:            "bg-orange-100 text-orange-700",
+  UNKNOWN:           "bg-slate-100 text-slate-500",
 };
 
-export const LAYER_DOT: Record<string, string> = {
-  SOURCE: "bg-slate-400", RAW: "bg-sky-500", STAGING: "bg-purple-500", TABLE: "bg-indigo-500", VIEW: "bg-teal-500",
-  LAKEHOUSE: "bg-cyan-500", SEMANTIC_MODEL: "bg-amber-500", REPORT: "bg-orange-500",
+export const TYPE_DOT: Record<string, string> = {
+  TABLE: "bg-indigo-500", VIEW: "bg-teal-500", MATERIALIZED_VIEW: "bg-emerald-500", FOREIGN_TABLE: "bg-sky-500",
+  LAKEHOUSE_TABLE: "bg-cyan-500", FILE: "bg-lime-600", API_RESOURCE: "bg-violet-500", SEMANTIC_MODEL: "bg-amber-500",
+  REPORT: "bg-orange-500", UNKNOWN: "bg-slate-400",
 };
 
 // Engine glyph — small colored monogram badge showing which system a node's
@@ -65,7 +65,7 @@ export type LineageNodeData = {
   entityName: string;
   sourceName: string | null;
   schemaName: string | null;
-  layerCode: string | null;
+  objectTypeCode: string | null;
   sourceTypeCode: string | null;
   qualityStatus: string;
   hasUpstreamIssue: boolean;
@@ -81,7 +81,7 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
   const [expanded, setExpanded] = useState(false);
   const [allColumns, setAllColumns] = useState<{ attributeId: number; name: string; qualityStatus: string; attributeClassCode: string | null }[] | null>(null);
   const [loadingCols, setLoadingCols] = useState(false);
-  const labels = layerLabels(data.t);
+  const labels = objectTypeLabels(data.t);
 
   useEffect(() => {
     if (!expanded || allColumns !== null) return;
@@ -118,8 +118,8 @@ export function LineageNodeCard({ data }: { data: LineageNodeData }) {
         <span className="text-sky-500 text-sm shrink-0">▤</span>
         <span className="text-sm font-semibold text-brand-purple truncate flex-1 min-w-0" dir="auto">{data.entityName}</span>
         <EngineGlyph engineCode={data.sourceTypeCode} label={engineLabels(data.t)[data.sourceTypeCode ?? ""]} />
-        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${LAYER_COLORS[data.layerCode ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
-          {labels[data.layerCode ?? ""] ?? data.layerCode ?? "—"}
+        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${TYPE_COLORS[data.objectTypeCode ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
+          {labels[data.objectTypeCode ?? ""] ?? data.objectTypeCode ?? "—"}
         </span>
       </div>
       <div className="text-[10px] text-slate-500 truncate ps-5 mb-1 min-h-[14px]" title={fullPath} dir="auto">{location || "—"}</div>

@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { objectTypeFromSourceTableType, type ObjectTypeCode } from "./object-types";
 import { sql } from "./db";
 import { openSecret } from "./secrets";
 import { maskStoredPersonalDataQuietly } from "./privacy/pi-housekeeping";
@@ -42,7 +43,8 @@ type CrawlColumn = {
   profile?: ColProfile;
 };
 
-type CrawlTable  = { name: string; isView: boolean; columns: CrawlColumn[]; comment?: string | null; extProps?: Record<string, string>; rowCount?: number; sampleSize?: number };
+// objectType: what the source catalog says the object is (lib/object-types.ts).
+type CrawlTable  = { name: string; isView: boolean; objectType: ObjectTypeCode; columns: CrawlColumn[]; comment?: string | null; extProps?: Record<string, string>; rowCount?: number; sampleSize?: number };
 type CrawlSchema = { name: string; tables: CrawlTable[] };
 
 // FK topology harvested alongside columns — feeds bayanat.attribute_reference_links,
@@ -397,7 +399,7 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
           }
         }
 
-        tables.push({ name: tr.t, isView: tr.v === "VIEW", columns, comment: tCommentRow?.cmt ?? null, rowCount, sampleSize });
+        tables.push({ name: tr.t, isView: tr.v === "VIEW", objectType: objectTypeFromSourceTableType(tr.v), columns, comment: tCommentRow?.cmt ?? null, rowCount, sampleSize });
       }
 
       if (tables.length > 0) schemas.push({ name: sr.n, tables });
@@ -482,7 +484,7 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
            WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, [sname, tname],
         );
         tables.push({
-          name: tname, isView: ttype === "VIEW",
+          name: tname, isView: ttype === "VIEW" || ttype === "SYSTEM VIEW", objectType: objectTypeFromSourceTableType(ttype),
           comment: tcomment || null,
           columns: (cRows as Record<string, string>[]).map(c => ({
             name:         c.column_name    || c.COLUMN_NAME,
@@ -608,7 +610,7 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
           JOIN sys.schemas sc ON sc.schema_id=o.schema_id
           WHERE ep.name='MS_Description' AND ep.minor_id=0 AND sc.name=@s AND o.name=@t`);
         tables.push({
-          name: trow.table_name, isView: trow.table_type === "VIEW",
+          name: trow.table_name, isView: trow.table_type === "VIEW", objectType: objectTypeFromSourceTableType(trow.table_type),
           comment: tcmt.recordset[0]?.cmt ?? null,
           extProps: tableProps.get(trow.table_name),
           columns: cr.recordset.map((c: Record<string, string|boolean|null>) => ({
@@ -786,7 +788,7 @@ async function crawlFile(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
         columns.forEach((col, idx) => { col.profile = profileFileColumn(sampleRows, idx, sampleSize!); });
       }
 
-      tables.push({ name: tableName, isView: false, columns, comment: null, rowCount: dataRows.length, sampleSize });
+      tables.push({ name: tableName, isView: false, objectType: "FILE", columns, comment: null, rowCount: dataRows.length, sampleSize });
       await logger.info(`  → ${tableName}: ${columns.length} columns, ${dataRows.length} rows`);
     }
   }
@@ -881,7 +883,7 @@ async function crawlJson(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
         columns.forEach((col, idx) => { col.profile = profileFileColumn(sampleRows, idx, sampleSize!); });
       }
 
-      tables.push({ name: tableName, isView: false, columns, comment: null, rowCount: grid.length, sampleSize });
+      tables.push({ name: tableName, isView: false, objectType: "FILE", columns, comment: null, rowCount: grid.length, sampleSize });
       await logger.info(`  → ${tableName}: ${columns.length} columns, ${grid.length} rows`);
     }
   }
@@ -981,7 +983,7 @@ async function crawlRestApi(cfg: ConnCfg, config: CrawlConfig | null, logger: Jo
       comment: props[name]?.description ?? null,
     }));
 
-    tables.push({ name: tableName, isView: false, columns, comment: schema?.description ?? null });
+    tables.push({ name: tableName, isView: false, objectType: "API_RESOURCE", columns, comment: schema?.description ?? null });
     await logger.info(`  → ${tableName}: ${columns.length} columns`);
   }
 
@@ -1085,7 +1087,7 @@ async function crawlSoapApi(cfg: ConnCfg, config: CrawlConfig | null, logger: Jo
       defaultValue: el.default != null ? String(el.default) : null, comment: null,
     }));
 
-    tables.push({ name: tableName, isView: false, columns, comment: null });
+    tables.push({ name: tableName, isView: false, objectType: "API_RESOURCE", columns, comment: null });
     await logger.info(`  → ${tableName}: ${columns.length} columns`);
   }
 
@@ -1113,8 +1115,10 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
       : `AND owner NOT IN (${SYS.map(s=>`'${s}'`).join(",")})`;
 
     const tabRes = await conn.execute(
-      `SELECT owner,table_name,'BASE TABLE' AS ttype FROM all_tables WHERE 1=1 ${schemaFilter}
-       UNION ALL SELECT owner,view_name,'VIEW' FROM all_views WHERE 1=1 ${schemaFilter} ORDER BY 1,2`,
+      `SELECT owner,table_name,'BASE TABLE' AS ttype FROM all_tables t WHERE 1=1 ${schemaFilter}
+         AND NOT EXISTS (SELECT 1 FROM all_mviews m WHERE m.owner = t.owner AND m.mview_name = t.table_name)
+       UNION ALL SELECT owner,view_name,'VIEW' FROM all_views WHERE 1=1 ${schemaFilter}
+       UNION ALL SELECT owner,mview_name,'MATERIALIZED VIEW' FROM all_mviews WHERE 1=1 ${schemaFilter} ORDER BY 1,2`,
       [], { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
     const schemaMap = new Map<string, CrawlTable[]>();
@@ -1163,7 +1167,7 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
       }
       const colCmts = new Map(((cCommentRes.rows || []) as Record<string,string>[]).map(r => [r.COLUMN_NAME, r.COMMENTS ?? null]));
       schemaMap.get(owner)!.push({
-        name: tname, isView: row.TTYPE === "VIEW",
+        name: tname, isView: row.TTYPE !== "BASE TABLE", objectType: objectTypeFromSourceTableType(row.TTYPE),
         comment: ((tCommentRes.rows || []) as Record<string,string>[])[0]?.COMMENTS ?? null,
         columns: (colRes.rows || []).map((c: Record<string, string>) => ({
           name: c.COLUMN_NAME, dataType: c.DATA_TYPE,
@@ -1398,6 +1402,7 @@ async function saveCrawlResults(
         await sql`
           UPDATE bayanat.data_entities SET
             is_view_indicator = ${table.isView},
+            object_type_code = ${table.objectType},
             source_description_text = ${table.comment ?? null},
             suggested_category_code = ${suggestion.code},
             category_confidence_code = ${suggestion.confidence},
@@ -1424,9 +1429,9 @@ async function saveCrawlResults(
       } else {
         entityId = (await sql<{ id: number }[]>`
           INSERT INTO bayanat.data_entities
-            (schema_id, entity_name_text, display_name_text, is_view_indicator, source_description_text,
+            (schema_id, entity_name_text, display_name_text, is_view_indicator, object_type_code, source_description_text,
              entity_category_code, suggested_category_code, category_confidence_code, category_is_confirmed)
-          VALUES (${schemaId}, ${table.name}, ${table.name}, ${table.isView}, ${table.comment ?? null},
+          VALUES (${schemaId}, ${table.name}, ${table.name}, ${table.isView}, ${table.objectType}, ${table.comment ?? null},
                   ${suggestion.code}, ${suggestion.code}, ${suggestion.confidence}, false)
           RETURNING entity_id AS id
         `)[0].id;

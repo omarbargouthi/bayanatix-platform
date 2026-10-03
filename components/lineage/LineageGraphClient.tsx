@@ -8,7 +8,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
-import { LineageNodeCard, layerLabels, LAYER_DOT, EngineGlyph, engineLabels, type LineageNodeData } from "./LineageNode";
+import { LineageNodeCard, objectTypeLabels, TYPE_DOT, TYPE_COLORS, EngineGlyph, engineLabels, type LineageNodeData } from "./LineageNode";
+import { OBJECT_TYPES } from "@/lib/object-types";
 import { ImpactReportPanel } from "./ImpactReportPanel";
 import { AddLineageModal, type PickedTable } from "./AddLineageModal";
 import { ChangeImpactPanel } from "./ChangeImpactPanel";
@@ -20,7 +21,7 @@ type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
 type Scope = "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
 
 type GraphNode = {
-  entityId: number; entityName: string; layerCode: string | null; schemaName: string | null;
+  entityId: number; entityName: string; objectTypeCode: string | null; schemaName: string | null;
   sourceName: string | null; sourceTypeCode: string | null; ownerName: string | null; qualityStatus: string; dqTagCount: number;
   columnCount: number; rowCountEstimate: number | null; isCurrent: boolean; hasUpstreamIssue: boolean;
   columns: { attributeId: number; name: string }[];
@@ -88,7 +89,6 @@ function applySwimlanes(laidOutNodes: Node[], systemOf: Map<string, string>): No
   return laidOutNodes.map((n) => byId.get(n.id)!);
 }
 
-const LEGEND_ITEMS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"];
 // Hop depth choices for the Upstream/Downstream pickers; 10 = "All" (the traversal functions' own cap).
 const DEPTH_OPTIONS = [1, 2, 3, 4, 5, 10];
 
@@ -176,7 +176,7 @@ function LineageGraphInner({
       position: { x: 0, y: 0 },
       data: {
         entityId: n.entityId, entityName: n.entityName, sourceName: n.sourceName, schemaName: n.schemaName,
-        layerCode: n.layerCode, sourceTypeCode: n.sourceTypeCode,
+        objectTypeCode: n.objectTypeCode, sourceTypeCode: n.sourceTypeCode,
         qualityStatus: n.qualityStatus, hasUpstreamIssue: n.hasUpstreamIssue, isCurrent: n.isCurrent,
         columnCount: n.columnCount, columns: n.columns, scope, onSelectColumn: refocusToColumn, t: t.lineage,
       } satisfies LineageNodeData,
@@ -367,10 +367,11 @@ function LineageGraphInner({
         )}
 
         <div className="flex items-center gap-3 ml-auto text-[11px] text-muted">
-          {LEGEND_ITEMS.map((code) => (
+          {/* Only the object types actually present in this graph. */}
+          {OBJECT_TYPES.filter((code) => graph?.nodes.some((n) => (n.objectTypeCode ?? "UNKNOWN") === code)).map((code) => (
             <span key={code} className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${LAYER_DOT[code]}`} />
-              {layerLabels(t.lineage)[code]}
+              <span className={`w-2 h-2 rounded-full ${TYPE_DOT[code]}`} />
+              {objectTypeLabels(t.lineage)[code]}
             </span>
           ))}
         </div>
@@ -424,8 +425,8 @@ function LineageGraphInner({
         {selectedNode && view === "graph" && (
           <div className="absolute top-4 right-4 w-64 bg-white border border-line rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${layerLabels(t.lineage)[selectedNode.layerCode ?? ""] ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
-                {layerLabels(t.lineage)[selectedNode.layerCode ?? ""] ?? selectedNode.layerCode ?? "—"}
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${TYPE_COLORS[selectedNode.objectTypeCode ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
+                {objectTypeLabels(t.lineage)[selectedNode.objectTypeCode ?? ""] ?? selectedNode.objectTypeCode ?? "—"}
               </span>
               <EngineGlyph engineCode={selectedNode.sourceTypeCode} label={engineLabels(t.lineage)[selectedNode.sourceTypeCode ?? ""]} />
             </div>
