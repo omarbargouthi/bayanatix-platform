@@ -488,11 +488,12 @@ export async function getEntityProfile(entityId: number): Promise<EntityProfileD
   const attrRows = await sql<{
     attributeId: number; nullCount: number; nullPct: number; distinctCount: number;
     minValue: string | null; maxValue: string | null; topValues: { value: string; count: number }[] | null;
+    valuesMasked: boolean;
   }[]>`
     SELECT attribute_id AS "attributeId", null_count AS "nullCount",
            null_pct AS "nullPct", distinct_count AS "distinctCount",
            min_value AS "minValue", max_value AS "maxValue",
-           top_values AS "topValues"
+           top_values AS "topValues", values_masked AS "valuesMasked"
     FROM bayanat.attribute_profile
     WHERE profile_id = ${prof.profileId}
   `;

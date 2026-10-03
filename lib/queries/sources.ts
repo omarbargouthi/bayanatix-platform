@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { sealSecret, openSecret } from "../secrets";
 
 export type CrawlConfig = {
   configId:              number | null;
@@ -157,7 +158,7 @@ export async function getConnection(connectionId: number): Promise<DataSourceCon
 
 export async function getConnectionPassword(connectionId: number): Promise<string | null> {
   const [row] = await sql<{ p: string | null }[]>`SELECT password_text AS p FROM bayanat.connection_registry WHERE connection_id = ${connectionId}`;
-  return row?.p ?? null;
+  return openSecret(row?.p ?? null);
 }
 
 export async function createConnection(data: {
@@ -172,7 +173,7 @@ export async function createConnection(data: {
     VALUES (
       ${data.connectionName}, ${data.dbTypeCode}, ${data.hostAddress}, ${data.portNumber},
       ${data.databaseName ?? null}, ${data.serviceName ?? null}, ${data.defaultSchema ?? null},
-      ${data.usernameText ?? null}, ${data.passwordText ?? null}, ${data.sslEnabled}
+      ${data.usernameText ?? null}, ${sealSecret(data.passwordText ?? null)}, ${data.sslEnabled}
     )
     RETURNING connection_id AS id
   `;
@@ -199,7 +200,7 @@ export async function updateConnection(connectionId: number, data: {
       username_text    = coalesce(${data.usernameText    ?? null}, username_text),
       ssl_enabled      = coalesce(${data.sslEnabled      ?? null}, ssl_enabled),
       is_active_boolean= coalesce(${data.isActiveBoolean ?? null}, is_active_boolean),
-      password_text    = CASE WHEN ${data.passwordText ?? null} IS NOT NULL THEN ${data.passwordText ?? null} ELSE password_text END,
+      password_text    = CASE WHEN ${data.passwordText ?? null} IS NOT NULL THEN ${sealSecret(data.passwordText ?? null)} ELSE password_text END,
       lineage_enabled        = coalesce(${data.lineageEnabled        ?? null}, lineage_enabled),
       lineage_scan_views      = coalesce(${data.lineageScanViews      ?? null}, lineage_scan_views),
       lineage_scan_matviews   = coalesce(${data.lineageScanMatviews   ?? null}, lineage_scan_matviews),

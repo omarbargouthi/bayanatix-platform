@@ -4,10 +4,11 @@ import { sql } from "@/lib/db";
 import { canReadData, roleAllowsPiClearText, hasPiClearTextGrant } from "@/lib/can";
 import { getLiveSampleRows, getPiColumnNames } from "@/lib/sample-data";
 import { getSampleDataSettings } from "@/lib/sample-data-settings";
+import { logDataAccess } from "@/lib/privacy/pi-housekeeping";
 
 const MASK = "●●●●●●";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -54,6 +55,16 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     }
     return masked;
   });
+
+  // Every view of live data is logged, with whether personal-data columns were shown in clear text.
+  await logDataAccess({
+    userId: session.userId, assetType: "DATA_ENTITIES", assetId: entityId,
+    piColumnCount: piColumns.size, clearText: canViewClearText && piColumns.size > 0,
+    clearTextBasis: piColumns.size === 0 || !canViewClearText ? null : isAdminOverride && !(piEligible && piGranted) ? "ADMIN" : "GRANT",
+    rowCount: rows.length,
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    userAgent: req.headers.get("user-agent"),
+  }).catch((e) => console.error("[data-access-log]", e));
 
   return NextResponse.json({
     authorized: true,

@@ -2,6 +2,7 @@ import postgres from "postgres";
 import { createHash } from "node:crypto";
 import { parse as pgParse } from "libpg-query";
 import { sql } from "./db";
+import { openSecret } from "./secrets";
 import { ensureSchema, ensureEntity, ensureAttribute } from "./lineage/catalog-upsert";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -408,6 +409,7 @@ export async function runLineageScan(connectionId: number, triggeredByUserId: st
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!conn) throw new Error("Connection not found");
+  conn.passwordText = openSecret(conn.passwordText);
   if (!conn.lineageEnabled) throw new Error("Lineage scanning is not enabled for this connection — enable it under Data Lineage settings first.");
 
   const [dataSource] = await sql<{ id: number }[]>`

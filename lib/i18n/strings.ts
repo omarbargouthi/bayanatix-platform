@@ -2946,4 +2946,24 @@ export type I18nStrings = {
     inheritedBadge:      string;
     inheritedFrom:       string;
   };
+
+  // ── Privacy hardening: hidden profile values, data access log ──
+  privacy: {
+    valuesHidden:     string;
+    valuesHiddenHint: string;
+    tabDataAccess:    string;
+    accessTitle:      string;
+    accessDesc:       string;
+    colWhen:          string;
+    colUser:          string;
+    colAsset:         string;
+    colRows:          string;
+    colPersonal:      string;
+    masked:           string;
+    clearGrant:       string;
+    clearAdmin:       string;
+    none:             string;
+    onlyClear:        string;
+    empty:            string;
+  };
 };

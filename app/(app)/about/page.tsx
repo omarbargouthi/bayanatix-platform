@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { verifyLicense } from "@/lib/license/verify";
 
 // Curated, not queried -- this exists to answer a regulatory ask ("show you have
@@ -63,6 +64,11 @@ export default async function AboutPage() {
           {FEATURES.map((f) => <li key={f}>{f}</li>)}
         </ul>
       </div>
+
+      <Link href="/about/privacy" className="block bg-white border border-line rounded-xl p-5 hover:border-brand-purple/40 transition-colors">
+        <h2 className="text-sm font-semibold text-ink">Privacy by Design →</h2>
+        <p className="text-[13px] text-ink-soft mt-1">How Bayanis follows the seven Privacy by Design principles, with the product behaviour behind each and the known gaps.</p>
+      </Link>
     </div>
   );
 }

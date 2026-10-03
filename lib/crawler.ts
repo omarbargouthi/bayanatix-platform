@@ -1,5 +1,7 @@
 import postgres from "postgres";
 import { sql } from "./db";
+import { openSecret } from "./secrets";
+import { maskStoredPersonalDataQuietly } from "./privacy/pi-housekeeping";
 import { applyGovernanceDefaults } from "./queries/stakeholders";
 import { logUpdate, logCreate } from "./audit";
 import { startWorkflow } from "./workflow";
@@ -1193,6 +1195,7 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!cfg) throw new Error("Connection not found");
+  cfg.passwordText = openSecret(cfg.passwordText);
 
   try {
     if (cfg.dbTypeCode === "POSTGRES") {
@@ -1752,6 +1755,7 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!cfgRow) throw new Error("Connection not found");
+  cfgRow.passwordText = openSecret(cfgRow.passwordText);
 
   // Load crawl config (schema/table filters, profiling settings, governance defaults)
   const [configRow] = await sql<{
@@ -1856,6 +1860,9 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
         await logger.warn(`Column classification step failed: ${(e as Error).message}`);
       }
     }
+
+    // Profiling just stored min/max/top values: drop them again for personal-data columns.
+    maskStoredPersonalDataQuietly("crawl");
 
     await finishJob(logger.jobId, result, cfgRow.connectionName, triggeredByUserId);
 

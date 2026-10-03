@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { openSecret } from "./secrets";
 import { sql } from "./db";
 
 // Live "SELECT * ... LIMIT N" preview for the Sample Data tab. Only wired up
@@ -37,6 +38,7 @@ async function getEntityConnectionInfo(entityId: number): Promise<EntityConn | n
     LEFT JOIN bayanat.connection_registry cr ON cr.connection_id = ds.connection_id
     WHERE e.entity_id = ${entityId}
   `;
+  if (row) row.passwordText = openSecret(row.passwordText);
   return row ?? null;
 }
 

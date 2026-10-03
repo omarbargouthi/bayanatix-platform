@@ -7,6 +7,8 @@
 
 import postgres from "postgres";
 import { sql } from "./db";
+import { openSecret } from "./secrets";
+import { maskStoredPersonalDataQuietly } from "./privacy/pi-housekeeping";
 import { getDqRuleById, saveDqResult } from "./queries/dq";
 import type { DqRule } from "./queries/dq";
 import { startWorkflow } from "./workflow";
@@ -48,7 +50,8 @@ async function getSourceSql(rule: DqRule): Promise<ReturnType<typeof postgres> |
     LIMIT 1
   `;
   if (rows.length === 0 || !rows[0].host) return null;
-  const { host, port, dbName, username, password } = rows[0];
+  const { host, port, dbName, username } = rows[0];
+  const password = openSecret(rows[0].password) ?? "";
   return postgres(
     `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${dbName}`,
     { max: 1, connect_timeout: 5, ssl: "prefer", transform: { undefined: null } }
@@ -93,6 +96,8 @@ export async function runDqRule(ruleId: number): Promise<RunResult> {
       );
     }
 
+    // Failing-value samples were just stored: mask them if the column holds personal data.
+    maskStoredPersonalDataQuietly("dq-run");
     return { ruleId, resultId, statusCode, score, durationMs, ...engineResult };
   } catch (err: unknown) {
     const durationMs = Date.now() - start;

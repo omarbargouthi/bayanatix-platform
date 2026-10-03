@@ -217,14 +217,21 @@ export function ProfilingPanel({
             {/* Distinct count */}
             <div className="text-right font-mono text-[12px] tabular-nums">{fmt(p.distinctCount)}</div>
 
-            {/* Min */}
-            <div className="font-mono text-[11px] text-ink-soft truncate" title={p.minValue ?? ""}>{p.minValue ?? "—"}</div>
+            {(p as { valuesMasked?: boolean }).valuesMasked ? (
+              // Personal-data column: values aren't kept (lib/privacy/pi-housekeeping.ts).
+              <div className="col-span-3 text-[11px] text-muted italic" title={t.privacy.valuesHiddenHint}>🔒 {t.privacy.valuesHidden}</div>
+            ) : (
+              <>
+                {/* Min */}
+                <div className="font-mono text-[11px] text-ink-soft truncate" title={p.minValue ?? ""}>{p.minValue ?? "—"}</div>
 
-            {/* Max */}
-            <div className="font-mono text-[11px] text-ink-soft truncate" title={p.maxValue ?? ""}>{p.maxValue ?? "—"}</div>
+                {/* Max */}
+                <div className="font-mono text-[11px] text-ink-soft truncate" title={p.maxValue ?? ""}>{p.maxValue ?? "—"}</div>
 
-            {/* Top values */}
-            <TopValues values={p.topValues} />
+                {/* Top values */}
+                <TopValues values={p.topValues} />
+              </>
+            )}
           </div>
         );
       })}

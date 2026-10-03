@@ -2804,4 +2804,23 @@ export const en: I18nStrings = {
     inheritedBadge:      "inherited",
     inheritedFrom:       "Inherited from {source} via lineage. It follows the source automatically; set a classification here to override it.",
   },
+
+  privacy: {
+    valuesHidden:     "Hidden: personal data",
+    valuesHiddenHint: "Bayanis doesn't keep sample, minimum, maximum or frequent values of personal-data columns.",
+    tabDataAccess:    "Data Access",
+    accessTitle:      "Data access log",
+    accessDesc:       "Every view of live sample data, and whether personal-data columns were shown masked or in clear text.",
+    colWhen:          "When",
+    colUser:          "User",
+    colAsset:         "Table",
+    colRows:          "Rows",
+    colPersonal:      "Personal-data columns",
+    masked:           "Masked",
+    clearGrant:       "Clear text (approved request)",
+    clearAdmin:       "Clear text (administrator)",
+    none:             "None",
+    onlyClear:        "Clear-text views only",
+    empty:            "No access recorded yet.",
+  },
 };

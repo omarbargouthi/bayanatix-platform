@@ -16,6 +16,7 @@
 // whose logic masks/hashes/encrypts (or whose target column is encrypted) stop PI.
 import { sql } from "../db";
 import { logUpdate } from "../audit";
+import { maskStoredPersonalData } from "../privacy/pi-housekeeping";
 
 export type PropagationField = "CLASSIFICATION" | "BUSINESS_TERM" | "DESCRIPTION" | "TAG" | "RETENTION";
 export type PropagationSummary = { applied: number; removed: number; suggested: number; superseded: number; columnsClassified: number };
@@ -254,6 +255,10 @@ export async function runPropagation(opts: { log?: (m: string) => Promise<void> 
     `;
     summary.superseded += stale.length;
   }
+
+  // Classifications may have just turned columns into personal-data columns.
+  const masked = await maskStoredPersonalData();
+  if (masked.profiles + masked.dqSamplesMasked > 0) await log(`Personal data removed from stored profiles: ${masked.profiles} profile(s), ${masked.dqSamplesMasked} DQ sample(s).`);
 
   await log(`Propagation: ${summary.applied} classification(s) applied, ${summary.removed} removed/replaced, ${summary.suggested} new suggestion(s), ${summary.superseded} suggestion(s) no longer applicable; ${summary.columnsClassified} column(s) inherit a classification.`);
   return summary;

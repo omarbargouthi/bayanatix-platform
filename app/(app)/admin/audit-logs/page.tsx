@@ -6,6 +6,7 @@ import { AuditLogClient } from "@/app/(app)/admin/audit-log/AuditLogClient";
 import type { AdminUser } from "@/lib/types";
 import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
 import { useLang } from "@/lib/lang-context";
+import { DataAccessLogSection } from "@/components/admin/DataAccessLogSection";
 
 // Every job_type_code any feature creates via lib/queries/background-jobs.ts's
 // createJob() — kept here (not imported from that file) since this is a client
@@ -157,6 +158,7 @@ function AuditLogsInner() {
   const SUB_TABS = [
     { id: "audit",    label: t.auditLog.tabAudit },
     { id: "job-logs", label: t.auditLog.tabJobLogs },
+    { id: "data-access", label: t.privacy.tabDataAccess },
   ];
 
   return (
@@ -180,6 +182,7 @@ function AuditLogsInner() {
       </div>
       {tab === "audit"    && <AuditSection />}
       {tab === "job-logs" && <JobLogsSection />}
+      {tab === "data-access" && <DataAccessLogSection />}
     </div>
   );
 }
