@@ -16,7 +16,7 @@ export type ImpactAssetRow = {
   parentEntityName:         string | null;
   schemaName:               string | null;
   sourceName:               string | null;
-  objectTypeCode:                ObjectTypeCode | null;
+  objectTypeCode:           ObjectTypeCode | null;
   ownerName:                string | null;
   qualityStatus:            LineageQualityStatus;
   dqTagCount:                number;

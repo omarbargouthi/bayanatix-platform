@@ -25,7 +25,9 @@ const NO_CHANGE = "", REMOVE_OWN = "none";
 export function PropagationPreview({
   assetType, assetId, removing, onPreview,
 }: {
-  assetType: "DATA_ENTITIES" | "DATA_ATTRIBUTES"; assetId: number; removing: boolean; onPreview?: (p: Preview | null) => void;
+  assetType: "DATA_ENTITIES" | "DATA_ATTRIBUTES"; assetId: number; removing: boolean;
+  // planned: the planned classification (glossary id or "none") when one is chosen
+  onPreview?: (p: Preview | null, planned: string | null) => void;
 }) {
   const { t } = useLang();
   const pp = t.propagationPreview;
@@ -43,7 +45,7 @@ export function PropagationPreview({
     if (scenario === "RECLASSIFY" && planned !== REMOVE_OWN) p.set("newTerm", planned);
     fetch(`/api/lineage/propagation/preview?${p}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: Preview | null) => { setData(d); onPreview?.(scenario === "NONE" ? null : d); })
+      .then((d: Preview | null) => { setData(d); onPreview?.(scenario === "NONE" ? null : d, scenario === "RECLASSIFY" ? planned : null); })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetType, assetId, scenario, planned]);

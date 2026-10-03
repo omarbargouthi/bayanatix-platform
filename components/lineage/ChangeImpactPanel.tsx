@@ -46,6 +46,8 @@ export function ChangeImpactPanel({
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ created: { requestId: number; entityName: string; notified: number }[]; workflowMapped: boolean } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [planned, setPlanned] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetch(`/api/lineage/entities/${entityId}/columns`).then((r) => (r.ok ? r.json() : [])).then(setColumns).catch(() => {});
@@ -89,6 +91,27 @@ export function ChangeImpactPanel({
     const lines = preview.changes.slice(0, 25).map((c) => `- ${c.entityName}.${c.columnName}: ${name(c.before)} → ${name(c.after)}`);
     if (preview.changes.length > 25) lines.push(`- … +${preview.changes.length - 25}`);
     return `\n\n${fill(pp.requestNote, { n: preview.changes.length })}:\n${lines.join("\n")}`;
+  }
+
+  // Excel of what the panel shows: the planned change, impacted assets (with the
+  // current selection) and the propagation effects — for sharing outside Bayanis.
+  async function exportExcel() {
+    setExporting(true); setError(null);
+    try {
+      const r = await fetch("/api/lineage/change-impact/export", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...focus, changeType, priority, details, selected: [...selected], planned }),
+      });
+      if (!r.ok) { setError(t.impactExport.exportFailed); return; }
+      const blob = await r.blob();
+      const name = /filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") ?? "")?.[1] ?? "impact.xlsx";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function raise() {
@@ -147,7 +170,7 @@ export function ChangeImpactPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto nice-scroll">
-          <PropagationPreview assetType={focus.assetType} assetId={focus.assetId} removing={changeType === "REMOVE"} onPreview={setPreview} />
+          <PropagationPreview assetType={focus.assetType} assetId={focus.assetId} removing={changeType === "REMOVE"} onPreview={(p, plan) => { setPreview(p); setPlanned(plan); }} />
           {loading && <div className="py-12 text-center text-sm text-muted">{lt.loading}</div>}
           {!loading && assets.length === 0 && (
             <div className="m-5 text-[13px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-3">{lt.noImpact}</div>
@@ -209,13 +232,17 @@ export function ChangeImpactPanel({
             </div>
           )}
           {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</div>}
-          {canManage ? (
-            <button onClick={raise} disabled={raising || selected.size === 0 || !!created} className="btn btn-primary w-full text-sm">
-              {raising ? lt.raising : fill(lt.raiseRequests, { n: selected.size })}
+          {!canManage && assets.length > 0 && <p className="text-[12px] text-muted">{lt.viewOnlyNote}</p>}
+          <div className="flex gap-2">
+            <button onClick={exportExcel} disabled={exporting || loading} className="btn text-sm shrink-0">
+              {exporting ? t.impactExport.exporting : t.impactExport.export}
             </button>
-          ) : (
-            assets.length > 0 && <p className="text-[12px] text-muted">{lt.viewOnlyNote}</p>
-          )}
+            {canManage && (
+              <button onClick={raise} disabled={raising || selected.size === 0 || !!created} className="btn btn-primary flex-1 text-sm">
+                {raising ? lt.raising : fill(lt.raiseRequests, { n: selected.size })}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
