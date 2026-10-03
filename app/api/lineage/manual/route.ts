@@ -12,6 +12,7 @@ type Body = {
   transformationTypeCode?: string;
   transformationLogicText?: string;
   columnMappings?: { sourceAttributeId: number; targetAttributeId: number; transformationTypeCode?: string; expression?: string }[];
+  processId?: number | string | null; // named manual process for every link created here
 };
 
 async function resolveEndpoint(ep: Endpoint): Promise<number | { error: string }> {
@@ -47,6 +48,8 @@ export async function POST(req: Request) {
 
   const typeCode = body.transformationTypeCode || "MANUAL";
   const logic = body.transformationLogicText?.trim() || null;
+  const processId = body.processId == null || body.processId === "" ? null : Number(body.processId);
+  if (processId != null && !Number.isFinite(processId)) return NextResponse.json({ error: "Invalid process" }, { status: 400 });
   const mappings = (body.columnMappings ?? []).filter((m) => Number.isFinite(m.sourceAttributeId) && Number.isFinite(m.targetAttributeId));
 
   // Every mapped column must belong to the table on its side of the link.
@@ -62,10 +65,10 @@ export async function POST(req: Request) {
 
   try {
     const ops: LineageOp[] = [
-      { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic },
+      { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic, processId },
       ...mappings.map((m): LineageOp => ({
         op: "CREATE", scope: "ATTRIBUTE_LEVEL", sourceId: m.sourceAttributeId, targetId: m.targetAttributeId,
-        typeCode: m.transformationTypeCode || "DIRECT", logic: m.expression?.trim() || null,
+        typeCode: m.transformationTypeCode || "DIRECT", logic: m.expression?.trim() || null, processId,
       })),
     ];
     const result = await submitLineageChanges(ops, session.userId, {

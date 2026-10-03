@@ -11,24 +11,27 @@ import { startWorkflow, resolveAssetSteward } from "../workflow";
 import { createNotification } from "../queries/notifications";
 import { upsertManualEdge } from "./manual-edges";
 import { schedulePropagation } from "./propagation";
+import { isManualProcess } from "./manual-processes";
 
 export type LineageScope = "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
+// processId: the named manual process (db/148). On UPDATE, undefined keeps the link's
+// current process; null takes it out of its process.
 export type LineageOp =
-  | { op: "CREATE"; scope: LineageScope; sourceId: number; targetId: number; typeCode: string; logic: string | null; keepExisting?: boolean }
-  | { op: "UPDATE"; lineageId: number; typeCode: string; logic: string | null }
+  | { op: "CREATE"; scope: LineageScope; sourceId: number; targetId: number; typeCode: string; logic: string | null; keepExisting?: boolean; processId?: number | null }
+  | { op: "UPDATE"; lineageId: number; typeCode: string; logic: string | null; processId?: number | null }
   | { op: "DELETE"; lineageId: number };
 export type SubmitResult = { mode: "APPLIED" | "PENDING"; requestId: number | null; changes: number };
 
 type EdgeRow = {
   lineageId: number; scope: LineageScope; sourceId: number; targetId: number;
-  typeCode: string | null; logic: string | null; provenance: string;
+  typeCode: string | null; logic: string | null; provenance: string; processId: number | null;
 };
 
 async function loadEdges(ids: number[]): Promise<Map<number, EdgeRow>> {
   if (ids.length === 0) return new Map();
   const rows = await sql<EdgeRow[]>`
     SELECT lineage_id AS "lineageId", lineage_scope_code AS scope, source_asset_id AS "sourceId", target_asset_id AS "targetId",
-           transformation_type_code AS "typeCode", transformation_logic_text AS logic, provenance_code AS provenance
+           transformation_type_code AS "typeCode", transformation_logic_text AS logic, provenance_code AS provenance, process_id AS "processId"
     FROM bayanat.data_lineage WHERE lineage_id = ANY(${ids})
   `;
   return new Map(rows.map((r) => [Number(r.lineageId), { ...r, lineageId: Number(r.lineageId), sourceId: Number(r.sourceId), targetId: Number(r.targetId) }]));
@@ -54,6 +57,7 @@ export async function describeEdge(scope: LineageScope, sourceId: number, target
 type ChangeRow = {
   changeId: number; op: "CREATE" | "UPDATE" | "DELETE"; lineageId: number | null; scope: LineageScope;
   sourceId: number; targetId: number; typeCode: string | null; logic: string | null; keepExisting: boolean; userId: string;
+  processId: number | null; setProcess: boolean;
 };
 
 // Applies one recorded change to data_lineage; returns false if it no longer applies
@@ -62,14 +66,14 @@ async function applyChange(tx: typeof sql, c: ChangeRow): Promise<boolean> {
   if (c.op === "CREATE") {
     const id = await upsertManualEdge(tx, {
       scope: c.scope, sourceId: c.sourceId, targetId: c.targetId, typeCode: c.typeCode ?? "MANUAL",
-      logic: c.logic, userId: c.userId, onlyIfMissing: c.keepExisting,
+      logic: c.logic, userId: c.userId, onlyIfMissing: c.keepExisting, processId: c.processId,
     });
     let lineageId = id;
     if (lineageId == null) {
       // Kept the existing link (keepExisting): record which one it was.
       const [existing] = await tx<{ id: number }[]>`
         SELECT lineage_id AS id FROM bayanat.data_lineage
-        WHERE lineage_scope_code = ${c.scope} AND source_asset_id = ${c.sourceId} AND target_asset_id = ${c.targetId} AND process_id IS NULL
+        WHERE lineage_scope_code = ${c.scope} AND source_asset_id = ${c.sourceId} AND target_asset_id = ${c.targetId} AND process_id IS NOT DISTINCT FROM ${c.processId}
       `;
       lineageId = existing ? Number(existing.id) : null;
     }
@@ -77,7 +81,7 @@ async function applyChange(tx: typeof sql, c: ChangeRow): Promise<boolean> {
     return true;
   }
   const [before] = await tx<Record<string, unknown>[]>`
-    SELECT lineage_scope_code, source_asset_id, target_asset_id, transformation_type_code, transformation_logic_text, provenance_code
+    SELECT lineage_scope_code, source_asset_id, target_asset_id, transformation_type_code, transformation_logic_text, provenance_code, process_id
     FROM bayanat.data_lineage WHERE lineage_id = ${c.lineageId} AND provenance_code = 'MANUAL'
   `;
   if (!before) return false;
@@ -85,6 +89,7 @@ async function applyChange(tx: typeof sql, c: ChangeRow): Promise<boolean> {
   if (c.op === "UPDATE") {
     await tx`
       UPDATE bayanat.data_lineage SET transformation_type_code = ${c.typeCode}, transformation_logic_text = ${c.logic},
+        process_id = ${c.setProcess ? c.processId : tx`process_id`},
         updated_by_user_id = ${c.userId}, last_updated_timestamp = NOW()
       WHERE lineage_id = ${c.lineageId}
     `;
@@ -97,7 +102,8 @@ async function applyChange(tx: typeof sql, c: ChangeRow): Promise<boolean> {
 const CHANGE_COLS = sql`
   change_id AS "changeId", op_code AS op, lineage_id AS "lineageId", lineage_scope_code AS scope,
   source_asset_id AS "sourceId", target_asset_id AS "targetId", transformation_type_code AS "typeCode",
-  transformation_logic_text AS logic, keep_existing AS "keepExisting", requested_by_user_id AS "userId"
+  transformation_logic_text AS logic, keep_existing AS "keepExisting", requested_by_user_id AS "userId",
+  process_id AS "processId", set_process AS "setProcess"
 `;
 
 async function auditApplied(changes: ChangeRow[]) {
@@ -137,12 +143,31 @@ export async function submitLineageChanges(
   `;
   if (pendingClash.length > 0) return { error: "This link already has a change waiting for approval" };
 
-  const rows = ops.map((o) => {
-    if (o.op === "CREATE") return { ...o, lineageId: null as number | null };
+  // Processes must be named manual processes; moving a link must not collide with
+  // the same link already recorded under the target process.
+  for (const pid of new Set(ops.map((o) => (o.op === "DELETE" ? null : o.processId ?? null)).filter((x): x is number => x != null))) {
+    if (!(await isManualProcess(pid))) return { error: "Unknown process — pick one of the named processes" };
+  }
+  for (const o of ops) {
+    if (o.op !== "UPDATE" || o.processId === undefined) continue;
     const e = edges.get(o.lineageId)!;
+    if ((e.processId ?? null) === (o.processId ?? null)) continue;
+    const [clash] = await sql`
+      SELECT 1 FROM bayanat.data_lineage
+      WHERE lineage_scope_code = ${e.scope} AND source_asset_id = ${e.sourceId} AND target_asset_id = ${e.targetId}
+        AND process_id IS NOT DISTINCT FROM ${o.processId ?? null} AND lineage_id <> ${o.lineageId}
+    `;
+    if (clash) return { error: "This link already exists in that process" };
+  }
+
+  const rows = ops.map((o) => {
+    if (o.op === "CREATE") return { ...o, lineageId: null as number | null, processId: o.processId ?? null, setProcess: true };
+    const e = edges.get(o.lineageId)!;
+    const setProcess = o.op === "UPDATE" && o.processId !== undefined;
     return {
       op: o.op, lineageId: o.lineageId, scope: e.scope, sourceId: e.sourceId, targetId: e.targetId,
       typeCode: o.op === "UPDATE" ? o.typeCode : e.typeCode, logic: o.op === "UPDATE" ? o.logic : e.logic, keepExisting: false,
+      processId: setProcess ? (o as { processId?: number | null }).processId ?? null : e.processId, setProcess,
     };
   });
 
@@ -183,9 +208,11 @@ export async function submitLineageChanges(
       const [c] = await t<ChangeRow[]>`
         INSERT INTO bayanat.lineage_changes
           (request_id, op_code, lineage_id, lineage_scope_code, source_asset_id, target_asset_id,
-           transformation_type_code, transformation_logic_text, keep_existing, status_code, origin_code, change_note, requested_by_user_id)
+           transformation_type_code, transformation_logic_text, keep_existing, status_code, origin_code, change_note, requested_by_user_id,
+           process_id, set_process)
         VALUES (${requestId}, ${r.op}, ${r.lineageId}, ${r.scope}, ${r.sourceId}, ${r.targetId},
-           ${r.typeCode}, ${r.logic}, ${r.keepExisting ?? false}, ${mapping ? "PENDING" : "APPLIED"}, ${meta.origin}, ${meta.note ?? null}, ${userId})
+           ${r.typeCode}, ${r.logic}, ${r.keepExisting ?? false}, ${mapping ? "PENDING" : "APPLIED"}, ${meta.origin}, ${meta.note ?? null}, ${userId},
+           ${r.processId}, ${r.setProcess})
         RETURNING ${CHANGE_COLS}
       `;
       out.push({ ...c, sourceId: Number(c.sourceId), targetId: Number(c.targetId) });

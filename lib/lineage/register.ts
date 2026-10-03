@@ -5,6 +5,7 @@ import { sql } from "../db";
 export type RegisterFilters = {
   q?: string; origin?: "SCANNED" | "MANUAL" | ""; status?: "ACTIVE" | "PENDING" | "REVIEW" | "";
   level?: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL" | ""; page?: number; pageSize?: number;
+  processId?: number | null; // a named manual process
 };
 
 export type RegisterRow = {
@@ -14,7 +15,7 @@ export type RegisterRow = {
   targetSystem: string | null; targetSchema: string | null; targetTable: string | null; targetColumn: string | null;
   targetEntityId: number | null;
   transformationTypeCode: string | null; transformationTypeName: string | null; logic: string | null;
-  provenance: "SCANNED" | "MANUAL"; isConfirmed: boolean; processName: string | null;
+  provenance: "SCANNED" | "MANUAL"; isConfirmed: boolean; processName: string | null; processId: number | null;
   pendingOp: "CREATE" | "UPDATE" | "DELETE" | null; pendingRequestId: number | null;
   openReviews: number; updatedAt: string | null; updatedBy: string | null;
 };
@@ -41,7 +42,7 @@ export async function getRegister(f: RegisterFilters): Promise<{ rows: RegisterR
         td.source_name_text AS "targetSystem", ts.schema_name_text AS "targetSchema", te.entity_name_text AS "targetTable", ta.physical_name_text AS "targetColumn", te.entity_id AS "targetEntityId",
         dl.transformation_type_code AS "transformationTypeCode", tt.transformation_type_name_text AS "transformationTypeName",
         dl.transformation_logic_text AS logic, dl.provenance_code AS provenance, coalesce(dl.is_confirmed, false) AS "isConfirmed",
-        lp.process_name AS "processName",
+        lp.process_name AS "processName", dl.process_id AS "processId",
         pc.op_code AS "pendingOp", pc.request_id AS "pendingRequestId",
         (SELECT count(*)::int FROM bayanat.asset_request_targets art JOIN bayanat.asset_requests ar ON ar.request_id = art.request_id
           WHERE art.asset_type_code = 'DATA_LINEAGE' AND art.asset_id = dl.lineage_id AND ar.status_code IN ('OPEN', 'IN_PROGRESS')) AS "openReviews",
@@ -63,12 +64,13 @@ export async function getRegister(f: RegisterFilters): Promise<{ rows: RegisterR
         sd.source_name_text, ss.schema_name_text, se.entity_name_text, sa.physical_name_text, se.entity_id,
         td.source_name_text, ts.schema_name_text, te.entity_name_text, ta.physical_name_text, te.entity_id,
         lc.transformation_type_code, tt.transformation_type_name_text, lc.transformation_logic_text, 'MANUAL', false,
-        NULL, 'CREATE', lc.request_id, 0, lc.requested_at::text, u.full_name
+        lp.process_name, lc.process_id, 'CREATE', lc.request_id, 0, lc.requested_at::text, u.full_name
       FROM bayanat.lineage_changes lc
       ${side("s", "lc.source_asset_id", "lc.lineage_scope_code")}
       ${side("t", "lc.target_asset_id", "lc.lineage_scope_code")}
       LEFT JOIN bayanat.lineage_transformation_types tt ON tt.transformation_type_code = lc.transformation_type_code
       LEFT JOIN bayanat.users u ON u.user_id = lc.requested_by_user_id
+      LEFT JOIN bayanat.lineage_processes lp ON lp.process_id = lc.process_id
       WHERE lc.status_code = 'PENDING' AND lc.op_code = 'CREATE'
     )
     SELECT *, count(*) OVER ()::int AS total FROM links
@@ -76,6 +78,7 @@ export async function getRegister(f: RegisterFilters): Promise<{ rows: RegisterR
       ${q ? sql`AND lower(concat_ws(' ', "sourceSystem", "sourceSchema", "sourceTable", "sourceColumn", "targetSystem", "targetSchema", "targetTable", "targetColumn", "transformationTypeName", logic, "processName")) LIKE ${q}` : sql``}
       ${f.origin ? sql`AND provenance = ${f.origin}` : sql``}
       ${f.level ? sql`AND scope = ${f.level}` : sql``}
+      ${f.processId ? sql`AND "processId" = ${f.processId}` : sql``}
       ${f.status === "ACTIVE" ? sql`AND "lineageId" IS NOT NULL AND "pendingOp" IS NULL` : sql``}
       ${f.status === "PENDING" ? sql`AND "pendingOp" IS NOT NULL` : sql``}
       ${f.status === "REVIEW" ? sql`AND "openReviews" > 0` : sql``}

@@ -6,13 +6,14 @@ import { useLang } from "@/lib/lang-context";
 import { AddLineageModal } from "./AddLineageModal";
 import { LineageImportButton } from "./LineageImportButton";
 import { ReviewRequestModal } from "./ReviewRequestModal";
+import { ProcessPicker, ProcessManager, fetchProcesses, type ManualProcess } from "./ProcessPicker";
 
 type Row = {
   lineageId: number | null; changeId: number | null; scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
   sourceSystem: string | null; sourceSchema: string | null; sourceTable: string | null; sourceColumn: string | null; sourceEntityId: number | null;
   targetSystem: string | null; targetSchema: string | null; targetTable: string | null; targetColumn: string | null; targetEntityId: number | null;
   transformationTypeCode: string | null; transformationTypeName: string | null; logic: string | null;
-  provenance: "SCANNED" | "MANUAL"; isConfirmed: boolean; processName: string | null;
+  provenance: "SCANNED" | "MANUAL"; isConfirmed: boolean; processName: string | null; processId: number | null;
   pendingOp: "CREATE" | "UPDATE" | "DELETE" | null; pendingRequestId: number | null;
   openReviews: number; updatedAt: string | null; updatedBy: string | null;
 };
@@ -39,6 +40,9 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
   const [origin, setOrigin] = useState("");
   const [status, setStatus] = useState("");
   const [level, setLevel] = useState("");
+  const [process, setProcess] = useState("");
+  const [processes, setProcesses] = useState<ManualProcess[]>([]);
+  const [managing, setManaging] = useState(false);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ rows: Row[]; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +51,7 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
 
   const [adding, setAdding] = useState(false);
   const [reviewing, setReviewing] = useState<Row | null>(null);
-  const [editing, setEditing] = useState<{ row: Row; mode: "edit" | "remove"; typeCode: string; logic: string; note: string } | null>(null);
+  const [editing, setEditing] = useState<{ row: Row; mode: "edit" | "remove"; typeCode: string; logic: string; note: string; processId: number | null } | null>(null);
   const [history, setHistory] = useState<{ row: Row; items: History[] | null } | null>(null);
   const [types, setTypes] = useState<{ code: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -59,8 +63,9 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
     if (origin) p.set("origin", origin);
     if (status) p.set("status", status);
     if (level) p.set("level", level);
+    if (process) p.set("process", process);
     return p;
-  }, [q, origin, status, level, page]);
+  }, [q, origin, status, level, process, page]);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -74,7 +79,8 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [query, reload]);
 
-  useEffect(() => { setPage(1); }, [q, origin, status, level]);
+  useEffect(() => { setPage(1); }, [q, origin, status, level, process]);
+  useEffect(() => { fetchProcesses().then(setProcesses).catch(() => {}); }, [reload, managing]);
   useEffect(() => {
     if (canManage) fetch("/api/lineage/transformation-types").then((r) => (r.ok ? r.json() : [])).then(setTypes).catch(() => {});
   }, [canManage]);
@@ -93,7 +99,7 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
       const r = editing.mode === "edit"
         ? await fetch(`/api/lineage/edges/${id}`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ transformationTypeCode: editing.typeCode, transformationLogicText: editing.logic, note: editing.note }),
+            body: JSON.stringify({ transformationTypeCode: editing.typeCode, transformationLogicText: editing.logic, note: editing.note, processId: editing.processId }),
           })
         : await fetch(`/api/lineage/edges/${id}?note=${encodeURIComponent(editing.note)}`, { method: "DELETE" });
       const d = await r.json().catch(() => ({}));
@@ -127,6 +133,7 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
             <p className="text-[13px] text-muted mt-0.5 max-w-3xl">{lr.desc}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setManaging(true)} className="btn btn-sm">{t.lineageProcesses.manage}</button>
             <a href={`/api/lineage/register?${query()}&format=xlsx`} className="btn btn-sm">⭳ {t.lineageTools.exportExcel}</a>
             {canManage && <LineageImportButton onImported={() => setReload((n) => n + 1)} />}
             {canManage && <button onClick={() => setAdding(true)} className="btn btn-primary btn-sm">+ {lr.addMapping}</button>}
@@ -150,6 +157,12 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
             <option value="ENTITY_LEVEL">{lr.levelTable}</option>
             <option value="ATTRIBUTE_LEVEL">{lr.levelColumn}</option>
           </select>
+          {processes.length > 0 && (
+            <select className="input-field w-auto max-w-[260px]" value={process} onChange={(e) => setProcess(e.target.value)}>
+              <option value="">{t.lineageProcesses.allProcesses}</option>
+              {processes.map((p) => <option key={p.processId} value={p.processId}>{p.name}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
@@ -202,6 +215,7 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
                     <td className="px-4 py-2.5 max-w-[220px]">
                       <div className="text-[12px] text-ink-soft">{r.transformationTypeName ?? r.transformationTypeCode ?? "—"}</div>
                       {r.logic && <div className="text-[11px] font-mono text-muted truncate" title={r.logic} dir="ltr">{r.logic}</div>}
+                      {r.processName && <div className="text-[11px] text-brand-deep mt-0.5 truncate" title={r.processName} dir="auto">{t.lineageProcesses.processLabel.replace("{name}", r.processName)}</div>}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${r.provenance === "SCANNED" ? "bg-sky-50 text-sky-700" : "bg-purple-50 text-purple-700"}`}>
@@ -228,8 +242,8 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
                         {r.targetEntityId != null && <Link href={`/lineage?assetType=DATA_ENTITIES&assetId=${r.targetEntityId}`} className="text-ink-soft hover:text-brand-purple hover:underline">{lr.actShowGraph}</Link>}
                         {editable && (
                           <>
-                            <button onClick={() => setEditing({ row: r, mode: "edit", typeCode: r.transformationTypeCode ?? "MANUAL", logic: r.logic ?? "", note: "" })} className="text-brand-purple hover:underline">{lr.actEdit}</button>
-                            <button onClick={() => setEditing({ row: r, mode: "remove", typeCode: "", logic: "", note: "" })} className="text-red-600 hover:underline">{lr.actRemove}</button>
+                            <button onClick={() => setEditing({ row: r, mode: "edit", typeCode: r.transformationTypeCode ?? "MANUAL", logic: r.logic ?? "", note: "", processId: r.processId })} className="text-brand-purple hover:underline">{lr.actEdit}</button>
+                            <button onClick={() => setEditing({ row: r, mode: "remove", typeCode: "", logic: "", note: "", processId: r.processId })} className="text-red-600 hover:underline">{lr.actRemove}</button>
                           </>
                         )}
                         {r.lineageId != null && <button onClick={() => setReviewing(r)} className="text-sky-700 hover:underline">{lr.actReview}</button>}
@@ -253,6 +267,14 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
               : { kind: "ok", text: lr.submittedApplied });
             setReload((n) => n + 1);
           }}
+        />
+      )}
+
+      {managing && (
+        <ProcessManager
+          canManage={canManage}
+          onClose={() => setManaging(false)}
+          onShowLinks={(p) => { setProcess(String(p.processId)); setManaging(false); }}
         />
       )}
 
@@ -280,6 +302,7 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
                     <label className="field-label">{t.lineageEditor.logic}</label>
                     <textarea className="input-field w-full font-mono text-[12px]" rows={3} value={editing.logic} onChange={(e) => setEditing({ ...editing, logic: e.target.value })} />
                   </div>
+                  <ProcessPicker value={editing.processId} onChange={(processId) => setEditing({ ...editing, processId })} />
                 </>
               ) : (
                 <p className="text-[13px] text-ink">{lr.removeConfirm}</p>

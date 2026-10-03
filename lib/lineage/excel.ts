@@ -5,6 +5,7 @@ import { sql } from "../db";
 import { updateJobProgress, finishJob, failJob } from "../queries/background-jobs";
 import { ensureExternalEntity, EXTERNAL_SOURCE_NAME } from "./manual-edges";
 import { submitLineageChanges, type LineageOp } from "./changes";
+import { findOrCreateManualProcess } from "./manual-processes";
 
 export const LINEAGE_IMPORT_JOB_TYPE = "LINEAGE_IMPORT";
 
@@ -19,6 +20,7 @@ export const COLUMNS = [
   { key: "targetColumn", header: "Target Column", width: 22 },
   { key: "transformationType", header: "Transformation Type", width: 20 },
   { key: "logic", header: "Logic / Notes", width: 40 },
+  { key: "process", header: "Process", width: 28 },
 ] as const;
 type ColKey = (typeof COLUMNS)[number]["key"];
 export type LineageRow = Record<ColKey, string>;
@@ -65,6 +67,7 @@ async function addReferenceSheets(wb: ExcelJS.Workbook) {
     `• For something that isn't in the catalog (an application, file feed, report tool), put "${EXTERNAL_SOURCE_NAME}" as the System and any name as the Table; it is created as an external asset.`,
     "• Fill both Source Column and Target Column to record column-level lineage (the table-level link is added too). Leave both empty for a table-level link only.",
     "• Transformation Type: a code or name from the Transformation Types sheet. Leave empty for Manual (table rows) or Direct Copy (column rows).",
+    "• Process (optional): the named process the flow belongs to, e.g. \"Nightly ETL to the data warehouse\". A new name creates the process. Exported scanned links show their scanned process (info only).",
     "• Uploading the same row again updates it — nothing is duplicated. Links found by scanners are not changed.",
     "• Rows that can't be matched are returned in a rejected-rows file with the reason, ready to fix and upload again.",
   ].forEach((line, i) => {
@@ -84,7 +87,7 @@ export async function buildTemplate(): Promise<Buffer> {
   addLineageSheet(wb, [{
     sourceSystem: "CRM Database", sourceSchema: "crm", sourceTable: "customer_account", sourceColumn: "account_id",
     targetSystem: "Analytics_DW", targetSchema: "dw", targetTable: "dim_customer", targetColumn: "customer_key",
-    transformationType: "DIRECT", logic: "Example row — replace or delete",
+    transformationType: "DIRECT", logic: "Example row — replace or delete", process: "Nightly ETL to the data warehouse",
   }]);
   await addReferenceSheets(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
@@ -196,6 +199,7 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
     const rejected: { row: LineageRow; reason: string }[] = [];
     const ops: LineageOp[] = [];
     let imported = 0, columnLinks = 0, processed = 0;
+    const processCache = new Map<string, number>();
     await updateJobProgress(jobId, 0, rows.length);
 
     for (const r of rows) {
@@ -228,16 +232,23 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
         }
         const typeCode = resolve.type(r.transformationType, srcCol != null ? "DIRECT" : "MANUAL");
         if (!typeCode) return `Unknown Transformation Type "${r.transformationType}" — see the Transformation Types sheet`;
+        let processId: number | null = null;
+        if (r.process) {
+          const p = processCache.get(r.process.toLowerCase()) ?? await findOrCreateManualProcess(r.process, userId);
+          if (typeof p !== "number") return `Process: ${p.error}`;
+          processCache.set(r.process.toLowerCase(), p);
+          processId = p;
+        }
 
         // A column row also implies the table link — added only if missing, so it
         // never overwrites notes already on that table link.
         if (src !== tgt) {
           ops.push(srcCol != null
-            ? { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode: "MANUAL", logic: null, keepExisting: true }
-            : { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic: r.logic || null });
+            ? { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode: "MANUAL", logic: null, keepExisting: true, processId }
+            : { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic: r.logic || null, processId });
         }
         if (srcCol != null && tgtCol != null) {
-          ops.push({ op: "CREATE", scope: "ATTRIBUTE_LEVEL", sourceId: srcCol, targetId: tgtCol, typeCode, logic: r.logic || null });
+          ops.push({ op: "CREATE", scope: "ATTRIBUTE_LEVEL", sourceId: srcCol, targetId: tgtCol, typeCode, logic: r.logic || null, processId });
           columnLinks++;
         }
         return null;

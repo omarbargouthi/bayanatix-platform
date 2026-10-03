@@ -33,6 +33,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     transformationTypeCode?: string;
     transformationLogicText?: string;
     note?: string;
+    processId?: number | string | null; // omitted = keep; null = no process
   } = await req.json();
 
   if (body.action === "confirm") {
@@ -61,6 +62,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     op: "UPDATE", lineageId,
     typeCode: body.transformationTypeCode ?? existing.transformationTypeCode ?? "MANUAL",
     logic: body.transformationLogicText !== undefined ? (body.transformationLogicText.trim() || null) : existing.transformationLogicText,
+    ...(body.processId !== undefined ? { processId: body.processId == null || body.processId === "" ? null : Number(body.processId) } : {}),
   }], session.userId, { origin: "REGISTER", title: `Edit lineage: ${await describeEdge(edge.scope, Number(edge.s), Number(edge.t))}`, note: body.note });
   if ("error" in result) return NextResponse.json(result, { status: 400 });
   return NextResponse.json(result);

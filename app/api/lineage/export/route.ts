@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     return {
       sourceSystem: s?.sourceName ?? "", sourceSchema: s?.schemaName ?? "", sourceTable: s?.entityName ?? "", sourceColumn: e.sourceColumnName ?? "",
       targetSystem: t?.sourceName ?? "", targetSchema: t?.schemaName ?? "", targetTable: t?.entityName ?? "", targetColumn: e.targetColumnName ?? "",
-      transformationType: e.transformationTypeCode ?? "", logic: e.transformationLogicText ?? "",
+      transformationType: e.transformationTypeCode ?? "", logic: e.transformationLogicText ?? "", process: e.processName ?? "",
     };
   });
   const buf = await buildExport(rows, graph.edges.map((e) => (e.provenanceCode === "SCANNED" ? (e.isConfirmed ? "Scanned (confirmed)" : "Scanned") : "Manual")));

@@ -16,8 +16,11 @@ export async function POST(req: Request) {
 
   const body: {
     scope: string; sourceAssetId: number; targetAssetId: number; assetTypeCode: string;
-    transformationTypeCode?: string; transformationLogicText?: string;
+    transformationTypeCode?: string; transformationLogicText?: string; processId?: number | string | null;
   } = await req.json();
+  const processId = body.processId == null || body.processId === "" ? null : Number(body.processId);
+  if (processId != null && !Number.isFinite(processId)) return NextResponse.json({ error: "Invalid process" }, { status: 400 });
+
 
   if (!SCOPES.has(body.scope)) return NextResponse.json({ error: "scope must be ENTITY_LEVEL or ATTRIBUTE_LEVEL" }, { status: 400 });
   if (!ASSET_TYPES.has(body.assetTypeCode)) return NextResponse.json({ error: "assetTypeCode must be DATA_ENTITIES or DATA_ATTRIBUTES" }, { status: 400 });
@@ -32,7 +35,7 @@ export async function POST(req: Request) {
     const scope = body.scope as "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
     const result = await submitLineageChanges([{
       op: "CREATE", scope, sourceId: body.sourceAssetId, targetId: body.targetAssetId,
-      typeCode: body.transformationTypeCode ?? "MANUAL", logic: body.transformationLogicText ?? null,
+      typeCode: body.transformationTypeCode ?? "MANUAL", logic: body.transformationLogicText ?? null, processId,
     }], session.userId, { origin: "DIALOG", title: `Add lineage: ${await describeEdge(scope, body.sourceAssetId, body.targetAssetId)}` });
     if ("error" in result) return NextResponse.json(result, { status: 400 });
     return NextResponse.json(result, { status: 201 });

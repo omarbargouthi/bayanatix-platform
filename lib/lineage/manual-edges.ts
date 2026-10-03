@@ -27,15 +27,16 @@ type Tx = typeof sql;
 // steward already wrote on that table link.
 export async function upsertManualEdge(
   tx: Tx,
-  edge: { scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL"; sourceId: number; targetId: number; typeCode: string; logic: string | null; userId: string; onlyIfMissing?: boolean },
+  // processId: the named manual process the link belongs to (part of the link's identity).
+  edge: { scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL"; sourceId: number; targetId: number; typeCode: string; logic: string | null; userId: string; onlyIfMissing?: boolean; processId?: number | null },
 ): Promise<number | null> {
   const assetType = edge.scope === "ENTITY_LEVEL" ? "DATA_ENTITIES" : "DATA_ATTRIBUTES";
   if (edge.onlyIfMissing) {
     const [row] = await tx<{ id: number }[]>`
       INSERT INTO bayanat.data_lineage
         (lineage_scope_code, source_asset_id, target_asset_id, asset_type_code,
-         transformation_type_code, transformation_logic_text, provenance_code, is_confirmed, updated_by_user_id)
-      VALUES (${edge.scope}, ${edge.sourceId}, ${edge.targetId}, ${assetType}, ${edge.typeCode}, ${edge.logic}, 'MANUAL', true, ${edge.userId})
+         transformation_type_code, transformation_logic_text, provenance_code, is_confirmed, updated_by_user_id, process_id)
+      VALUES (${edge.scope}, ${edge.sourceId}, ${edge.targetId}, ${assetType}, ${edge.typeCode}, ${edge.logic}, 'MANUAL', true, ${edge.userId}, ${edge.processId ?? null})
       ON CONFLICT (lineage_scope_code, source_asset_id, target_asset_id, COALESCE(process_id, -1)) DO NOTHING
       RETURNING lineage_id AS id
     `;
@@ -44,8 +45,8 @@ export async function upsertManualEdge(
   const [row] = await tx<{ id: number }[]>`
     INSERT INTO bayanat.data_lineage
       (lineage_scope_code, source_asset_id, target_asset_id, asset_type_code,
-       transformation_type_code, transformation_logic_text, provenance_code, is_confirmed, updated_by_user_id)
-    VALUES (${edge.scope}, ${edge.sourceId}, ${edge.targetId}, ${assetType}, ${edge.typeCode}, ${edge.logic}, 'MANUAL', true, ${edge.userId})
+       transformation_type_code, transformation_logic_text, provenance_code, is_confirmed, updated_by_user_id, process_id)
+    VALUES (${edge.scope}, ${edge.sourceId}, ${edge.targetId}, ${assetType}, ${edge.typeCode}, ${edge.logic}, 'MANUAL', true, ${edge.userId}, ${edge.processId ?? null})
     ON CONFLICT (lineage_scope_code, source_asset_id, target_asset_id, COALESCE(process_id, -1))
     DO UPDATE SET transformation_type_code = EXCLUDED.transformation_type_code,
                   transformation_logic_text = EXCLUDED.transformation_logic_text,

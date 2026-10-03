@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/lang-context";
 import { objectTypeLabels } from "./LineageNode";
 import { MANUAL_OBJECT_TYPES } from "@/lib/object-types";
+import { ProcessPicker } from "./ProcessPicker";
 
 export type PickedTable = { entityId: number; name: string; schemaName: string | null };
 type Endpoint =
@@ -118,6 +119,7 @@ export function AddLineageModal({ initialSource, initialTarget, onClose, onSaved
   const [types, setTypes] = useState<TransformationType[]>([]);
   const [typeCode, setTypeCode] = useState("MANUAL");
   const [logic, setLogic] = useState("");
+  const [processId, setProcessId] = useState<number | null>(null);
   const [sourceCols, setSourceCols] = useState<Column[]>([]);
   const [targetCols, setTargetCols] = useState<Column[]>([]);
   const [mappings, setMappings] = useState<Record<number, Mapping>>({});
@@ -174,7 +176,7 @@ export function AddLineageModal({ initialSource, initialTarget, onClose, onSaved
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: endpointBody(source), target: endpointBody(target),
-          transformationTypeCode: typeCode, transformationLogicText: logic,
+          transformationTypeCode: typeCode, transformationLogicText: logic, processId,
           columnMappings: Object.entries(mappings)
             .filter(([, m]) => m.sourceAttributeId != null)
             .map(([targetAttributeId, m]) => ({
@@ -228,6 +230,10 @@ export function AddLineageModal({ initialSource, initialTarget, onClose, onSaved
               <label className="field-label">{le.logic}</label>
               <textarea className="input-field w-full font-mono text-[12px]" rows={2} placeholder={le.logicPh} value={logic} onChange={(e) => setLogic(e.target.value)} dir="auto" />
             </div>
+          </div>
+
+          <div className="max-w-md">
+            <ProcessPicker value={processId} onChange={setProcessId} />
           </div>
 
           <div>

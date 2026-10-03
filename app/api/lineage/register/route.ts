@@ -18,6 +18,7 @@ export async function GET(req: Request) {
     status: pick(sp.get("status"), ["ACTIVE", "PENDING", "REVIEW"] as const),
     level: pick(sp.get("level"), ["ENTITY_LEVEL", "ATTRIBUTE_LEVEL"] as const),
     page: Number(sp.get("page") ?? 1),
+    processId: Number(sp.get("process")) || null,
   };
 
   if (sp.get("format") === "xlsx") {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
       active.map((r) => ({
         sourceSystem: r.sourceSystem ?? "", sourceSchema: r.sourceSchema ?? "", sourceTable: r.sourceTable ?? "", sourceColumn: r.sourceColumn ?? "",
         targetSystem: r.targetSystem ?? "", targetSchema: r.targetSchema ?? "", targetTable: r.targetTable ?? "", targetColumn: r.targetColumn ?? "",
-        transformationType: r.transformationTypeCode ?? "", logic: r.logic ?? "",
+        transformationType: r.transformationTypeCode ?? "", logic: r.logic ?? "", process: r.processName ?? "",
       })),
       active.map((r) => (r.provenance === "SCANNED" ? "Scanned" : "Manual")),
     );
