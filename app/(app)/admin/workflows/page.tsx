@@ -17,6 +17,7 @@ const ALL_TYPES = [
   { code: "PUBLISH_OPEN_DATA_PI", label: "Publish Open Data (PI)" },
   { code: "PI_CLEAR_TEXT_ACCESS", label: "PI Clear-Text Access" },
   { code: "METADATA_UPDATE",      label: "Metadata Update (Rescan Changes)" },
+  { code: "CHANGE_IMPACT_REVIEW", label: "Change Impact Review (Lineage)" },
 ];
 
 const ASSIGNEE_TYPE_OPTIONS = [
@@ -49,6 +50,7 @@ const TYPE_COLOR: Record<string, string> = {
   PUBLISH_OPEN_DATA:    "bg-cyan-50 text-cyan-700 border-cyan-200",
   PUBLISH_OPEN_DATA_PI: "bg-pink-50 text-pink-700 border-pink-200",
   METADATA_UPDATE:      "bg-teal-50 text-teal-700 border-teal-200",
+  CHANGE_IMPACT_REVIEW: "bg-violet-50 text-violet-700 border-violet-200",
 };
 
 const STATUS_COLOR: Record<string, string> = {

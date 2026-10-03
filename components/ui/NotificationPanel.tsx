@@ -54,6 +54,7 @@ const JOB_LABEL_TO_CODE: Record<string, keyof I18nStrings["jobLogs"]["types"]> =
   "Translations Import":   "TRANSLATIONS_IMPORT",
   "Bulk Download":         "BULK_DOWNLOAD",
   "Bulk Upload":           "BULK_UPLOAD",
+  "Lineage Import":        "LINEAGE_IMPORT",
 };
 
 // Job notifications are stored as plain English text at insert time (see

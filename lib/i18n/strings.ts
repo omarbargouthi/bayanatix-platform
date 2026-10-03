@@ -2663,6 +2663,7 @@ export type I18nStrings = {
       TRANSLATIONS_IMPORT:   string;
       BULK_DOWNLOAD:         string;
       BULK_UPLOAD:           string;
+      LINEAGE_IMPORT:        string;
     };
   };
 
@@ -2755,5 +2756,78 @@ export type I18nStrings = {
     saveEdge:          string;
     actionFailed:      string;
     dragHint:          string;
+  };
+
+  // ── Lineage table view, Excel import/export, change impact (lineage page) ──
+  lineageTools: {
+    viewGraph:           string;
+    viewTable:           string;
+    upstream:            string;
+    downstream:          string;
+    hopsOption:          string;
+    allHops:             string;
+    exportExcel:         string;
+    tableSource:         string;
+    tableTarget:         string;
+    tableTransformation: string;
+    tableLogic:          string;
+    tableOrigin:         string;
+    noLinks:             string;
+    scanned:             string;
+    manualLabel:         string;
+    confirmed:           string;
+    importExcel:         string;
+    importTitle:         string;
+    importDesc:          string;
+    downloadTemplate:    string;
+    chooseFile:          string;
+    upload:              string;
+    uploading:           string;
+    importRunning:       string;
+    importDone:          string;
+    importRejected:      string;
+    downloadRejected:    string;
+    downloadLog:         string;
+    importFailed:        string;
+    viewJobLogs:         string;
+    assessChange:        string;
+    changeTitle:         string;
+    changeDesc:          string;
+    changeAsset:         string;
+    wholeTable:          string;
+    changeType:          string;
+    changeDetails:       string;
+    changeDetailsPh:     string;
+    priority:            string;
+    impactedAssets:      string;
+    impactedCount:       string;
+    selectAll:           string;
+    noImpact:            string;
+    colAsset:            string;
+    colHop:              string;
+    colLayer:            string;
+    colOwner:            string;
+    noOwner:             string;
+    raiseRequests:       string;
+    raising:             string;
+    raised:              string;
+    raisedNoWorkflow:    string;
+    openRequest:         string;
+    raiseFailed:         string;
+    loading:             string;
+    viewOnlyNote:        string;
+    changeTypes: {
+      RENAME:     string;
+      DATA_TYPE:  string;
+      REMOVE:     string;
+      LOGIC:      string;
+      VALUES:     string;
+      OTHER:      string;
+    };
+    priorities: {
+      HIGH:       string;
+      MEDIUM:     string;
+      LOW:        string;
+    };
   };
 };

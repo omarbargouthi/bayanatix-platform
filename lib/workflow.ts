@@ -53,7 +53,7 @@ async function resolveAssetOwner(assetTypeCode: string, assetId: number): Promis
 // the Owner — for workflows where "steward action" means the whole governance
 // team around the asset, not just whoever owns it (e.g. a metadata-change
 // review triggered by a rescan).
-async function resolveAssetSteward(assetTypeCode: string, assetId: number): Promise<string[]> {
+export async function resolveAssetSteward(assetTypeCode: string, assetId: number): Promise<string[]> {
   if (assetTypeCode === "DATA_ATTRIBUTES") {
     const eff = await resolveEffectiveGovernance(assetId);
     return [...new Set(eff.map((e) => e.userId))];

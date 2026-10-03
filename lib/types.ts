@@ -478,7 +478,8 @@ export type RequestTypeCode =
   | "CLASSIFY_ASSET"
   | "PUBLISH_OPEN_DATA"
   | "PUBLISH_OPEN_DATA_PI"
-  | "METADATA_UPDATE";
+  | "METADATA_UPDATE"
+  | "CHANGE_IMPACT_REVIEW";
 
 // ── Open Data ─────────────────────────────────────────────────────────────────
 

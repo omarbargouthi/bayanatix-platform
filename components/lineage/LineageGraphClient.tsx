@@ -11,6 +11,7 @@ import dagre from "dagre";
 import { LineageNodeCard, layerLabels, LAYER_DOT, EngineGlyph, engineLabels, type LineageNodeData } from "./LineageNode";
 import { ImpactReportPanel } from "./ImpactReportPanel";
 import { AddLineageModal, type PickedTable } from "./AddLineageModal";
+import { ChangeImpactPanel } from "./ChangeImpactPanel";
 import { useLang } from "@/lib/lang-context";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
@@ -86,9 +87,11 @@ function applySwimlanes(laidOutNodes: Node[], systemOf: Map<string, string>): No
 }
 
 const LEGEND_ITEMS = ["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"];
+// Hop depth choices for the Upstream/Downstream pickers; 10 = "All" (the traversal functions' own cap).
+const DEPTH_OPTIONS = [1, 2, 3, 4, 5, 10];
 
 function LineageGraphInner({
-  initialAssetType, initialAssetId, canManage, preserveParams = {},
+  initialAssetType, initialAssetId, canManage, preserveParams = {}, reloadSignal = 0,
 }: {
   initialAssetType: AssetType | null;
   initialAssetId: number | null;
@@ -96,6 +99,8 @@ function LineageGraphInner({
   // Extra query params (e.g. { tab: "Lineage" }) to keep alongside assetType/assetId when
   // this graph is embedded inside a host page's own URL, rather than the standalone route.
   preserveParams?: Record<string, string>;
+  // Bumped by the host page after something outside the graph changed lineage (e.g. an Excel import).
+  reloadSignal?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -122,6 +127,8 @@ function LineageGraphInner({
   // the toolbar or by dragging between two nodes — and edit/delete on an edge.
   const [addLineage, setAddLineage] = useState<{ source: PickedTable | null; target: PickedTable | null } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [view, setView] = useState<"graph" | "table">("graph");
+  const [changeImpactOpen, setChangeImpactOpen] = useState(false);
   const [edgeTypes, setEdgeTypes] = useState<{ code: string; name: string }[]>([]);
   const [editingEdge, setEditingEdge] = useState<{ typeCode: string; logic: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -153,7 +160,7 @@ function LineageGraphInner({
     const params = new URLSearchParams({ ...preserveParams, assetType: focus.assetType, assetId: String(focus.assetId) });
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus, scope, upDepth, downDepth, reloadKey]);
+  }, [focus, scope, upDepth, downDepth, reloadKey, reloadSignal]);
 
   useEffect(() => {
     if (!canManage) return;
@@ -360,16 +367,40 @@ function LineageGraphInner({
           <button onClick={() => setScope("ATTRIBUTE_LEVEL")} className={`px-3 py-1.5 transition-colors ${scope === "ATTRIBUTE_LEVEL" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas-soft"}`}>{t.lineage.columnLevel}</button>
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs font-medium text-ink-soft">
-          <button onClick={() => setUpDepth((d) => Math.max(1, d - 1))} className="w-5 h-5 flex items-center justify-center hover:bg-canvas-soft rounded">−</button>
-          <span>{t.lineage.upstreamLabel.replace("{n}", String(upDepth))}</span>
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs font-medium text-ink-soft">
-          <span>{t.lineage.downstreamLabel.replace("{n}", String(downDepth))}</span>
-          <button onClick={() => setDownDepth((d) => Math.min(5, d + 1))} className="w-5 h-5 flex items-center justify-center hover:bg-canvas-soft rounded">+</button>
+        {([
+          [t.lineageTools.upstream, upDepth, setUpDepth],
+          [t.lineageTools.downstream, downDepth, setDownDepth],
+        ] as const).map(([label, value, set]) => (
+          <label key={label} className="flex items-center gap-1.5 rounded-lg border border-line ps-2.5 text-xs font-medium text-ink-soft bg-white">
+            {label}
+            <select
+              value={value}
+              onChange={(e) => set(Number(e.target.value))}
+              className="bg-transparent border-0 border-s border-line py-1.5 ps-2 pe-1 text-xs font-semibold text-ink outline-none cursor-pointer"
+            >
+              {DEPTH_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n === 10 ? t.lineageTools.allHops : t.lineageTools.hopsOption.replace("{n}", String(n))}</option>
+              ))}
+            </select>
+          </label>
+        ))}
+
+        <div className="flex rounded-lg border border-line overflow-hidden text-xs font-medium">
+          {(["graph", "table"] as const).map((v) => (
+            <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 transition-colors ${view === v ? "bg-brand-deep text-white" : "bg-white text-ink-soft hover:bg-canvas-soft"}`}>
+              {v === "graph" ? t.lineageTools.viewGraph : t.lineageTools.viewTable}
+            </button>
+          ))}
         </div>
 
-        {systemCount > 1 && (
+        <a
+          href={`/api/lineage/export?assetType=${focus.assetType}&assetId=${focus.assetId}&scope=${scope}&up=${upDepth}&down=${downDepth}`}
+          className="btn btn-sm text-xs"
+        >
+          ⭳ {t.lineageTools.exportExcel}
+        </a>
+
+        {systemCount > 1 && view === "graph" && (
           <button
             onClick={() => setGroupBySystem((v) => !v)}
             className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${groupBySystem ? "bg-brand-purple text-white border-brand-purple" : "bg-white text-ink-soft border-line hover:bg-canvas-soft"}`}
@@ -377,6 +408,8 @@ function LineageGraphInner({
             {t.lineage.groupBySystem}
           </button>
         )}
+
+        <button onClick={() => setChangeImpactOpen(true)} className="btn btn-sm text-xs">{t.lineageTools.assessChange}</button>
 
         {canManage && (
           <button
@@ -405,7 +438,10 @@ function LineageGraphInner({
             <div className="text-sm text-muted">{t.lineage.loadingLineage}</div>
           </div>
         )}
-        <ReactFlow
+        {view === "table" && graph && (
+          <LineageTable graph={graph} selectedId={selectedEdge?.lineageId ?? null} onSelect={(e) => { setSelectedEdge(e); setSelectedEntityId(null); }} />
+        )}
+        {view === "graph" && <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -423,14 +459,14 @@ function LineageGraphInner({
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#d8dcee" />
           <Controls position="bottom-center" showInteractive={false} />
-        </ReactFlow>
+        </ReactFlow>}
 
-        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur border border-line rounded-full px-3 py-1.5 text-[11px] text-muted shadow-sm">
+        {view === "graph" && <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur border border-line rounded-full px-3 py-1.5 text-[11px] text-muted shadow-sm">
           {t.lineage.canvasHint}
-        </div>
+        </div>}
 
         {/* ── Detail panel ── */}
-        {selectedNode && (
+        {selectedNode && view === "graph" && (
           <div className="absolute top-4 right-4 w-64 bg-white border border-line rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${layerLabels(t.lineage)[selectedNode.layerCode ?? ""] ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
@@ -463,6 +499,9 @@ function LineageGraphInner({
                 <button onClick={() => setImpactDirection("UP")} className="bg-canvas-soft hover:bg-line-soft rounded-lg p-2 text-center transition-colors">
                   <div className="text-base font-bold text-ink">{graph.counts.upstreamTotal}</div>
                   <div className="text-[10px] text-muted">{t.lineage.detail.upstream}</div>
+                </button>
+                <button onClick={() => setChangeImpactOpen(true)} className="col-span-2 btn btn-sm text-xs">
+                  {t.lineageTools.assessChange}
                 </button>
               </div>
             )}
@@ -545,6 +584,16 @@ function LineageGraphInner({
         />
       )}
 
+      {changeImpactOpen && graph && (
+        <ChangeImpactPanel
+          entityId={graph.focus.entityId}
+          entityName={graph.nodes.find((n) => n.entityId === graph.focus.entityId)?.entityName ?? graph.focus.name}
+          initialColumnId={graph.focus.assetType === "DATA_ATTRIBUTES" ? graph.focus.assetId : null}
+          canManage={canManage}
+          onClose={() => setChangeImpactOpen(false)}
+        />
+      )}
+
       {impactDirection && graph && (
         <ImpactReportPanel
           assetType={graph.focus.assetType}
@@ -559,7 +608,65 @@ function LineageGraphInner({
   );
 }
 
-export function LineageGraphClient(props: { initialAssetType: AssetType | null; initialAssetId: number | null; canManage: boolean; preserveParams?: Record<string, string> }) {
+// Tabular view of the same lineage the graph shows: one row per link.
+function LineageTable({ graph, selectedId, onSelect }: { graph: Graph; selectedId: number | null; onSelect: (e: GraphEdge) => void }) {
+  const { t } = useLang();
+  const lt = t.lineageTools;
+  const nodeById = new Map(graph.nodes.map((n) => [n.entityId, n]));
+  const end = (entityId: number, column: string | null) => {
+    const n = nodeById.get(entityId);
+    return (
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium text-ink truncate" dir="auto" title={n?.entityName}>
+          {n?.entityName ?? `#${entityId}`}{column ? <span className="text-brand-purple">.{column}</span> : null}
+        </div>
+        <div className="text-[11px] text-muted truncate" dir="auto">{[n?.sourceName, n?.schemaName].filter(Boolean).join(" · ")}</div>
+      </div>
+    );
+  };
+  if (graph.edges.length === 0) return <div className="h-full grid place-items-center text-sm text-muted bg-white">{lt.noLinks}</div>;
+  return (
+    <div className="h-full overflow-auto bg-white">
+      <table className="w-full text-start">
+        <thead className="sticky top-0 bg-canvas-soft z-[1]">
+          <tr className="text-[11px] uppercase tracking-wider text-muted font-bold">
+            <th className="px-4 py-2.5 text-start">{lt.tableSource}</th>
+            <th className="px-1 py-2.5" />
+            <th className="px-4 py-2.5 text-start">{lt.tableTarget}</th>
+            <th className="px-4 py-2.5 text-start">{lt.tableTransformation}</th>
+            <th className="px-4 py-2.5 text-start">{lt.tableOrigin}</th>
+            <th className="px-4 py-2.5 text-start">{lt.tableLogic}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {graph.edges.map((e) => (
+            <tr
+              key={e.lineageId}
+              onClick={() => onSelect(e)}
+              className={`border-t border-line-soft cursor-pointer ${selectedId === e.lineageId ? "bg-brand-purple/[0.06]" : "hover:bg-canvas-soft"}`}
+            >
+              <td className="px-4 py-2 max-w-[260px]">{end(e.sourceEntityId, e.sourceColumnName)}</td>
+              <td className="px-1 py-2 text-muted">→</td>
+              <td className="px-4 py-2 max-w-[260px]">{end(e.targetEntityId, e.targetColumnName)}</td>
+              <td className="px-4 py-2 text-[12px] text-ink-soft whitespace-nowrap">{e.transformationTypeName ?? e.transformationTypeCode ?? "—"}</td>
+              <td className="px-4 py-2 whitespace-nowrap">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${e.provenanceCode === "SCANNED" ? "bg-sky-50 text-sky-700" : "bg-purple-50 text-purple-700"}`}>
+                  {e.provenanceCode === "SCANNED" ? lt.scanned : lt.manualLabel}
+                </span>
+                {e.isConfirmed && <span className="ms-1.5 text-[11px] text-emerald-600">✓ {lt.confirmed}</span>}
+              </td>
+              <td className="px-4 py-2 max-w-[320px]">
+                <div className="text-[11px] font-mono text-ink-soft truncate" title={e.transformationLogicText ?? undefined} dir="ltr">{e.transformationLogicText ?? ""}</div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function LineageGraphClient(props: { initialAssetType: AssetType | null; initialAssetId: number | null; canManage: boolean; preserveParams?: Record<string, string>; reloadSignal?: number }) {
   return (
     <ReactFlowProvider>
       <LineageGraphInner {...props} />

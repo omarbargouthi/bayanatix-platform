@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logUpdate } from "@/lib/audit";
-import { ensureDataSource, ensureSchema, ensureEntity } from "@/lib/lineage/catalog-upsert";
-import type { LineageLayerCode } from "@/lib/queries/lineage";
-
-const LAYERS = new Set(["SOURCE", "RAW", "STAGING", "TABLE", "VIEW", "LAKEHOUSE", "SEMANTIC_MODEL", "REPORT"]);
+import { ensureExternalEntity, upsertManualEdge, LINEAGE_LAYERS } from "@/lib/lineage/manual-edges";
 
 type Endpoint = { entityId?: number | null; external?: { name: string; layerCode: string } | null };
 type Body = {
@@ -16,9 +13,6 @@ type Body = {
   columnMappings?: { sourceAttributeId: number; targetAttributeId: number; transformationTypeCode?: string; expression?: string }[];
 };
 
-// Endpoints that aren't in the catalog (an application, a file feed, a report
-// tool) are recorded as entities under one "External systems" source, so the
-// graph, impact analysis and propagation treat them like any other node.
 async function resolveEndpoint(ep: Endpoint): Promise<number | { error: string }> {
   if (ep.entityId != null) {
     if (!Number.isFinite(ep.entityId)) return { error: "Invalid table" };
@@ -29,13 +23,8 @@ async function resolveEndpoint(ep: Endpoint): Promise<number | { error: string }
   if (!name) return { error: "Pick a table or name an external asset for both sides" };
   if (name.length > 200) return { error: "External asset name is too long" };
   const layer = ep.external?.layerCode ?? "SOURCE";
-  if (!LAYERS.has(layer)) return { error: "Invalid layer" };
-  const dsId = await ensureDataSource("External systems", "EXTERNAL", null, "external");
-  const schemaId = await ensureSchema(dsId, "manual");
-  return ensureEntity(schemaId, name, layer === "VIEW", {
-    layerCodeOverride: layer as LineageLayerCode,
-    description: "Added manually as a lineage endpoint",
-  });
+  if (!(LINEAGE_LAYERS as readonly string[]).includes(layer)) return { error: "Invalid layer" };
+  return ensureExternalEntity(name, layer);
 }
 
 // POST — create a manual lineage link between two tables (or external assets),
@@ -69,29 +58,17 @@ export async function POST(req: Request) {
     if (bad) return NextResponse.json({ error: "A mapped column does not belong to the selected table" }, { status: 400 });
   }
 
-  const upsert = (tx: typeof sql, scope: string, assetType: string, from: number, to: number, type: string, text: string | null) => tx<{ id: number }[]>`
-    INSERT INTO bayanat.data_lineage
-      (lineage_scope_code, source_asset_id, target_asset_id, asset_type_code,
-       transformation_type_code, transformation_logic_text, provenance_code, is_confirmed, updated_by_user_id)
-    VALUES (${scope}, ${from}, ${to}, ${assetType}, ${type}, ${text}, 'MANUAL', true, ${session.userId})
-    ON CONFLICT (lineage_scope_code, source_asset_id, target_asset_id, COALESCE(process_id, -1))
-    DO UPDATE SET transformation_type_code = EXCLUDED.transformation_type_code,
-                  transformation_logic_text = EXCLUDED.transformation_logic_text,
-                  updated_by_user_id = EXCLUDED.updated_by_user_id,
-                  last_updated_timestamp = NOW()
-    RETURNING lineage_id AS id
-  `;
-
   try {
     const result = await sql.begin(async (tx) => {
-      const [entityEdge] = await upsert(tx as unknown as typeof sql, "ENTITY_LEVEL", "DATA_ENTITIES", src, tgt, typeCode, logic);
-      let columnEdges = 0;
+      const t = tx as unknown as typeof sql;
+      const lineageId = await upsertManualEdge(t, { scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic, userId: session.userId });
       for (const m of mappings) {
-        await upsert(tx as unknown as typeof sql, "ATTRIBUTE_LEVEL", "DATA_ATTRIBUTES", m.sourceAttributeId, m.targetAttributeId,
-          m.transformationTypeCode || "DIRECT", m.expression?.trim() || null);
-        columnEdges++;
+        await upsertManualEdge(t, {
+          scope: "ATTRIBUTE_LEVEL", sourceId: m.sourceAttributeId, targetId: m.targetAttributeId,
+          typeCode: m.transformationTypeCode || "DIRECT", logic: m.expression?.trim() || null, userId: session.userId,
+        });
       }
-      return { lineageId: Number(entityEdge.id), columnEdges };
+      return { lineageId: lineageId as number, columnEdges: mappings.length };
     });
 
     await logUpdate("DATA_ENTITIES", tgt, session.userId, [
