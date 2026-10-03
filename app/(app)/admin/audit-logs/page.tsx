@@ -7,6 +7,7 @@ import type { AdminUser } from "@/lib/types";
 import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
 import { useLang } from "@/lib/lang-context";
 import { DataAccessLogSection } from "@/components/admin/DataAccessLogSection";
+import { ConsentRegisterSection } from "@/components/admin/ConsentRegisterSection";
 
 // Every job_type_code any feature creates via lib/queries/background-jobs.ts's
 // createJob() — kept here (not imported from that file) since this is a client
@@ -159,6 +160,7 @@ function AuditLogsInner() {
     { id: "audit",    label: t.auditLog.tabAudit },
     { id: "job-logs", label: t.auditLog.tabJobLogs },
     { id: "data-access", label: t.privacy.tabDataAccess },
+    { id: "consent", label: t.consentRegister.tab },
   ];
 
   return (
@@ -183,6 +185,7 @@ function AuditLogsInner() {
       {tab === "audit"    && <AuditSection />}
       {tab === "job-logs" && <JobLogsSection />}
       {tab === "data-access" && <DataAccessLogSection />}
+      {tab === "consent" && <ConsentRegisterSection />}
     </div>
   );
 }

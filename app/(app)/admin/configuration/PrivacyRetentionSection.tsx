@@ -132,8 +132,9 @@ export function PrivacyRetentionSection() {
           </label>
         </div>
         {stats && (
-          <div className="text-[12px] text-ink-soft bg-canvas-soft rounded-md px-3 py-2">
-            Current version: <b>{stats.version}</b>{s.consentUpdatedAt && ` (updated ${fmt(s.consentUpdatedAt)})`} · accepted by <b>{stats.accepted}</b> of {stats.activeUsers} active user(s)
+          <div className="flex items-center justify-between gap-3 text-[12px] text-ink-soft bg-canvas-soft rounded-md px-3 py-2">
+            <span>Current version: <b>{stats.version}</b>{s.consentUpdatedAt && ` (updated ${fmt(s.consentUpdatedAt)})`} · accepted by <b>{stats.accepted}</b> of {stats.activeUsers} active user(s)</span>
+            <Link href="/admin/audit-logs?tab=consent" className="text-brand-purple hover:underline shrink-0">View consent register →</Link>
           </div>
         )}
         <div className="space-y-2">
