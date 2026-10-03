@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { usePollJob, JobStatusCard } from "./shared";
+import { usePollJob, JobStatusCard, fillBulk as fill } from "./shared";
+import { useLang } from "@/lib/lang-context";
 
 // Scoped Download/Upload, reusing the exact same job engine as /bulk-operations
 // (components/bulk/BulkOperationsClient.tsx) but with the scope fixed to a given
@@ -20,6 +21,7 @@ export function EntityBulkExportImportModal({
   title: string;
   onClose: () => void;
 }) {
+  const b = useLang().t.bulkOps;
   const [tab, setTab] = useState<"download" | "upload">("download");
 
   const [includeExtended, setIncludeExtended] = useState(true);
@@ -36,7 +38,7 @@ export function EntityBulkExportImportModal({
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, includeExtended }),
       });
       const data = await res.json();
-      if (!res.ok) { setDownloadError(data.error ?? "Download failed"); return; }
+      if (!res.ok) { setDownloadError(data.error ?? b.downloadFailed); return; }
       setDownloadJobId(data.jobId);
     } finally {
       setDownloading(false);
@@ -61,7 +63,7 @@ export function EntityBulkExportImportModal({
       fd.append("conflict_policy", conflictPolicy);
       const res = await fetch("/api/bulk/uploads", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) { setUploadError(data.error ?? "Upload failed"); return; }
+      if (!res.ok) { setUploadError(data.error ?? b.uploadFailed); return; }
       setUploadJobId(data.jobId);
     } finally {
       setUploading(false);
@@ -73,10 +75,10 @@ export function EntityBulkExportImportModal({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-line max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
           <div>
-            <h2 className="font-bold text-brand-deep">Export / Import</h2>
+            <h2 className="font-bold text-brand-deep">{b.modalTitle}</h2>
             <p className="text-[11px] text-muted font-mono mt-0.5 truncate max-w-[380px]">{title}</p>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label={b.close} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
 
         <div className="px-6 pt-4 shrink-0">
@@ -85,9 +87,9 @@ export function EntityBulkExportImportModal({
               <button
                 key={k}
                 onClick={() => setTab(k)}
-                className={`text-[12px] font-semibold px-3 py-1.5 rounded-md capitalize ${tab === k ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}
+                className={`text-[12px] font-semibold px-3 py-1.5 rounded-md ${tab === k ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}
               >
-                {k}
+                {k === "upload" ? b.tabUpload : b.tabDownload}
               </button>
             ))}
           </div>
@@ -96,48 +98,42 @@ export function EntityBulkExportImportModal({
         <div className="px-6 py-5 overflow-y-auto flex-1">
           {tab === "download" && (
             <div>
-              <p className="text-xs text-muted mb-4">
-                Exports {entityIds.length} table{entityIds.length !== 1 ? "s" : ""} and all of their columns to Excel
-                for offline bulk editing. Runs as a background job.
-              </p>
+              <p className="text-xs text-muted mb-4">{fill(b.modalExportDesc, { n: entityIds.length })}</p>
               <label className="flex items-center gap-1.5 text-sm mb-4">
-                <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
+                <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> {b.includeExtended}
               </label>
               {downloadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{downloadError}</div>}
               <button onClick={download} disabled={downloading} className="btn btn-primary btn-sm">
-                {downloading ? "Starting…" : "Start Download"}
+                {downloading ? b.starting : b.startDownload}
               </button>
-              {downloadJob && <JobStatusCard job={downloadJob} title="Export" />}
+              {downloadJob && <JobStatusCard job={downloadJob} title={b.export} />}
             </div>
           )}
 
           {tab === "upload" && (
             <div>
-              <p className="text-xs text-muted mb-4">
-                Upload an edited template. It's validated and committed automatically as a background job. Any rows
-                that fail land in a downloadable rejected-records file you can fix and re-upload.
-              </p>
+              <p className="text-xs text-muted mb-4">{b.modalUploadDesc}</p>
               <div className="flex items-center gap-3 mb-4 flex-wrap">
                 <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
                 <label className="flex items-center gap-1.5 text-sm">
-                  <input type="checkbox" checked={strictMode} onChange={(e) => setStrictMode(e.target.checked)} /> Strict mode
+                  <input type="checkbox" checked={strictMode} onChange={(e) => setStrictMode(e.target.checked)} /> {b.strictShort}
                 </label>
                 <select value={conflictPolicy} onChange={(e) => setConflictPolicy(e.target.value as "SKIP" | "OVERWRITE")} className="text-sm border border-line rounded-lg px-2 py-1.5 bg-white">
-                  <option value="SKIP">Conflicts: Skip</option>
-                  <option value="OVERWRITE">Conflicts: Overwrite</option>
+                  <option value="SKIP">{b.conflictSkipShort}</option>
+                  <option value="OVERWRITE">{b.conflictOverwriteShort}</option>
                 </select>
               </div>
               {uploadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{uploadError}</div>}
               <button onClick={upload} disabled={!file || uploading} className="btn btn-primary btn-sm">
-                {uploading ? "Starting…" : "Upload"}
+                {uploading ? b.starting : b.upload}
               </button>
-              {uploadJob && <JobStatusCard job={uploadJob} title="Upload" />}
+              {uploadJob && <JobStatusCard job={uploadJob} title={b.upload} />}
             </div>
           )}
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-line shrink-0">
-          <button onClick={onClose} className="btn">Close</button>
+          <button onClick={onClose} className="btn">{b.close}</button>
         </div>
       </div>
     </div>

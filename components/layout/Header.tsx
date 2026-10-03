@@ -63,7 +63,7 @@ function HeaderIconBtn({
 export function Header({ crumbs, user, contextTypes, collaborationHref }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[]; collaborationHref?: string }) {
   const router    = useRouter();
   const { toggle } = useSidebar();
-  const { isRtl } = useLang();
+  const { isRtl, t } = useLang();
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -227,7 +227,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             onKeyDown={handleSearchKeyDown}
             className="bg-transparent border-0 outline-none text-sm text-ink placeholder:text-muted flex-1 min-w-0"
-            placeholder="Search assets, schemas, tables, columns…  (Ctrl+K)"
+            placeholder={t.globalHeader.searchPh}
           />
           {searchQuery && (
             <button onMouseDown={(e) => e.preventDefault()} onClick={() => { setSearchQuery(""); setSearchResults([]); }} className="text-muted hover:text-ink text-base leading-none">×</button>

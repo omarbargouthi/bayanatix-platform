@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { type BulkJob, STATUS_STYLE, STATUS_LABEL, usePollJob, ProgressBar, JobFileLinks, JobStatusCard } from "./shared";
+import { type BulkJob, STATUS_STYLE, statusLabel, formatTotals, fillBulk as fill, usePollJob, ProgressBar, JobFileLinks, JobStatusCard } from "./shared";
+import { useLang } from "@/lib/lang-context";
 import Link from "next/link";
 import { usePollBackgroundJob, type BackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 
@@ -11,13 +12,15 @@ type CustomTypeOption = { typeId: number; typeCode: string; typeNameText: string
 type CustomRelTypeOption = { relTypeId: number; relCode: string; relNameText: string };
 
 const CREATABLE_SHEETS = [
-  { value: "DataSources", label: "Data Source" },
-  { value: "BusinessTerms", label: "Business Terms" },
-  { value: "CustomAssets", label: "Custom Assets" },
-  { value: "CustomAssetLinks", label: "Custom Asset Links" },
+  { value: "DataSources", labelKey: "sheetDataSource" },
+  { value: "BusinessTerms", labelKey: "sheetBusinessTerms" },
+  { value: "CustomAssets", labelKey: "sheetCustomAssets" },
+  { value: "CustomAssetLinks", labelKey: "sheetCustomAssetLinks" },
 ] as const;
 
 export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
+  const { t } = useLang();
+  const b = t.bulkOps;
   const [tab, setTab] = useState<"download" | "upload" | "jobs">("download");
 
   // A job-completion notification links here with ?tab=jobs so it actually
@@ -66,16 +69,16 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
         : downloadKind === "CUSTOM_TYPE" ? { type: "CUSTOM_ASSETS_BY_TYPE", typeId: customTypeId }
         : downloadKind === "CUSTOM_REL_TYPE" ? { type: "CUSTOM_ASSET_LINKS_BY_REL_TYPE", relTypeId: customRelTypeId }
         : { type: "EMPTY_TEMPLATE", sheet: emptyTemplateSheet };
-      if (downloadKind === "SOURCE" && !sourceId) { setDownloadError("Choose a data source"); return; }
-      if (downloadKind === "TERMS_DOMAIN" && !domainId) { setDownloadError("Choose a domain"); return; }
-      if (downloadKind === "CUSTOM_TYPE" && !customTypeId) { setDownloadError("Choose a custom asset type"); return; }
-      if (downloadKind === "CUSTOM_REL_TYPE" && !customRelTypeId) { setDownloadError("Choose a relationship type"); return; }
+      if (downloadKind === "SOURCE" && !sourceId) { setDownloadError(b.errChooseSource); return; }
+      if (downloadKind === "TERMS_DOMAIN" && !domainId) { setDownloadError(b.errChooseDomain); return; }
+      if (downloadKind === "CUSTOM_TYPE" && !customTypeId) { setDownloadError(b.errChooseType); return; }
+      if (downloadKind === "CUSTOM_REL_TYPE" && !customRelTypeId) { setDownloadError(b.errChooseRel); return; }
 
       const res = await fetch("/api/bulk/downloads", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, includeExtended, includeLineage: downloadKind === "SOURCE" && includeLineage }),
       });
       const data = await res.json();
-      if (!res.ok) { setDownloadError(data.error ?? "Download failed"); return; }
+      if (!res.ok) { setDownloadError(data.error ?? b.downloadFailed); return; }
       setDownloadJobId(data.jobId);
     } finally {
       setDownloading(false);
@@ -103,7 +106,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       fd.append("conflict_policy", conflictPolicy);
       const res = await fetch("/api/bulk/uploads", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) { setUploadError(data.error ?? "Upload failed"); return; }
+      if (!res.ok) { setUploadError(data.error ?? b.uploadFailed); return; }
       setUploadJobId(data.jobId ?? null);
       setLineageJobId(data.lineageJobId ?? null);
     } finally {
@@ -144,9 +147,9 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`text-[12px] font-semibold px-3 py-1.5 rounded-md capitalize ${tab === k ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}
+            className={`text-[12px] font-semibold px-3 py-1.5 rounded-md ${tab === k ? "bg-white text-brand-purple shadow-sm" : "text-muted"}`}
           >
-            {k === "jobs" ? "Jobs" : k}
+            {k === "jobs" ? b.tabJobs : k === "upload" ? b.tabUpload : b.tabDownload}
           </button>
         ))}
       </div>
@@ -154,51 +157,51 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       {/* ── Download ─────────────────────────────────────────────────────── */}
       {tab === "download" && (
       <div className="card p-5">
-        <h2 className="text-lg font-bold text-ink mb-1">Download</h2>
-        <p className="text-xs text-muted mb-4">Export a scope to Excel for offline bulk editing, or download a blank template to create brand-new records. Runs as a background job — track it here or in the Jobs tab.</p>
+        <h2 className="text-lg font-bold text-ink mb-1">{b.downloadTitle}</h2>
+        <p className="text-xs text-muted mb-4">{b.downloadDesc}</p>
 
         <div className="flex items-center gap-4 mb-4 flex-wrap">
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="radio" checked={downloadKind === "SOURCE"} onChange={() => setDownloadKind("SOURCE")} /> Data Source
+            <input type="radio" checked={downloadKind === "SOURCE"} onChange={() => setDownloadKind("SOURCE")} /> {b.kindSource}
           </label>
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="radio" checked={downloadKind === "TERMS_ALL"} onChange={() => setDownloadKind("TERMS_ALL")} /> Business Terms — All
+            <input type="radio" checked={downloadKind === "TERMS_ALL"} onChange={() => setDownloadKind("TERMS_ALL")} /> {b.kindTermsAll}
           </label>
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="radio" checked={downloadKind === "TERMS_DOMAIN"} onChange={() => setDownloadKind("TERMS_DOMAIN")} /> Business Terms — By Domain
+            <input type="radio" checked={downloadKind === "TERMS_DOMAIN"} onChange={() => setDownloadKind("TERMS_DOMAIN")} /> {b.kindTermsDomain}
           </label>
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="radio" checked={downloadKind === "CUSTOM_TYPE"} onChange={() => setDownloadKind("CUSTOM_TYPE")} /> Custom Assets — By Type
+            <input type="radio" checked={downloadKind === "CUSTOM_TYPE"} onChange={() => setDownloadKind("CUSTOM_TYPE")} /> {b.kindCustomType}
           </label>
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="radio" checked={downloadKind === "CUSTOM_REL_TYPE"} onChange={() => setDownloadKind("CUSTOM_REL_TYPE")} /> Custom Asset Links — By Relationship
+            <input type="radio" checked={downloadKind === "CUSTOM_REL_TYPE"} onChange={() => setDownloadKind("CUSTOM_REL_TYPE")} /> {b.kindCustomRel}
           </label>
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="radio" checked={downloadKind === "EMPTY_TEMPLATE"} onChange={() => setDownloadKind("EMPTY_TEMPLATE")} /> Empty Template (new records)
+            <input type="radio" checked={downloadKind === "EMPTY_TEMPLATE"} onChange={() => setDownloadKind("EMPTY_TEMPLATE")} /> {b.kindEmpty}
           </label>
         </div>
 
         {downloadKind === "SOURCE" && (
           <div className="mb-4">
             <select value={sourceId} onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px] mb-3">
-              <option value="">Select a data source…</option>
+              <option value="">{b.selectSource}</option>
               {sources.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.dbType})</option>)}
             </select>
             <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" checked={includeSchemas} onChange={(e) => setIncludeSchemas(e.target.checked)} /> Include Schemas
+                <input type="checkbox" checked={includeSchemas} onChange={(e) => setIncludeSchemas(e.target.checked)} /> {b.includeSchemas}
               </label>
               <label className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" checked={includeTables} onChange={(e) => { setIncludeTables(e.target.checked); if (!e.target.checked) setIncludeColumns(false); }} /> Include Tables
+                <input type="checkbox" checked={includeTables} onChange={(e) => { setIncludeTables(e.target.checked); if (!e.target.checked) setIncludeColumns(false); }} /> {b.includeTables}
               </label>
               <label className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" checked={includeColumns} disabled={!includeTables} onChange={(e) => setIncludeColumns(e.target.checked)} /> Include Columns
+                <input type="checkbox" checked={includeColumns} disabled={!includeTables} onChange={(e) => setIncludeColumns(e.target.checked)} /> {b.includeColumns}
               </label>
               <label className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
+                <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> {b.includeExtended}
               </label>
-              <label className="flex items-center gap-1.5 text-sm" title="Every lineage link touching this source's tables, in the lineage template format. Edits upload through lineage approval; scanned links are read-only.">
-                <input type="checkbox" checked={includeLineage} onChange={(e) => setIncludeLineage(e.target.checked)} /> Include lineage
+              <label className="flex items-center gap-1.5 text-sm" title={b.includeLineageHint}>
+                <input type="checkbox" checked={includeLineage} onChange={(e) => setIncludeLineage(e.target.checked)} /> {b.includeLineage}
               </label>
             </div>
           </div>
@@ -206,25 +209,25 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
         {downloadKind === "TERMS_ALL" && (
           <div className="mb-4">
             <label className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
+              <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> {b.includeExtended}
             </label>
           </div>
         )}
         {downloadKind === "TERMS_DOMAIN" && (
           <div className="mb-4">
             <select value={domainId} onChange={(e) => setDomainId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px] mb-3">
-              <option value="">Select a domain…</option>
+              <option value="">{b.selectDomain}</option>
               {domains.map((d) => <option key={d.glossaryId} value={d.glossaryId}>{d.domainName}</option>)}
             </select>
             <label className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
+              <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> {b.includeExtended}
             </label>
           </div>
         )}
         {downloadKind === "CUSTOM_TYPE" && (
           <div className="mb-4">
             <select value={customTypeId} onChange={(e) => setCustomTypeId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
-              <option value="">Select a custom asset type…</option>
+              <option value="">{b.selectCustomType}</option>
               {customTypes.map((t) => <option key={t.typeId} value={t.typeId}>{t.typeNameText} ({t.typeCode})</option>)}
             </select>
           </div>
@@ -232,7 +235,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
         {downloadKind === "CUSTOM_REL_TYPE" && (
           <div className="mb-4">
             <select value={customRelTypeId} onChange={(e) => setCustomRelTypeId(e.target.value ? Number(e.target.value) : "")} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
-              <option value="">Select a relationship type…</option>
+              <option value="">{b.selectRelType}</option>
               {customRelTypes.map((r) => <option key={r.relTypeId} value={r.relTypeId}>{r.relNameText} ({r.relCode})</option>)}
             </select>
           </div>
@@ -240,49 +243,44 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
         {downloadKind === "EMPTY_TEMPLATE" && (
           <div className="mb-4">
             <select value={emptyTemplateSheet} onChange={(e) => setEmptyTemplateSheet(e.target.value as typeof emptyTemplateSheet)} className="text-sm border border-line rounded-lg px-3 py-2 bg-white min-w-[220px]">
-              {CREATABLE_SHEETS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {CREATABLE_SHEETS.map((s) => <option key={s.value} value={s.value}>{b[s.labelKey]}</option>)}
             </select>
-            <p className="text-[11px] text-muted mt-2">Headers only, no rows. Leave the _ID column blank on every row you add — new records get their id assigned automatically when uploaded.</p>
+            <p className="text-[11px] text-muted mt-2">{b.emptyTemplateHint}</p>
           </div>
         )}
 
         {downloadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{downloadError}</div>}
         <button onClick={download} disabled={downloading || !canEdit} className="btn btn-primary btn-sm">
-          {downloading ? "Starting…" : "Start Download"}
+          {downloading ? b.starting : b.startDownload}
         </button>
-        {!canEdit && <p className="text-[11px] text-muted mt-2">You need edit rights to download bulk templates.</p>}
+        {!canEdit && <p className="text-[11px] text-muted mt-2">{b.needEdit}</p>}
 
-        {downloadJob && <JobStatusCard job={downloadJob} title="Export" />}
+        {downloadJob && <JobStatusCard job={downloadJob} title={b.export} />}
       </div>
       )}
 
       {/* ── Upload ───────────────────────────────────────────────────────── */}
       {tab === "upload" && canEdit && (
         <div className="card p-5">
-          <h2 className="text-lg font-bold text-ink mb-1">Upload</h2>
-          <p className="text-xs text-muted mb-4">
-            Upload an edited (or blank, filled-in) template. It's validated and committed automatically as a background
-            job — there's no separate approval step. Any rows that fail land in a downloadable rejected-records file
-            you can fix and re-upload. A Lineage sheet is imported as lineage changes (through lineage approval when a
-            workflow is mapped); scanned links in it are read-only and skipped.
-          </p>
+          <h2 className="text-lg font-bold text-ink mb-1">{b.uploadTitle}</h2>
+          <p className="text-xs text-muted mb-4">{b.uploadDesc}</p>
 
           <div className="flex items-center gap-4 mb-4 flex-wrap">
             <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
             <label className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={strictMode} onChange={(e) => setStrictMode(e.target.checked)} /> Strict mode (blank cells clear values)
+              <input type="checkbox" checked={strictMode} onChange={(e) => setStrictMode(e.target.checked)} /> {b.strictMode}
             </label>
             <select value={conflictPolicy} onChange={(e) => setConflictPolicy(e.target.value as "SKIP" | "OVERWRITE")} className="text-sm border border-line rounded-lg px-2 py-1.5 bg-white">
-              <option value="SKIP">Conflicts: Skip (default)</option>
-              <option value="OVERWRITE">Conflicts: Overwrite anyway</option>
+              <option value="SKIP">{b.conflictSkip}</option>
+              <option value="OVERWRITE">{b.conflictOverwrite}</option>
             </select>
             <button onClick={upload} disabled={!file || uploading} className="btn btn-primary btn-sm">
-              {uploading ? "Starting…" : "Upload"}
+              {uploading ? b.starting : b.upload}
             </button>
           </div>
           {uploadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{uploadError}</div>}
 
-          {uploadJob && <JobStatusCard job={uploadJob} title="Upload" />}
+          {uploadJob && <JobStatusCard job={uploadJob} title={b.upload} />}
           {lineageJobId && <LineageJobCard job={lineageJob} jobId={lineageJobId} />}
         </div>
       )}
@@ -291,27 +289,27 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       {tab === "jobs" && (
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-ink">Jobs</h2>
-            <span className="text-[11px] text-muted">{jobs.length} job{jobs.length !== 1 ? "s" : ""}</span>
+            <h2 className="text-lg font-bold text-ink">{b.jobsTitle}</h2>
+            <span className="text-[11px] text-muted">{fill(b.jobsCount, { n: jobs.length })}</span>
           </div>
 
           {jobsLoading ? (
-            <div className="text-center text-muted text-sm py-10">Loading…</div>
+            <div className="text-center text-muted text-sm py-10">{b.loading}</div>
           ) : jobs.length === 0 ? (
-            <div className="text-center text-muted text-sm py-10">No bulk jobs yet — start a download or upload to see it here.</div>
+            <div className="text-center text-muted text-sm py-10">{b.noJobs}</div>
           ) : (
             <div className="space-y-2">
               {jobs.map((j) => (
                 <div key={j.jobId} className="border border-line rounded-lg px-4 py-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-canvas-soft text-ink-soft">{j.jobTypeCode}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[j.status]}`}>{STATUS_LABEL[j.status]}</span>
-                    <span className="text-[12px] font-semibold text-ink">Job #{j.jobId}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-canvas-soft text-ink-soft">{(b.jobTypes as Record<string, string>)[j.jobTypeCode] ?? j.jobTypeCode}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[j.status]}`}>{statusLabel(b, j.status)}</span>
+                    <span className="text-[12px] font-semibold text-ink">{fill(b.jobNo, { id: j.jobId })}</span>
                     {j.fileName && <span className="text-[11px] text-muted font-mono">{j.fileName}</span>}
                   </div>
                   <div className="text-[11px] text-muted mt-1">
-                    Started {new Date(j.createdAt).toLocaleString()}
-                    {j.finishedAt && ` · Finished ${new Date(j.finishedAt).toLocaleString()}`}
+                    {fill(b.started, { date: new Date(j.createdAt).toLocaleString() })}
+                    {j.finishedAt && ` · ${fill(b.finished, { date: new Date(j.finishedAt).toLocaleString() })}`}
                   </div>
                   {j.status === "RUNNING" && <ProgressBar job={j} />}
                   {j.status === "FAILED" && j.errorText && (
@@ -319,7 +317,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
                   )}
                   {j.status === "COMMITTED" && j.totals && (
                     <div className="text-[12px] text-ink-soft mt-1.5">
-                      {Object.entries(j.totals).filter(([, v]) => typeof v === "number" || typeof v === "string").map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                      {formatTotals(b, j.totals)}
                     </div>
                   )}
                   {j.status === "COMMITTED" && <JobFileLinks job={j} />}
@@ -335,25 +333,26 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
 
 // Status of the Lineage sheet of a bulk upload (a lineage import job).
 function LineageJobCard({ job, jobId }: { job: BackgroundJob | null; jobId: number }) {
+  const b = useLang().t.bulkOps;
   const r = (job?.resultJson ?? {}) as { rowsRead?: number; imported?: number; rejected?: number; scannedSkipped?: number; mode?: string; requestId?: number | null };
   return (
     <div className="mt-4 border border-line rounded-lg px-4 py-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-canvas-soft text-ink-soft">LINEAGE</span>
-        <span className="text-[12px] font-semibold text-ink">Lineage sheet · Job #{jobId}</span>
-        <span className="text-[11px] text-muted">{!job || job.status === "RUNNING" ? "Running…" : job.status === "COMPLETED" ? "Done" : "Failed"}</span>
+        <span className="text-[12px] font-semibold text-ink">{fill(b.lineageSheet, { id: jobId })}</span>
+        <span className="text-[11px] text-muted">{!job || job.status === "RUNNING" ? b.running : job.status === "COMPLETED" ? b.done : b.failed}</span>
       </div>
       {job?.status === "COMPLETED" && (
         <div className="text-[12px] text-ink-soft mt-1.5 space-y-1">
           <div>
-            Rows: {r.rowsRead ?? 0} · imported: {r.imported ?? 0} · rejected: {r.rejected ?? 0}
-            {r.scannedSkipped ? ` · scanned links skipped (read-only): ${r.scannedSkipped}` : ""}
+            {fill(b.lineageRows, { read: r.rowsRead ?? 0, imported: r.imported ?? 0, rejected: r.rejected ?? 0 })}
+            {r.scannedSkipped ? fill(b.lineageScannedSkipped, { n: r.scannedSkipped }) : ""}
           </div>
-          {r.mode === "PENDING" && r.requestId && <div>Sent for approval as <Link href={`/requests/${r.requestId}`} className="text-brand-purple underline">request #{r.requestId}</Link> — the links appear once it is approved.</div>}
-          {r.mode === "APPLIED" && <div className="text-emerald-700">Applied.</div>}
+          {r.mode === "PENDING" && r.requestId && <div><Link href={`/requests/${r.requestId}`} className="text-brand-purple underline">{fill(b.lineagePending, { id: r.requestId })}</Link></div>}
+          {r.mode === "APPLIED" && <div className="text-emerald-700">{b.lineageApplied}</div>}
           <div className="flex gap-4">
-            {job.hasResultFile && <a href={`/api/jobs/${jobId}/file`} className="text-brand-purple font-semibold hover:underline">⭳ Rejected rows</a>}
-            {job.hasLogFile && <a href={`/api/jobs/${jobId}/log-file`} className="text-muted hover:underline">⭳ Log</a>}
+            {job.hasResultFile && <a href={`/api/jobs/${jobId}/file`} className="text-brand-purple font-semibold hover:underline">⭳ {b.rejectedRows}</a>}
+            {job.hasLogFile && <a href={`/api/jobs/${jobId}/log-file`} className="text-muted hover:underline">⭳ {b.log}</a>}
           </div>
         </div>
       )}

@@ -27,7 +27,7 @@ export default async function BulkOperationsPage() {
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-ink">{t.nav.bulkOperations}</h1>
           <p className="text-sm text-muted mt-1">
-            {"Download catalog metadata to Excel, edit offline, then upload to preview and apply changes in bulk."}
+            {t.bulkOps.pageDesc}
           </p>
         </div>
         <BulkOperationsClient canEdit={canEdit} />
