@@ -4,6 +4,7 @@
 // captured by the PostgreSQL lineage scan) with libpg-query; read-only.
 import { parse as pgParse } from "libpg-query";
 import { sql } from "../db";
+import { toParsableSql, caseInsensitive, type SqlDialect } from "./sql-dialects";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type N = any;
@@ -211,7 +212,7 @@ function splitAnd(n: N): N[] {
   return [n];
 }
 
-type CatalogTable = { entityId: number; schemaId: number; schema: string; name: string; objectTypeCode: string; columns: string[] };
+export type CatalogTable = { entityId: number; schemaId: number; schema: string; name: string; objectTypeCode: string; columns: string[] };
 type Catalog = { find: (schema: string | null, name: string) => CatalogTable | null };
 
 // ── Building the anatomy ──────────────────────────────────────────────────────
@@ -402,8 +403,11 @@ export function outputNames(q: ViewQuery): string[] {
 }
 
 /** Parse a view definition (a bare SELECT from pg_get_viewdef, or a CREATE VIEW). */
-export async function parseViewDefinition(definition: string, catalog: Catalog): Promise<ViewQuery> {
+export async function parseViewDefinition(definition: string, catalog: Catalog, opts: { lowercaseIdentifiers?: boolean } = {}): Promise<ViewQuery> {
   const parsed = await pgParse(definition);
+  // Case-insensitive engines (SQL Server, Oracle, MySQL): match names regardless of
+  // quoting/case; the catalog's own spelling is restored afterwards (canonicalize).
+  if (opts.lowercaseIdentifiers) lowercaseIdentifiers(parsed);
   const raw = parsed.stmts?.[0]?.stmt;
   const select = raw?.SelectStmt ?? raw?.ViewStmt?.query?.SelectStmt ?? raw?.CreateTableAsStmt?.query?.SelectStmt;
   if (!select) throw new Error("Not a SELECT-based view definition");
@@ -418,19 +422,83 @@ export async function referencedRelations(definition: string): Promise<{ schema:
   return [...out.values()];
 }
 
+function lowercaseIdentifiers(ast: N): void {
+  const low = (x: N) => { if (x?.String?.sval) x.String.sval = x.String.sval.toLowerCase(); };
+  walk(ast, (x) => {
+    if (x.ColumnRef) x.ColumnRef.fields.forEach(low);
+    if (x.RangeVar) {
+      for (const k of ["relname", "schemaname", "catalogname"]) if (x.RangeVar[k]) x.RangeVar[k] = x.RangeVar[k].toLowerCase();
+    }
+    if (x.Alias?.aliasname) x.Alias.aliasname = x.Alias.aliasname.toLowerCase();
+    if (x.alias?.aliasname) x.alias.aliasname = x.alias.aliasname.toLowerCase();
+    if (x.ResTarget?.name) x.ResTarget.name = x.ResTarget.name.toLowerCase();
+    if (x.CommonTableExpr?.ctename) x.CommonTableExpr.ctename = x.CommonTableExpr.ctename.toLowerCase();
+    if (x.JoinExpr?.usingClause) x.JoinExpr.usingClause.forEach(low);
+  });
+}
+
+// Restore the catalog's spelling of table/column names after case-insensitive parsing.
+function canonicalize(q: ViewQuery, tableOf: (schema: string | null, name: string) => { schema: string; name: string; columns: string[] } | null, viewColumns: string[]): void {
+  const pick = (list: string[], x: string) => list.find((c) => c.toLowerCase() === x.toLowerCase()) ?? x;
+  for (const c of q.ctes) canonicalize(c.query, tableOf, []);
+  if (q.kind === "SET_OP") { q.branches.forEach((b, i) => canonicalize(b, tableOf, i === 0 ? viewColumns : [])); return; }
+  const colsOf = new Map<string, string[]>();
+  for (const src of q.sources) {
+    if (src.subquery) canonicalize(src.subquery, tableOf, []);
+    const cat = src.kind === "TABLE" ? tableOf(src.schema, src.name) : null;
+    if (!cat) continue;
+    src.schema = cat.schema; src.name = cat.name;
+    src.usedColumns = src.usedColumns.map((c) => pick(cat.columns, c));
+    colsOf.set(src.alias, cat.columns);
+  }
+  const fix = (r: ColumnRefOut) => (r.alias && colsOf.has(r.alias) ? { ...r, column: pick(colsOf.get(r.alias)!, r.column) } : r);
+  for (const j of q.joins) j.pairs = j.pairs.map((p) => ({ ...p, left: fix(p.left), right: fix(p.right) }));
+  for (const c of q.columns) { c.sources = c.sources.map(fix); c.name = pick(viewColumns, c.name); }
+}
+
+/** Parse a definition in any supported dialect and match it to the catalog. Pure
+ *  apart from loadTables (lower-cased table names → catalog rows). */
+export async function analyzeDefinition(
+  dialect: SqlDialect, definition: string,
+  ctx: { viewSchema: string | null; viewColumns: string[]; loadTables: (lowerNames: string[]) => Promise<CatalogTable[]> },
+): Promise<ViewQuery> {
+  const ci = caseInsensitive(dialect);
+  const norm = (x: string | null) => (x == null ? null : ci ? x.toLowerCase() : x);
+  const parsable = toParsableSql(dialect, definition);
+  const rels = await referencedRelations(parsable);
+  const names = [...new Set(rels.map((r) => r.name.toLowerCase()))];
+  const canon = names.length ? await ctx.loadTables(names) : [];
+  // Matching copy (lower-cased for case-insensitive engines)
+  const tables: CatalogTable[] = canon.map((r) => ({ ...r, schema: norm(r.schema)!, name: norm(r.name)!, columns: r.columns.map((c) => norm(c)!) }));
+  const findIn = <T extends { schema: string; name: string }>(list: T[], schema: string | null, name: string): T | null => {
+    const same = list.filter((t) => norm(t.name) === norm(name));
+    if (schema) return same.find((t) => norm(t.schema) === norm(schema)) ?? null;
+    return same.find((t) => norm(t.schema) === norm(ctx.viewSchema)) ?? same.find((t) => norm(t.schema) === "public" || norm(t.schema) === "dbo")
+      ?? (same.length === 1 ? same[0] : null);
+  };
+  const anatomy = await parseViewDefinition(parsable, { find: (schema, name) => findIn(tables, schema, name) }, { lowercaseIdentifiers: ci });
+  if (ci) canonicalize(anatomy, (schema, name) => findIn(canon, schema, name), ctx.viewColumns);
+  return anatomy;
+}
+
 // ── Entry point for the API ───────────────────────────────────────────────────
 
 export type ViewAnatomyResult = {
   view: { entityId: number; name: string; schemaName: string | null; sourceName: string | null; objectTypeCode: string };
-  definition: string | null; scannedAt: string | null;
+  definition: string | null; scannedAt: string | null; dialect: SqlDialect | null;
   anatomy: ViewQuery | null;
   problem: "NO_DEFINITION" | "PARSE_FAILED" | null;
 };
 
 export async function getViewAnatomy(entityId: number): Promise<ViewAnatomyResult | null> {
-  const [v] = await sql<{ entityId: number; name: string; schemaName: string | null; sourceName: string | null; objectTypeCode: string; dataSourceId: number; connectionId: number | null }[]>`
+  const [v] = await sql<{
+    entityId: number; name: string; schemaName: string | null; sourceName: string | null; objectTypeCode: string;
+    dataSourceId: number; connectionId: number | null; definition: string | null; dialect: SqlDialect | null; capturedAt: string | null; columns: string[] | null;
+  }[]>`
     SELECT e.entity_id AS "entityId", e.entity_name_text AS name, s.schema_name_text AS "schemaName", d.source_name_text AS "sourceName",
-           e.object_type_code AS "objectTypeCode", d.data_source_id AS "dataSourceId", d.connection_id AS "connectionId"
+           e.object_type_code AS "objectTypeCode", d.data_source_id AS "dataSourceId", d.connection_id AS "connectionId",
+           e.view_definition_text AS definition, e.view_definition_dialect AS dialect, e.view_definition_captured_at::text AS "capturedAt",
+           (SELECT array_agg(a.physical_name_text ORDER BY a.attribute_id) FROM bayanat.data_attributes a WHERE a.entity_id = e.entity_id) AS columns
     FROM bayanat.data_entities e
     JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
     JOIN bayanat.data_sources d ON d.data_source_id = s.data_source_id
@@ -439,37 +507,36 @@ export async function getViewAnatomy(entityId: number): Promise<ViewAnatomyResul
   if (!v) return null;
   const view = { entityId: Number(v.entityId), name: v.name, schemaName: v.schemaName, sourceName: v.sourceName, objectTypeCode: v.objectTypeCode };
 
-  // The view's own definition, as captured by the lineage scan of its connection.
-  const [proc] = await sql<{ definition: string; scannedAt: string | null }[]>`
-    SELECT definition_text AS definition, last_scanned_timestamp::text AS "scannedAt"
-    FROM bayanat.lineage_processes
-    WHERE process_type_code IN ('VIEW', 'MATVIEW') AND schema_name = ${v.schemaName} AND process_name = ${v.name}
-    ORDER BY (connection_id IS NOT DISTINCT FROM ${v.connectionId}) DESC, last_scanned_timestamp DESC NULLS LAST
-    LIMIT 1
-  `;
-  if (!proc?.definition?.trim()) return { view, definition: null, scannedAt: null, anatomy: null, problem: "NO_DEFINITION" };
+  // The definition captured by the crawler (any engine); otherwise the one captured
+  // by the PostgreSQL lineage scan of its connection.
+  let definition = v.definition?.trim() ? v.definition : null;
+  let dialect: SqlDialect | null = definition ? (v.dialect ?? "POSTGRES") : null;
+  let scannedAt = definition ? v.capturedAt : null;
+  if (!definition) {
+    const [proc] = await sql<{ definition: string; scannedAt: string | null }[]>`
+      SELECT definition_text AS definition, last_scanned_timestamp::text AS "scannedAt"
+      FROM bayanat.lineage_processes
+      WHERE process_type_code IN ('VIEW', 'MATVIEW') AND schema_name = ${v.schemaName} AND process_name = ${v.name}
+      ORDER BY (connection_id IS NOT DISTINCT FROM ${v.connectionId}) DESC, last_scanned_timestamp DESC NULLS LAST
+      LIMIT 1
+    `;
+    if (proc?.definition?.trim()) { definition = proc.definition; dialect = "POSTGRES"; scannedAt = proc.scannedAt; }
+  }
+  if (!definition || !dialect) return { view, definition: null, scannedAt: null, dialect: null, anatomy: null, problem: "NO_DEFINITION" };
 
   try {
-    const rels = await referencedRelations(proc.definition);
-    const names = [...new Set(rels.map((r) => r.name))];
-    const rows = names.length === 0 ? [] : await sql<{ entityId: number; schemaId: number; schema: string; name: string; objectTypeCode: string; columns: string[] | null }[]>`
-      SELECT e.entity_id AS "entityId", s.schema_id AS "schemaId", s.schema_name_text AS schema, e.entity_name_text AS name,
-             e.object_type_code AS "objectTypeCode",
-             (SELECT array_agg(a.physical_name_text ORDER BY a.attribute_id) FROM bayanat.data_attributes a WHERE a.entity_id = e.entity_id) AS columns
-      FROM bayanat.data_entities e JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
-      WHERE s.data_source_id = ${v.dataSourceId} AND e.entity_name_text = ANY(${names})
-    `;
-    const tables: CatalogTable[] = rows.map((r) => ({ ...r, entityId: Number(r.entityId), schemaId: Number(r.schemaId), columns: r.columns ?? [] }));
-    const catalog: Catalog = {
-      find: (schema, name) => {
-        const same = tables.filter((t) => t.name === name);
-        if (schema) return same.find((t) => t.schema === schema) ?? null;
-        return same.find((t) => t.schema === v.schemaName) ?? same.find((t) => t.schema === "public") ?? (same.length === 1 ? same[0] : null);
-      },
-    };
-    const anatomy = await parseViewDefinition(proc.definition, catalog);
-    return { view, definition: proc.definition, scannedAt: proc.scannedAt, anatomy, problem: null };
+    const anatomy = await analyzeDefinition(dialect, definition, {
+      viewSchema: v.schemaName, viewColumns: v.columns ?? [],
+      loadTables: async (names) => (await sql<CatalogTable[]>`
+        SELECT e.entity_id::int AS "entityId", s.schema_id::int AS "schemaId", s.schema_name_text AS schema, e.entity_name_text AS name,
+               e.object_type_code AS "objectTypeCode",
+               coalesce((SELECT array_agg(a.physical_name_text ORDER BY a.attribute_id) FROM bayanat.data_attributes a WHERE a.entity_id = e.entity_id), '{}') AS columns
+        FROM bayanat.data_entities e JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+        WHERE s.data_source_id = ${v.dataSourceId} AND lower(e.entity_name_text) = ANY(${names})
+      `),
+    });
+    return { view, definition, scannedAt, dialect, anatomy, problem: null };
   } catch {
-    return { view, definition: proc.definition, scannedAt: proc.scannedAt, anatomy: null, problem: "PARSE_FAILED" };
+    return { view, definition, scannedAt, dialect, anatomy: null, problem: "PARSE_FAILED" };
   }
 }

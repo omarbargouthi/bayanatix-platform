@@ -44,7 +44,8 @@ type CrawlColumn = {
 };
 
 // objectType: what the source catalog says the object is (lib/object-types.ts).
-type CrawlTable  = { name: string; isView: boolean; objectType: ObjectTypeCode; columns: CrawlColumn[]; comment?: string | null; extProps?: Record<string, string>; rowCount?: number; sampleSize?: number };
+// definition: a view's SQL as the source stores it (parsed by lib/lineage/view-anatomy.ts).
+type CrawlTable  = { name: string; isView: boolean; objectType: ObjectTypeCode; definition?: { sql: string; dialect: "POSTGRES" | "MSSQL" | "ORACLE" | "MYSQL" } | null; columns: CrawlColumn[]; comment?: string | null; extProps?: Record<string, string>; rowCount?: number; sampleSize?: number };
 type CrawlSchema = { name: string; tables: CrawlTable[] };
 
 // FK topology harvested alongside columns — feeds bayanat.attribute_reference_links,
@@ -399,7 +400,14 @@ async function crawlPostgres(cfg: ConnCfg, config: CrawlConfig | null, logger: J
           }
         }
 
-        tables.push({ name: tr.t, isView: tr.v === "VIEW", objectType: objectTypeFromSourceTableType(tr.v), columns, comment: tCommentRow?.cmt ?? null, rowCount, sampleSize });
+        let definition: CrawlTable["definition"] = null;
+        if (tr.v === "VIEW") {
+          try {
+            const [d] = await pg<{ def: string | null }[]>`SELECT pg_get_viewdef(format('%I.%I', ${sr.n}::text, ${tr.t}::text)::regclass, true) AS def`;
+            if (d?.def) definition = { sql: d.def, dialect: "POSTGRES" };
+          } catch (e) { await logger.warn(`  View definition not readable for ${sr.n}.${tr.t}: ${(e as Error).message}`); }
+        }
+        tables.push({ name: tr.t, isView: tr.v === "VIEW", objectType: objectTypeFromSourceTableType(tr.v), definition, columns, comment: tCommentRow?.cmt ?? null, rowCount, sampleSize });
       }
 
       if (tables.length > 0) schemas.push({ name: sr.n, tables });
@@ -483,8 +491,17 @@ async function crawlMysql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
            FROM information_schema.columns
            WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, [sname, tname],
         );
+        let definition: CrawlTable["definition"] = null;
+        if (ttype === "VIEW") {
+          try {
+            const [vRows] = await conn.query(`SELECT view_definition AS d FROM information_schema.views WHERE table_schema = ? AND table_name = ?`, [sname, tname]);
+            const d = (vRows as Record<string, string>[])[0];
+            const text = d?.d ?? d?.D ?? d?.VIEW_DEFINITION;
+            if (text) definition = { sql: text, dialect: "MYSQL" };
+          } catch (e) { await logger.warn(`  View definition not readable for ${sname}.${tname}: ${(e as Error).message}`); }
+        }
         tables.push({
-          name: tname, isView: ttype === "VIEW" || ttype === "SYSTEM VIEW", objectType: objectTypeFromSourceTableType(ttype),
+          name: tname, isView: ttype === "VIEW" || ttype === "SYSTEM VIEW", objectType: objectTypeFromSourceTableType(ttype), definition,
           comment: tcomment || null,
           columns: (cRows as Record<string, string>[]).map(c => ({
             name:         c.column_name    || c.COLUMN_NAME,
@@ -609,8 +626,18 @@ async function crawlMssql(cfg: ConnCfg, config: CrawlConfig | null, logger: JobL
           JOIN sys.objects o ON o.object_id=ep.major_id
           JOIN sys.schemas sc ON sc.schema_id=o.schema_id
           WHERE ep.name='MS_Description' AND ep.minor_id=0 AND sc.name=@s AND o.name=@t`);
+        let definition: CrawlTable["definition"] = null;
+        if (trow.table_type === "VIEW") {
+          try {
+            const vd = await pool.request().input("s", mssql.VarChar, sname).input("t", mssql.VarChar, trow.table_name).query(`
+              SELECT m.definition AS d FROM sys.sql_modules m
+              JOIN sys.views v ON v.object_id = m.object_id JOIN sys.schemas sc ON sc.schema_id = v.schema_id
+              WHERE sc.name = @s AND v.name = @t`);
+            if (vd.recordset[0]?.d) definition = { sql: vd.recordset[0].d, dialect: "MSSQL" };
+          } catch (e) { await logger.warn(`  View definition not readable for ${sname}.${trow.table_name}: ${(e as Error).message}`); }
+        }
         tables.push({
-          name: trow.table_name, isView: trow.table_type === "VIEW", objectType: objectTypeFromSourceTableType(trow.table_type),
+          name: trow.table_name, isView: trow.table_type === "VIEW", objectType: objectTypeFromSourceTableType(trow.table_type), definition,
           comment: tcmt.recordset[0]?.cmt ?? null,
           extProps: tableProps.get(trow.table_name),
           columns: cr.recordset.map((c: Record<string, string|boolean|null>) => ({
@@ -1166,8 +1193,21 @@ async function crawlOracle(cfg: ConnCfg, config: CrawlConfig | null, logger: Job
         });
       }
       const colCmts = new Map(((cCommentRes.rows || []) as Record<string,string>[]).map(r => [r.COLUMN_NAME, r.COMMENTS ?? null]));
+      let definition: CrawlTable["definition"] = null;
+      if (row.TTYPE !== "BASE TABLE") {
+        try {
+          const vd = await conn.execute(
+            row.TTYPE === "VIEW"
+              ? `SELECT text AS d FROM all_views WHERE owner = :o AND view_name = :t`
+              : `SELECT query AS d FROM all_mviews WHERE owner = :o AND mview_name = :t`,
+            [owner, tname], { outFormat: oracledb.OUT_FORMAT_OBJECT },
+          );
+          const d = ((vd.rows || []) as Record<string, string>[])[0]?.D;
+          if (d) definition = { sql: d, dialect: "ORACLE" };
+        } catch (e) { await logger.warn(`  View definition not readable for ${owner}.${tname}: ${(e as Error).message}`); }
+      }
       schemaMap.get(owner)!.push({
-        name: tname, isView: row.TTYPE !== "BASE TABLE", objectType: objectTypeFromSourceTableType(row.TTYPE),
+        name: tname, isView: row.TTYPE !== "BASE TABLE", objectType: objectTypeFromSourceTableType(row.TTYPE), definition,
         comment: ((tCommentRes.rows || []) as Record<string,string>[])[0]?.COMMENTS ?? null,
         columns: (colRes.rows || []).map((c: Record<string, string>) => ({
           name: c.COLUMN_NAME, dataType: c.DATA_TYPE,
@@ -1403,6 +1443,9 @@ async function saveCrawlResults(
           UPDATE bayanat.data_entities SET
             is_view_indicator = ${table.isView},
             object_type_code = ${table.objectType},
+            view_definition_text = ${table.definition?.sql ?? null},
+            view_definition_dialect = ${table.definition?.dialect ?? null},
+            view_definition_captured_at = ${table.definition ? sql`now()` : null},
             source_description_text = ${table.comment ?? null},
             suggested_category_code = ${suggestion.code},
             category_confidence_code = ${suggestion.confidence},
@@ -1429,9 +1472,11 @@ async function saveCrawlResults(
       } else {
         entityId = (await sql<{ id: number }[]>`
           INSERT INTO bayanat.data_entities
-            (schema_id, entity_name_text, display_name_text, is_view_indicator, object_type_code, source_description_text,
+            (schema_id, entity_name_text, display_name_text, is_view_indicator, object_type_code,
+             view_definition_text, view_definition_dialect, view_definition_captured_at, source_description_text,
              entity_category_code, suggested_category_code, category_confidence_code, category_is_confirmed)
-          VALUES (${schemaId}, ${table.name}, ${table.name}, ${table.isView}, ${table.objectType}, ${table.comment ?? null},
+          VALUES (${schemaId}, ${table.name}, ${table.name}, ${table.isView}, ${table.objectType},
+                  ${table.definition?.sql ?? null}, ${table.definition?.dialect ?? null}, ${table.definition ? sql`now()` : null}, ${table.comment ?? null},
                   ${suggestion.code}, ${suggestion.code}, ${suggestion.confidence}, false)
           RETURNING entity_id AS id
         `)[0].id;
