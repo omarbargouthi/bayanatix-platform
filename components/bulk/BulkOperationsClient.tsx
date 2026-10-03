@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { type BulkJob, STATUS_STYLE, STATUS_LABEL, usePollJob, ProgressBar, JobFileLinks, JobStatusCard } from "./shared";
+import Link from "next/link";
+import { usePollBackgroundJob, type BackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 
 type SourceOption = { id: number; name: string; dbType: string | null };
 type DomainOption = { glossaryId: number; domainName: string };
@@ -41,6 +43,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [customRelTypeId, setCustomRelTypeId] = useState<number | "">("");
   const [emptyTemplateSheet, setEmptyTemplateSheet] = useState<typeof CREATABLE_SHEETS[number]["value"]>("BusinessTerms");
   const [includeExtended, setIncludeExtended] = useState(true);
+  const [includeLineage, setIncludeLineage] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadJobId, setDownloadJobId] = useState<number | null>(null);
@@ -69,7 +72,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       if (downloadKind === "CUSTOM_REL_TYPE" && !customRelTypeId) { setDownloadError("Choose a relationship type"); return; }
 
       const res = await fetch("/api/bulk/downloads", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, includeExtended }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, includeExtended, includeLineage: downloadKind === "SOURCE" && includeLineage }),
       });
       const data = await res.json();
       if (!res.ok) { setDownloadError(data.error ?? "Download failed"); return; }
@@ -87,10 +90,12 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadJobId, setUploadJobId] = useState<number | null>(null);
   const uploadJob = usePollJob(uploadJobId);
+  const [lineageJobId, setLineageJobId] = useState<number | null>(null);
+  const lineageJob = usePollBackgroundJob(lineageJobId);
 
   async function upload() {
     if (!file) return;
-    setUploading(true); setUploadError(null); setUploadJobId(null);
+    setUploading(true); setUploadError(null); setUploadJobId(null); setLineageJobId(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -99,7 +104,8 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
       const res = await fetch("/api/bulk/uploads", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) { setUploadError(data.error ?? "Upload failed"); return; }
-      setUploadJobId(data.jobId);
+      setUploadJobId(data.jobId ?? null);
+      setLineageJobId(data.lineageJobId ?? null);
     } finally {
       setUploading(false);
     }
@@ -191,6 +197,9 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
               <label className="flex items-center gap-1.5 text-sm">
                 <input type="checkbox" checked={includeExtended} onChange={(e) => setIncludeExtended(e.target.checked)} /> Include extended/custom attributes
               </label>
+              <label className="flex items-center gap-1.5 text-sm" title="Every lineage link touching this source's tables, in the lineage template format. Edits upload through lineage approval; scanned links are read-only.">
+                <input type="checkbox" checked={includeLineage} onChange={(e) => setIncludeLineage(e.target.checked)} /> Include lineage
+              </label>
             </div>
           </div>
         )}
@@ -254,7 +263,8 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
           <p className="text-xs text-muted mb-4">
             Upload an edited (or blank, filled-in) template. It's validated and committed automatically as a background
             job — there's no separate approval step. Any rows that fail land in a downloadable rejected-records file
-            you can fix and re-upload.
+            you can fix and re-upload. A Lineage sheet is imported as lineage changes (through lineage approval when a
+            workflow is mapped); scanned links in it are read-only and skipped.
           </p>
 
           <div className="flex items-center gap-4 mb-4 flex-wrap">
@@ -273,6 +283,7 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
           {uploadError && <div className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{uploadError}</div>}
 
           {uploadJob && <JobStatusCard job={uploadJob} title="Upload" />}
+          {lineageJobId && <LineageJobCard job={lineageJob} jobId={lineageJobId} />}
         </div>
       )}
 
@@ -318,6 +329,35 @@ export function BulkOperationsClient({ canEdit }: { canEdit: boolean }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Status of the Lineage sheet of a bulk upload (a lineage import job).
+function LineageJobCard({ job, jobId }: { job: BackgroundJob | null; jobId: number }) {
+  const r = (job?.resultJson ?? {}) as { rowsRead?: number; imported?: number; rejected?: number; scannedSkipped?: number; mode?: string; requestId?: number | null };
+  return (
+    <div className="mt-4 border border-line rounded-lg px-4 py-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-canvas-soft text-ink-soft">LINEAGE</span>
+        <span className="text-[12px] font-semibold text-ink">Lineage sheet · Job #{jobId}</span>
+        <span className="text-[11px] text-muted">{!job || job.status === "RUNNING" ? "Running…" : job.status === "COMPLETED" ? "Done" : "Failed"}</span>
+      </div>
+      {job?.status === "COMPLETED" && (
+        <div className="text-[12px] text-ink-soft mt-1.5 space-y-1">
+          <div>
+            Rows: {r.rowsRead ?? 0} · imported: {r.imported ?? 0} · rejected: {r.rejected ?? 0}
+            {r.scannedSkipped ? ` · scanned links skipped (read-only): ${r.scannedSkipped}` : ""}
+          </div>
+          {r.mode === "PENDING" && r.requestId && <div>Sent for approval as <Link href={`/requests/${r.requestId}`} className="text-brand-purple underline">request #{r.requestId}</Link> — the links appear once it is approved.</div>}
+          {r.mode === "APPLIED" && <div className="text-emerald-700">Applied.</div>}
+          <div className="flex gap-4">
+            {job.hasResultFile && <a href={`/api/jobs/${jobId}/file`} className="text-brand-purple font-semibold hover:underline">⭳ Rejected rows</a>}
+            {job.hasLogFile && <a href={`/api/jobs/${jobId}/log-file`} className="text-muted hover:underline">⭳ Log</a>}
+          </div>
+        </div>
+      )}
+      {job?.status === "FAILED" && <div className="text-[12px] text-red-600 mt-1.5">{job.errorText}</div>}
     </div>
   );
 }

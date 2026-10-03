@@ -6,8 +6,10 @@ import { buildDownloadWorkbooks } from "@/lib/bulk/workbook-writer";
 import { buildJobLogText } from "@/lib/bulk/log-writer";
 import { slugifyForFilename, timestampForFilename } from "@/lib/bulk/filename";
 import { createDownloadJob, finishDownloadJob, failJob, getBulkJob } from "@/lib/queries/bulk-jobs";
+import { sql } from "@/lib/db";
+import { lineageRowsForEntities, appendLineageSheet } from "@/lib/lineage/excel";
 
-// Body: { scope: DownloadScope } -> { jobId, status: "RUNNING" } immediately; the
+// Body: { scope: DownloadScope, includeExtended?, includeLineage? } -> { jobId, status: "RUNNING" } immediately; the
 // export itself runs in the background (see lib/queries/bulk-jobs.ts's top note) —
 // poll GET /api/bulk/jobs/{id} (or the Jobs tab) until status is COMMITTED, then
 // GET /api/bulk/jobs/{id}/file (and /log-file for the operation log).
@@ -19,6 +21,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const scope = body.scope as DownloadScope;
   const includeExtended = body.includeExtended !== false;
+  // Lineage sheet (template format) for a data source or selected tables: every link touching them.
+  const includeLineage = body.includeLineage === true && (scope?.type === "DATA_SOURCE" || scope?.type === "SELECTED");
   if (!scope?.type) return NextResponse.json({ error: "scope is required" }, { status: 400 });
   if (!(await assertDownloadScopeAllowed(session, scope))) {
     return NextResponse.json({ error: "You don't have edit permission on part of this scope" }, { status: 403 });
@@ -29,7 +33,16 @@ export async function POST(req: Request) {
   void (async () => {
     try {
       const sheetRows = await resolveDownloadScope(scope, { includeExtended });
-      const totalRows = Object.values(sheetRows).reduce((sum, rows) => sum + (rows?.length ?? 0), 0);
+      let lineage: Awaited<ReturnType<typeof lineageRowsForEntities>> | null = null;
+      if (includeLineage) {
+        const entityIds = scope.type === "DATA_SOURCE"
+          ? (await sql<{ id: number }[]>`
+              SELECT e.entity_id AS id FROM bayanat.data_entities e JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+              WHERE s.data_source_id = ${scope.dataSourceId}`).map((r) => Number(r.id))
+          : scope.type === "SELECTED" ? scope.entityIds ?? [] : [];
+        lineage = await lineageRowsForEntities(entityIds);
+      }
+      const totalRows = Object.values(sheetRows).reduce((sum, rows) => sum + (rows?.length ?? 0), 0) + (lineage?.rows.length ?? 0);
       if (totalRows === 0 && scope.type !== "EMPTY_TEMPLATE") {
         await failJob(jobId, "No rows matched the requested scope");
         return;
@@ -39,6 +52,7 @@ export async function POST(req: Request) {
         exportId: `job-${jobId}`, scopeDescription: JSON.stringify(scope),
         exportedByUserId: session.userId, exportedAt: new Date(),
       }, { includeExtended });
+      if (lineage) buffers[0] = await appendLineageSheet(buffers[0], lineage.rows, lineage.provenance);
 
       // NOTE: scopes over ROW_CAP_PER_FILE split into multiple workbook buffers
       // (spec §2.2), but only the first is persisted/downloadable today — zipping
@@ -49,7 +63,7 @@ export async function POST(req: Request) {
       const fileName = `${itemName}_${timestampForFilename(new Date())}${buffers.length > 1 ? "_part1-of-" + buffers.length : ""}.xlsx`;
       const totals = {
         rows: totalRows, files: buffers.length,
-        sheets: Object.fromEntries(Object.entries(sheetRows).map(([k, v]) => [k, v?.length ?? 0])),
+        sheets: { ...Object.fromEntries(Object.entries(sheetRows).map(([k, v]) => [k, v?.length ?? 0])), ...(lineage ? { Lineage: lineage.rows.length } : {}) },
       };
 
       const job = await getBulkJob(jobId);

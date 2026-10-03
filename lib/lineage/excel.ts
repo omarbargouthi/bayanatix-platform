@@ -93,10 +93,69 @@ export async function buildTemplate(): Promise<Buffer> {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
+const PROVENANCE_HEADER = "Provenance (info only)";
+
+/** Every lineage link (table and column level) touching any of these tables, in the
+ *  template's columns — for Bulk Operations' "Include lineage". */
+export async function lineageRowsForEntities(entityIds: number[]): Promise<{ rows: LineageRow[]; provenance: string[] }> {
+  if (entityIds.length === 0) return { rows: [], provenance: [] };
+  const found = await sql<(LineageRow & { prov: string; confirmed: boolean })[]>`
+    WITH l AS (
+      SELECT dl.*,
+        CASE WHEN dl.lineage_scope_code = 'ATTRIBUTE_LEVEL' THEN sa.entity_id ELSE dl.source_asset_id END AS src_entity,
+        CASE WHEN dl.lineage_scope_code = 'ATTRIBUTE_LEVEL' THEN ta.entity_id ELSE dl.target_asset_id END AS tgt_entity,
+        sa.physical_name_text AS src_col, ta.physical_name_text AS tgt_col
+      FROM bayanat.data_lineage dl
+      LEFT JOIN bayanat.data_attributes sa ON dl.lineage_scope_code = 'ATTRIBUTE_LEVEL' AND sa.attribute_id = dl.source_asset_id
+      LEFT JOIN bayanat.data_attributes ta ON dl.lineage_scope_code = 'ATTRIBUTE_LEVEL' AND ta.attribute_id = dl.target_asset_id
+    )
+    SELECT sd.source_name_text AS "sourceSystem", ss.schema_name_text AS "sourceSchema", se.entity_name_text AS "sourceTable", coalesce(l.src_col, '') AS "sourceColumn",
+           td.source_name_text AS "targetSystem", ts.schema_name_text AS "targetSchema", te.entity_name_text AS "targetTable", coalesce(l.tgt_col, '') AS "targetColumn",
+           coalesce(l.transformation_type_code, '') AS "transformationType", coalesce(l.transformation_logic_text, '') AS logic,
+           coalesce(p.process_name, '') AS process, l.provenance_code AS prov, coalesce(l.is_confirmed, false) AS confirmed
+    FROM l
+    JOIN bayanat.data_entities se ON se.entity_id = l.src_entity JOIN bayanat.data_schemas ss ON ss.schema_id = se.schema_id JOIN bayanat.data_sources sd ON sd.data_source_id = ss.data_source_id
+    JOIN bayanat.data_entities te ON te.entity_id = l.tgt_entity JOIN bayanat.data_schemas ts ON ts.schema_id = te.schema_id JOIN bayanat.data_sources td ON td.data_source_id = ts.data_source_id
+    LEFT JOIN bayanat.lineage_processes p ON p.process_id = l.process_id
+    WHERE l.src_entity = ANY(${entityIds}) OR l.tgt_entity = ANY(${entityIds})
+    ORDER BY te.entity_name_text, l.lineage_scope_code DESC, l.tgt_col NULLS FIRST, se.entity_name_text
+  `;
+  return {
+    rows: found.map(({ prov: _p, confirmed: _c, ...r }) => r),
+    provenance: found.map((r) => (r.prov === "SCANNED" ? (r.confirmed ? "Scanned (confirmed)" : "Scanned") : "Manual")),
+  };
+}
+
+/** Adds the Lineage + Transformation Types sheets to an existing workbook buffer. */
+export async function appendLineageSheet(buffer: Buffer, rows: LineageRow[], provenance: string[]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+  if (wb.getWorksheet("Lineage")) wb.removeWorksheet(wb.getWorksheet("Lineage")!.id);
+  addLineageSheet(wb, rows, { header: PROVENANCE_HEADER, width: 20, values: provenance });
+  if (!wb.getWorksheet("Transformation Types")) {
+    const types = wb.addWorksheet("Transformation Types");
+    types.columns = [{ header: "Code", key: "code", width: 16 }, { header: "Name", key: "name", width: 22 }, { header: "Description", key: "description", width: 70 }];
+    for (const t of await transformationTypes()) types.addRow(t);
+    styleHeader(types);
+  }
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+/** True when the workbook has a Lineage sheet in the template's format. */
+export async function hasLineageSheet(buffer: Buffer): Promise<boolean> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+  const ws = wb.getWorksheet("Lineage");
+  if (!ws) return false;
+  const headers: string[] = [];
+  ws.getRow(1).eachCell((cell) => headers.push(cellText(cell.value).toLowerCase()));
+  return headers.includes("source table") && headers.includes("target table") && ws.rowCount > 1;
+}
+
 export async function buildExport(rows: LineageRow[], provenance: string[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Bayanis";
-  addLineageSheet(wb, rows, { header: "Provenance (info only)", width: 20, values: provenance });
+  addLineageSheet(wb, rows, { header: PROVENANCE_HEADER, width: 20, values: provenance });
   await addReferenceSheets(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -113,27 +172,33 @@ function cellText(v: ExcelJS.CellValue): string {
   return String(v).trim();
 }
 
-async function readRows(buffer: Buffer): Promise<{ rows: LineageRow[]; error?: string }> {
+async function readRows(buffer: Buffer): Promise<{ rows: LineageRow[]; provenance: string[]; error?: string }> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
   const ws = wb.getWorksheet("Lineage") ?? wb.worksheets[0];
-  if (!ws) return { rows: [], error: "The file has no sheets" };
+  if (!ws) return { rows: [], provenance: [], error: "The file has no sheets" };
   const headerIdx = new Map<ColKey, number>();
+  let provenanceCol: number | null = null;
   ws.getRow(1).eachCell((cell, col) => {
     const h = cellText(cell.value).toLowerCase();
     const match = COLUMNS.find((c) => c.header.toLowerCase() === h);
     if (match) headerIdx.set(match.key, col);
+    if (h === PROVENANCE_HEADER.toLowerCase()) provenanceCol = col;
   });
   if (!headerIdx.has("sourceTable") || !headerIdx.has("targetTable")) {
-    return { rows: [], error: "Header row must include \"Source Table\" and \"Target Table\" — download the template for the expected columns" };
+    return { rows: [], provenance: [], error: "Header row must include \"Source Table\" and \"Target Table\" — download the template for the expected columns" };
   }
   const rows: LineageRow[] = [];
+  const provenance: string[] = [];
   ws.eachRow((row, n) => {
     if (n === 1) return;
     const r = Object.fromEntries(COLUMNS.map((c) => [c.key, headerIdx.has(c.key) ? cellText(row.getCell(headerIdx.get(c.key)!).value) : ""])) as LineageRow;
-    if (Object.values(r).some((v) => v !== "")) rows.push(r);
+    if (Object.values(r).some((v) => v !== "")) {
+      rows.push(r);
+      provenance.push(provenanceCol ? cellText(row.getCell(provenanceCol).value) : "");
+    }
   });
-  return { rows };
+  return { rows, provenance };
 }
 
 type Resolver = {
@@ -192,7 +257,12 @@ async function makeResolver(): Promise<Resolver> {
 
 export async function runLineageImport(jobId: number, userId: string, fileName: string, buffer: Buffer): Promise<void> {
   try {
-    const { rows, error } = await readRows(buffer);
+    const read = await readRows(buffer);
+    const { error } = read;
+    // Scanned links in an export are read-only: skip them (they'd otherwise come
+    // back as manual copies of the scanned link).
+    const scannedSkipped = read.rows.filter((_r, i) => /^scanned/i.test(read.provenance[i] ?? "")).length;
+    const rows = read.rows.filter((_r, i) => !/^scanned/i.test(read.provenance[i] ?? ""));
     if (error) { await failJob(jobId, error); return; }
 
     const resolve = await makeResolver();
@@ -270,7 +340,7 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
     const log = Buffer.from([
       `Lineage import — ${new Date().toISOString()}`,
       `File: ${fileName}`,
-      `Rows read: ${rows.length}, accepted: ${imported} (column-level: ${columnLinks}), rejected: ${rejected.length}`,
+      `Rows read: ${rows.length + scannedSkipped}, accepted: ${imported} (column-level: ${columnLinks}), rejected: ${rejected.length}${scannedSkipped ? `, scanned links skipped (read-only): ${scannedSkipped}` : ""}`,
       submitted.mode === "PENDING" ? `Sent for approval as request #${submitted.requestId} — the links appear once it is approved.`
         : submitted.mode === "APPLIED" ? "Applied (no approval workflow is mapped to Manual Lineage Change)." : "Nothing to apply.",
       ...(rejected.length ? ["", "Rejected rows:", ...rejected.map((x) => `  ${x.row.sourceTable}.${x.row.sourceColumn || "*"} → ${x.row.targetTable}.${x.row.targetColumn || "*"}: ${x.reason}`)] : []),
@@ -286,7 +356,7 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
     }
 
     await finishJob(jobId, {
-      resultJson: { rowsRead: rows.length, imported, columnLinks, rejected: rejected.length, mode: submitted.mode, requestId: submitted.requestId },
+      resultJson: { rowsRead: rows.length + scannedSkipped, imported, columnLinks, rejected: rejected.length, scannedSkipped, mode: submitted.mode, requestId: submitted.requestId },
       logFileData: log,
       ...(rejectedFile ? {
         resultFileData: rejectedFile,

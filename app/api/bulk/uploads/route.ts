@@ -8,6 +8,8 @@ import { buildResultWorkbook, buildRejectedWorkbook } from "@/lib/bulk/result-wr
 import { buildJobLogText } from "@/lib/bulk/log-writer";
 import { createUploadJob, finishUploadCommit, failJob, getBulkJob } from "@/lib/queries/bulk-jobs";
 import { TEMPLATE_SCHEMA_VERSION } from "@/lib/bulk/sheets";
+import { createJob } from "@/lib/queries/background-jobs";
+import { hasLineageSheet, runLineageImport, LINEAGE_IMPORT_JOB_TYPE } from "@/lib/lineage/excel";
 
 // multipart/form-data: file, strict_mode?, conflict_policy?
 // Reads and sanity-checks the workbook synchronously (fast — just structure, no
@@ -43,8 +45,22 @@ export async function POST(req: Request) {
       error: `This template is from an older schema version (expected ${TEMPLATE_SCHEMA_VERSION}, found ${parsed.meta?.schemaVersion ?? "unknown"}) — re-download the template and re-apply your edits.`,
     }, { status: 400 });
   }
-  if (Object.keys(parsed.sheets).length === 0) {
+  // A Lineage sheet goes through the lineage import (approval + history), not the
+  // per-asset bulk commit: its rows are relationships, not records with an _ID.
+  const withLineage = await hasLineageSheet(fileData).catch(() => false);
+  if (withLineage && session.role !== "ADMIN" && session.role !== "STEWARD") {
+    return NextResponse.json({ error: "The Lineage sheet can only be uploaded by a steward or admin — remove it to upload the rest" }, { status: 403 });
+  }
+  if (Object.keys(parsed.sheets).length === 0 && !withLineage) {
     return NextResponse.json({ error: "No recognizable sheets/columns found — is this a Bayanis export file?" }, { status: 400 });
+  }
+  let lineageJobId: number | null = null;
+  if (withLineage) {
+    lineageJobId = await createJob(LINEAGE_IMPORT_JOB_TYPE, { fileName: file.name, via: "BULK_UPLOAD" }, session.userId);
+    void runLineageImport(lineageJobId, session.userId, file.name, fileData);
+  }
+  if (Object.keys(parsed.sheets).length === 0) {
+    return NextResponse.json({ jobId: null, lineageJobId, status: "RUNNING" }, { status: 202 });
   }
 
   const exportSnapshotAt = parsed.meta?.exportedAt ? new Date(parsed.meta.exportedAt) : null;
@@ -66,5 +82,5 @@ export async function POST(req: Request) {
     }
   })();
 
-  return NextResponse.json({ jobId, status: "RUNNING" }, { status: 202 });
+  return NextResponse.json({ jobId, lineageJobId, status: "RUNNING" }, { status: 202 });
 }
