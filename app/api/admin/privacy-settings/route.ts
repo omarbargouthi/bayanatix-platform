@@ -2,17 +2,15 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { logUpdate } from "@/lib/audit";
 import {
-  getPolicySettings, updateRetentionSettings, updateConsentSettings, getConsentStats, getConsentTranslationStatus,
-  type RetentionSettings,
+  getPolicySettings, updateRetentionSettings, updateConsentSettings, getConsentStats, type RetentionSettings,
 } from "@/lib/privacy/policy-settings";
 
-// GET — retention periods + consent notice settings + who has accepted + translation
-// status of the notice per enabled language (admin only).
+// GET — retention periods + consent notice settings + who has accepted (admin only).
 export async function GET() {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const [settings, consentStats, consentTranslations] = await Promise.all([getPolicySettings(), getConsentStats(), getConsentTranslationStatus()]);
-  return NextResponse.json({ settings, consentStats, consentTranslations });
+  const [settings, consentStats] = await Promise.all([getPolicySettings(), getConsentStats()]);
+  return NextResponse.json({ settings, consentStats });
 }
 
 const days = (v: unknown): number | null | "invalid" => {

@@ -85,25 +85,6 @@ export async function getConsentNotice(lang: string): Promise<{ title: string; t
   return { title: tr[CONSENT_KEYS.title] ?? s.consentTitleEn, text: tr[CONSENT_KEYS.text], version: s.consentVersion, lang };
 }
 
-/** Per enabled non-English language: is the notice translated and current? */
-export async function getConsentTranslationStatus(): Promise<{ languageCode: string; languageName: string; status: "CURRENT" | "STALE" | "MISSING" }[]> {
-  return sql<{ languageCode: string; languageName: string; status: "CURRENT" | "STALE" | "MISSING" }[]>`
-    SELECT l.language_code AS "languageCode", l.language_name_text AS "languageName",
-      CASE
-        WHEN count(tr.translation_id) FILTER (WHERE tr.status_code = 'STALE') > 0 THEN 'STALE'
-        WHEN count(tr.translation_id) FILTER (WHERE tr.status_code <> 'MISSING' AND btrim(coalesce(tr.translated_text, '')) <> '')
-             = count(tk.key_id) AND count(tk.key_id) > 0 THEN 'CURRENT'
-        ELSE 'MISSING'
-      END AS status
-    FROM bayanat.languages l
-    LEFT JOIN bayanat.translation_keys tk ON tk.category_code = 'PLATFORM_CONSENT'
-    LEFT JOIN bayanat.translations tr ON tr.key_id = tk.key_id AND tr.language_code = l.language_code
-    WHERE l.is_enabled_indicator AND l.language_code <> 'en'
-    GROUP BY l.language_code, l.language_name_text
-    ORDER BY l.language_name_text
-  `;
-}
-
 /** True when consent is switched on and this user hasn't accepted the current version. */
 export async function needsConsent(userId: string): Promise<boolean> {
   const [row] = await sql<{ needs: boolean }[]>`
