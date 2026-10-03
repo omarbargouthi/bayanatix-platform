@@ -2900,6 +2900,7 @@ export const en: I18nStrings = {
   },
   viewAnatomy: {
     open:            "How this view is built",
+    catalogTab:      "How it's built",
     title:           "How this view is built",
     tabStructure:    "Structure",
     tabSql:          "SQL definition",

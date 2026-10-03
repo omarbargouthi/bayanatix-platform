@@ -335,6 +335,7 @@ export async function getEntityById(entityId: number): Promise<
       e.description_text as "description",
       e.source_description_text as "sourceDescription",
       coalesce(e.is_view_indicator, false) as "isView",
+      e.object_type_code as "objectTypeCode",
       e.row_count_estimate as "rowCount",
       e.trust_score as "trustScore",
       e.lifecycle_status_code as "lifecycleStatus",

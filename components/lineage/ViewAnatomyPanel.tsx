@@ -256,20 +256,73 @@ function SourceCard({ src, c, t, ty }: { src: ViewSource; c: (typeof PALETTE)[nu
   );
 }
 
-// Drawer: "How this view is built" for a VIEW / MATERIALIZED_VIEW entity.
-export function ViewAnatomyPanel({ entityId, onClose }: { entityId: number; onClose: () => void }) {
-  const { t } = useLang();
-  const va = t.viewAnatomy;
-  const ty = objectTypeLabels(t.lineage);
+function useViewAnatomy(entityId: number) {
   const [data, setData] = useState<ViewAnatomyResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"structure" | "sql">("structure");
-
   useEffect(() => {
     setLoading(true);
     fetch(`/api/lineage/view-anatomy?entityId=${entityId}`)
       .then((r) => (r.ok ? r.json() : null)).then(setData).finally(() => setLoading(false));
   }, [entityId]);
+  return { data, loading };
+}
+
+// Structure / SQL tabs and content — shared by the lineage drawer and the catalog
+// table page's "How it's built" tab.
+export function ViewAnatomyBody({ data, loading, padded = true }: { data: ViewAnatomyResult | null; loading: boolean; padded?: boolean }) {
+  const { t } = useLang();
+  const va = t.viewAnatomy;
+  const ty = objectTypeLabels(t.lineage);
+  const [tab, setTab] = useState<"structure" | "sql">("structure");
+  const px = padded ? "px-6" : "";
+  return (
+    <>
+      {data?.definition && (
+        <div className={`${px} border-b border-line flex gap-1 shrink-0`}>
+          {(["structure", "sql"] as const).map((k) => (
+            <button key={k} onClick={() => setTab(k)} disabled={k === "structure" && !data.anatomy}
+              className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px ${tab === k ? "border-brand-purple text-brand-purple" : "border-transparent text-ink-soft hover:text-ink"} disabled:opacity-40`}>
+              {k === "structure" ? va.tabStructure : va.tabSql}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className={padded ? "flex-1 overflow-y-auto nice-scroll px-6 py-5" : "pt-5"}>
+        {loading && <div className="py-12 text-center text-sm text-muted">{va.loading}</div>}
+        {!loading && data?.problem === "NO_DEFINITION" && <div className="text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3">{va.noDefinition}</div>}
+        {!loading && data?.problem === "PARSE_FAILED" && <div className="mb-4 text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3">{va.parseFailed}</div>}
+        {!loading && data?.anatomy && tab === "structure" && <QueryBlock q={data.anatomy} t={va} ty={ty} />}
+        {!loading && data?.definition && (tab === "sql" || !data.anatomy) && (
+          <pre className="font-mono text-[12px] leading-relaxed text-ink bg-canvas-soft border border-line rounded-lg p-4 whitespace-pre-wrap" dir="ltr">{data.definition.trim()}</pre>
+        )}
+      </div>
+    </>
+  );
+}
+
+const fmtDate = (s: string) => new Date(s).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// Catalog table page tab (views only).
+export function ViewAnatomyTab({ entityId }: { entityId: number }) {
+  const { t } = useLang();
+  const { data, loading } = useViewAnatomy(entityId);
+  return (
+    <div className="card p-5">
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <h3 className="font-bold text-[15px] text-brand-deep">{t.viewAnatomy.title}</h3>
+        {data?.scannedAt && <span className="text-[11px] text-muted">{fill(t.viewAnatomy.scannedAt, { date: fmtDate(data.scannedAt) })}</span>}
+      </div>
+      <ViewAnatomyBody data={data} loading={loading} padded={false} />
+    </div>
+  );
+}
+
+// Drawer: "How this view is built" for a VIEW / MATERIALIZED_VIEW entity.
+export function ViewAnatomyPanel({ entityId, onClose }: { entityId: number; onClose: () => void }) {
+  const { t } = useLang();
+  const va = t.viewAnatomy;
+  const ty = objectTypeLabels(t.lineage);
+  const { data, loading } = useViewAnatomy(entityId);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/20" onClick={onClose}>
@@ -284,31 +337,11 @@ export function ViewAnatomyPanel({ entityId, onClose }: { entityId: number; onCl
                 <span className="text-[11px] text-muted" dir="auto">{[data.view.sourceName, data.view.schemaName].filter(Boolean).join(" › ")}</span>
               </div>
             )}
-            {data?.scannedAt && <div className="text-[11px] text-muted mt-0.5">{fill(va.scannedAt, { date: new Date(data.scannedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) })}</div>}
+            {data?.scannedAt && <div className="text-[11px] text-muted mt-0.5">{fill(va.scannedAt, { date: fmtDate(data.scannedAt) })}</div>}
           </div>
           <button onClick={onClose} aria-label={t.common.close} className="text-muted hover:text-ink text-xl leading-none">×</button>
         </div>
-
-        {data?.definition && (
-          <div className="px-6 border-b border-line flex gap-1 shrink-0">
-            {(["structure", "sql"] as const).map((k) => (
-              <button key={k} onClick={() => setTab(k)} disabled={k === "structure" && !data.anatomy}
-                className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px ${tab === k ? "border-brand-purple text-brand-purple" : "border-transparent text-ink-soft hover:text-ink"} disabled:opacity-40`}>
-                {k === "structure" ? va.tabStructure : va.tabSql}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto nice-scroll px-6 py-5">
-          {loading && <div className="py-12 text-center text-sm text-muted">{va.loading}</div>}
-          {!loading && data?.problem === "NO_DEFINITION" && <div className="text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3">{va.noDefinition}</div>}
-          {!loading && data?.problem === "PARSE_FAILED" && <div className="mb-4 text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3">{va.parseFailed}</div>}
-          {!loading && data?.anatomy && tab === "structure" && <QueryBlock q={data.anatomy} t={va} ty={ty} />}
-          {!loading && data?.definition && (tab === "sql" || !data.anatomy) && (
-            <pre className="font-mono text-[12px] leading-relaxed text-ink bg-canvas-soft border border-line rounded-lg p-4 whitespace-pre-wrap" dir="ltr">{data.definition.trim()}</pre>
-          )}
-        </div>
+        <ViewAnatomyBody data={data} loading={loading} />
       </div>
     </div>
   );

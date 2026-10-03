@@ -63,6 +63,7 @@ export type DataEntity = {
   description: string | null;
   sourceDescription: string | null;
   isView: boolean;
+  objectTypeCode?: string | null; // lib/object-types.ts
   certCode?: string | null;
   dataCertCode?: string | null;
   trustScore?: number | null;

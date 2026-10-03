@@ -3,10 +3,11 @@
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
 
-const TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Relationships", "Sample Data", "Custom Properties"] as const;
+// "View Definition" (how the view is built) is only offered for views.
+const TABS = ["Schema", "Data Quality", "Activity", "Lineage", "View Definition", "Relationships", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof TABS[number];
 
-export function TableTabs({ active }: { active: Tab }) {
+export function TableTabs({ active, isView = false }: { active: Tab; isView?: boolean }) {
   const router   = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -18,6 +19,7 @@ export function TableTabs({ active }: { active: Tab }) {
     "Data Quality":      c.tabDataQuality,
     "Activity":          c.tabActivity,
     "Lineage":           c.tabLineage,
+    "View Definition":   t.viewAnatomy.catalogTab,
     "Relationships":     c.tabRelationships,
     "Sample Data":       c.tabSampleData,
     "Custom Properties": c.tabCustomProps,
@@ -31,7 +33,7 @@ export function TableTabs({ active }: { active: Tab }) {
 
   return (
     <div className="flex gap-1 border-b border-line mb-5">
-      {TABS.map((t) => (
+      {TABS.filter((tab) => tab !== "View Definition" || isView).map((t) => (
         <button
           key={t}
           onClick={() => navigate(t)}

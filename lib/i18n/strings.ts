@@ -3043,6 +3043,7 @@ export type I18nStrings = {
   };
   viewAnatomy: {
     open:            string;
+    catalogTab:      string;
     title:           string;
     tabStructure:    string;
     tabSql:          string;

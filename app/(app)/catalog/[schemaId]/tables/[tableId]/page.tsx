@@ -26,12 +26,14 @@ import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPane
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { SampleDataTab } from "@/components/catalog/SampleDataTab";
+import { ViewAnatomyTab } from "@/components/lineage/ViewAnatomyPanel";
+import { isViewType } from "@/lib/object-types";
 import { getServerT } from "@/lib/i18n/server";
 import type { I18nStrings } from "@/lib/i18n/strings";
 
 export const dynamic = "force-dynamic";
 
-const VALID_TABS = ["Schema", "Data Quality", "Activity", "Lineage", "Relationships", "Sample Data", "Custom Properties"] as const;
+const VALID_TABS = ["Schema", "Data Quality", "Activity", "Lineage", "View Definition", "Relationships", "Sample Data", "Custom Properties"] as const;
 type Tab = typeof VALID_TABS[number];
 
 function isValidTab(s: string | undefined): s is Tab {
@@ -62,6 +64,7 @@ export default async function TablePage({
     activeTab === "Schema" ? getTableDqDimensions(id) : Promise.resolve(null),
   ]);
   if (!entity) notFound();
+  const entityIsView = isViewType(entity.objectTypeCode) || entity.isView;
 
   const canEdit = await canEditMetadata(user);
 
@@ -139,7 +142,7 @@ export default async function TablePage({
               categoryIsConfirmed={entity.categoryIsConfirmed}
               canEdit={canEdit}
             />
-            <Tag>{entity.isView ? t.catalog.viewBadge : t.catalog.tableBadge} · {fmtNumber(entity.rowCount as number | null)} {t.catalog.rowsWord}</Tag>
+            <Tag>{(t.lineage.objectTypes as Record<string, string>)[entity.objectTypeCode ?? ""] ?? (entity.isView ? t.catalog.viewBadge : t.catalog.tableBadge)} · {fmtNumber(entity.rowCount as number | null)} {t.catalog.rowsWord}</Tag>
           </h1>
           <TablePageActions
             entityId={entity.entityId}
@@ -150,7 +153,7 @@ export default async function TablePage({
 
         {/* ── Tabs — need Suspense because TableTabs uses useSearchParams ── */}
         <Suspense fallback={<div className="h-12 border-b border-line mb-5" />}>
-          <TableTabs active={activeTab} />
+          <TableTabs active={activeTab} isView={entityIsView} />
         </Suspense>
 
         {/* ── Schema tab ──────────────────────────────────────────────── */}
@@ -239,6 +242,9 @@ export default async function TablePage({
         {activeTab === "Lineage" && (
           <LineageTab entityId={entity.entityId} entityName={entity.entityName} canManage={user.role === "ADMIN" || user.role === "STEWARD"} />
         )}
+
+        {/* ── View Definition tab (views only) ─────────────────────────── */}
+        {activeTab === "View Definition" && entityIsView && <ViewAnatomyTab entityId={entity.entityId} />}
 
         {/* ── Relationships tab ────────────────────────────────────────── */}
         {activeTab === "Relationships" && (
