@@ -2,9 +2,9 @@
 // columns, so an export can be edited and uploaded back), and the import job.
 import ExcelJS from "exceljs";
 import { sql } from "../db";
-import { logUpdate } from "../audit";
 import { updateJobProgress, finishJob, failJob } from "../queries/background-jobs";
-import { ensureExternalEntity, upsertManualEdge, EXTERNAL_SOURCE_NAME } from "./manual-edges";
+import { ensureExternalEntity, EXTERNAL_SOURCE_NAME } from "./manual-edges";
+import { submitLineageChanges, type LineageOp } from "./changes";
 
 export const LINEAGE_IMPORT_JOB_TYPE = "LINEAGE_IMPORT";
 
@@ -194,7 +194,7 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
 
     const resolve = await makeResolver();
     const rejected: { row: LineageRow; reason: string }[] = [];
-    const touchedTargets = new Map<number, number>();
+    const ops: LineageOp[] = [];
     let imported = 0, columnLinks = 0, processed = 0;
     await updateJobProgress(jobId, 0, rows.length);
 
@@ -229,35 +229,39 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
         const typeCode = resolve.type(r.transformationType, srcCol != null ? "DIRECT" : "MANUAL");
         if (!typeCode) return `Unknown Transformation Type "${r.transformationType}" — see the Transformation Types sheet`;
 
-        await sql.begin(async (tx) => {
-          const t = tx as unknown as typeof sql;
-          if (src !== tgt) {
-            await upsertManualEdge(t, srcCol != null
-              ? { scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode: "MANUAL", logic: null, userId, onlyIfMissing: true }
-              : { scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic: r.logic || null, userId });
-          }
-          if (srcCol != null && tgtCol != null) {
-            await upsertManualEdge(t, { scope: "ATTRIBUTE_LEVEL", sourceId: srcCol, targetId: tgtCol, typeCode, logic: r.logic || null, userId });
-          }
-        });
-        if (srcCol != null) columnLinks++;
-        touchedTargets.set(tgt, (touchedTargets.get(tgt) ?? 0) + 1);
+        // A column row also implies the table link — added only if missing, so it
+        // never overwrites notes already on that table link.
+        if (src !== tgt) {
+          ops.push(srcCol != null
+            ? { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode: "MANUAL", logic: null, keepExisting: true }
+            : { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic: r.logic || null });
+        }
+        if (srcCol != null && tgtCol != null) {
+          ops.push({ op: "CREATE", scope: "ATTRIBUTE_LEVEL", sourceId: srcCol, targetId: tgtCol, typeCode, logic: r.logic || null });
+          columnLinks++;
+        }
         return null;
       })();
       if (reason) rejected.push({ row: r, reason }); else imported++;
       if (processed % 25 === 0 || processed === rows.length) await updateJobProgress(jobId, processed, rows.length);
     }
 
-    for (const [entityId, n] of touchedTargets) {
-      await logUpdate("DATA_ENTITIES", entityId, userId, [
-        { field: "lineage_edge", oldVal: null, newVal: `${n} lineage row(s) imported from Excel (${fileName})` },
-      ]).catch(() => {});
+    // The whole file is one proposal: approved (or applied, with no workflow mapped) together.
+    let submitted: { mode: string; requestId: number | null } = { mode: "NONE", requestId: null };
+    if (ops.length > 0) {
+      const res = await submitLineageChanges(ops, userId, {
+        origin: "IMPORT", title: `Lineage import: ${fileName} (${imported} row(s))`, note: `Imported from ${fileName}`,
+      });
+      if ("error" in res) { await failJob(jobId, res.error); return; }
+      submitted = res;
     }
 
     const log = Buffer.from([
       `Lineage import — ${new Date().toISOString()}`,
       `File: ${fileName}`,
-      `Rows read: ${rows.length}, imported: ${imported} (column-level: ${columnLinks}), rejected: ${rejected.length}`,
+      `Rows read: ${rows.length}, accepted: ${imported} (column-level: ${columnLinks}), rejected: ${rejected.length}`,
+      submitted.mode === "PENDING" ? `Sent for approval as request #${submitted.requestId} — the links appear once it is approved.`
+        : submitted.mode === "APPLIED" ? "Applied (no approval workflow is mapped to Manual Lineage Change)." : "Nothing to apply.",
       ...(rejected.length ? ["", "Rejected rows:", ...rejected.map((x) => `  ${x.row.sourceTable}.${x.row.sourceColumn || "*"} → ${x.row.targetTable}.${x.row.targetColumn || "*"}: ${x.reason}`)] : []),
     ].join("\n") + "\n", "utf-8");
 
@@ -271,7 +275,7 @@ export async function runLineageImport(jobId: number, userId: string, fileName: 
     }
 
     await finishJob(jobId, {
-      resultJson: { rowsRead: rows.length, imported, columnLinks, rejected: rejected.length },
+      resultJson: { rowsRead: rows.length, imported, columnLinks, rejected: rejected.length, mode: submitted.mode, requestId: submitted.requestId },
       logFileData: log,
       ...(rejectedFile ? {
         resultFileData: rejectedFile,

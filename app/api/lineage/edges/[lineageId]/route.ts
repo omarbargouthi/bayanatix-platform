@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logUpdate } from "@/lib/audit";
+import { submitLineageChanges, describeEdge } from "@/lib/lineage/changes";
 
 type Ctx = { params: { lineageId: string } };
 
@@ -31,6 +32,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     action?: "confirm";
     transformationTypeCode?: string;
     transformationLogicText?: string;
+    note?: string;
   } = await req.json();
 
   if (body.action === "confirm") {
@@ -51,24 +53,23 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Only manually-curated edges can be edited — confirm a scanned edge instead" }, { status: 409 });
   }
 
-  await sql`
-    UPDATE bayanat.data_lineage SET
-      transformation_type_code = COALESCE(${body.transformationTypeCode ?? null}, transformation_type_code),
-      transformation_logic_text = COALESCE(${body.transformationLogicText ?? null}, transformation_logic_text),
-      last_updated_timestamp = NOW(), updated_by_user_id = ${session.userId}
-    WHERE lineage_id = ${lineageId}
+  // Edits go through approval (LINEAGE_CHANGE) and are recorded in the link's history.
+  const [edge] = await sql<{ scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL"; s: number; t: number }[]>`
+    SELECT lineage_scope_code AS scope, source_asset_id AS s, target_asset_id AS t FROM bayanat.data_lineage WHERE lineage_id = ${lineageId}
   `;
-  await logUpdate(existing.assetTypeCode, existing.targetAssetId, session.userId, [
-    { field: "transformation_logic_text", oldVal: existing.transformationLogicText, newVal: body.transformationLogicText ?? existing.transformationLogicText },
-  ]);
-
-  return NextResponse.json({ ok: true });
+  const result = await submitLineageChanges([{
+    op: "UPDATE", lineageId,
+    typeCode: body.transformationTypeCode ?? existing.transformationTypeCode ?? "MANUAL",
+    logic: body.transformationLogicText !== undefined ? (body.transformationLogicText.trim() || null) : existing.transformationLogicText,
+  }], session.userId, { origin: "REGISTER", title: `Edit lineage: ${await describeEdge(edge.scope, Number(edge.s), Number(edge.t))}`, note: body.note });
+  if ("error" in result) return NextResponse.json(result, { status: 400 });
+  return NextResponse.json(result);
 }
 
-// DELETE — remove a lineage edge (steward/admin only). Scanned edges can be
-// deleted too (e.g. to correct a bad auto-extraction) — the next rescan of
-// that process will simply recreate it if it's still genuinely present.
-export async function DELETE(_req: Request, { params }: Ctx) {
+// DELETE — propose removing a MANUAL lineage link (steward/admin only), through
+// LINEAGE_CHANGE approval. Scanned links aren't removed by hand: raise a
+// review request against them instead (POST /api/lineage/review).
+export async function DELETE(req: Request, { params }: Ctx) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.role !== "ADMIN" && session.role !== "STEWARD") {
@@ -78,16 +79,15 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   const lineageId = Number(params.lineageId);
   if (!Number.isFinite(lineageId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  const [existing] = await sql<{ assetTypeCode: string; targetAssetId: number; sourceAssetId: number }[]>`
-    SELECT asset_type_code AS "assetTypeCode", target_asset_id AS "targetAssetId", source_asset_id AS "sourceAssetId"
-    FROM bayanat.data_lineage WHERE lineage_id = ${lineageId}
+  const [existing] = await sql<{ scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL"; s: number; t: number }[]>`
+    SELECT lineage_scope_code AS scope, source_asset_id AS s, target_asset_id AS t FROM bayanat.data_lineage WHERE lineage_id = ${lineageId}
   `;
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await sql`DELETE FROM bayanat.data_lineage WHERE lineage_id = ${lineageId}`;
-  await logUpdate(existing.assetTypeCode, existing.targetAssetId, session.userId, [
-    { field: "lineage_edge", oldVal: `from asset #${existing.sourceAssetId}`, newVal: null },
-  ]);
-
-  return NextResponse.json({ ok: true });
+  const note = new URL(req.url).searchParams.get("note");
+  const result = await submitLineageChanges([{ op: "DELETE", lineageId }], session.userId, {
+    origin: "REGISTER", title: `Remove lineage: ${await describeEdge(existing.scope, Number(existing.s), Number(existing.t))}`, note,
+  });
+  if ("error" in result) return NextResponse.json(result, { status: 400 });
+  return NextResponse.json(result);
 }

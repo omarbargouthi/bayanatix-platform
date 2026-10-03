@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { logUpdate } from "@/lib/audit";
-import { ensureExternalEntity, upsertManualEdge, LINEAGE_LAYERS } from "@/lib/lineage/manual-edges";
+import { ensureExternalEntity, LINEAGE_LAYERS } from "@/lib/lineage/manual-edges";
+import { submitLineageChanges, describeEdge, type LineageOp } from "@/lib/lineage/changes";
 
 type Endpoint = { entityId?: number | null; external?: { name: string; layerCode: string } | null };
 type Body = {
@@ -27,8 +27,9 @@ async function resolveEndpoint(ep: Endpoint): Promise<number | { error: string }
   return ensureExternalEntity(name, layer);
 }
 
-// POST — create a manual lineage link between two tables (or external assets),
-// optionally with column-level mappings, in one transaction. Steward/admin only.
+// POST — propose a manual lineage link between two tables (or external assets),
+// optionally with column-level mappings. Goes through LINEAGE_CHANGE approval when
+// a workflow is mapped, otherwise applies at once; recorded either way. Steward/admin only.
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,23 +60,18 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await sql.begin(async (tx) => {
-      const t = tx as unknown as typeof sql;
-      const lineageId = await upsertManualEdge(t, { scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic, userId: session.userId });
-      for (const m of mappings) {
-        await upsertManualEdge(t, {
-          scope: "ATTRIBUTE_LEVEL", sourceId: m.sourceAttributeId, targetId: m.targetAttributeId,
-          typeCode: m.transformationTypeCode || "DIRECT", logic: m.expression?.trim() || null, userId: session.userId,
-        });
-      }
-      return { lineageId: lineageId as number, columnEdges: mappings.length };
+    const ops: LineageOp[] = [
+      { op: "CREATE", scope: "ENTITY_LEVEL", sourceId: src, targetId: tgt, typeCode, logic },
+      ...mappings.map((m): LineageOp => ({
+        op: "CREATE", scope: "ATTRIBUTE_LEVEL", sourceId: m.sourceAttributeId, targetId: m.targetAttributeId,
+        typeCode: m.transformationTypeCode || "DIRECT", logic: m.expression?.trim() || null,
+      })),
+    ];
+    const result = await submitLineageChanges(ops, session.userId, {
+      origin: "DIALOG", title: `Add lineage: ${await describeEdge("ENTITY_LEVEL", src, tgt)}`,
     });
-
-    await logUpdate("DATA_ENTITIES", tgt, session.userId, [
-      { field: "lineage_edge", oldVal: null, newVal: `Manual lineage from table #${src}${result.columnEdges ? ` (${result.columnEdges} column mapping(s))` : ""}` },
-    ]);
-
-    return NextResponse.json({ ...result, sourceEntityId: src, targetEntityId: tgt }, { status: 201 });
+    if ("error" in result) return NextResponse.json(result, { status: 400 });
+    return NextResponse.json({ ...result, columnEdges: mappings.length, sourceEntityId: src, targetEntityId: tgt }, { status: 201 });
   } catch (err) {
     console.error("[lineage manual create]", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to save lineage" }, { status: 500 });

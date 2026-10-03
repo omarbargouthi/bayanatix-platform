@@ -18,6 +18,8 @@ const ALL_TYPES = [
   { code: "PI_CLEAR_TEXT_ACCESS", label: "PI Clear-Text Access" },
   { code: "METADATA_UPDATE",      label: "Metadata Update (Rescan Changes)" },
   { code: "CHANGE_IMPACT_REVIEW", label: "Change Impact Review (Lineage)" },
+  { code: "LINEAGE_CHANGE",       label: "Manual Lineage Change (Approval)" },
+  { code: "LINEAGE_REVIEW",       label: "Lineage Link Review" },
 ];
 
 const ASSIGNEE_TYPE_OPTIONS = [
@@ -51,6 +53,8 @@ const TYPE_COLOR: Record<string, string> = {
   PUBLISH_OPEN_DATA_PI: "bg-pink-50 text-pink-700 border-pink-200",
   METADATA_UPDATE:      "bg-teal-50 text-teal-700 border-teal-200",
   CHANGE_IMPACT_REVIEW: "bg-violet-50 text-violet-700 border-violet-200",
+  LINEAGE_CHANGE:       "bg-indigo-50 text-indigo-700 border-indigo-200",
+  LINEAGE_REVIEW:       "bg-sky-50 text-sky-700 border-sky-200",
 };
 
 const STATUS_COLOR: Record<string, string> = {

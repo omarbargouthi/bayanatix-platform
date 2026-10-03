@@ -108,7 +108,8 @@ export function AddLineageModal({ initialSource, initialTarget, onClose, onSaved
   initialSource?: PickedTable | null;
   initialTarget?: PickedTable | null;
   onClose: () => void;
-  onSaved: () => void;
+  // mode PENDING = sent for approval as requestId; APPLIED = in effect now.
+  onSaved: (result?: { mode: "APPLIED" | "PENDING"; requestId: number | null }) => void;
 }) {
   const { t } = useLang();
   const le = t.lineageEditor;
@@ -182,12 +183,12 @@ export function AddLineageModal({ initialSource, initialTarget, onClose, onSaved
             })),
         }),
       });
+      const d = await r.json().catch(() => ({}));
       if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
         setError(d.error ?? le.saveFailed);
         return;
       }
-      onSaved();
+      onSaved({ mode: d.mode, requestId: d.requestId ?? null });
     } catch {
       setError(le.saveFailed);
     } finally {

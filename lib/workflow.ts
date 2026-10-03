@@ -310,6 +310,13 @@ async function applyApprovalOutcome(requestId: number, requestTypeCode: string, 
       }
       return;
     }
+    case "LINEAGE_CHANGE": {
+      // Proposed manual lineage changes wait in bayanat.lineage_changes until the
+      // workflow decides; imported lazily to avoid a workflow <-> lineage import cycle.
+      const { applyLineageRequest } = await import("./lineage/changes");
+      await applyLineageRequest(requestId, approved);
+      return;
+    }
     default:
       // FIX_DATA_ISSUE, UPDATE_DEFINITION, CERTIFY_ASSET, GRANT_ACCESS, REMOVE_ACCESS, OTHER,
       // METADATA_UPDATE (the crawler already applied the actual schema change/soft-delete at

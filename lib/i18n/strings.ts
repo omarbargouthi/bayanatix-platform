@@ -44,6 +44,9 @@ export type I18nStrings = {
     sectionDomains:    string;
     sectionAdmin:      string;
     sectionCompliance: string;
+    // Data Catalog sub-menu
+    catalogAssets:     string;
+    catalogGlossaries: string;
   };
 
   // ── User role labels ────────────────────────────────────────────────────────
@@ -2829,5 +2832,76 @@ export type I18nStrings = {
       MEDIUM:     string;
       LOW:        string;
     };
+  };
+
+  // ── Lineage Mapping Register + review/approval of manual lineage ──
+  lineageRegister: {
+    tabGraph:           string;
+    tabRegister:        string;
+    title:              string;
+    desc:               string;
+    searchPh:           string;
+    allOrigins:         string;
+    allStatuses:        string;
+    statusActive:       string;
+    statusPending:      string;
+    statusReview:       string;
+    allLevels:          string;
+    levelTable:         string;
+    levelColumn:        string;
+    addMapping:         string;
+    resultsCount:       string;
+    prev:               string;
+    next:               string;
+    pageOf:             string;
+    colSource:          string;
+    colTarget:          string;
+    colTransformation:  string;
+    colOrigin:          string;
+    colStatus:          string;
+    colUpdated:         string;
+    pendingCreate:      string;
+    pendingUpdate:      string;
+    pendingDelete:      string;
+    reviewsOpen:        string;
+    requestNo:          string;
+    actHistory:         string;
+    actEdit:            string;
+    actRemove:          string;
+    actReview:          string;
+    actShowGraph:       string;
+    editTitle:          string;
+    removeTitle:        string;
+    removeConfirm:      string;
+    changeNote:         string;
+    changeNotePh:       string;
+    submit:             string;
+    submitting:         string;
+    submittedApplied:   string;
+    submittedPending:   string;
+    reviewTitle:        string;
+    reviewDesc:         string;
+    reviewReason:       string;
+    reviewReasonPh:     string;
+    reviewSent:         string;
+    reviewSentNotified: string;
+    historyTitle:       string;
+    historyEmpty:       string;
+    opCreate:           string;
+    opUpdate:           string;
+    opDelete:           string;
+    stApplied:          string;
+    stPending:          string;
+    stRejected:         string;
+    originDialog:       string;
+    originRegister:     string;
+    originImport:       string;
+    byName:             string;
+    previously:         string;
+    noResults:          string;
+    actionFailed:       string;
+    openInRegister:     string;
+    scannedNoEdit:      string;
+    importPending:      string;
   };
 };

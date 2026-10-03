@@ -43,7 +43,7 @@ export function LineageImportButton({ onImported }: { onImported?: () => void })
     }
   }
 
-  const result = job?.resultJson as { rowsRead?: number; imported?: number; columnLinks?: number; rejected?: number } | null | undefined;
+  const result = job?.resultJson as { rowsRead?: number; imported?: number; columnLinks?: number; rejected?: number; mode?: string; requestId?: number | null } | null | undefined;
 
   return (
     <>
@@ -87,6 +87,12 @@ export function LineageImportButton({ onImported }: { onImported?: () => void })
                   <div className="text-[13px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">
                     {fill(lt.importDone, { imported: result.imported ?? 0, rows: result.rowsRead ?? 0, columns: result.columnLinks ?? 0 })}
                   </div>
+                  {result.mode === "PENDING" && result.requestId && (
+                    <div className="text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                      {fill(t.lineageRegister.importPending, { id: result.requestId })}{" "}
+                      <a href={`/requests/${result.requestId}`} className="font-semibold underline">{fill(t.lineageRegister.requestNo, { id: result.requestId })}</a>
+                    </div>
+                  )}
                   {(result.rejected ?? 0) > 0 && (
                     <div className="text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
                       {fill(lt.importRejected, { n: result.rejected ?? 0 })}

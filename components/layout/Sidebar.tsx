@@ -50,7 +50,6 @@ const NAV_ADMIN_DEF = [
   { href: "/admin/user-management",      key: "userManagement"      as const, Icon: IconShield },
   { href: "/admin/tags",                 key: "tags"                as const, Icon: IconTag },
   { href: "/bulk-operations",            key: "bulkOperations"      as const, Icon: IconBulk },
-  { href: "/lineage",                    key: "lineage"             as const, Icon: IconLineage },
   { href: "/admin/workflows",            key: "workflows"           as const, Icon: IconLines },
   { href: "/admin/sources",             key: "dataSources"          as const, Icon: IconShare },
   { href: "/admin/audit-logs",          key: "auditLogs"            as const, Icon: IconHistory },
@@ -100,6 +99,16 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
     }));
 
   const NAV_ADMIN: Item[] = NAV_ADMIN_DEF.map((d) => ({ href: d.href, label: t.nav[d.key], Icon: d.Icon }));
+
+  // Data Catalog sub-menu: each opens its own view (assets overview, glossaries,
+  // lineage graph + mapping register). Lineage used to sit under Administration,
+  // which hid it — and its Excel import — from stewards.
+  const CATALOG_CHILDREN: Item[] = [
+    { href: "/catalog",  label: t.nav.catalogAssets,     Icon: IconDB },
+    { href: "/glossary", label: t.nav.catalogGlossaries, Icon: IconGlossary },
+    { href: "/lineage",  label: t.nav.lineage,           Icon: IconLineage },
+  ];
+  const catalogChildActive = CATALOG_CHILDREN.some((c) => isActive(c.href));
 
   const borderSide = isRtl ? "border-l border-line" : "border-r border-line";
 
@@ -193,7 +202,18 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
             </div>
         }
 
-        {NAV_DOMAINS.map((it) => (
+        {NAV_DOMAINS.map((it) => it.href === "/catalog" ? (
+          <div key={it.href}>
+            <NavLink item={it} active={collapsed && catalogChildActive} collapsed={collapsed} isRtl={isRtl} />
+            {!collapsed && (
+              <div className={`mt-0.5 flex flex-col gap-0.5 ${isRtl ? "mr-4 border-r pr-1.5" : "ml-4 border-l pl-1.5"} border-line`}>
+                {CATALOG_CHILDREN.map((c) => (
+                  <NavLink key={c.href} item={c} active={isActive(c.href)} collapsed={false} isRtl={isRtl} small />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
           <NavLink key={it.href} item={it} active={isActive(it.href)} collapsed={collapsed} isRtl={isRtl} />
         ))}
 
@@ -252,8 +272,8 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
   );
 }
 
-function NavLink({ item, active, collapsed, isRtl }: {
-  item: Item; active: boolean; collapsed: boolean; isRtl?: boolean;
+function NavLink({ item, active, collapsed, isRtl, small }: {
+  item: Item; active: boolean; collapsed: boolean; isRtl?: boolean; small?: boolean;
 }) {
   const { Icon } = item;
   // Active indicator: left-side bar in LTR, right-side bar in RTL
@@ -273,8 +293,8 @@ function NavLink({ item, active, collapsed, isRtl }: {
           : "text-ink-soft hover:bg-canvas hover:text-brand-deep",
       ].join(" ")}
     >
-      <Icon className={["w-[15px] h-[15px] shrink-0", active ? "text-brand-purple" : ""].join(" ")} />
-      {!collapsed && <span className="flex-1 text-[13px]">{item.label}</span>}
+      <Icon className={[small ? "w-[13px] h-[13px] shrink-0" : "w-[15px] h-[15px] shrink-0", active ? "text-brand-purple" : ""].join(" ")} />
+      {!collapsed && <span className={`flex-1 ${small ? "text-[12.5px]" : "text-[13px]"}`}>{item.label}</span>}
       {!collapsed && item.badge ? (
         <span className="bg-brand-purple text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
           {item.badge}

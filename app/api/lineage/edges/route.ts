@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { logUpdate } from "@/lib/audit";
+import { submitLineageChanges, describeEdge } from "@/lib/lineage/changes";
 
 const ASSET_TYPES = new Set(["DATA_ENTITIES", "DATA_ATTRIBUTES"]);
 const SCOPES = new Set(["ENTITY_LEVEL", "ATTRIBUTE_LEVEL"]);
 
-// POST — manually create a lineage edge (steward/admin only)
+// POST — propose one manual lineage edge (steward/admin only); approval + history via lib/lineage/changes.
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,28 +29,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const [row] = await sql<{ id: number }[]>`
-      INSERT INTO bayanat.data_lineage
-        (lineage_scope_code, source_asset_id, target_asset_id, asset_type_code,
-         transformation_type_code, transformation_logic_text,
-         provenance_code, is_confirmed, updated_by_user_id)
-      VALUES
-        (${body.scope}, ${body.sourceAssetId}, ${body.targetAssetId}, ${body.assetTypeCode},
-         ${body.transformationTypeCode ?? "MANUAL"}, ${body.transformationLogicText ?? null},
-         'MANUAL', true, ${session.userId})
-      ON CONFLICT (lineage_scope_code, source_asset_id, target_asset_id, COALESCE(process_id, -1))
-      DO UPDATE SET transformation_type_code = EXCLUDED.transformation_type_code,
-                    transformation_logic_text = EXCLUDED.transformation_logic_text,
-                    updated_by_user_id = EXCLUDED.updated_by_user_id,
-                    last_updated_timestamp = NOW()
-      RETURNING lineage_id AS id
-    `;
-
-    await logUpdate(body.assetTypeCode, body.targetAssetId, session.userId, [
-      { field: "lineage_edge", oldVal: null, newVal: `Manual edge from asset #${body.sourceAssetId} (${body.scope})` },
-    ]);
-
-    return NextResponse.json({ lineageId: row.id }, { status: 201 });
+    const scope = body.scope as "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
+    const result = await submitLineageChanges([{
+      op: "CREATE", scope, sourceId: body.sourceAssetId, targetId: body.targetAssetId,
+      typeCode: body.transformationTypeCode ?? "MANUAL", logic: body.transformationLogicText ?? null,
+    }], session.userId, { origin: "DIALOG", title: `Add lineage: ${await describeEdge(scope, body.sourceAssetId, body.targetAssetId)}` });
+    if ("error" in result) return NextResponse.json(result, { status: 400 });
+    return NextResponse.json(result, { status: 201 });
   } catch (err) {
     console.error("[lineage edge create]", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to create edge" }, { status: 500 });

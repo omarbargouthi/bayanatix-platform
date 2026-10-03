@@ -12,6 +12,8 @@ import { LineageNodeCard, layerLabels, LAYER_DOT, EngineGlyph, engineLabels, typ
 import { ImpactReportPanel } from "./ImpactReportPanel";
 import { AddLineageModal, type PickedTable } from "./AddLineageModal";
 import { ChangeImpactPanel } from "./ChangeImpactPanel";
+import { ReviewRequestModal } from "./ReviewRequestModal";
+import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
@@ -120,7 +122,6 @@ function LineageGraphInner({
 
   const [selectedEntityId, setSelectedEntityId] = useState<number | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<GraphEdge | null>(null);
-  const [confirming, setConfirming] = useState(false);
   const [impactDirection, setImpactDirection] = useState<"UP" | "DOWN" | null>(null);
 
   // Manual lineage editing (stewards/admins): the Add Lineage dialog — opened from
@@ -129,11 +130,8 @@ function LineageGraphInner({
   const [reloadKey, setReloadKey] = useState(0);
   const [view, setView] = useState<"graph" | "table">("graph");
   const [changeImpactOpen, setChangeImpactOpen] = useState(false);
-  const [edgeTypes, setEdgeTypes] = useState<{ code: string; name: string }[]>([]);
-  const [editingEdge, setEditingEdge] = useState<{ typeCode: string; logic: string } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [edgeBusy, setEdgeBusy] = useState(false);
-  const [edgeError, setEdgeError] = useState<string | null>(null);
+  const [reviewEdge, setReviewEdge] = useState<GraphEdge | null>(null);
+  const [notice, setNotice] = useState<{ text: string; requestId: number | null } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -162,13 +160,7 @@ function LineageGraphInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus, scope, upDepth, downDepth, reloadKey, reloadSignal]);
 
-  useEffect(() => {
-    if (!canManage) return;
-    fetch("/api/lineage/transformation-types").then((r) => (r.ok ? r.json() : [])).then(setEdgeTypes).catch(() => {});
-  }, [canManage]);
 
-  // Reset the edge popover's edit/delete state whenever a different edge is picked.
-  useEffect(() => { setEditingEdge(null); setConfirmDelete(false); setEdgeError(null); }, [selectedEdge?.lineageId]);
 
   // ── Build React Flow nodes/edges whenever graph changes ─────────────────
   const refocusToColumn = useCallback((entityId: number, attributeId: number, name: string) => {
@@ -246,58 +238,10 @@ function LineageGraphInner({
     setAddLineage({ source: pickedTable(Number(conn.source)), target: pickedTable(Number(conn.target)) });
   }
 
-  async function saveEdgeEdit() {
-    if (!selectedEdge || !editingEdge) return;
-    setEdgeBusy(true); setEdgeError(null);
-    try {
-      const r = await fetch(`/api/lineage/edges/${selectedEdge.lineageId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transformationTypeCode: editingEdge.typeCode, transformationLogicText: editingEdge.logic }),
-      });
-      if (!r.ok) { setEdgeError((await r.json().catch(() => ({}))).error ?? t.lineageEditor.actionFailed); return; }
-      const name = edgeTypes.find((x) => x.code === editingEdge.typeCode)?.name ?? editingEdge.typeCode;
-      const patched = { ...selectedEdge, transformationTypeCode: editingEdge.typeCode, transformationTypeName: name, transformationLogicText: editingEdge.logic || null };
-      setSelectedEdge(patched);
-      setGraph((g) => g ? { ...g, edges: g.edges.map((e) => e.lineageId === patched.lineageId ? patched : e) } : g);
-      setEditingEdge(null);
-    } finally {
-      setEdgeBusy(false);
-    }
-  }
-
-  async function deleteEdge() {
-    if (!selectedEdge) return;
-    setEdgeBusy(true); setEdgeError(null);
-    try {
-      const r = await fetch(`/api/lineage/edges/${selectedEdge.lineageId}`, { method: "DELETE" });
-      if (!r.ok) { setEdgeError((await r.json().catch(() => ({}))).error ?? t.lineageEditor.actionFailed); return; }
-      setSelectedEdge(null);
-      setReloadKey((k) => k + 1);
-    } finally {
-      setEdgeBusy(false);
-    }
-  }
-
   function onEdgeClick(_e: React.MouseEvent, edge: Edge) {
     const full = graph?.edges.find((e) => e.lineageId === Number(edge.id));
     setSelectedEdge(full ?? null);
     setSelectedEntityId(null);
-  }
-
-  async function confirmEdge() {
-    if (!selectedEdge) return;
-    setConfirming(true);
-    try {
-      const r = await fetch(`/api/lineage/edges/${selectedEdge.lineageId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "confirm" }),
-      });
-      if (r.ok) {
-        setSelectedEdge({ ...selectedEdge, isConfirmed: true });
-        setGraph((g) => g ? { ...g, edges: g.edges.map((e) => e.lineageId === selectedEdge.lineageId ? { ...e, isConfirmed: true } : e) } : g);
-      }
-    } finally {
-      setConfirming(false);
-    }
   }
 
   const selectedNode = useMemo(() => graph?.nodes.find((n) => n.entityId === selectedEntityId) ?? null, [graph, selectedEntityId]);
@@ -431,6 +375,16 @@ function LineageGraphInner({
         </div>
       </div>
 
+      {notice && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2 text-[12px] text-emerald-700 bg-emerald-50 border-b border-emerald-200 shrink-0">
+          <span>
+            {notice.text}{" "}
+            {notice.requestId && <Link href={`/requests/${notice.requestId}`} className="font-semibold underline">{t.lineageRegister.requestNo.replace("{id}", String(notice.requestId))}</Link>}
+          </span>
+          <button onClick={() => setNotice(null)} className="text-base leading-none opacity-60 hover:opacity-100">×</button>
+        </div>
+      )}
+
       {/* ── Canvas ── */}
       <div className="flex-1 relative">
         {loading && (
@@ -526,51 +480,18 @@ function LineageGraphInner({
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${selectedEdge.provenanceCode === "SCANNED" ? "bg-sky-50 text-sky-700" : "bg-purple-50 text-purple-700"}`}>
                 {selectedEdge.provenanceCode === "SCANNED" ? t.lineage.edge.autoScanned : t.lineage.edge.manual}{selectedEdge.confidenceCode ? ` · ${selectedEdge.confidenceCode}` : ""}
               </span>
-              {canManage && selectedEdge.provenanceCode === "SCANNED" && !selectedEdge.isConfirmed && (
-                <button onClick={confirmEdge} disabled={confirming} className="btn btn-primary btn-sm text-[11px]">{confirming ? t.lineage.edge.confirming : t.lineage.edge.confirm}</button>
-              )}
               {selectedEdge.isConfirmed && <span className="text-[11px] text-emerald-600 font-medium">{t.lineage.edge.confirmed}</span>}
             </div>
 
-            {canManage && editingEdge && (
-              <div className="space-y-2 pt-1 border-t border-line-soft">
-                <select className="input-field w-full text-[12px] mt-2" value={editingEdge.typeCode} onChange={(e) => setEditingEdge({ ...editingEdge, typeCode: e.target.value })}>
-                  {edgeTypes.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
-                </select>
-                <textarea className="input-field w-full font-mono text-[11px]" rows={3} placeholder={t.lineageEditor.logicPh} value={editingEdge.logic} onChange={(e) => setEditingEdge({ ...editingEdge, logic: e.target.value })} />
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setEditingEdge(null)} className="btn btn-sm text-[11px]">{t.common.cancel}</button>
-                  <button onClick={saveEdgeEdit} disabled={edgeBusy} className="btn btn-primary btn-sm text-[11px]">{edgeBusy ? t.lineageEditor.saving : t.lineageEditor.saveEdge}</button>
-                </div>
-              </div>
-            )}
+            {/* Not right? Ask the owners to review it — links aren't confirmed or deleted in place.
+                Manual links are edited/removed (with approval) in the Mapping Register. */}
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-line-soft">
+              <Link href={`/lineage?view=register&q=${encodeURIComponent(selectedEdge.targetColumnName ?? graph?.nodes.find((n) => n.entityId === selectedEdge.targetEntityId)?.entityName ?? "")}`} className="text-[12px] text-ink-soft hover:text-brand-purple hover:underline">
+                {t.lineageRegister.openInRegister}
+              </Link>
+              <button onClick={() => setReviewEdge(selectedEdge)} className="text-[12px] font-semibold text-sky-700 hover:underline">{t.lineageRegister.actReview}</button>
+            </div>
 
-            {canManage && !editingEdge && confirmDelete && (
-              <div className="pt-2 border-t border-line-soft space-y-2">
-                <div className="text-[12px] font-semibold text-ink">{t.lineageEditor.deleteConfirm}</div>
-                {selectedEdge.provenanceCode === "SCANNED" && <div className="text-[11px] text-muted">{t.lineageEditor.deleteScannedNote}</div>}
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setConfirmDelete(false)} className="btn btn-sm text-[11px]">{t.common.cancel}</button>
-                  <button onClick={deleteEdge} disabled={edgeBusy} className="btn btn-sm text-[11px] !bg-red-600 !text-white !border-red-600">{t.lineageEditor.yesDelete}</button>
-                </div>
-              </div>
-            )}
-
-            {canManage && !editingEdge && !confirmDelete && (
-              <div className="flex justify-end gap-3 pt-2 border-t border-line-soft">
-                {selectedEdge.provenanceCode === "MANUAL" && (
-                  <button
-                    onClick={() => setEditingEdge({ typeCode: selectedEdge.transformationTypeCode ?? "MANUAL", logic: selectedEdge.transformationLogicText ?? "" })}
-                    className="text-[12px] font-medium text-brand-purple hover:underline"
-                  >
-                    {t.lineageEditor.editEdge}
-                  </button>
-                )}
-                <button onClick={() => setConfirmDelete(true)} className="text-[12px] font-medium text-red-600 hover:underline">{t.lineageEditor.deleteEdge}</button>
-              </div>
-            )}
-
-            {edgeError && <div className="text-[11px] text-red-600">{edgeError}</div>}
           </div>
         )}
       </div>
@@ -580,7 +501,21 @@ function LineageGraphInner({
           initialSource={addLineage.source}
           initialTarget={addLineage.target}
           onClose={() => setAddLineage(null)}
-          onSaved={() => { setAddLineage(null); setReloadKey((k) => k + 1); }}
+          onSaved={(res) => {
+            setAddLineage(null);
+            setReloadKey((k) => k + 1);
+            setNotice(res?.mode === "PENDING"
+              ? { text: t.lineageRegister.submittedPending.replace("{id}", String(res.requestId)), requestId: res.requestId }
+              : { text: t.lineageRegister.submittedApplied, requestId: null });
+          }}
+        />
+      )}
+
+      {reviewEdge && (
+        <ReviewRequestModal
+          lineageId={reviewEdge.lineageId}
+          label={`${graph?.nodes.find((n) => n.entityId === reviewEdge.sourceEntityId)?.entityName ?? "?"}${reviewEdge.sourceColumnName ? "." + reviewEdge.sourceColumnName : ""} → ${graph?.nodes.find((n) => n.entityId === reviewEdge.targetEntityId)?.entityName ?? "?"}${reviewEdge.targetColumnName ? "." + reviewEdge.targetColumnName : ""}`}
+          onClose={() => setReviewEdge(null)}
         />
       )}
 

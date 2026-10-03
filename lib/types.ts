@@ -479,7 +479,9 @@ export type RequestTypeCode =
   | "PUBLISH_OPEN_DATA"
   | "PUBLISH_OPEN_DATA_PI"
   | "METADATA_UPDATE"
-  | "CHANGE_IMPACT_REVIEW";
+  | "CHANGE_IMPACT_REVIEW"
+  | "LINEAGE_CHANGE"
+  | "LINEAGE_REVIEW";
 
 // ── Open Data ─────────────────────────────────────────────────────────────────
 

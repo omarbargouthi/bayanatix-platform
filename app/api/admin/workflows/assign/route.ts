@@ -10,7 +10,8 @@ export async function POST(req: Request) {
   const { requestTypeCode, workflowId } = await req.json();
   const VALID_TYPES = [
     "FIX_DATA_ISSUE", "UPDATE_DEFINITION", "CERTIFY_ASSET", "GRANT_ACCESS", "REMOVE_ACCESS", "OTHER",
-    "CLASSIFY_ASSET", "COMPLIANCE_REVIEW", "PUBLISH_OPEN_DATA", "PUBLISH_OPEN_DATA_PI", "METADATA_UPDATE", "CHANGE_IMPACT_REVIEW",
+    "CLASSIFY_ASSET", "COMPLIANCE_REVIEW", "PUBLISH_OPEN_DATA", "PUBLISH_OPEN_DATA_PI", "PI_CLEAR_TEXT_ACCESS", "METADATA_UPDATE", "CHANGE_IMPACT_REVIEW",
+    "LINEAGE_CHANGE", "LINEAGE_REVIEW",
   ];
   if (!VALID_TYPES.includes(requestTypeCode))
     return NextResponse.json({ error: "Invalid requestTypeCode" }, { status: 400 });
