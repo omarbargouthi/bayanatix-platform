@@ -1,6 +1,11 @@
 // Platform policy settings (db/144): retention periods for Bayanis's own records,
 // and the acceptable-use / activity-monitoring consent shown after sign-in.
+// The notice is English-base like other admin-defined text: other languages are
+// translated in Languages & Translations (category PLATFORM_CONSENT, db/145).
 import { sql } from "../db";
+import { upsertKey } from "../i18n-admin/translatable-fields";
+
+const CONSENT_KEYS = { title: "platform_consent.1.title", text: "platform_consent.1.text" };
 
 export type RetentionSettings = {
   auditLogDays: number | null;
@@ -11,7 +16,7 @@ export type RetentionSettings = {
 };
 export type ConsentSettings = {
   consentEnabled: boolean; consentVersion: number;
-  consentTitleEn: string; consentTextEn: string; consentTitleAr: string; consentTextAr: string;
+  consentTitleEn: string; consentTextEn: string;
   consentUpdatedAt: string | null;
 };
 export type PolicySettings = RetentionSettings & ConsentSettings & {
@@ -25,7 +30,6 @@ export async function getPolicySettings(): Promise<PolicySettings> {
            last_retention_run_at::text AS "lastRetentionRunAt", last_retention_result AS "lastRetentionResult",
            consent_enabled AS "consentEnabled", consent_version AS "consentVersion",
            consent_title_en AS "consentTitleEn", consent_text_en AS "consentTextEn",
-           consent_title_ar AS "consentTitleAr", consent_text_ar AS "consentTextAr",
            consent_updated_at::text AS "consentUpdatedAt"
     FROM bayanat.platform_policy_settings WHERE settings_id = 1
   `;
@@ -44,16 +48,59 @@ export async function updateRetentionSettings(s: RetentionSettings, userId: stri
 
 /** requireReacceptance bumps the version, so everyone is asked again. */
 export async function updateConsentSettings(
-  c: { enabled: boolean; titleEn: string; textEn: string; titleAr: string; textAr: string; requireReacceptance: boolean }, userId: string,
+  c: { enabled: boolean; titleEn: string; textEn: string; requireReacceptance: boolean }, userId: string,
 ): Promise<void> {
   await sql`
     UPDATE bayanat.platform_policy_settings SET
       consent_enabled = ${c.enabled},
       consent_title_en = ${c.titleEn}, consent_text_en = ${c.textEn},
-      consent_title_ar = ${c.titleAr}, consent_text_ar = ${c.textAr},
       consent_version = consent_version + ${c.requireReacceptance ? 1 : 0},
       consent_updated_at = now(), consent_updated_by = ${userId}, updated_at = now(), updated_by_user_id = ${userId}
     WHERE settings_id = 1
+  `;
+  // Keep the translation keys in step right away (not on the next Workbench sync):
+  // a changed English text marks existing translations STALE, so nobody is shown
+  // a translation of wording that no longer applies.
+  const counters = { keysCreated: 0, keysUpdatedStale: 0, secondarySeeded: 0 };
+  if (c.titleEn.trim()) await upsertKey(counters, "PLATFORM_CONSENT", CONSENT_KEYS.title, c.titleEn.trim(), "en", "ar", null);
+  if (c.textEn.trim()) await upsertKey(counters, "PLATFORM_CONSENT", CONSENT_KEYS.text, c.textEn.trim(), "en", "ar", null);
+}
+
+/** The notice in the user's language; falls back to English while a translation
+ *  is missing or out of date (STALE), same as other translated text. */
+export async function getConsentNotice(lang: string): Promise<{ title: string; text: string; version: number; lang: string }> {
+  const s = await getPolicySettings();
+  const english = { title: s.consentTitleEn, text: s.consentTextEn, version: s.consentVersion, lang: "en" };
+  if (lang === "en") return english;
+  const rows = await sql<{ keyCode: string; text: string }[]>`
+    SELECT tk.key_code AS "keyCode", tr.translated_text AS text
+    FROM bayanat.translation_keys tk
+    JOIN bayanat.translations tr ON tr.key_id = tk.key_id
+    WHERE tk.key_code IN ${sql([CONSENT_KEYS.title, CONSENT_KEYS.text])} AND tr.language_code = ${lang}
+      AND tr.status_code <> 'STALE' AND btrim(coalesce(tr.translated_text, '')) <> ''
+  `;
+  const tr = Object.fromEntries(rows.map((r) => [r.keyCode, r.text]));
+  // Title and text are a pair: switch language only when the body itself is translated.
+  if (!tr[CONSENT_KEYS.text]) return english;
+  return { title: tr[CONSENT_KEYS.title] ?? s.consentTitleEn, text: tr[CONSENT_KEYS.text], version: s.consentVersion, lang };
+}
+
+/** Per enabled non-English language: is the notice translated and current? */
+export async function getConsentTranslationStatus(): Promise<{ languageCode: string; languageName: string; status: "CURRENT" | "STALE" | "MISSING" }[]> {
+  return sql<{ languageCode: string; languageName: string; status: "CURRENT" | "STALE" | "MISSING" }[]>`
+    SELECT l.language_code AS "languageCode", l.language_name_text AS "languageName",
+      CASE
+        WHEN count(tr.translation_id) FILTER (WHERE tr.status_code = 'STALE') > 0 THEN 'STALE'
+        WHEN count(tr.translation_id) FILTER (WHERE tr.status_code <> 'MISSING' AND btrim(coalesce(tr.translated_text, '')) <> '')
+             = count(tk.key_id) AND count(tk.key_id) > 0 THEN 'CURRENT'
+        ELSE 'MISSING'
+      END AS status
+    FROM bayanat.languages l
+    LEFT JOIN bayanat.translation_keys tk ON tk.category_code = 'PLATFORM_CONSENT'
+    LEFT JOIN bayanat.translations tr ON tr.key_id = tk.key_id AND tr.language_code = l.language_code
+    WHERE l.is_enabled_indicator AND l.language_code <> 'en'
+    GROUP BY l.language_code, l.language_name_text
+    ORDER BY l.language_name_text
   `;
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Settings = {
@@ -7,7 +8,13 @@ type Settings = {
   notificationDays: number | null; dqSampleDays: number | null;
   lastRetentionRunAt: string | null; lastRetentionResult: Record<string, number> | null;
   consentEnabled: boolean; consentVersion: number;
-  consentTitleEn: string; consentTextEn: string; consentTitleAr: string; consentTextAr: string; consentUpdatedAt: string | null;
+  consentTitleEn: string; consentTextEn: string; consentUpdatedAt: string | null;
+};
+type TranslationStatus = { languageCode: string; languageName: string; status: "CURRENT" | "STALE" | "MISSING" };
+const TR_STATUS: Record<TranslationStatus["status"], { label: string; cls: string }> = {
+  CURRENT: { label: "translated", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  STALE: { label: "out of date, English shown until updated", cls: "text-amber-700 bg-amber-50 border-amber-200" },
+  MISSING: { label: "not translated, English shown", cls: "text-red-600 bg-red-50 border-red-200" },
 };
 type Stats = { version: number; activeUsers: number; accepted: number; recent: { userName: string; userId: string; version: number; decision: string; decidedAt: string }[] };
 
@@ -26,18 +33,19 @@ const fmt = (s: string | null) => (s ? new Date(s).toLocaleString("en-GB", { day
 export function PrivacyRetentionSection() {
   const [s, setS] = useState<Settings | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [translations, setTranslations] = useState<TranslationStatus[]>([]);
   const [retention, setRetention] = useState<Record<string, string>>({});
-  const [consent, setConsent] = useState({ enabled: false, titleEn: "", textEn: "", titleAr: "", textAr: "" });
+  const [consent, setConsent] = useState({ enabled: false, titleEn: "", textEn: "" });
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
     const r = await fetch("/api/admin/privacy-settings");
     if (!r.ok) return;
-    const d: { settings: Settings; consentStats: Stats } = await r.json();
-    setS(d.settings); setStats(d.consentStats);
+    const d: { settings: Settings; consentStats: Stats; consentTranslations: TranslationStatus[] } = await r.json();
+    setS(d.settings); setStats(d.consentStats); setTranslations(d.consentTranslations ?? []);
     setRetention(Object.fromEntries(RETENTION_FIELDS.map((f) => [f.key, d.settings[f.key] == null ? "" : String(d.settings[f.key])])));
-    setConsent({ enabled: d.settings.consentEnabled, titleEn: d.settings.consentTitleEn, textEn: d.settings.consentTextEn, titleAr: d.settings.consentTitleAr, textAr: d.settings.consentTextAr });
+    setConsent({ enabled: d.settings.consentEnabled, titleEn: d.settings.consentTitleEn, textEn: d.settings.consentTextEn });
   }
   useEffect(() => { load(); }, []);
 
@@ -65,7 +73,7 @@ export function PrivacyRetentionSection() {
   }
 
   if (!s) return <div className="py-8 text-center text-muted text-sm">Loading…</div>;
-  const consentChanged = consent.titleEn !== s.consentTitleEn || consent.textEn !== s.consentTextEn || consent.titleAr !== s.consentTitleAr || consent.textAr !== s.consentTextAr;
+  const consentChanged = consent.titleEn !== s.consentTitleEn || consent.textEn !== s.consentTextEn;
 
   return (
     <div className="space-y-8">
@@ -135,19 +143,25 @@ export function PrivacyRetentionSection() {
             Current version: <b>{stats.version}</b>{s.consentUpdatedAt && ` (updated ${fmt(s.consentUpdatedAt)})`} · accepted by <b>{stats.accepted}</b> of {stats.activeUsers} active user(s)
           </div>
         )}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-[10px] font-semibold text-muted uppercase block">Title (English)</label>
-            <input className="input w-full text-sm" value={consent.titleEn} onChange={(e) => setConsent((c) => ({ ...c, titleEn: e.target.value }))} />
-            <label className="text-[10px] font-semibold text-muted uppercase block">Notice (English)</label>
-            <textarea className="input w-full text-[13px] leading-relaxed" rows={12} value={consent.textEn} onChange={(e) => setConsent((c) => ({ ...c, textEn: e.target.value }))} />
-          </div>
-          <div className="space-y-2" dir="rtl">
-            <label className="text-[10px] font-semibold text-muted uppercase block">العنوان (عربي)</label>
-            <input className="input w-full text-sm" value={consent.titleAr} onChange={(e) => setConsent((c) => ({ ...c, titleAr: e.target.value }))} />
-            <label className="text-[10px] font-semibold text-muted uppercase block">نص الإشعار (عربي)</label>
-            <textarea className="input w-full text-[13px] leading-relaxed" rows={12} value={consent.textAr} onChange={(e) => setConsent((c) => ({ ...c, textAr: e.target.value }))} />
-          </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-semibold text-muted uppercase block">Title</label>
+          <input className="input w-full text-sm" value={consent.titleEn} onChange={(e) => setConsent((c) => ({ ...c, titleEn: e.target.value }))} />
+          <label className="text-[10px] font-semibold text-muted uppercase block">Notice</label>
+          <textarea className="input w-full text-[13px] leading-relaxed" rows={12} value={consent.textEn} onChange={(e) => setConsent((c) => ({ ...c, textEn: e.target.value }))} />
+          <p className="text-[11px] text-muted">
+            English is the base text. Arabic and any other enabled language are translated in{" "}
+            <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>{" "}
+            (category &ldquo;User Consent Notice&rdquo;). Saving a change to the English marks existing translations out of date.
+          </p>
+          {translations.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {translations.map((t) => (
+                <span key={t.languageCode} className={`text-[11px] border rounded-full px-2.5 py-0.5 ${TR_STATUS[t.status].cls}`}>
+                  <bdi>{t.languageName}</bdi>: {TR_STATUS[t.status].label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-soft">
           <button

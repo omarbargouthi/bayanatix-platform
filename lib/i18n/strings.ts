@@ -2966,4 +2966,14 @@ export type I18nStrings = {
     onlyClear:        string;
     empty:            string;
   };
+  consent: {
+    hello:     string;
+    intro:     string;
+    version:   string;
+    agree:     string;
+    accept:    string;
+    decline:   string;
+    saving:    string;
+    failed:    string;
+  };
 };

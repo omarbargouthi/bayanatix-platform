@@ -1,18 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import type { I18nStrings } from "@/lib/i18n/strings";
 
-// Labels are fixed bilingual strings (this page sits outside the app shell and its
-// language provider); the notice itself is the admin-authored text for the language.
-const LABELS = {
-  en: { hello: "Hello {name}.", intro: "Before you continue, please read and accept this notice.", version: "Version {n}", accept: "I accept", decline: "Decline and sign out", agree: "I have read and understood this notice.", saving: "Saving…", failed: "Could not save your decision. Please try again." },
-  ar: { hello: "مرحباً {name}،", intro: "قبل المتابعة، يرجى قراءة هذا الإشعار والموافقة عليه.", version: "الإصدار {n}", accept: "أوافق", decline: "رفض وتسجيل الخروج", agree: "قرأت هذا الإشعار وفهمته.", saving: "جارٍ الحفظ…", failed: "تعذر حفظ قرارك. يرجى المحاولة مرة أخرى." },
-};
-
-export function ConsentClient({ lang, userName, title, text, version }: {
-  lang: "en" | "ar"; userName: string; title: string; text: string; version: number;
+// Labels are resolved server-side (this page sits outside the app shell and its
+// language provider); the notice is the admin-authored text, translated or English.
+export function ConsentClient({ dir, noticeDir, labels: L, userName, title, text, version }: {
+  dir: "ltr" | "rtl"; noticeDir: "ltr" | "rtl"; labels: I18nStrings["consent"];
+  userName: string; title: string; text: string; version: number;
 }) {
-  const L = LABELS[lang];
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +30,7 @@ export function ConsentClient({ lang, userName, title, text, version }: {
   }
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-canvas flex items-center justify-center px-4 py-10">
+    <div dir={dir} className="min-h-screen bg-canvas flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-2xl bg-white border border-line rounded-2xl shadow-xl">
         <div className="flex items-center gap-3 px-8 pt-7 pb-5 border-b border-line">
           <img src="/logo.svg" alt="" className="w-7 h-9" />
@@ -43,10 +39,10 @@ export function ConsentClient({ lang, userName, title, text, version }: {
         <div className="px-8 py-6 space-y-4">
           <div>
             <p className="text-sm text-ink-soft">{L.hello.replace("{name}", userName)} {L.intro}</p>
-            <h1 className="text-xl font-bold text-brand-deep mt-3">{title}</h1>
+            <h1 dir={noticeDir} className="text-xl font-bold text-brand-deep mt-3">{title}</h1>
             <p className="text-[11px] text-muted mt-0.5">{L.version.replace("{n}", String(version))}</p>
           </div>
-          <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-line-soft bg-canvas-soft px-5 py-4 text-[14px] leading-relaxed text-ink whitespace-pre-wrap">
+          <div dir={noticeDir} className="max-h-[50vh] overflow-y-auto rounded-lg border border-line-soft bg-canvas-soft px-5 py-4 text-[14px] leading-relaxed text-ink whitespace-pre-wrap">
             {text}
           </div>
           <label className="flex items-center gap-2.5 text-sm text-ink cursor-pointer">

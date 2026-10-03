@@ -166,6 +166,17 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
       { keySuffix: "inverse_name", textColumn: "inverse_name_text", secondaryColumn: "inverse_name_ar_text" },
     ],
   },
+  {
+    // Single settings row (db/144-145). Saving the notice also upserts these keys
+    // immediately (lib/privacy/policy-settings.ts) so a changed English text marks
+    // translations STALE without waiting for a sync.
+    categoryCode: "PLATFORM_CONSENT", table: "bayanat.platform_policy_settings", idExpr: "settings_id::text",
+    keyPrefix: "platform_consent",
+    fields: [
+      { keySuffix: "title", textColumn: "consent_title_en" },
+      { keySuffix: "text", textColumn: "consent_text_en" },
+    ],
+  },
 ];
 
 // Small, heavily-repeated value sets embedded as free text in a larger table (no

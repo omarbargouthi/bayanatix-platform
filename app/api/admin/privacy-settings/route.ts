@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { logUpdate } from "@/lib/audit";
 import {
-  getPolicySettings, updateRetentionSettings, updateConsentSettings, getConsentStats, type RetentionSettings,
+  getPolicySettings, updateRetentionSettings, updateConsentSettings, getConsentStats, getConsentTranslationStatus,
+  type RetentionSettings,
 } from "@/lib/privacy/policy-settings";
 
-// GET — retention periods + consent notice settings + who has accepted (admin only).
+// GET — retention periods + consent notice settings + who has accepted + translation
+// status of the notice per enabled language (admin only).
 export async function GET() {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const [settings, consentStats] = await Promise.all([getPolicySettings(), getConsentStats()]);
-  return NextResponse.json({ settings, consentStats });
+  const [settings, consentStats, consentTranslations] = await Promise.all([getPolicySettings(), getConsentStats(), getConsentTranslationStatus()]);
+  return NextResponse.json({ settings, consentStats, consentTranslations });
 }
 
 const days = (v: unknown): number | null | "invalid" => {
@@ -19,7 +21,8 @@ const days = (v: unknown): number | null | "invalid" => {
   return Number.isInteger(n) && n >= 1 && n <= 36500 ? n : "invalid";
 };
 
-// PUT — { retention?: {...days or null}, consent?: { enabled, titleEn, textEn, titleAr, textAr, requireReacceptance } }
+// PUT — { retention?: {...days or null}, consent?: { enabled, titleEn, textEn, requireReacceptance } }
+// The notice is English-base; other languages are translated in Languages & Translations.
 export async function PUT(req: Request) {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -47,8 +50,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "The English title and text are required to switch the consent notice on" }, { status: 400 });
     }
     await updateConsentSettings({
-      enabled: !!c.enabled, titleEn: String(c.titleEn ?? ""), textEn: String(c.textEn ?? ""),
-      titleAr: String(c.titleAr ?? ""), textAr: String(c.textAr ?? ""), requireReacceptance: !!c.requireReacceptance,
+      enabled: !!c.enabled, titleEn: String(c.titleEn ?? ""), textEn: String(c.textEn ?? ""), requireReacceptance: !!c.requireReacceptance,
     }, session.userId);
     await logUpdate("PLATFORM_SETTINGS", 1, session.userId, [
       { field: "consent.enabled", oldVal: String(before.consentEnabled), newVal: String(!!c.enabled) },

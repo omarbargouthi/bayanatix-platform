@@ -2823,4 +2823,14 @@ export const en: I18nStrings = {
     onlyClear:        "Clear-text views only",
     empty:            "No access recorded yet.",
   },
+  consent: {
+    hello:     "Hello {name}.",
+    intro:     "Before you continue, please read and accept this notice.",
+    version:   "Version {n}",
+    agree:     "I have read and understood this notice.",
+    accept:    "I accept",
+    decline:   "Decline and sign out",
+    saving:    "Saving…",
+    failed:    "Could not save your decision. Please try again.",
+  },
 };
