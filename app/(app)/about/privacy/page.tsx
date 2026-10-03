@@ -74,6 +74,7 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
     evidence: [
       { text: "Freedom-of-information requests are handled through a public portal with SLA tracking and an appeals process.", href: "/foi" },
       { text: "Access to personal data in clear text is tied to a purpose and legal basis, and every such access is logged." },
+      { text: "Data subject requests (access, correction, erasure, restriction) are answered by following the retention path: the master table, its related tables and their PI columns, with legal-hold and retention-period exceptions, due dates and per-table tracking. Bayanis never stores the person's identity — the locate queries take it as a parameter.", href: "/privacy?tab=dsr" },
       { text: "Compliance assessments cover PDPL and other privacy regulations, with evidence and review.", href: "/governance/compliance" },
     ],
   },
