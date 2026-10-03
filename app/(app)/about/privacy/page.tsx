@@ -52,7 +52,7 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
     evidence: [
       { text: "Data source passwords and AI provider keys are encrypted at rest (AES-256-GCM)." },
       { text: "Role-based access at domain, source, schema, table and column level; single sign-on with LDAP / Active Directory and OpenID Connect." },
-      { text: "Security headers on every page, including a Content-Security-Policy, HSTS, clickjacking protection and a strict referrer policy." },
+      { text: "Security headers on every page, including a nonce-based Content-Security-Policy (only scripts carrying that request's one-time nonce can run), HSTS, clickjacking protection and a strict referrer policy." },
       { text: "Retention schedules drive deletion, with legal holds that block it where required.", href: "/privacy" },
       { text: "Bayanis's own records (audit log, data access log, job logs, notifications, data-quality samples) are deleted automatically after the retention periods set by the administrator.", href: "/admin/configuration" },
     ],
@@ -82,7 +82,6 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
 
 const GAPS = [
   "Data-subject requests for Bayanis's own user accounts (export or erase a user's profile and activity) are handled manually.",
-  "The Content-Security-Policy still allows inline scripts (needed by the framework); nonce-based scripts are planned.",
   "Encryption keys are rotated manually; there is no built-in key-rotation tool yet.",
 ];
 
