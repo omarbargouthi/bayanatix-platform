@@ -9,7 +9,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { LineageNodeCard, objectTypeLabels, TYPE_DOT, TYPE_COLORS, EngineGlyph, engineLabels, type LineageNodeData } from "./LineageNode";
-import { OBJECT_TYPES } from "@/lib/object-types";
+import { OBJECT_TYPES, isViewType } from "@/lib/object-types";
+import { ViewAnatomyPanel } from "./ViewAnatomyPanel";
 import { ImpactReportPanel } from "./ImpactReportPanel";
 import { AddLineageModal, type PickedTable } from "./AddLineageModal";
 import { ChangeImpactPanel } from "./ChangeImpactPanel";
@@ -130,6 +131,7 @@ function LineageGraphInner({
   const [reloadKey, setReloadKey] = useState(0);
   const [view, setView] = useState<"graph" | "table">("graph");
   const [changeImpactOpen, setChangeImpactOpen] = useState(false);
+  const [viewAnatomyId, setViewAnatomyId] = useState<number | null>(null);
   const [reviewEdge, setReviewEdge] = useState<GraphEdge | null>(null);
   const [notice, setNotice] = useState<{ text: string; requestId: number | null } | null>(null);
 
@@ -449,6 +451,11 @@ function LineageGraphInner({
               <div className="flex justify-between"><span className="text-muted">{t.lineage.detail.rows}</span><span className="text-ink font-medium">{selectedNode.rowCountEstimate != null ? selectedNode.rowCountEstimate.toLocaleString() : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted">{t.lineage.detail.columns}</span><span className="text-ink font-medium">{selectedNode.columnCount}</span></div>
             </div>
+            {isViewType(selectedNode.objectTypeCode) && (
+              <button onClick={() => setViewAnatomyId(selectedNode.entityId)} className="btn btn-sm text-xs w-full">
+                {t.viewAnatomy.open}
+              </button>
+            )}
             {selectedNode.entityId === graph?.focus.entityId && (
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button onClick={() => setImpactDirection("DOWN")} className="bg-canvas-soft hover:bg-line-soft rounded-lg p-2 text-center transition-colors">
@@ -523,6 +530,8 @@ function LineageGraphInner({
           onClose={() => setReviewEdge(null)}
         />
       )}
+
+      {viewAnatomyId != null && <ViewAnatomyPanel entityId={viewAnatomyId} onClose={() => setViewAnatomyId(null)} />}
 
       {changeImpactOpen && graph && (
         <ChangeImpactPanel
