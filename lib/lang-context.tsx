@@ -96,8 +96,10 @@ async function fetchBundle(lang: Lang): Promise<Record<string, string>> {
 
 async function fetchLookupCache(): Promise<LookupCache> {
   try {
+    // Signed-out pages (login, public FOI form) get a 401 here — lookups are only
+    // needed once signed in. Awaited inside the try so a bad response can't escape.
     const r = await fetch("/api/lookups/all");
-    if (r.ok) return r.json();
+    if (r.ok && (r.headers.get("content-type") ?? "").includes("application/json")) return await r.json();
   } catch {}
   return {};
 }

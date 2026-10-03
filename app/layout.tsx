@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,6 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading the request headers renders every page per request, so each one carries
+  // its own CSP nonce (middleware.ts) — a pre-rendered page would have none and its
+  // scripts would be blocked.
+  headers().get("x-nonce");
   return (
     <html lang="en">
       <head>

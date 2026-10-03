@@ -1,24 +1,3 @@
-// Content-Security-Policy (verified page by page in a browser). Everything must come
-// from this origin except Google Fonts; no plugins, no framing, no foreign forms
-// targets other than https (OIDC sign-in redirects). Next.js still needs inline
-// scripts for its hydration payload, and eval + websockets in dev only (React
-// Refresh / HMR). Tightening to nonce-based scripts is a follow-up that needs a
-// per-request nonce through middleware.
-const isDev = process.env.NODE_ENV !== "production";
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob:",
-  `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self' https:",
-  "frame-ancestors 'none'",
-].join("; ");
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -32,7 +11,8 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["libpg-query", "xlsx"],
   },
-  // Security headers, applied to every response (CSP defined above).
+  // Security headers, applied to every response. The Content-Security-Policy is
+  // per request (nonce-based) and set by middleware.ts — see lib/csp.ts.
   async headers() {
     return [
       {
@@ -46,7 +26,6 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "Content-Security-Policy", value: csp },
         ],
       },
     ];

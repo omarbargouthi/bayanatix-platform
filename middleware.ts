@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { verifyLicense, isLicenseBlocked } from "@/lib/license/verify";
+import { buildCsp, newNonce } from "@/lib/csp";
 
 const PUBLIC_PREFIXES = [
   "/license-expired",   // must stay reachable even when the license check below blocks everything else
@@ -34,6 +35,19 @@ function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/") || pathname === "/logo.svg");
 }
 
+// Continue with a per-request nonce-based Content-Security-Policy (lib/csp.ts): set on
+// the request so Next.js stamps the nonce on its scripts, and on the response.
+function next(req: NextRequest): NextResponse {
+  const nonce = newNonce();
+  const csp = buildCsp(nonce);
+  const headers = new Headers(req.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", csp);
+  const res = NextResponse.next({ request: { headers } });
+  res.headers.set("Content-Security-Policy", csp);
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -49,7 +63,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  if (isPublic(pathname)) return NextResponse.next();
+  if (isPublic(pathname)) return next(req);
 
   const token = req.cookies.get("bayanatix_session")?.value;
   let valid = false;
@@ -63,12 +77,14 @@ export async function middleware(req: NextRequest) {
   }
 
   if (!valid) {
+    // API calls get a JSON 401 (a redirect would hand fetch() the HTML login page).
+    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("from", pathname);
     return NextResponse.redirect(url);
   }
-  return NextResponse.next();
+  return next(req);
 }
 
 export const config = {
