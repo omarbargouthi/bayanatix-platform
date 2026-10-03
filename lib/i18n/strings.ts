@@ -2667,6 +2667,7 @@ export type I18nStrings = {
       BULK_DOWNLOAD:         string;
       BULK_UPLOAD:           string;
       LINEAGE_IMPORT:        string;
+      LINEAGE_PROPAGATION:   string;
     };
   };
 
@@ -2903,5 +2904,46 @@ export type I18nStrings = {
     openInRegister:     string;
     scannedNoEdit:      string;
     importPending:      string;
+  };
+
+  // ── Metadata propagation along lineage (components/lineage/PropagationPanel.tsx) ──
+  lineagePropagation: {
+    tabPropagation:      string;
+    title:               string;
+    desc:                string;
+    viewSuggested:       string;
+    viewApplied:         string;
+    viewHistory:         string;
+    allFields:           string;
+    fieldCLASSIFICATION: string;
+    fieldBUSINESS_TERM:  string;
+    fieldDESCRIPTION:    string;
+    fieldTAG:            string;
+    fieldRETENTION:      string;
+    searchPh:            string;
+    runNow:              string;
+    running:             string;
+    lastRun:             string;
+    runFailed:           string;
+    colField:            string;
+    colValue:            string;
+    colFrom:             string;
+    colTo:               string;
+    colReason:           string;
+    colWhen:             string;
+    colStatus:           string;
+    accept:              string;
+    reject:              string;
+    stACCEPTED:          string;
+    stREJECTED:          string;
+    stSUPERSEDED:        string;
+    stAPPLIED:           string;
+    hops:                string;
+    empty:               string;
+    count:               string;
+    pii:                 string;
+    decideFailed:        string;
+    inheritedBadge:      string;
+    inheritedFrom:       string;
   };
 };

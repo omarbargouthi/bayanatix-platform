@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { logUpdate } from "../audit";
+import { schedulePropagation } from "../lineage/propagation";
 
 export type SitSuggestionRow = {
   attributeId: number;
@@ -95,6 +96,7 @@ async function applyClassificationTerm(attributeId: number, glossaryId: number, 
     VALUES (${glossaryId}, 'DATA_ATTRIBUTES', ${attributeId}, ${userId}, 'CLASSIFICATION')
     ON CONFLICT DO NOTHING
   `;
+  schedulePropagation("sit-classification");
 
   const [old] = await sql<{ classificationCode: string | null }[]>`
     SELECT classification_code AS "classificationCode" FROM bayanat.data_attributes WHERE attribute_id = ${attributeId}

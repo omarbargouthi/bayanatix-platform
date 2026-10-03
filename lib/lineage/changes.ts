@@ -10,6 +10,7 @@ import { logUpdate } from "../audit";
 import { startWorkflow, resolveAssetSteward } from "../workflow";
 import { createNotification } from "../queries/notifications";
 import { upsertManualEdge } from "./manual-edges";
+import { schedulePropagation } from "./propagation";
 
 export type LineageScope = "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL";
 export type LineageOp =
@@ -196,6 +197,7 @@ export async function submitLineageChanges(
 
   if (!mapping) {
     await auditApplied(inserted);
+    schedulePropagation("lineage-change");
     return { mode: "APPLIED", requestId: null, changes: inserted.length };
   }
   // A "Deactive" workflow approves on the spot — applyLineageRequest runs inside startWorkflow.
@@ -225,6 +227,7 @@ export async function applyLineageRequest(requestId: number, approved: boolean):
     }
   });
   await auditApplied(applied);
+  if (applied.length > 0) schedulePropagation("lineage-change-approved");
 }
 
 // "This link doesn't look right" — a review request against one lineage link,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { schedulePropagation } from "@/lib/lineage/propagation";
 
 type Params = { params: { assetType: string; assetId: string } };
 
@@ -40,12 +41,25 @@ export async function PUT(req: Request, { params }: Params) {
     const classificationId: number | null = body.classificationId ?? null;
     const enrichmentIds: number[]         = body.enrichmentIds ?? [];
 
+    // A classification inherited through lineage that comes back unchanged stays
+    // inherited (keeps following its source) instead of turning into a manual one.
+    const [inherited] = await sql<{ glossaryId: number; propagationId: number }[]>`
+      SELECT glossary_id AS "glossaryId", propagation_id AS "propagationId" FROM bayanat.asset_business_terms
+      WHERE asset_type_code = ${assetType} AND asset_id = ${assetId} AND term_role = 'CLASSIFICATION' AND propagation_id IS NOT NULL
+    `;
+
     await sql`
       DELETE FROM bayanat.asset_business_terms
       WHERE asset_type_code = ${assetType} AND asset_id = ${assetId}
     `;
 
-    if (classificationId != null) {
+    if (classificationId != null && inherited && Number(inherited.glossaryId) === classificationId) {
+      await sql`
+        INSERT INTO bayanat.asset_business_terms (glossary_id, asset_type_code, asset_id, linked_by, term_role, propagation_id)
+        VALUES (${classificationId}, ${assetType}, ${assetId}, NULL, 'CLASSIFICATION', ${inherited.propagationId})
+        ON CONFLICT DO NOTHING
+      `;
+    } else if (classificationId != null) {
       await sql`
         INSERT INTO bayanat.asset_business_terms (glossary_id, asset_type_code, asset_id, linked_by, term_role)
         VALUES (${classificationId}, ${assetType}, ${assetId}, ${session.userId}, 'CLASSIFICATION')
@@ -75,5 +89,6 @@ export async function PUT(req: Request, { params }: Params) {
     }
   }
 
+  schedulePropagation("terms");
   return NextResponse.json({ ok: true });
 }

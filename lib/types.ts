@@ -137,6 +137,9 @@ export type DataAttribute = {
   classTermIsPii?:          boolean | null;
   classTermPiCategoryCode?: string | null;
   classTermPiCategoryName?: string | null;
+  // Classification inherited through lineage propagation (lib/lineage/propagation.ts), and its source column.
+  classInherited?:          boolean | null;
+  classInheritedFrom?:      string | null;
   // See DataEntity.lifecycleStatus — same soft-delete concept, column-level.
   lifecycleStatus?: "ACTIVE" | "DEPRECATED";
   deprecatedAt?: string | null;

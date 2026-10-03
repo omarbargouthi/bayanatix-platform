@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { canEditMetadata } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { startWorkflow } from "@/lib/workflow";
+import { schedulePropagation } from "@/lib/lineage/propagation";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -71,5 +72,6 @@ export async function POST(req: Request) {
     await startWorkflow(req_row.requestId, "CLASSIFY_ASSET", title);
   }
 
+  schedulePropagation("classification");
   return NextResponse.json({ ok: true, count: attributeIds.length });
 }

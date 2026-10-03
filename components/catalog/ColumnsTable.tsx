@@ -289,6 +289,14 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
             <div>
               <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colDetailTermWord}</span>
               <span className="font-semibold text-brand-deep">{attr.classTermName}</span>
+              {attr.classInherited && (
+                <span
+                  className="ms-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 align-middle cursor-help"
+                  title={t.lineagePropagation.inheritedFrom.replace("{source}", attr.classInheritedFrom ?? "?")}
+                >
+                  ↳ {t.lineagePropagation.inheritedBadge}
+                </span>
+              )}
             </div>
             <div>
               <span className="text-[10px] text-muted uppercase tracking-wide block mb-0.5">{c.colHeaderClassification}</span>
@@ -653,7 +661,8 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
                     return <div key="sensitivity" className="min-w-0"><ClassificationTag code={a.classTermClassCode ?? a.classificationCode} /></div>;
                   case "classTerm":
                     return (
-                      <div key="classTerm" className="min-w-0 text-[12px] text-ink-soft truncate">
+                      <div key="classTerm" className="min-w-0 text-[12px] text-ink-soft truncate" title={a.classInherited ? t.lineagePropagation.inheritedFrom.replace("{source}", a.classInheritedFrom ?? "?") : undefined}>
+                        {a.classInherited && <span className="text-sky-700 font-semibold me-1">↳</span>}
                         {a.classTermName ?? <span className="text-muted">—</span>}
                       </div>
                     );

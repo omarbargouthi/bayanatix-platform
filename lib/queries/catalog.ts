@@ -383,6 +383,12 @@ export async function getEntityById(entityId: number): Promise<
       bg_cls.is_pii_indicator      as "classTermIsPii",
       bg_cls.pi_category_code      as "classTermPiCategoryCode",
       pct_cls.category_name_text   as "classTermPiCategoryName",
+      (abt_cls.propagation_id is not null) as "classInherited",
+      (select se.entity_name_text || '.' || sa.physical_name_text
+         from bayanat.lineage_propagations lp
+         join bayanat.data_attributes sa on sa.attribute_id = lp.source_asset_id
+         join bayanat.data_entities se on se.entity_id = sa.entity_id
+        where lp.propagation_id = abt_cls.propagation_id) as "classInheritedFrom",
       a.lifecycle_status_code      as "lifecycleStatus",
       a.deprecated_at_timestamp::text as "deprecatedAt"
     from bayanat.data_attributes a

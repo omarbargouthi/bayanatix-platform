@@ -69,6 +69,7 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   TRANSLATIONS_EXPORT: "Translations Export",
   TRANSLATIONS_IMPORT: "Translations Import",
   LINEAGE_IMPORT: "Lineage Import",
+  LINEAGE_PROPAGATION: "Lineage Propagation",
 };
 
 // Every background job's completion (success or failure) notifies whoever

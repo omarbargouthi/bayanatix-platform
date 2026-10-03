@@ -14,7 +14,7 @@ const BACKGROUND_JOB_TYPES = [
   "GOV_COMPLIANCE_EXPORT", "GOV_COMPLIANCE_IMPORT",
   "REPORT_EXPORT_XLSX", "REPORT_EXPORT_PDF",
   "TRANSLATIONS_EXPORT", "TRANSLATIONS_IMPORT",
-  "LINEAGE_IMPORT",
+  "LINEAGE_IMPORT", "LINEAGE_PROPAGATION",
 ];
 // ── Audit log section ─────────────────────────────────────────────────────────
 

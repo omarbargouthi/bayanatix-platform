@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MappingRegister } from "@/components/lineage/MappingRegister";
+import { PropagationPanel } from "@/components/lineage/PropagationPanel";
 import { useLang } from "@/lib/lang-context";
 import { LineageGraphClient } from "@/components/lineage/LineageGraphClient";
 import { PbixUploadButton } from "@/components/lineage/PbixUploadButton";
@@ -22,10 +23,11 @@ export function LineagePageClient({
   const [reloadSignal, setReloadSignal] = useState(0);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const view = searchParams.get("view") === "register" ? "register" : "graph";
+  const view = searchParams.get("view") === "register" ? "register" : searchParams.get("view") === "propagation" ? "propagation" : "graph";
   const tabs = [
     { id: "graph", label: t.lineageRegister.tabGraph },
     { id: "register", label: t.lineageRegister.tabRegister },
+    { id: "propagation", label: t.lineagePropagation.tabPropagation },
   ] as const;
   return (
     <main className="px-8 py-7 pb-14">
@@ -49,7 +51,7 @@ export function LineagePageClient({
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => router.replace(tab.id === "register" ? "/lineage?view=register" : "/lineage", { scroll: false })}
+            onClick={() => router.replace(tab.id === "graph" ? "/lineage" : `/lineage?view=${tab.id}`, { scroll: false })}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               view === tab.id ? "text-brand-purple border-brand-purple" : "text-ink-soft border-transparent hover:text-brand-deep"
             }`}
@@ -68,8 +70,10 @@ export function LineagePageClient({
             reloadSignal={reloadSignal}
           />
         </div>
-      ) : (
+      ) : view === "register" ? (
         <MappingRegister canManage={canManage} initialQuery={searchParams.get("q") ?? ""} />
+      ) : (
+        <PropagationPanel canManage={canManage} />
       )}
     </main>
   );

@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { runLineageScan } from "@/lib/lineage-scanner";
 import { ingestPowerBiScanResult } from "@/lib/lineage/powerbi-ingester";
+import { schedulePropagation } from "@/lib/lineage/propagation";
 
 // Dispatches by connection_registry.db_type_code (v2 extends v1's Postgres-only
 // dispatch). POWERBI/FABRIC only support the dev-only fixturePath test mode in
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
   try {
     if (conn.dbTypeCode === "POSTGRES") {
       const { scanRunId } = await runLineageScan(connectionId, session.userId);
+      schedulePropagation("lineage-scan");
       return NextResponse.json({ scanRunId }, { status: 201 });
     }
 
@@ -41,6 +43,7 @@ export async function POST(req: Request) {
       const text = await readFile(filePath, "utf8");
       const scanResult = JSON.parse(text);
       const result = await ingestPowerBiScanResult(scanResult, connectionId, session.userId);
+      schedulePropagation("lineage-scan");
       return NextResponse.json(result, { status: 201 });
     }
 
