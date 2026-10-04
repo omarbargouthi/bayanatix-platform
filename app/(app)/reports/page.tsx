@@ -18,7 +18,7 @@ export default async function ReportsIndexPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.nav.reports }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.reports }]} user={user} />
       <ReportsIndexClient domains={domains} />
     </>
   );

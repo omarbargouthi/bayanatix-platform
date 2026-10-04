@@ -29,7 +29,7 @@ export default async function ClassificationPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.classification.pageTitle },
         ]}
         user={user}

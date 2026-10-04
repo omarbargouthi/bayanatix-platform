@@ -27,7 +27,7 @@ export default async function DataQualityPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.quality },
         ]}
         user={user}

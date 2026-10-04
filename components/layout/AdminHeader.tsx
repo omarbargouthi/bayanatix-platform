@@ -80,7 +80,7 @@ export function AdminHeader({ user }: { user: SessionUser }) {
   }, [section, detailId]);
 
   const crumbs: Crumb[] = [
-    { label: "Bayanat", href: "/dashboard" },
+    { label: "Bayanis", href: "/dashboard" },
     { label: "Administration", href: "/admin" },
   ];
   if (section) {

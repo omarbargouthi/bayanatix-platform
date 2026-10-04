@@ -29,7 +29,7 @@ export default async function GlossaryTermPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat",           href: "/dashboard" },
+          { label: "Bayanis",           href: "/dashboard" },
           { label: t.glossary.pageTitle, href: "/glossary" },
           ...(term.domainName
             ? [{ label: term.domainName, href: `/glossary?domain=${term.domainId}` }]

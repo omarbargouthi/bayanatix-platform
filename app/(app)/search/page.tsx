@@ -24,7 +24,7 @@ export default async function SearchPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.catalog.pageTitle, href: "/catalog" },
           { label: t.common.search },
         ]}

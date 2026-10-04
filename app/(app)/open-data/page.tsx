@@ -27,7 +27,7 @@ export default async function OpenDataPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.openData.pageTitle },
         ]}
         user={user}

@@ -36,7 +36,7 @@ export default async function OpenDataDetailPage({ params }: { params: { id: str
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.openData.pageTitle, href: "/open-data" },
           { label: dataset.datasetName },
         ]}

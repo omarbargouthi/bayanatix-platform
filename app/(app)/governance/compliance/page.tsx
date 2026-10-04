@@ -51,7 +51,7 @@ export default async function CompliancePage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat",         href: "/dashboard" },
+          { label: "Bayanis",         href: "/dashboard" },
           { label: t.governance.pageTitle, href: "/governance" },
           { label: t.compliance.pageTitle },
         ]}

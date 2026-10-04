@@ -44,7 +44,7 @@ export default async function SchemaPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.catalog.pageTitle, href: "/catalog" },
           ...(schema.source ? [{ label: schema.source.sourceName, href: "/catalog" }] : []),
           { label: schema.schemaName },

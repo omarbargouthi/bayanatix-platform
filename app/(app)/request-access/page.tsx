@@ -18,7 +18,7 @@ export default async function RequestAccessPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.requestAccess.pageTitle },
         ]}
         user={user}

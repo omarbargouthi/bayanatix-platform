@@ -25,7 +25,7 @@ export default async function DqReportPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.reports, href: "/reports" },
           { label: t.reports.dq.title },
         ]}

@@ -16,7 +16,7 @@ export default async function PrivacyPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.privacy },
         ]}
         user={user}

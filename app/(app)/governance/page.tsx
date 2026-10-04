@@ -24,7 +24,7 @@ export default async function GovernancePage() {
   return (
     <>
       <Header
-        crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.governance.pageTitle }]}
+        crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.governance.pageTitle }]}
         user={user}
       />
       <GovernancePageClient

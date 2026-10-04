@@ -28,7 +28,7 @@ export default async function HomepagePage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.homepage.pageTitle }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.homepage.pageTitle }]} user={user} />
       <HomepageClient firstName={firstName} initialWidgetKeys={initialWidgetKeys} widgetData={widgetData} />
     </>
   );

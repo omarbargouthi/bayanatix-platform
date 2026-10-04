@@ -38,7 +38,7 @@ export default async function AssetDetailPage({ params }: { params: { typeCode: 
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.customAssets, href: "/assets" },
           { label: type.typeNameText, href: `/assets/${params.typeCode}` },
           { label: instance.assetNameText },

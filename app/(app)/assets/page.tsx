@@ -16,7 +16,7 @@ export default async function CustomAssetsHubPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.nav.customAssets }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.customAssets }]} user={user} />
       <div className="p-6 max-w-5xl mx-auto space-y-6">
         <div>
           <h1 className="text-xl font-bold text-brand-deep mb-1">Custom Assets</h1>

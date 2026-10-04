@@ -35,7 +35,7 @@ export default async function FrameworkSectionPage({ params }: { params: { secti
     <>
       <Header
         crumbs={[
-          { label: "Bayanat",             href: "/dashboard" },
+          { label: "Bayanis",             href: "/dashboard" },
           { label: t.governance.pageTitle,     href: "/governance" },
           { label: t.governance.framework,href: "/governance/framework" },
           { label: SECTION_EN_LABEL[key] },

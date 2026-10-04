@@ -13,7 +13,7 @@ export default async function ChatPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.chat.headerTitle }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.chat.headerTitle }]} user={user} />
       <ChatPageClient />
     </>
   );

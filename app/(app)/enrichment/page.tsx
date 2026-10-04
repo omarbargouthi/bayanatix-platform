@@ -18,7 +18,7 @@ export default async function EnrichmentPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.enrichment },
         ]}
         user={user}

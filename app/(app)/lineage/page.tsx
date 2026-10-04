@@ -20,7 +20,7 @@ export default async function LineagePage({
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.nav.catalog, href: "/catalog" }, { label: t.lineage.pageTitle }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.catalog, href: "/catalog" }, { label: t.lineage.pageTitle }]} user={user} />
       <LineagePageClient
         initialAssetType={assetType}
         initialAssetId={Number.isFinite(assetId) ? assetId : null}

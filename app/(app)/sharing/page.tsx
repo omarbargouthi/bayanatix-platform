@@ -16,7 +16,7 @@ export default async function SharingPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.sharing.pageTitle },
         ]}
         user={user}

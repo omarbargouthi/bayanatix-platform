@@ -91,7 +91,7 @@ export default async function TablePage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.catalog.pageTitle, href: "/catalog" },
           ...(entity.source ? [{ label: entity.source.sourceName, href: "/catalog" }] : []),
           ...(entity.schema

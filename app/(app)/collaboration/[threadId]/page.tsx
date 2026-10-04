@@ -16,7 +16,7 @@ export default async function ThreadDetailPage({ params }: { params: { threadId:
   return (
     <>
       <Header
-        crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: "Collaboration", href: "/collaboration" }, { label: data.thread.title }]}
+        crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: "Collaboration", href: "/collaboration" }, { label: data.thread.title }]}
         user={session}
       />
       <ThreadDetailClient thread={data.thread} messages={data.messages} />

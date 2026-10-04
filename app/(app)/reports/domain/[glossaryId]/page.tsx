@@ -20,7 +20,7 @@ export default async function DomainScorecardPage({ params }: { params: { glossa
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.reports, href: "/reports" },
           { label: scorecard.domain.name },
         ]}

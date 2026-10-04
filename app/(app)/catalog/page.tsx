@@ -35,7 +35,7 @@ export default async function CatalogPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.catalog.pageTitle },
         ]}
         user={user}

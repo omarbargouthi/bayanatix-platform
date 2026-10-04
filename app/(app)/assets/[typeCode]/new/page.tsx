@@ -20,7 +20,7 @@ export default async function NewAssetPage({ params }: { params: { typeCode: str
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.customAssets, href: "/assets" },
           { label: type.typeNameText, href: `/assets/${params.typeCode}` },
           { label: "New" },

@@ -25,7 +25,7 @@ export default async function MatrixPage({ params, searchParams }: { params: { r
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.customAssets, href: "/assets" },
           { label: `${relType.relNameText} Matrix` },
         ]}

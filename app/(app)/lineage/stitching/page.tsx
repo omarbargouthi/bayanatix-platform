@@ -16,7 +16,7 @@ export default async function StitchingReviewPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.lineage.pageTitle, href: "/lineage" },
           { label: "Stitching Review" },
         ]}

@@ -31,7 +31,7 @@ export default async function GlossaryPage({
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.glossary.pageTitle },
         ]}
         user={user}

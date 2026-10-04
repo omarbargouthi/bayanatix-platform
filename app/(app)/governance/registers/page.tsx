@@ -22,7 +22,7 @@ export default async function RegistersPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.governance.pageTitle, href: "/governance" },
           { label: t.governance.registers },
         ]}

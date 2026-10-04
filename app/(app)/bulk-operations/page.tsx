@@ -18,7 +18,7 @@ export default async function BulkOperationsPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.bulkOperations },
         ]}
         user={user}

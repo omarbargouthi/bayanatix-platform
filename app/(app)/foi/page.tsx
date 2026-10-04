@@ -16,7 +16,7 @@ export default async function FoiPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.foi },
         ]}
         user={session}

@@ -23,7 +23,7 @@ export default async function NewOpenDataPage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: t.openData.pageTitle, href: "/open-data" },
           { label: "New Dataset" },
         ]}

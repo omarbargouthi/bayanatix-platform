@@ -9,7 +9,7 @@ export default async function CollaborationPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: "Collaboration" }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: "Collaboration" }]} user={user} />
       <CollaborationPageClient />
     </>
   );

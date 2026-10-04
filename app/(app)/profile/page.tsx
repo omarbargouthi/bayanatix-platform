@@ -17,7 +17,7 @@ export default async function ProfilePage() {
     <>
       <Header
         crumbs={[
-          { label: "Bayanat", href: "/dashboard" },
+          { label: "Bayanis", href: "/dashboard" },
           { label: "My Profile" },
         ]}
         user={session}

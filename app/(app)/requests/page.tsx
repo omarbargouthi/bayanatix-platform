@@ -9,7 +9,7 @@ export default async function RequestsPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: "Asset Requests" }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: "Asset Requests" }]} user={user} />
       <RequestsPageClient />
     </>
   );

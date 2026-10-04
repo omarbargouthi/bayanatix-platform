@@ -31,7 +31,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanat", href: "/dashboard" }, { label: t.nav.dashboard }]} user={user} />
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.dashboard }]} user={user} />
       <DashboardClient
         firstName={firstName}
         domains={domains}
