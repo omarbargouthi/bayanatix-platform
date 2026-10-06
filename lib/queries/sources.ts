@@ -200,7 +200,7 @@ export async function updateConnection(connectionId: number, data: {
       username_text    = coalesce(${data.usernameText    ?? null}, username_text),
       ssl_enabled      = coalesce(${data.sslEnabled      ?? null}, ssl_enabled),
       is_active_boolean= coalesce(${data.isActiveBoolean ?? null}, is_active_boolean),
-      password_text    = CASE WHEN ${data.passwordText ?? null} IS NOT NULL THEN ${sealSecret(data.passwordText ?? null)} ELSE password_text END,
+      password_text    = CASE WHEN ${data.passwordText ?? null}::text IS NOT NULL THEN ${sealSecret(data.passwordText ?? null)} ELSE password_text END,
       lineage_enabled        = coalesce(${data.lineageEnabled        ?? null}, lineage_enabled),
       lineage_scan_views      = coalesce(${data.lineageScanViews      ?? null}, lineage_scan_views),
       lineage_scan_matviews   = coalesce(${data.lineageScanMatviews   ?? null}, lineage_scan_matviews),

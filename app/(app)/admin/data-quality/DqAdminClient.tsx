@@ -195,23 +195,35 @@ function RuleFormModal({
         notifyOwners: form.notifyOwners,
         openIssueOnFail: form.openIssueOnFail,
       };
-      if (editRule) {
-        const asset = form.selectedAssets[0];
-        await fetch(`/api/dq/rules/${editRule.ruleId}`, {
-          method: "PATCH",
+      const createFor = (asset: SelectedAsset) =>
+        fetch("/api/dq/rules", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...base, assetTypeCode: asset.assetType, assetId: asset.assetId }),
         });
+      let responses: Response[];
+      if (editRule) {
+        // A rule checks one asset. The rule being edited keeps its own asset (or takes the
+        // first one if that was removed); every other asset selected gets its own copy.
+        const own = form.selectedAssets.find((a) => a.assetType === editRule.assetTypeCode && a.assetId === editRule.assetId)
+          ?? form.selectedAssets[0];
+        const added = form.selectedAssets.filter((a) => a !== own);
+        responses = await Promise.all([
+          fetch(`/api/dq/rules/${editRule.ruleId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...base, assetTypeCode: own.assetType, assetId: own.assetId }),
+          }),
+          ...added.map(createFor),
+        ]);
       } else {
-        await Promise.all(
-          form.selectedAssets.map((asset) =>
-            fetch("/api/dq/rules", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...base, assetTypeCode: asset.assetType, assetId: asset.assetId }),
-            })
-          )
-        );
+        responses = await Promise.all(form.selectedAssets.map(createFor));
+      }
+      const failed = responses.find((r) => !r.ok);
+      if (failed) {
+        const e = await failed.json().catch(() => ({}));
+        setError(failed.status === 403 ? "You don't have permission to save this rule on one of the selected assets." : (e.error ?? "Failed to save rule. Please try again."));
+        return;
       }
       onSaved();
     } catch {

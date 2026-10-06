@@ -343,23 +343,33 @@ export default function DataSourcesPage() {
         if (!r.ok) { const e = await r.json(); alert(e.error); return; }
         const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
         setSelected(fresh);
+        setForm(f => ({ ...f, hostAddress: fresh.hostAddress }));
         setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
         setTestResult(null);
       }
     } finally { setSaving(false); }
   }
 
+  // Test and Crawl run against the saved connection, so whatever was edited on screen
+  // (path, host, port, credentials…) is saved first — otherwise they'd silently use the
+  // previous values.
+  async function saveEdits(): Promise<string | null> {
+    if (!selected) return null;
+    const body: Record<string, unknown> = { ...form, portNumber: Number(form.portNumber) };
+    if (!form.passwordText) delete body.passwordText;
+    const r = await fetch(`/api/admin/sources/${selected.connectionId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); return e.error ?? "Could not save the connection"; }
+    return null;
+  }
+
   async function handleTest() {
     if (!selected) return;
     setTesting(true); setTestResult(null);
     try {
-      // Save password if changed before test
-      if (form.passwordText) {
-        await fetch(`/api/admin/sources/${selected.connectionId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ passwordText: form.passwordText }),
-        });
-      }
+      const saveError = await saveEdits();
+      if (saveError) { setTestResult({ ok: false, message: saveError }); return; }
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 30000);
       let data: { ok: boolean; message: string };
@@ -374,6 +384,7 @@ export default function DataSourcesPage() {
       setTestResult(data);
       const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();
       setSelected(fresh);
+      setForm(f => ({ ...f, hostAddress: fresh.hostAddress }));
       setConnections(prev => prev.map(c => c.connectionId === fresh.connectionId ? fresh : c));
     } catch (e: unknown) {
       setTestResult({ ok: false, message: (e as Error).message });
@@ -384,6 +395,8 @@ export default function DataSourcesPage() {
 
   async function handleCrawl() {
     if (!selected) return;
+    const saveError = await saveEdits();
+    if (saveError) { alert(saveError); return; }
     const r = await fetch(`/api/admin/sources/${selected.connectionId}/crawl`, { method: "POST" });
     if (!r.ok) { const e = await r.json(); alert(e.error); return; }
     const fresh = await (await fetch(`/api/admin/sources/${selected.connectionId}`)).json();

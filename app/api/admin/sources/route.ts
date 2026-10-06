@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { listConnections, createConnection } from "@/lib/queries/sources";
+import { cleanSourcePath } from "@/lib/source-path";
 
 export async function GET() {
   const session = await getSession();
@@ -14,7 +15,8 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
-  const { connectionName, dbTypeCode, hostAddress, portNumber, databaseName, serviceName, defaultSchema, usernameText, passwordText, sslEnabled } = body;
+  const { connectionName, dbTypeCode, portNumber, databaseName, serviceName, defaultSchema, usernameText, passwordText, sslEnabled } = body;
+  const hostAddress = typeof body.hostAddress === "string" ? cleanSourcePath(body.hostAddress) : body.hostAddress;
   const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL", "JSON", "REST_API", "SOAP_API"];
   if (!VALID.includes(dbTypeCode)) return NextResponse.json({ error: `dbTypeCode must be one of ${VALID.join(", ")}` }, { status: 400 });
   // File sources (CSV/EXCEL/JSON) store their path in hostAddress and have no real port,

@@ -93,18 +93,19 @@ function JobLogsSection() {
       {!loading && jobs.map(job => (
         <div key={job.jobId} className="card mb-3 overflow-hidden">
           <button
-            className="w-full grid grid-cols-[1fr_1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-4 items-center text-start hover:bg-canvas-soft transition-colors"
+            className="w-full px-5 py-4 text-start hover:bg-canvas-soft transition-colors"
             onClick={() => toggleLogs(job.jobId)}
           >
-            <div>
-              <div className="text-sm font-semibold text-brand-deep">{job.connectionName}</div>
+           <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_110px_110px_100px_16px] gap-4 items-center">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-brand-deep truncate">{job.connectionName ?? "—"}</div>
               <div className="text-[11px] text-muted mt-0.5">{j.jobNumber.replace("{id}", String(job.jobId))}</div>
             </div>
             <div>
               <div className="text-xs text-ink">{fmt(job.startedAt)}</div>
               <div className="text-[11px] text-muted">{j.duration.replace("{value}", dur(job.startedAt, job.finishedAt))}</div>
             </div>
-            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLE[job.status] ?? "bg-gray-100 text-gray-600"}`}>
+            <span className={`justify-self-start text-[11px] font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLE[job.status] ?? "bg-gray-100 text-gray-600"}`}>
               {statusLabel[job.status] ?? job.status}
             </span>
             <div className="text-xs text-muted text-end">
@@ -114,10 +115,11 @@ function JobLogsSection() {
             <div className="text-xs text-muted">
               <strong>{job.columnCount}</strong> {j.cols}
             </div>
-            {job.errorText && (
-              <div className="text-[11px] text-red-600 max-w-[180px] truncate" title={job.errorText}>{job.errorText}</div>
-            )}
             <span className="text-muted text-xs">{expandedId === job.jobId ? "▲" : "▼"}</span>
+           </div>
+            {job.errorText && (
+              <div dir="ltr" className="mt-2 text-[11px] text-red-600 break-words text-left" title={job.errorText}>{job.errorText}</div>
+            )}
           </button>
 
           {expandedId === job.jobId && (

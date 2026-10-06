@@ -2,6 +2,7 @@ import postgres from "postgres";
 import { objectTypeFromSourceTableType, type ObjectTypeCode } from "./object-types";
 import { sql } from "./db";
 import { openSecret } from "./secrets";
+import { cleanSourcePath } from "./source-path";
 import { maskStoredPersonalDataQuietly } from "./privacy/pi-housekeeping";
 import { applyGovernanceDefaults } from "./queries/stakeholders";
 import { logUpdate, logCreate } from "./audit";
@@ -739,7 +740,8 @@ function profileFileColumn(rows: unknown[][], idx: number, sampleSize: number): 
 
 // `rootPath` is stored in the connection's host_address field — file sources have
 // no network host, so that column is repurposed to hold a file or directory path.
-function listSourceFiles(fs: typeof import("node:fs"), path: typeof import("node:path"), rootPath: string, dbTypeCode: string): { files: string[]; schemaName: string } {
+function listSourceFiles(fs: typeof import("node:fs"), path: typeof import("node:path"), rawPath: string, dbTypeCode: string): { files: string[]; schemaName: string } {
+  const rootPath = cleanSourcePath(rawPath);
   if (!fs.existsSync(rootPath)) throw new Error(`Path not found: ${rootPath}`);
   const stat = fs.statSync(rootPath);
   const exts = FILE_EXTENSIONS[dbTypeCode] ?? [];
@@ -929,7 +931,7 @@ async function crawlJson(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
 // when fetching a URL, for specs published behind auth.
 
 async function fetchSpecText(cfg: ConnCfg): Promise<string> {
-  const loc = cfg.hostAddress;
+  const loc = cleanSourcePath(cfg.hostAddress ?? "");
   if (!loc) throw new Error("Spec file path or URL is required");
   if (/^https?:\/\//i.test(loc)) {
     const headers: Record<string, string> = {};

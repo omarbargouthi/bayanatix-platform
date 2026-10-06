@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getConnection, updateConnection, deleteConnection } from "@/lib/queries/sources";
+import { cleanSourcePath } from "@/lib/source-path";
 
 type Params = { params: { id: string } };
 
@@ -16,6 +17,10 @@ export async function PATCH(req: Request, { params }: Params) {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
+  if (typeof body.hostAddress === "string") {
+    body.hostAddress = cleanSourcePath(body.hostAddress);
+    if (!body.hostAddress) return NextResponse.json({ error: "Host / path is required" }, { status: 400 });
+  }
   await updateConnection(Number(params.id), body);
   return NextResponse.json({ ok: true });
 }
