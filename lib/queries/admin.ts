@@ -36,6 +36,23 @@ export async function getUserById(userId: string): Promise<AdminUser | null> {
   return rows[0] ?? null;
 }
 
+export const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Case-insensitive: "John" and "john" are the same username. */
+export async function userIdTaken(userId: string): Promise<boolean> {
+  const [row] = await sql`SELECT 1 FROM bayanat.users WHERE lower(user_id) = ${userId.toLowerCase()}`;
+  return !!row;
+}
+
+export async function emailTaken(email: string, exceptUserId?: string): Promise<boolean> {
+  const [row] = await sql`
+    SELECT 1 FROM bayanat.users WHERE lower(email) = ${email.toLowerCase()}
+      ${exceptUserId ? sql`AND user_id <> ${exceptUserId}` : sql``}
+  `;
+  return !!row;
+}
+
 export async function createUser(
   userId: string,
   email: string,

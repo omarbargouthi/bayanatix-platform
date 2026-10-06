@@ -10,9 +10,14 @@ export default async function UserDetailPage({ params }: { params: { id: string 
   const session = await getSession();
   if (!session || session.role !== "ADMIN") redirect("/dashboard");
 
+  // A username with special characters (e.g. an email used as the username) arrives
+  // URL-encoded ("john%40example.com") — decode it before looking the user up.
+  let userId = params.id;
+  try { userId = decodeURIComponent(params.id); } catch { /* keep as-is */ }
+
   const [user, assignments, roles, picker] = await Promise.all([
-    getUserById(params.id),
-    getAssignmentsForUser(params.id),
+    getUserById(userId),
+    getAssignmentsForUser(userId),
     listRoles(),
     getResourcePickerOptions(),
   ]);

@@ -12,10 +12,10 @@ import { TeamForm } from "@/components/admin/TeamForm";
 
 function UsersSection() {
   const [users, setUsers] = useState<AdminUser[]>([]);
-  useEffect(() => {
-    fetch("/api/admin/users").then(r => r.json()).then(setUsers);
-  }, []);
-  return <UsersPageClient users={users} />;
+  const load = () => { fetch("/api/admin/users").then(r => r.json()).then(setUsers); };
+  useEffect(load, []);
+  // Reload after activate/deactivate or a new user, so the list shows the change at once.
+  return <UsersPageClient users={users} onChanged={load} />;
 }
 
 // ── Roles section ─────────────────────────────────────────────────────────────

@@ -35,7 +35,7 @@ export function UserDetailClient({
 
   async function saveInfo() {
     setSavingInfo(true);
-    await fetch(`/api/admin/users/${user.userId}`, {
+    await fetch(`/api/admin/users/${encodeURIComponent(user.userId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fullName: editName, email: editEmail, systemRole: editRole }),
@@ -66,7 +66,7 @@ export function UserDetailClient({
               {initials}
             </div>
             <div className="font-bold text-lg text-brand-deep">{user.fullName}</div>
-            <div className="text-sm text-muted">{user.userId}</div>
+            <div className="text-sm text-muted">Username: <span className="font-mono">{user.userId}</span></div>
             <div className={`mt-2 inline-block text-[11px] font-semibold px-3 py-0.5 rounded-full ${user.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
               {user.isActive ? "Active" : "Inactive"}
             </div>

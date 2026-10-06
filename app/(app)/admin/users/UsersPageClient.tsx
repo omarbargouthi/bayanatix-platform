@@ -14,8 +14,11 @@ const ROLE_BADGE: Record<string, string> = {
   VIEWER:  "bg-gray-100   text-gray-600",
 };
 
-export function UsersPageClient({ users }: { users: AdminUser[] }) {
+// onChanged: the host page reloads its own list (User Management fetches the users
+// client-side, so router.refresh() alone doesn't update it).
+export function UsersPageClient({ users, onChanged }: { users: AdminUser[]; onChanged?: () => void }) {
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [search,   setSearch]   = useState("");
 
@@ -25,12 +28,19 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
   );
 
   async function toggleActive(u: AdminUser) {
-    await fetch(`/api/admin/users/${u.userId}`, {
+    setError(null);
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(u.userId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !u.isActive }),
     });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error ?? "Could not update the user.");
+      return;
+    }
     router.refresh();
+    onChanged?.();
   }
 
   return (
@@ -42,6 +52,12 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
         <Stat label="Inactive"      value={users.filter((u) => !u.isActive).length} color="amber" />
         <Stat label="Admins"        value={users.filter((u) => u.systemRole === "ADMIN").length} color="purple" />
       </div>
+
+      {error && (
+        <div className="mb-4 text-[13px] text-red-600 bg-red-50 border border-red-200 rounded-md px-4 py-2.5 flex justify-between">
+          <span>{error}</span><button onClick={() => setError(null)} className="opacity-60 hover:opacity-100">×</button>
+        </div>
+      )}
 
       {/* Table card */}
       <div className="card overflow-hidden">
@@ -73,9 +89,9 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
                 <span className="w-7 h-7 rounded-full bg-brand-purple/15 text-brand-purple text-[11px] font-bold grid place-items-center shrink-0">
                   {u.fullName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </span>
-                <Link href={`/admin/users/${u.userId}`} className="hover:underline truncate">{u.fullName}</Link>
+                <Link href={`/admin/users/${encodeURIComponent(u.userId)}`} className="hover:underline truncate">{u.fullName}</Link>
               </div>
-              <div className="text-[11px] text-muted ml-8.5 pl-0.5 truncate">{u.userId}</div>
+              <div className="text-[11px] text-muted ml-8.5 pl-0.5 truncate" title="Username (internal id)">Username: {u.userId}</div>
             </div>
             <div className="min-w-0 text-ink-soft text-[13px] truncate flex items-center gap-1.5">
               <span className="truncate">{u.email}</span>
@@ -97,7 +113,7 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
               </span>
             </div>
             <div className="min-w-0 flex items-center gap-2">
-              <Link href={`/admin/users/${u.userId}`} className="btn btn-sm text-xs">Manage</Link>
+              <Link href={`/admin/users/${encodeURIComponent(u.userId)}`} className="btn btn-sm text-xs">Manage</Link>
               <button onClick={() => toggleActive(u)} className="btn btn-sm text-xs">
                 {u.isActive ? "Deactivate" : "Activate"}
               </button>
@@ -115,7 +131,7 @@ export function UsersPageClient({ users }: { users: AdminUser[] }) {
               <button onClick={() => setShowForm(false)} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
             </div>
             <div className="px-6 py-5">
-              <UserForm onClose={() => setShowForm(false)} />
+              <UserForm onClose={() => setShowForm(false)} onCreated={onChanged} />
             </div>
           </div>
         </div>
