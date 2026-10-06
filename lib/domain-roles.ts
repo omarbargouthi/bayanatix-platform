@@ -9,3 +9,13 @@ export const DOMAIN_MANAGE_ROLE_NAME = {
   FOI:          "Open Data & Access",
   OPEN_DATA:    "Open Data & Access",
 } as const;
+
+/** Display names for the domains (also stored as role_assignments.resource_name). */
+export const DOMAIN_LABEL: Record<string, string> = {
+  GOVERNANCE:   "Data Governance",
+  DATA_QUALITY: "Data Quality",
+  DATA_PRIVACY: "Data Privacy",
+  SHARING:      "Data Sharing",
+  FOI:          "FOI Requests",
+  OPEN_DATA:    "Open Data",
+};

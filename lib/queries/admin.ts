@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { DOMAIN_LABEL } from "../domain-roles";
 import type { AdminUser, Role, Team, RoleAssignment, TeamMember } from "../types";
 
 // ── Users ──────────────────────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ export async function listRoles(): Promise<Role[]> {
       r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.domain_write    AS "domainWrite",
       r.domain_read     AS "domainRead",
+      r.domain_codes    AS "domainCodes",
       r.is_admin        AS "isAdmin",
       r.created_at      AS "createdAt",
       (SELECT COUNT(DISTINCT user_id)::int FROM bayanat.role_assignments ra
@@ -124,6 +126,7 @@ export async function getRoleById(roleId: number): Promise<Role | null> {
       r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.domain_write    AS "domainWrite",
       r.domain_read     AS "domainRead",
+      r.domain_codes    AS "domainCodes",
       r.is_admin        AS "isAdmin",
       r.created_at      AS "createdAt",
       (SELECT COUNT(DISTINCT user_id)::int FROM bayanat.role_assignments ra
@@ -268,6 +271,7 @@ export async function getAssignmentsForUser(userId: string): Promise<RoleAssignm
       r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.domain_write    AS "domainWrite",
       r.domain_read     AS "domainRead",
+      r.domain_codes    AS "domainCodes",
       r.is_admin        AS "isAdmin",
       ra.user_id        AS "userId",
       u.full_name       AS "userFullName",
@@ -298,6 +302,7 @@ export async function getAssignmentsForTeam(teamId: number): Promise<RoleAssignm
       r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.domain_write    AS "domainWrite",
       r.domain_read     AS "domainRead",
+      r.domain_codes    AS "domainCodes",
       r.is_admin        AS "isAdmin",
       ra.user_id        AS "userId",
       NULL              AS "userFullName",
@@ -328,6 +333,7 @@ export async function getAssignmentsForRole(roleId: number): Promise<RoleAssignm
       r.pii_clear_text_allowed AS "piClearTextAllowed",
       r.domain_write    AS "domainWrite",
       r.domain_read     AS "domainRead",
+      r.domain_codes    AS "domainCodes",
       r.is_admin        AS "isAdmin",
       ra.user_id        AS "userId",
       u.full_name       AS "userFullName",
@@ -344,6 +350,27 @@ export async function getAssignmentsForRole(roleId: number): Promise<RoleAssignm
     WHERE ra.role_id = ${roleId}
     ORDER BY ra.created_at DESC
   `;
+}
+
+/** The domains a role applies to, or null when it isn't a domain role. */
+export async function roleDomainCodes(roleId: number): Promise<string[] | null> {
+  const [r] = await sql<{ codes: string[] | null }[]>`SELECT domain_codes AS codes FROM bayanat.roles WHERE role_id = ${roleId}`;
+  return r?.codes?.length ? r.codes : null;
+}
+
+/** Assign a domain role: one DOMAIN-scoped row per domain (existing ones kept). */
+export async function createDomainAssignments(data: { roleId: number; userId?: string; teamId?: number; domains: string[] }): Promise<number[]> {
+  const ids: number[] = [];
+  for (const domain of data.domains) {
+    const [existing] = await sql<{ id: number }[]>`
+      SELECT assignment_id AS id FROM bayanat.role_assignments
+      WHERE role_id = ${data.roleId} AND resource_type = 'DOMAIN' AND resource_id = ${domain}
+        AND user_id IS NOT DISTINCT FROM ${data.userId ?? null} AND team_id IS NOT DISTINCT FROM ${data.teamId ?? null}
+    `;
+    if (existing) { ids.push(Number(existing.id)); continue; }
+    ids.push(await createAssignment({ roleId: data.roleId, userId: data.userId, teamId: data.teamId, resourceType: "DOMAIN", resourceId: domain, resourceName: DOMAIN_LABEL[domain] ?? domain }));
+  }
+  return ids;
 }
 
 export async function createAssignment(data: {

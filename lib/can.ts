@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { DOMAIN_LABEL } from "./domain-roles";
 import type { SessionUser } from "./types";
 import {
   resolveEffectiveGovernance,
@@ -266,7 +267,7 @@ export async function grantDomainRead(domain: DomainCode, userId: string): Promi
   if (existing.length === 0) {
     await sql`
       INSERT INTO bayanat.role_assignments (role_id, user_id, resource_type, resource_id, resource_name)
-      VALUES (${role.roleId}, ${userId}, 'DOMAIN', ${domain}, ${domain})
+      VALUES (${role.roleId}, ${userId}, 'DOMAIN', ${domain}, ${DOMAIN_LABEL[domain] ?? domain})
     `;
   }
 }

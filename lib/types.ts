@@ -271,6 +271,8 @@ export type Role = {
   piClearTextAllowed: boolean;
   domainWrite:    boolean;
   domainRead:     boolean;
+  /** The domain(s) a domain role applies to (db/152) — null for data/metadata roles. */
+  domainCodes:    string[] | null;
   isAdmin:        boolean;
   createdAt:      string;
   userCount:      number;

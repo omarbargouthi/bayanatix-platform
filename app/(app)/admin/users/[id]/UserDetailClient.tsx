@@ -14,6 +14,7 @@ const SCOPE_BADGE: Record<string, string> = {
   DATA_SOURCE: "bg-blue-50   text-blue-700   border-blue-200",
   SCHEMA:      "bg-sky-50    text-sky-700    border-sky-200",
   TABLE:       "bg-teal-50   text-teal-700   border-teal-200",
+  DOMAIN:      "bg-amber-50  text-amber-800  border-amber-200",
 };
 
 export function UserDetailClient({

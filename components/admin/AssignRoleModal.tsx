@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Role, SourceOption, SchemaOption, TableOption } from "@/lib/types";
+import { DOMAIN_LABEL } from "@/lib/domain-roles";
 
 type Props = {
   roles:       Role[];
@@ -32,6 +33,18 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
   const [resId,          setResId]          = useState<string>("");
   const [saving,         setSaving]         = useState(false);
   const [err,            setErr]            = useState("");
+  // Domain roles (Data Governance, Data Privacy, …) apply to their domain — the data
+  // scope (source / schema / table) doesn't apply to them.
+  const [domains,        setDomains]        = useState<string[]>([]);
+  const selectedRole = roles.find((r) => String(r.roleId) === roleId) ?? null;
+  const roleDomains = selectedRole?.domainCodes?.length ? selectedRole.domainCodes : null;
+
+  function changeRole(v: string) {
+    setRoleId(v);
+    const r = roles.find((x) => String(x.roleId) === v);
+    setDomains(r?.domainCodes ?? []);
+    if (r?.domainCodes?.length) changeResType("GLOBAL");
+  }
 
   function changeResType(v: string) {
     setResType(v);
@@ -52,7 +65,8 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!roleId) { setErr("Select a role."); return; }
-    if (resType !== "GLOBAL" && !resId) { setErr("Select a resource."); return; }
+    if (roleDomains && domains.length === 0) { setErr("Select at least one domain."); return; }
+    if (!roleDomains && resType !== "GLOBAL" && !resId) { setErr("Select a resource."); return; }
     setSaving(true); setErr("");
     const res = await fetch("/api/admin/assignments", {
       method: "POST",
@@ -61,9 +75,9 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
         roleId:       Number(roleId),
         userId:       userId ?? undefined,
         teamId:       teamId ?? undefined,
-        resourceType: resType,
-        resourceId:   resType === "GLOBAL" ? null : resId,
-        resourceName: resType === "GLOBAL" ? "Global" : resName,
+        ...(roleDomains
+          ? { domains }
+          : { resourceType: resType, resourceId: resType === "GLOBAL" ? null : resId, resourceName: resType === "GLOBAL" ? "Global" : resName }),
       }),
     });
     setSaving(false);
@@ -88,7 +102,7 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
             <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Role *</label>
             <select
               value={roleId}
-              onChange={(e) => setRoleId(e.target.value)}
+              onChange={(e) => changeRole(e.target.value)}
               className={selectClass}
             >
               <option value="">— select role —</option>
@@ -99,16 +113,42 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
           </div>
 
           <div>
-            <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Scope *</label>
-            <select
-              value={resType}
-              onChange={(e) => changeResType(e.target.value)}
-              className={selectClass}
-            >
-              {RESOURCE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Scope {roleDomains ? "" : "*"}</label>
+            {roleDomains ? (
+              <>
+                <select disabled value="DOMAIN" className={selectClass} title="A domain role applies to its domain, not to a data source, schema or table">
+                  <option value="DOMAIN">Not applicable — domain role</option>
+                </select>
+                <div className="mt-2 text-[12px] text-ink-soft">
+                  {roleDomains.length === 1 ? (
+                    <>Applies to the <span className="font-semibold text-ink">{DOMAIN_LABEL[roleDomains[0]] ?? roleDomains[0]}</span> domain.</>
+                  ) : (
+                    <>
+                      <div className="mb-1">Applies to these domains:</div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {roleDomains.map((d) => (
+                          <label key={d} className="flex items-center gap-1.5 text-[13px] text-ink">
+                            <input type="checkbox" className="accent-brand-purple" checked={domains.includes(d)}
+                              onChange={(e) => setDomains((prev) => (e.target.checked ? [...prev, d] : prev.filter((x) => x !== d)))} />
+                            {DOMAIN_LABEL[d] ?? d}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <select
+                value={resType}
+                onChange={(e) => changeResType(e.target.value)}
+                className={selectClass}
+              >
+                {RESOURCE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {resType === "DATA_SOURCE" && (
@@ -186,6 +226,8 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
               r.metadataWrite  && { label: "Metadata Write",  color: "bg-blue-100 text-blue-700" },
               r.metadataDelete && { label: "Metadata Delete", color: "bg-red-100 text-red-700" },
               r.dataRead       && { label: "Data Read",       color: "bg-emerald-100 text-emerald-700" },
+              r.domainWrite    && { label: "Domain: Manage",  color: "bg-amber-100 text-amber-800" },
+              r.domainRead     && { label: "Domain: Read",    color: "bg-amber-100 text-amber-800" },
             ].filter(Boolean) as { label: string; color: string }[];
             return (
               <div className="bg-canvas-soft rounded-md px-3 py-3">
