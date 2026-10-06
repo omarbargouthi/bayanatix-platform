@@ -7,7 +7,6 @@ import { MappingRegister } from "@/components/lineage/MappingRegister";
 import { PropagationPanel } from "@/components/lineage/PropagationPanel";
 import { useLang } from "@/lib/lang-context";
 import { LineageGraphClient } from "@/components/lineage/LineageGraphClient";
-import { PbixUploadButton } from "@/components/lineage/PbixUploadButton";
 import { LineageImportButton } from "@/components/lineage/LineageImportButton";
 
 type AssetType = "DATA_ENTITIES" | "DATA_ATTRIBUTES";
@@ -39,7 +38,6 @@ export function LineagePageClient({
         {canManage && view === "graph" && (
           <div className="flex items-start gap-2 shrink-0">
             <LineageImportButton onImported={() => setReloadSignal((n) => n + 1)} />
-            <PbixUploadButton />
             <Link href="/lineage/stitching" className="btn btn-sm shrink-0">
               Stitching Review
             </Link>
