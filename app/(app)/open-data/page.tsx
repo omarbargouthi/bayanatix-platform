@@ -4,7 +4,6 @@ import { getSession } from "@/lib/auth";
 import { listOpenDatasets } from "@/lib/queries/open-data";
 import { OpenDataList } from "@/components/open-data/OpenDataList";
 import { getServerT } from "@/lib/i18n/server";
-import { DomainAccessPanel } from "@/components/domain-access/DomainAccessPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +43,6 @@ export default async function OpenDataPage({
           currentUserId={user.userId}
           currentUserRole={user.role}
         />
-        <div className="mt-6">
-          <DomainAccessPanel domain="OPEN_DATA" domainLabel={t.nav.openData} />
-        </div>
       </main>
     </>
   );

@@ -138,13 +138,23 @@ function JobLogsSection() {
         </div>
       ))}
 
-      {/* Compliance/Reports/Translations export+import jobs — moved here from
-          each feature's own page so every background job's history lives in
-          one place, matching this page's existing Crawl Job History above. */}
-      <div className="mt-8">
-        <h2 className="text-base font-bold text-ink mb-3">{j.backgroundJobs}</h2>
-        <BackgroundJobsPanel jobTypeCodes={BACKGROUND_JOB_TYPES} jobTypeLabels={j.types} title={j.backgroundJobsSubtitle} />
+    </main>
+  );
+}
+
+// ── Export & import logs (jobs started by users) ─────────────────────────────
+// Compliance / Reports / Translations / Lineage export+import jobs: every such
+// job's history, files and logs in one place, in its own tab.
+function ActivityLogsSection() {
+  const { t } = useLang();
+  const a = t.activityLogs;
+  return (
+    <main className="px-8 py-7 pb-14">
+      <div className="mb-5">
+        <h2 className="text-base font-bold text-ink">{a.title}</h2>
+        <p className="text-[13px] text-muted mt-0.5">{a.desc}</p>
       </div>
+      <BackgroundJobsPanel jobTypeCodes={BACKGROUND_JOB_TYPES} jobTypeLabels={t.jobLogs.types} title={a.subtitle} />
     </main>
   );
 }
@@ -159,6 +169,7 @@ function AuditLogsInner() {
   const SUB_TABS = [
     { id: "audit",    label: t.auditLog.tabAudit },
     { id: "job-logs", label: t.auditLog.tabJobLogs },
+    { id: "activity", label: t.activityLogs.tab },
     { id: "data-access", label: t.privacy.tabDataAccess },
     { id: "consent", label: t.consentRegister.tab },
   ];
@@ -184,6 +195,7 @@ function AuditLogsInner() {
       </div>
       {tab === "audit"    && <AuditSection />}
       {tab === "job-logs" && <JobLogsSection />}
+      {tab === "activity" && <ActivityLogsSection />}
       {tab === "data-access" && <DataAccessLogSection />}
       {tab === "consent" && <ConsentRegisterSection />}
     </div>

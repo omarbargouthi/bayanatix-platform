@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { DOMAIN_MANAGE_ROLE_NAME } from "@/lib/domain-roles";
 import { useLang } from "@/lib/lang-context";
 import type { DomainCode } from "@/lib/can";
 import type { AccessRequestRow, CatalogResourceType } from "@/lib/queries/access-requests";
@@ -34,6 +35,11 @@ export function RequestAccessClient() {
   }, []);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
+  // Notification links land on the right tab (?tab=pending | mine).
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested === "pending" || requested === "mine" || requested === "new") setTab(requested);
+  }, []);
 
   // ── New request form state ──────────────────────────────────────────────
   const [kind, setKind] = useState<"DOMAIN" | "CATALOG">("DOMAIN");
@@ -189,6 +195,7 @@ export function RequestAccessClient() {
                 <option value="">{c.domainPlaceholder}</option>
                 {ALL_DOMAINS.map((d) => <option key={d} value={d}>{domainLabel(d)}</option>)}
               </select>
+              {domain && <p className="text-[11px] text-muted mt-1">{t.accessApproval.approvedBy.replace("{role}", DOMAIN_MANAGE_ROLE_NAME[domain])}</p>}
             </div>
           ) : (
             <>

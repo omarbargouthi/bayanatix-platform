@@ -95,7 +95,7 @@ async function notifyJobFinished(jobId: number, status: "COMPLETED" | "FAILED", 
       body: status === "COMPLETED" ? `Job #${jobId} finished successfully.` : `Job #${jobId} failed: ${errorText ?? "unknown error"}`,
       severity: status === "COMPLETED" ? "SUCCESS" : "ERROR",
       actionLabel: "View Job Details",
-      actionHref: "/admin/audit-logs?tab=job-logs",
+      actionHref: "/admin/audit-logs?tab=activity",
       downloadHref: hasDownload ? `/api/jobs/${jobId}/file` : null,
       downloadLabel: hasDownload ? job.resultFileName : null,
     });

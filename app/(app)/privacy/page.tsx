@@ -3,7 +3,6 @@ import { getSession } from "@/lib/auth";
 import { Header } from "@/components/layout/Header";
 import { PrivacyClient } from "./PrivacyClient";
 import { getServerT } from "@/lib/i18n/server";
-import { DomainAccessPanel } from "@/components/domain-access/DomainAccessPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +21,6 @@ export default async function PrivacyPage() {
         user={user}
       />
       <PrivacyClient userRole={user.role} />
-      <div className="px-8 pb-8">
-        <DomainAccessPanel domain="DATA_PRIVACY" domainLabel={t.nav.privacy} />
-      </div>
     </>
   );
 }

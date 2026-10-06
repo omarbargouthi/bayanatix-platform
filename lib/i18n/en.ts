@@ -3282,4 +3282,13 @@ export const en: I18nStrings = {
   globalHeader: {
     searchPh: "Search assets, schemas, tables, columns…  (Ctrl+K)",
   },
+  accessApproval: {
+    approvedBy: "Approved by users holding the \"{role}\" role, or an administrator.",
+  },
+  activityLogs: {
+    tab: "Export & Import Logs",
+    title: "Export and import activity",
+    desc: "Exports, imports and other jobs started by users: who ran them, when, the outcome, and the files and logs they produced.",
+    subtitle: "Compliance · Reports · Translations · Lineage",
+  },
 };

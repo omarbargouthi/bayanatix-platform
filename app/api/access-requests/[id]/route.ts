@@ -4,6 +4,7 @@ import { grantDomainRead } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getAccessRequestById, canApproveAccessRequest } from "@/lib/queries/access-requests";
 import { createAssignment } from "@/lib/queries/admin";
+import { createNotification } from "@/lib/queries/notifications";
 
 const CATALOG_VIEW_ROLE_NAME = "Metadata Viewer";
 
@@ -57,6 +58,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         decided_at = NOW(), decision_note_text = ${note}
     WHERE request_id = ${requestId}
   `;
+
+  const what = request.requestKind === "DOMAIN" ? `${(request.domainCode ?? "").replace(/_/g, " ").toLowerCase()} domain` : request.resourceName ?? "the requested asset";
+  await createNotification({
+    userId: request.requesterUserId, type: "WORKFLOW", severity: decision === "APPROVED" ? "SUCCESS" : "WARNING",
+    title: decision === "APPROVED" ? `Access approved: ${what}` : `Access request declined: ${what}`,
+    body: `${decision === "APPROVED" ? "Approved" : "Declined"} by ${session.fullName}.${note ? ` Note: ${note}` : ""}`,
+    actionLabel: "My requests", actionHref: "/request-access?tab=mine",
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

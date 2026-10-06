@@ -3425,4 +3425,13 @@ export type I18nStrings = {
   globalHeader: {
     searchPh: string;
   };
+  accessApproval: {
+    approvedBy: string;
+  };
+  activityLogs: {
+    tab: string;
+    title: string;
+    desc: string;
+    subtitle: string;
+  };
 };
