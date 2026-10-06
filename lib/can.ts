@@ -186,11 +186,10 @@ export async function canViewPiClearText(session: SessionUser, entityId: number)
   return eligible && granted;
 }
 
-// Whether the user holds the global "Data Privacy Officer" role (bayanat.
-// roles/role_assignments — the same granular role used for the PI
-// Clear-Text Access approval workflow) — distinct from the generic
-// DATA_PRIVACY domain-access roles below, which gate the /privacy page itself,
-// not this specific role. ADMIN always qualifies.
+// Whether the user holds the "Data Privacy Officer" role (bayanat.roles/
+// role_assignments) — the role that manages the Data Privacy domain and is
+// used for the PI Clear-Text Access approval workflow (db/153 merged the two).
+// Held globally or on the Data Privacy domain. ADMIN always qualifies.
 export async function isDataPrivacyOfficer(session: SessionUser): Promise<boolean> {
   if (session.role === "ADMIN") return true;
   const [row] = await sql<{ cnt: number }[]>`
@@ -198,7 +197,7 @@ export async function isDataPrivacyOfficer(session: SessionUser): Promise<boolea
     FROM bayanat.role_assignments ra
     JOIN bayanat.roles r ON r.role_id = ra.role_id
     WHERE r.role_name = 'Data Privacy Officer'
-      AND ra.resource_type = 'GLOBAL'
+      AND (ra.resource_type = 'GLOBAL' OR (ra.resource_type = 'DOMAIN' AND ra.resource_id = 'DATA_PRIVACY'))
       AND (
         ra.user_id = ${session.userId}
         OR ra.team_id IN (SELECT team_id FROM bayanat.team_members WHERE user_id = ${session.userId})

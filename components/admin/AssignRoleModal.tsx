@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Role, SourceOption, SchemaOption, TableOption } from "@/lib/types";
-import { DOMAIN_LABEL, isReadOnlyRole } from "@/lib/domain-roles";
+import { DOMAIN_LABEL, hasCatalogPrivileges, isReadOnlyRole } from "@/lib/domain-roles";
 
 type Props = {
   roles:       Role[];
@@ -13,6 +13,8 @@ type Props = {
   teamId?:     number;
   /** The user's system role (ADMIN / STEWARD / OFFICER / VIEWER) — a Viewer can only hold read-only roles. */
   userSystemRole?: string;
+  /** For a team: the members whose system role is Viewer — the same rule applies through a team. */
+  viewerMembers?: string[];
   onDone:      () => void;
   onClose:     () => void;
 };
@@ -24,7 +26,7 @@ const RESOURCE_TYPES = [
   { value: "TABLE",       label: "Table" },
 ];
 
-export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamId, userSystemRole, onDone, onClose }: Props) {
+export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamId, userSystemRole, viewerMembers, onDone, onClose }: Props) {
   const [roleId,         setRoleId]         = useState<string>("");
   const [resType,        setResType]        = useState<string>("GLOBAL");
   // Scope-narrowing selections — Schema/Table scope needs Source (and Schema,
@@ -41,14 +43,21 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
   const selectedRole = roles.find((r) => String(r.roleId) === roleId) ?? null;
   const roleDomains = selectedRole?.domainCodes?.length ? selectedRole.domainCodes : null;
 
-  // A user whose system role is Viewer can only be given read-only roles.
-  const viewerBlocked = !!selectedRole && userSystemRole === "VIEWER" && !isReadOnlyRole(selectedRole);
+  // A domain role that also carries catalog privileges (e.g. Data Governance Officer):
+  // the scope applies to that part, the domain is granted alongside.
+  const scoped = !roleDomains || (!!selectedRole && hasCatalogPrivileges(selectedRole));
+
+  // A user whose system role is Viewer can only be given read-only roles — directly or
+  // through a team they belong to.
+  const beyondReadOnly = !!selectedRole && !isReadOnlyRole(selectedRole);
+  const viewerBlocked = beyondReadOnly && userSystemRole === "VIEWER";
+  const teamBlocked = beyondReadOnly && !!viewerMembers && viewerMembers.length > 0;
 
   function changeRole(v: string) {
     setRoleId(v);
     const r = roles.find((x) => String(x.roleId) === v);
     setDomains(r?.domainCodes ?? []);
-    if (r?.domainCodes?.length) changeResType("GLOBAL");
+    if (r?.domainCodes?.length && !hasCatalogPrivileges(r)) changeResType("GLOBAL");
   }
 
   function changeResType(v: string) {
@@ -71,7 +80,7 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
     e.preventDefault();
     if (!roleId) { setErr("Select a role."); return; }
     if (roleDomains && domains.length === 0) { setErr("Select at least one domain."); return; }
-    if (!roleDomains && resType !== "GLOBAL" && !resId) { setErr("Select a resource."); return; }
+    if (scoped && resType !== "GLOBAL" && !resId) { setErr("Select a resource."); return; }
     setSaving(true); setErr("");
     const res = await fetch("/api/admin/assignments", {
       method: "POST",
@@ -80,9 +89,8 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
         roleId:       Number(roleId),
         userId:       userId ?? undefined,
         teamId:       teamId ?? undefined,
-        ...(roleDomains
-          ? { domains }
-          : { resourceType: resType, resourceId: resType === "GLOBAL" ? null : resId, resourceName: resType === "GLOBAL" ? "Global" : resName }),
+        ...(roleDomains ? { domains } : {}),
+        ...(scoped ? { resourceType: resType, resourceId: resType === "GLOBAL" ? null : resId, resourceName: resType === "GLOBAL" ? "Global" : resName } : {}),
       }),
     });
     setSaving(false);
@@ -122,13 +130,25 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
           </div>
 
           <div>
-            <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Scope {roleDomains ? "" : "*"}</label>
-            {roleDomains ? (
-              <>
-                <select disabled value="DOMAIN" className={selectClass} title="A domain role applies to its domain, not to a data source, schema or table">
-                  <option value="DOMAIN">Not applicable — domain role</option>
-                </select>
+            <label className="block text-[11px] uppercase tracking-wider text-muted mb-1.5">Scope {scoped ? "*" : ""}</label>
+            {scoped ? (
+              <select
+                value={resType}
+                onChange={(e) => changeResType(e.target.value)}
+                className={selectClass}
+              >
+                {RESOURCE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            ) : (
+              <select disabled value="DOMAIN" className={selectClass} title="A domain role applies to its domain, not to a data source, schema or table">
+                <option value="DOMAIN">Not applicable — domain role</option>
+              </select>
+            )}
+            {roleDomains && (
                 <div className="mt-2 text-[12px] text-ink-soft">
+                  {scoped && <div className="mb-1">The scope applies to this role&apos;s catalog privileges (metadata and data).</div>}
                   {roleDomains.length === 1 ? (
                     <>Applies to the <span className="font-semibold text-ink">{DOMAIN_LABEL[roleDomains[0]] ?? roleDomains[0]}</span> domain.</>
                   ) : (
@@ -146,17 +166,6 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
                     </>
                   )}
                 </div>
-              </>
-            ) : (
-              <select
-                value={resType}
-                onChange={(e) => changeResType(e.target.value)}
-                className={selectClass}
-              >
-                {RESOURCE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
             )}
           </div>
 
@@ -257,9 +266,16 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
             </p>
           )}
 
+          {teamBlocked && (
+            <p className="text-[13px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              This team has members whose system role is <b>Viewer</b>, which is read-only: <b>{viewerMembers!.join(", ")}</b>.
+              Change their system role or remove them from the team before assigning <b>{selectedRole?.roleName}</b>, or pick a read-only role.
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 pt-2 border-t border-line-soft">
             <button type="button" onClick={onClose} className="btn btn-sm">Cancel</button>
-            <button type="submit" disabled={saving || viewerBlocked} className="btn btn-primary btn-sm">
+            <button type="submit" disabled={saving || viewerBlocked || teamBlocked} className="btn btn-primary btn-sm">
               {saving ? "Assigning…" : "Assign Role"}
             </button>
           </div>

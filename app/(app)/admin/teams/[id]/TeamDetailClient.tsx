@@ -12,6 +12,7 @@ const SCOPE_BADGE: Record<string, string> = {
   DATA_SOURCE: "bg-blue-50   text-blue-700   border-blue-200",
   SCHEMA:      "bg-sky-50    text-sky-700    border-sky-200",
   TABLE:       "bg-teal-50   text-teal-700   border-teal-200",
+  DOMAIN:      "bg-amber-50  text-amber-800  border-amber-200",
 };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -38,16 +39,22 @@ export function TeamDetailClient({
   const [showEdit,    setShowEdit]    = useState(false);
   const [addUserId,   setAddUserId]   = useState("");
   const [addingUser,  setAddingUser]  = useState(false);
+  const [memberError, setMemberError] = useState<string | null>(null);
 
   async function addMember() {
     if (!addUserId) return;
-    setAddingUser(true);
-    await fetch(`/api/admin/teams/${team.teamId}/members`, {
+    setAddingUser(true); setMemberError(null);
+    const res = await fetch(`/api/admin/teams/${team.teamId}/members`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: addUserId }),
     });
     setAddingUser(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setMemberError(d.error ?? "Could not add the user to the team.");
+      return;
+    }
     setAddUserId("");
     router.refresh();
   }
@@ -115,6 +122,10 @@ export function TeamDetailClient({
             </div>
           )}
 
+          {memberError && (
+            <p className="text-[13px] text-amber-900 bg-amber-50 border-b border-amber-200 px-5 py-2.5">{memberError}</p>
+          )}
+
           {members.length === 0
             ? <div className="py-8 text-center text-muted text-sm">No members yet.</div>
             : members.map((m) => (
@@ -174,6 +185,7 @@ export function TeamDetailClient({
         <AssignRoleModal
           roles={roles} sources={sources} schemas={schemas} tables={tables}
           teamId={team.teamId}
+          viewerMembers={members.filter((m) => m.systemRole === "VIEWER").map((m) => m.fullName)}
           onDone={() => { setShowAssign(false); router.refresh(); }}
           onClose={() => setShowAssign(false)}
         />

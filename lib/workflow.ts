@@ -124,7 +124,8 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
 
     case "ROLE": {
       if (!stage.assigneeRoleId) return [];
-      // Whoever holds this role globally (see bayanat.role_assignments) —
+      // Whoever holds this role globally or on its domain (see bayanat.
+      // role_assignments; the Officer roles are assigned to a domain) —
       // either directly, or as a member of a team the role was assigned to.
       // Resource-scoped (schema/table) role assignments don't apply here:
       // a workflow stage isn't tied to a specific asset.
@@ -132,12 +133,12 @@ async function resolveAssignees(stage: StageRow, requestId: number): Promise<str
         SELECT DISTINCT user_id AS "userId" FROM (
           SELECT ra.user_id
           FROM bayanat.role_assignments ra
-          WHERE ra.role_id = ${stage.assigneeRoleId} AND ra.resource_type = 'GLOBAL' AND ra.user_id IS NOT NULL
+          WHERE ra.role_id = ${stage.assigneeRoleId} AND ra.resource_type IN ('GLOBAL', 'DOMAIN') AND ra.user_id IS NOT NULL
           UNION
           SELECT tm.user_id
           FROM bayanat.role_assignments ra
           JOIN bayanat.team_members tm ON tm.team_id = ra.team_id
-          WHERE ra.role_id = ${stage.assigneeRoleId} AND ra.resource_type = 'GLOBAL' AND ra.team_id IS NOT NULL
+          WHERE ra.role_id = ${stage.assigneeRoleId} AND ra.resource_type IN ('GLOBAL', 'DOMAIN') AND ra.team_id IS NOT NULL
         ) x
       `;
       return rows.map((r) => r.userId);

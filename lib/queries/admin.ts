@@ -352,13 +352,37 @@ export async function getAssignmentsForRole(roleId: number): Promise<RoleAssignm
   `;
 }
 
-/** Roles beyond read-only (see isReadOnlyRole) that a user holds directly. */
+/** Roles beyond read-only (see isReadOnlyRole) that a user holds, directly or through a team. */
 export async function nonReadOnlyRolesOfUser(userId: string): Promise<string[]> {
+  return (await sql<{ name: string }[]>`
+    SELECT DISTINCT r.role_name || CASE WHEN t.team_id IS NULL THEN '' ELSE ' (through team ' || t.team_name || ')' END AS name
+    FROM bayanat.role_assignments ra
+    JOIN bayanat.roles r ON r.role_id = ra.role_id
+    LEFT JOIN bayanat.teams t ON t.team_id = ra.team_id
+    WHERE (ra.user_id = ${userId}
+           OR ra.team_id IN (SELECT team_id FROM bayanat.team_members WHERE user_id = ${userId}))
+      AND (r.metadata_write OR r.metadata_delete OR r.domain_write OR r.is_admin OR r.pii_clear_text_allowed)
+    ORDER BY 1
+  `).map((r) => r.name);
+}
+
+/** Roles beyond read-only that are assigned to a team (and so reach every member). */
+export async function nonReadOnlyRolesOfTeam(teamId: number): Promise<string[]> {
   return (await sql<{ name: string }[]>`
     SELECT DISTINCT r.role_name AS name
     FROM bayanat.role_assignments ra JOIN bayanat.roles r ON r.role_id = ra.role_id
-    WHERE ra.user_id = ${userId}
+    WHERE ra.team_id = ${teamId}
       AND (r.metadata_write OR r.metadata_delete OR r.domain_write OR r.is_admin OR r.pii_clear_text_allowed)
+    ORDER BY 1
+  `).map((r) => r.name);
+}
+
+/** Team members whose system role is Viewer (full names). */
+export async function viewerMembersOfTeam(teamId: number): Promise<string[]> {
+  return (await sql<{ name: string }[]>`
+    SELECT u.full_name AS name
+    FROM bayanat.team_members tm JOIN bayanat.users u ON u.user_id = tm.user_id
+    WHERE tm.team_id = ${teamId} AND u.role = 'VIEWER'
     ORDER BY 1
   `).map((r) => r.name);
 }
