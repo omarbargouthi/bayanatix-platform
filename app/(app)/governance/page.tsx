@@ -6,7 +6,6 @@ import { listRegisters } from "@/lib/queries/gov-registers";
 import { listFrameworks } from "@/lib/queries/gov-compliance";
 import { GovernancePageClient } from "./GovernancePageClient";
 import { getServerT } from "@/lib/i18n/server";
-import { DomainAccessPanel } from "@/components/domain-access/DomainAccessPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +31,6 @@ export default async function GovernancePage() {
         registers={registers}
         frameworks={frameworks}
       />
-      <div className="px-8 pb-8">
-        <DomainAccessPanel domain="GOVERNANCE" domainLabel={t.nav.governance} />
-      </div>
     </>
   );
 }

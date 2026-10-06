@@ -4,7 +4,6 @@ import { Header } from "@/components/layout/Header";
 import { getDqDimensions, getDqRules, getDqDashboardStats, getDqTrendData, getRecentDqResults } from "@/lib/queries/dq";
 import { DqAdminClient } from "@/app/(app)/admin/data-quality/DqAdminClient";
 import { getServerT } from "@/lib/i18n/server";
-import { DomainAccessPanel } from "@/components/domain-access/DomainAccessPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +39,6 @@ export default async function DataQualityPage() {
         recentRuns={recentRuns}
         userRole={user.role}
       />
-      <div className="px-8 pb-8">
-        <DomainAccessPanel domain="DATA_QUALITY" domainLabel={t.nav.quality} />
-      </div>
     </>
   );
 }

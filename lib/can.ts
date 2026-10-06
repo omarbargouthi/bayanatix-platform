@@ -188,8 +188,8 @@ export async function canViewPiClearText(session: SessionUser, entityId: number)
 // Whether the user holds the global "Data Privacy Officer" role (bayanat.
 // roles/role_assignments — the same granular role used for the PI
 // Clear-Text Access approval workflow) — distinct from the generic
-// DATA_PRIVACY domain-access roles below, which gate the /privacy page's
-// own DomainAccessPanel, not this specific role. ADMIN always qualifies.
+// DATA_PRIVACY domain-access roles below, which gate the /privacy page itself,
+// not this specific role. ADMIN always qualifies.
 export async function isDataPrivacyOfficer(session: SessionUser): Promise<boolean> {
   if (session.role === "ADMIN") return true;
   const [row] = await sql<{ cnt: number }[]>`
@@ -240,8 +240,8 @@ export async function canManageDomain(session: SessionUser, domain: DomainCode):
   return (await getDomainAccess(session, domain)) === "WRITE";
 }
 
-// Shared by the domain-access self-service delegation endpoint and the
-// access-requests approval flow — both end up doing the exact same grant.
+// Used by the access-requests approval flow: approving a domain request grants the
+// domain's read-only role (administrators assign roles directly in User Management).
 export const DOMAIN_READ_ROLE_NAME: Record<DomainCode, string> = {
   GOVERNANCE:    "Data Governance (Read)",
   DATA_QUALITY:  "Data Quality (Read)",
