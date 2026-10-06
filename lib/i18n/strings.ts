@@ -3427,6 +3427,9 @@ export type I18nStrings = {
   };
   accessApproval: {
     approvedBy: string;
+    alreadyRead: string;
+    alreadyManage: string;
+    alreadyPending: string;
   };
   activityLogs: {
     tab: string;

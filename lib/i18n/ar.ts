@@ -3284,6 +3284,9 @@ export const ar: I18nStrings = {
   },
   accessApproval: {
     approvedBy: "يوافق عليه المستخدمون الحاصلون على دور \"{role}\" أو مدير النظام.",
+    alreadyRead: "لديك بالفعل صلاحية القراءة على {domain} — لا حاجة لتقديم طلب.",
+    alreadyManage: "أنت تدير {domain} بالفعل — لا حاجة لتقديم طلب.",
+    alreadyPending: "لديك بالفعل طلب بخصوص {domain} بانتظار الموافقة.",
   },
   activityLogs: {
     tab: "سجلات التصدير والاستيراد",

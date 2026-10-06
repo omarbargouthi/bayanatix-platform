@@ -25,13 +25,15 @@ export function RequestAccessClient() {
   const [tab, setTab] = useState<Tab>("new");
   const [mine, setMine] = useState<AccessRequestRow[]>([]);
   const [pendingForMe, setPendingForMe] = useState<AccessRequestRow[]>([]);
+  const [domainAccess, setDomainAccess] = useState<Partial<Record<DomainCode, "WRITE" | "READ" | "NONE">>>({});
 
   const loadRequests = useCallback(async () => {
     const r = await fetch("/api/access-requests");
     if (!r.ok) return;
-    const d: { mine: AccessRequestRow[]; pendingForMe: AccessRequestRow[] } = await r.json();
+    const d: { mine: AccessRequestRow[]; pendingForMe: AccessRequestRow[]; domainAccess?: Partial<Record<DomainCode, "WRITE" | "READ" | "NONE">> } = await r.json();
     setMine(d.mine);
     setPendingForMe(d.pendingForMe);
+    setDomainAccess(d.domainAccess ?? {});
   }, []);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
@@ -80,6 +82,14 @@ export function RequestAccessClient() {
     setSchemas([]); setTables([]); setJustification("");
   }
 
+  // The chosen domain can't be requested when the user already has it (read or manage)
+  // or already has a request waiting: say so instead of taking another request.
+  const domainBlock: string | null = kind !== "DOMAIN" || !domain ? null
+    : domainAccess[domain] === "WRITE" ? t.accessApproval.alreadyManage.replace("{domain}", domainLabel(domain))
+    : domainAccess[domain] === "READ" ? t.accessApproval.alreadyRead.replace("{domain}", domainLabel(domain))
+    : mine.some((r) => r.requestKind === "DOMAIN" && r.domainCode === domain && r.statusCode === "PENDING") ? t.accessApproval.alreadyPending.replace("{domain}", domainLabel(domain))
+    : null;
+
   async function submit() {
     setMessage(null);
     let body: Record<string, unknown>;
@@ -101,7 +111,16 @@ export function RequestAccessClient() {
       const r = await fetch("/api/access-requests", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
-      if (!r.ok) { setMessage({ ok: false, text: c.submitFailed }); return; }
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        const name = kind === "DOMAIN" && domain ? domainLabel(domain) : "";
+        const text = err.code === "ALREADY_READ" ? t.accessApproval.alreadyRead.replace("{domain}", name)
+          : err.code === "ALREADY_MANAGE" ? t.accessApproval.alreadyManage.replace("{domain}", name)
+          : err.code === "ALREADY_PENDING" ? t.accessApproval.alreadyPending.replace("{domain}", name || (body.resourceName as string) || "")
+          : c.submitFailed;
+        setMessage({ ok: false, text });
+        return;
+      }
       setMessage({ ok: true, text: c.submitSuccess });
       resetForm();
       await loadRequests();
@@ -195,7 +214,10 @@ export function RequestAccessClient() {
                 <option value="">{c.domainPlaceholder}</option>
                 {ALL_DOMAINS.map((d) => <option key={d} value={d}>{domainLabel(d)}</option>)}
               </select>
-              {domain && <p className="text-[11px] text-muted mt-1">{t.accessApproval.approvedBy.replace("{role}", DOMAIN_MANAGE_ROLE_NAME[domain])}</p>}
+              {domain && !domainBlock && <p className="text-[11px] text-muted mt-1">{t.accessApproval.approvedBy.replace("{role}", DOMAIN_MANAGE_ROLE_NAME[domain])}</p>}
+              {domainBlock && (
+                <p className="text-[13px] text-sky-800 bg-sky-50 border border-sky-200 rounded-md px-3 py-2 mt-2">{domainBlock}</p>
+              )}
             </div>
           ) : (
             <>
@@ -265,7 +287,7 @@ export function RequestAccessClient() {
           )}
 
           <div className="flex justify-end">
-            <button onClick={submit} disabled={submitting} className="btn btn-primary">
+            <button onClick={submit} disabled={submitting || !!domainBlock} className="btn btn-primary">
               {submitting ? t.common.submitting : c.submitBtn}
             </button>
           </div>

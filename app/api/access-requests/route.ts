@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import type { DomainCode } from "@/lib/can";
+import { getDomainAccess, type DomainCode } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { CATALOG_RESOURCE_TYPES, canApproveAccessRequest, listAccessRequests, approversFor, type CatalogResourceType } from "@/lib/queries/access-requests";
 import { createNotification } from "@/lib/queries/notifications";
@@ -22,7 +22,11 @@ export async function GET() {
   const approveFlags = await Promise.all(pending.map((r) => canApproveAccessRequest(session, r)));
   const pendingForMe = pending.filter((_, i) => approveFlags[i]);
 
-  return NextResponse.json({ mine, pendingForMe });
+  // What the caller already has, so the form can say so instead of taking a request.
+  const levels = await Promise.all(ALL_DOMAINS.map((d) => getDomainAccess(session, d)));
+  const domainAccess = Object.fromEntries(ALL_DOMAINS.map((d, i) => [d, levels[i]]));
+
+  return NextResponse.json({ mine, pendingForMe, domainAccess });
 }
 
 async function notifyApprovers(
@@ -56,6 +60,17 @@ export async function POST(req: Request) {
     if (!ALL_DOMAINS.includes(domain)) {
       return NextResponse.json({ error: "Invalid domain" }, { status: 400 });
     }
+    // Already has the domain role (or manages the domain), or already asked: no new request.
+    const access = await getDomainAccess(session, domain);
+    if (access !== "NONE") {
+      return NextResponse.json({ code: access === "WRITE" ? "ALREADY_MANAGE" : "ALREADY_READ", error: "You already have access to this domain" }, { status: 409 });
+    }
+    const [pendingSame] = await sql`
+      SELECT 1 FROM bayanat.access_requests
+      WHERE requester_user_id = ${session.userId} AND request_kind = 'DOMAIN' AND domain_code = ${domain} AND status_code = 'PENDING'
+    `;
+    if (pendingSame) return NextResponse.json({ code: "ALREADY_PENDING", error: "You already have a pending request for this domain" }, { status: 409 });
+
     await sql`
       INSERT INTO bayanat.access_requests
         (requester_user_id, request_kind, domain_code, justification_text)
@@ -74,6 +89,13 @@ export async function POST(req: Request) {
     if (!CATALOG_RESOURCE_TYPES.includes(resourceType) || !resourceId) {
       return NextResponse.json({ error: "resourceType and resourceId are required" }, { status: 400 });
     }
+    const [pendingSame] = await sql`
+      SELECT 1 FROM bayanat.access_requests
+      WHERE requester_user_id = ${session.userId} AND request_kind = 'CATALOG' AND resource_type = ${resourceType}
+        AND resource_id = ${resourceId} AND status_code = 'PENDING'
+    `;
+    if (pendingSame) return NextResponse.json({ code: "ALREADY_PENDING", error: "You already have a pending request for this asset" }, { status: 409 });
+
     await sql`
       INSERT INTO bayanat.access_requests
         (requester_user_id, request_kind, resource_type, resource_id, resource_name, justification_text)

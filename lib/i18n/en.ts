@@ -3284,6 +3284,9 @@ export const en: I18nStrings = {
   },
   accessApproval: {
     approvedBy: "Approved by users holding the \"{role}\" role, or an administrator.",
+    alreadyRead: "You already have read access to {domain} — there is nothing to request.",
+    alreadyManage: "You already manage {domain} — there is nothing to request.",
+    alreadyPending: "You already have a request for {domain} waiting for approval.",
   },
   activityLogs: {
     tab: "Export & Import Logs",
