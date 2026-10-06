@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Role, SourceOption, SchemaOption, TableOption } from "@/lib/types";
-import { DOMAIN_LABEL } from "@/lib/domain-roles";
+import { DOMAIN_LABEL, isReadOnlyRole } from "@/lib/domain-roles";
 
 type Props = {
   roles:       Role[];
@@ -11,6 +11,8 @@ type Props = {
   tables:      TableOption[];
   userId?:     string;
   teamId?:     number;
+  /** The user's system role (ADMIN / STEWARD / OFFICER / VIEWER) — a Viewer can only hold read-only roles. */
+  userSystemRole?: string;
   onDone:      () => void;
   onClose:     () => void;
 };
@@ -22,7 +24,7 @@ const RESOURCE_TYPES = [
   { value: "TABLE",       label: "Table" },
 ];
 
-export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamId, onDone, onClose }: Props) {
+export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamId, userSystemRole, onDone, onClose }: Props) {
   const [roleId,         setRoleId]         = useState<string>("");
   const [resType,        setResType]        = useState<string>("GLOBAL");
   // Scope-narrowing selections — Schema/Table scope needs Source (and Schema,
@@ -38,6 +40,9 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
   const [domains,        setDomains]        = useState<string[]>([]);
   const selectedRole = roles.find((r) => String(r.roleId) === roleId) ?? null;
   const roleDomains = selectedRole?.domainCodes?.length ? selectedRole.domainCodes : null;
+
+  // A user whose system role is Viewer can only be given read-only roles.
+  const viewerBlocked = !!selectedRole && userSystemRole === "VIEWER" && !isReadOnlyRole(selectedRole);
 
   function changeRole(v: string) {
     setRoleId(v);
@@ -81,7 +86,11 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
       }),
     });
     setSaving(false);
-    if (!res.ok) { setErr("Failed to assign role."); return; }
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setErr(d.error ?? "Failed to assign role.");
+      return;
+    }
     onDone();
   }
 
@@ -241,9 +250,16 @@ export function AssignRoleModal({ roles, sources, schemas, tables, userId, teamI
             );
           })()}
 
+          {viewerBlocked && (
+            <p className="text-[13px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              This user&apos;s system role is <b>Viewer</b>, which is read-only. Change the system role in the user&apos;s
+              Profile (to Steward, Officer or Admin) before assigning <b>{selectedRole?.roleName}</b>, or pick a read-only role.
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 pt-2 border-t border-line-soft">
             <button type="button" onClick={onClose} className="btn btn-sm">Cancel</button>
-            <button type="submit" disabled={saving} className="btn btn-primary btn-sm">
+            <button type="submit" disabled={saving || viewerBlocked} className="btn btn-primary btn-sm">
               {saving ? "Assigning…" : "Assign Role"}
             </button>
           </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, hashPassword } from "@/lib/auth";
-import { updateUser, updateUserPassword, getUserById, emailTaken, EMAIL_RE } from "@/lib/queries/admin";
+import { updateUser, updateUserPassword, getUserById, emailTaken, EMAIL_RE, nonReadOnlyRolesOfUser } from "@/lib/queries/admin";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const user = await getSession();
@@ -17,6 +17,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (email !== undefined) {
     if (!EMAIL_RE.test(email)) return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
     if (await emailTaken(email, userId)) return NextResponse.json({ error: "Another user already has this email address" }, { status: 409 });
+  }
+  // The reverse of the assignment rule: a user holding roles beyond read-only can't be
+  // switched to the Viewer system role until those roles are removed.
+  if (systemRole === "VIEWER" && existing.systemRole !== "VIEWER") {
+    const held = await nonReadOnlyRolesOfUser(userId);
+    if (held.length > 0) {
+      return NextResponse.json({ error: `Remove these roles before changing the system role to Viewer: ${held.join(", ")}` }, { status: 409 });
+    }
   }
   // An admin can't lock themselves out by deactivating their own account.
   if (isActive === false && userId === user.userId) return NextResponse.json({ error: "You can't deactivate your own account" }, { status: 400 });

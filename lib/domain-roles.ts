@@ -19,3 +19,10 @@ export const DOMAIN_LABEL: Record<string, string> = {
   FOI:          "FOI Requests",
   OPEN_DATA:    "Open Data",
 };
+
+/** A role that grants nothing beyond reading (metadata, data or a domain). Anything
+ *  that can write/delete metadata, manage a domain, see PI in clear text or administer
+ *  the platform is not read-only — and can't be held by a user whose system role is Viewer. */
+export function isReadOnlyRole(r: { metadataWrite: boolean; metadataDelete: boolean; domainWrite: boolean; isAdmin: boolean; piClearTextAllowed?: boolean }): boolean {
+  return !(r.metadataWrite || r.metadataDelete || r.domainWrite || r.isAdmin || r.piClearTextAllowed);
+}

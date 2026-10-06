@@ -352,6 +352,26 @@ export async function getAssignmentsForRole(roleId: number): Promise<RoleAssignm
   `;
 }
 
+/** Roles beyond read-only (see isReadOnlyRole) that a user holds directly. */
+export async function nonReadOnlyRolesOfUser(userId: string): Promise<string[]> {
+  return (await sql<{ name: string }[]>`
+    SELECT DISTINCT r.role_name AS name
+    FROM bayanat.role_assignments ra JOIN bayanat.roles r ON r.role_id = ra.role_id
+    WHERE ra.user_id = ${userId}
+      AND (r.metadata_write OR r.metadata_delete OR r.domain_write OR r.is_admin OR r.pii_clear_text_allowed)
+    ORDER BY 1
+  `).map((r) => r.name);
+}
+
+/** True when the role grants only read privileges. */
+export async function roleIsReadOnly(roleId: number): Promise<boolean> {
+  const [r] = await sql<{ ro: boolean }[]>`
+    SELECT NOT (metadata_write OR metadata_delete OR domain_write OR is_admin OR pii_clear_text_allowed) AS ro
+    FROM bayanat.roles WHERE role_id = ${roleId}
+  `;
+  return r?.ro ?? true;
+}
+
 /** The domains a role applies to, or null when it isn't a domain role. */
 export async function roleDomainCodes(roleId: number): Promise<string[] | null> {
   const [r] = await sql<{ codes: string[] | null }[]>`SELECT domain_codes AS codes FROM bayanat.roles WHERE role_id = ${roleId}`;

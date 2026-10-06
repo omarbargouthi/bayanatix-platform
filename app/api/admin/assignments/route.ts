@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { createAssignment, createDomainAssignments, roleDomainCodes, deleteAssignment } from "@/lib/queries/admin";
+import { createAssignment, createDomainAssignments, roleDomainCodes, deleteAssignment, roleIsReadOnly, getUserById } from "@/lib/queries/admin";
 
 export async function POST(req: Request) {
   const user = await getSession();
@@ -10,6 +10,19 @@ export async function POST(req: Request) {
   const { roleId, userId, teamId, resourceType, resourceId, resourceName } = body;
   if (!roleId || (!userId && !teamId))
     return NextResponse.json({ error: "roleId and userId or teamId required" }, { status: 400 });
+
+  // A user whose system role is Viewer can only hold read-only roles: the administrator
+  // changes the system role first, then assigns a role that can change or manage things.
+  if (userId && !(await roleIsReadOnly(Number(roleId)))) {
+    const target = await getUserById(String(userId));
+    if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (target.systemRole === "VIEWER") {
+      return NextResponse.json({
+        code: "VIEWER_SYSTEM_ROLE",
+        error: "This user's system role is Viewer, which is read-only. Change the system role (Profile › System Role) before assigning a role that can edit or manage.",
+      }, { status: 409 });
+    }
+  }
 
   // A domain role applies to its domain(s), never to a data source / schema / table:
   // whatever scope was sent is ignored and it is saved against the domain.

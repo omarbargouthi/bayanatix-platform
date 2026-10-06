@@ -33,15 +33,21 @@ export function UserDetailClient({
   const [editRole,    setEditRole]    = useState(user.systemRole);
   const [editEmail,   setEditEmail]   = useState(user.email);
   const [savingInfo,  setSavingInfo]  = useState(false);
+  const [infoError,   setInfoError]   = useState<string | null>(null);
 
   async function saveInfo() {
-    setSavingInfo(true);
-    await fetch(`/api/admin/users/${encodeURIComponent(user.userId)}`, {
+    setSavingInfo(true); setInfoError(null);
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(user.userId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fullName: editName, email: editEmail, systemRole: editRole }),
     });
     setSavingInfo(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setInfoError(d.error ?? "Could not save the changes.");
+      return;
+    }
     router.refresh();
   }
 
@@ -91,6 +97,7 @@ export function UserDetailClient({
                   {["ADMIN","STEWARD","OFFICER","VIEWER"].map((r) => <option key={r}>{r}</option>)}
                 </select>
               </div>
+              {infoError && <p className="text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{infoError}</p>}
               <button onClick={saveInfo} disabled={savingInfo} className="btn btn-primary btn-sm w-full">
                 {savingInfo ? "Saving…" : "Save Changes"}
               </button>
@@ -162,6 +169,7 @@ export function UserDetailClient({
           schemas={schemas}
           tables={tables}
           userId={user.userId}
+          userSystemRole={user.systemRole}
           onDone={() => { setShowAssign(false); router.refresh(); }}
           onClose={() => setShowAssign(false)}
         />
