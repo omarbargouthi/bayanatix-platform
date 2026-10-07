@@ -21,7 +21,9 @@ import { maskStoredPersonalData } from "../privacy/pi-housekeeping";
 export type PropagationField = "CLASSIFICATION" | "BUSINESS_TERM" | "DESCRIPTION" | "TAG" | "RETENTION";
 export type PropagationSummary = { applied: number; removed: number; suggested: number; superseded: number; columnsClassified: number };
 
-const PASS_THROUGH = new Set(["DIRECT", "CAST", "LOOKUP", "JOIN", "FILTER", "MANUAL"]);
+// FILTER is neither: the source column only decides which rows take part, its values
+// never reach the target, so no classification / term / description flows through it.
+const PASS_THROUGH = new Set(["DIRECT", "CAST", "LOOKUP", "JOIN", "MANUAL"]);
 const CALCULATED = new Set(["EXPRESSION", "AGGREGATION", "MEASURE"]);
 const MASK_RE = /\b(mask\w*|hash\w*|encrypt\w*|tokeni[sz]\w*|redact\w*|anonymi[sz]\w*|pseudonymi[sz]\w*|sha(1|2|256|512)?|md5)\b/i;
 const SYSTEM_ACTOR = "SYSTEM";

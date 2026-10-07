@@ -189,8 +189,11 @@ function LineageGraphInner({
       target: String(e.targetEntityId),
       type: "smoothstep",
       animated: false,
-      style: { stroke: e.isConfirmed ? "#6058A0" : "#94a3b8", strokeWidth: 1.75, strokeDasharray: e.provenanceCode === "SCANNED" && !e.isConfirmed ? "5 3" : undefined },
-      markerEnd: { type: MarkerType.ArrowClosed, color: e.isConfirmed ? "#6058A0" : "#94a3b8", width: 16, height: 16 },
+      // A filter link (the source only decides which rows take part) is drawn dotted amber.
+      style: e.transformationTypeCode === "FILTER"
+        ? { stroke: "#d97706", strokeWidth: 1.5, strokeDasharray: "2 4" }
+        : { stroke: e.isConfirmed ? "#6058A0" : "#94a3b8", strokeWidth: 1.75, strokeDasharray: e.provenanceCode === "SCANNED" && !e.isConfirmed ? "5 3" : undefined },
+      markerEnd: { type: MarkerType.ArrowClosed, color: e.transformationTypeCode === "FILTER" ? "#d97706" : e.isConfirmed ? "#6058A0" : "#94a3b8", width: 16, height: 16 },
     }));
     let laidOut = layoutNodes(rfNodes, rfEdges);
     if (groupBySystem) {

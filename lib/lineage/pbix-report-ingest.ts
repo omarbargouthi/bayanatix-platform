@@ -86,6 +86,7 @@ export async function ingestPbixReportPages(o: {
 
       // One attribute per field the visual shows, fed by the model column / measure.
       const fieldNames = new Set<string>();
+      const fieldAttrs: { attrId: number; srcAttr: number | undefined }[] = [];
       for (const f of v.fields) {
         const srcEntity = tableEntity.get(f.table.toLowerCase());
         const srcAttr = srcEntity ? (await attrsOf(srcEntity)).get(f.name.toLowerCase()) : undefined;
@@ -95,6 +96,7 @@ export async function ingestPbixReportPages(o: {
         const dataType = f.kind === "measure" ? "measure" : f.aggregation ? clip(`${f.aggregation.toLowerCase()} of column`, 50) : "column";
         const attrId = await ensureAttribute(entityId, label, dataType, f.kind === "measure" ? { attributeClassCode: "MEASURE" } : {});
         fieldCount++;
+        fieldAttrs.push({ attrId, srcAttr });
         if (!srcAttr) { unresolved.add(`${f.table}[${f.name}]`); continue; }
         await upsertLineageEdge({
           scope: "ATTRIBUTE_LEVEL", sourceAssetId: srcAttr, targetAssetId: attrId,
@@ -103,6 +105,22 @@ export async function ingestPbixReportPages(o: {
           processId, confidenceCode: "HIGH", connectionId: o.connectionId,
         });
         edgesCreated++;
+      }
+
+      // Filters set on the visual: the filtered column doesn't supply any field's value,
+      // it decides which rows every field is computed over.
+      for (const flt of v.filters) {
+        const fltEntity = tableEntity.get(flt.table.toLowerCase());
+        const fltAttr = fltEntity ? (await attrsOf(fltEntity)).get(flt.name.toLowerCase()) : undefined;
+        if (!fltAttr) continue;
+        for (const fa of fieldAttrs) {
+          if (fa.srcAttr === fltAttr) continue; // already the field's value
+          await upsertLineageEdge({
+            scope: "ATTRIBUTE_LEVEL", sourceAssetId: fltAttr, targetAssetId: fa.attrId, transformationTypeCode: "FILTER",
+            transformationLogicText: `Visual filter on ${flt.table}[${flt.name}]`, processId, confidenceCode: "HIGH", connectionId: o.connectionId,
+          });
+          edgesCreated++;
+        }
       }
     }
   }

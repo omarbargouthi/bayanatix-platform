@@ -8,7 +8,7 @@ import { ensureSchema, ensureEntity, ensureAttribute } from "./catalog-upsert";
 import { resolveStitch, type ExternalRef, type Confidence } from "./stitching";
 import type { ObjectTypeCode } from "../object-types";
 import { csvRowOfEntity } from "./file-headers";
-import { daxNamedExpressions, daxColumnRefs, type DaxColumnRef } from "./dax-columns";
+import { daxNamedExpressions, daxColumnRoles, type DaxColumnRef } from "./dax-columns";
 
 // ── scanResult shape (trimmed to the fields this ingester consumes) ─────────
 
@@ -62,15 +62,6 @@ function parseM(expr: string): MSource {
 
   const ref: ExternalRef | null = engine && table ? { engine, host, database, schema, object: table } : null;
   return { ref, renameMap, isSimple: !!ref && !complex, lakehouseItemId: null, lakehouseTableName: null };
-}
-
-// DAX measure column references: 'Table'[Column] or Table[Column] (no full DAX parse, per spec).
-function extractDaxColumnRefs(dax: string): { table: string | null; column: string }[] {
-  const refs: { table: string | null; column: string }[] = [];
-  for (const m of dax.matchAll(/(?:'([^']+)'|([A-Za-z_][\w]*))\[([^\]]+)\]/g)) {
-    refs.push({ table: m[1] ?? m[2] ?? null, column: m[3] });
-  }
-  return refs;
 }
 
 // ── GUID-keyed catalog upsert (asset_external_ids) ───────────────────────────
@@ -272,15 +263,21 @@ export async function ingestPowerBiScanResult(
           }
 
           // ── Measures: attribute <- referenced columns in the same model table ──
+          // A column the measure aggregates is a value link (MEASURE); one that only
+          // appears in its CALCULATE / FILTER conditions is a FILTER link.
+          const colByLower = new Map([...colAttrId].map(([name, id]) => [name.toLowerCase(), id]));
           for (const meas of table.measures ?? []) {
-            const refs = extractDaxColumnRefs(meas.expression).filter((r) => !r.table || r.table === table.name);
+            const roles = daxColumnRoles(meas.expression);
+            const own = (refs: DaxColumnRef[]) => refs.filter((r) => r.table.toLowerCase() === table.name.toLowerCase());
             let resolved = 0;
-            for (const ref of refs) {
-              const attrId = colAttrId.get(ref.column);
-              if (!attrId) continue;
-              resolved++;
-              await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: attrId, targetAssetId: measureAttrId.get(meas.name)!, transformationTypeCode: "MEASURE", transformationLogicText: `${meas.name} = ${meas.expression}`, processId: dsProcessId, confidenceCode: resolved > 0 ? "MEDIUM" : "LOW", connectionId });
-              edgesCreated++;
+            for (const [refs, typeCode] of [[own(roles.value), "MEASURE"], [own(roles.filter), "FILTER"]] as const) {
+              for (const ref of refs) {
+                const attrId = colByLower.get(ref.column.toLowerCase());
+                if (!attrId) continue;
+                resolved++;
+                await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: attrId, targetAssetId: measureAttrId.get(meas.name)!, transformationTypeCode: typeCode, transformationLogicText: `${meas.name} = ${meas.expression}`, processId: dsProcessId, confidenceCode: "MEDIUM", connectionId });
+                edgesCreated++;
+              }
             }
             if (resolved === 0) warnings.push(`Measure "${meas.name}" (${ds.name}): no column references resolved within its own table — LOW confidence, unlinked.`);
           }
@@ -315,36 +312,51 @@ export async function ingestPowerBiScanResult(
           // source; a column added by name ("Name", <expression>) maps to every model column
           // its expression reads.
           const named = daxNamedExpressions(dax);
+          // Conditions that decide which rows the table keeps apply to every column of it.
+          const tableFilters = daxColumnRoles(dax, named, { skipNamed: true }).filter;
           const targetAttrs = await sql<{ id: number; name: string }[]>`SELECT attribute_id AS id, physical_name_text AS name FROM bayanat.data_attributes WHERE entity_id = ${targetId}`;
-          let traced = 0, untraced = 0;
+          const attrOf = async (ref: DaxColumnRef): Promise<number | null> => {
+            const refEntity = datasetTableEntity.get(`${ds.id}::${ref.table}`) ?? [...datasetTableEntity].find(([k]) => k.toLowerCase() === `${ds.id}::${ref.table}`.toLowerCase())?.[1];
+            if (!refEntity) return null;
+            const [a] = await sql<{ id: number }[]>`SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${refEntity} AND lower(physical_name_text) = lower(${ref.column})`;
+            return a?.id ?? null;
+          };
+          const keyOf = (r: DaxColumnRef) => `${r.table}\u0000${r.column}`.toLowerCase();
+          let untraced = 0;
           for (const col of table.columns) {
             const targetAttr = targetAttrs.find((a) => a.name === col.name);
             const src = col.sourceColumn?.trim();
             if (!targetAttr || !src) continue;
             const passThrough = /^(?:'((?:[^']|'')+)'|([^\[\]]+))\[([^\]]+)\]$/.exec(src);
-            let refs: DaxColumnRef[] = [], logic = "", typeCode = "DIRECT";
+            let values: DaxColumnRef[] = [], filters: DaxColumnRef[] = [], logic = "", valueType = "DIRECT", known = true;
             if (passThrough) {
-              refs = [{ table: (passThrough[1] ?? passThrough[2]).replace(/''/g, "'").trim(), column: passThrough[3] }];
+              values = [{ table: (passThrough[1] ?? passThrough[2]).replace(/''/g, "'").trim(), column: passThrough[3] }];
               logic = `DAX: ${table.name}[${col.name}] is ${src}`;
             } else {
-              const daxName = src.replace(/^\[|\]$/g, "");
-              const expr = named.get(daxName.toLowerCase());
-              if (expr == null) { untraced++; continue; }
-              refs = daxColumnRefs(expr, named);
-              typeCode = "EXPRESSION";
-              logic = `DAX: ${table.name}[${col.name}] = ${expr.replace(/\s+/g, " ").slice(0, 1500)}`;
-              if (refs.length === 0) continue; // a constant — it reads no column
+              const expr = named.get(src.replace(/^\[|\]$/g, "").toLowerCase());
+              if (expr == null) known = false;
+              else {
+                const roles = daxColumnRoles(expr, named);
+                values = roles.value; filters = roles.filter;
+                valueType = "EXPRESSION";
+                logic = `DAX: ${table.name}[${col.name}] = ${expr.replace(/\s+/g, " ").slice(0, 1500)}`;
+              }
             }
-            let linked = false;
-            for (const ref of refs) {
-              const refEntity = datasetTableEntity.get(`${ds.id}::${ref.table}`) ?? [...datasetTableEntity].find(([k]) => k.toLowerCase() === `${ds.id}::${ref.table}`.toLowerCase())?.[1];
-              if (!refEntity) continue;
-              const [srcAttr] = await sql<{ id: number }[]>`SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${refEntity} AND lower(physical_name_text) = lower(${ref.column})`;
-              if (!srcAttr) continue;
-              await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: srcAttr.id, targetAssetId: targetAttr.id, transformationTypeCode: typeCode, transformationLogicText: logic, processId: calcProcessId, confidenceCode: "HIGH", connectionId });
-              edgesCreated++; linked = true;
+            if (!known) { untraced++; continue; }
+            const valueKeys = new Set(values.map(keyOf));
+            const allFilters = new Map([...filters, ...tableFilters].filter((r) => !valueKeys.has(keyOf(r))).map((r) => [keyOf(r), r]));
+            for (const [refs, typeCode] of [[values, valueType], [[...allFilters.values()], "FILTER"]] as const) {
+              for (const ref of refs) {
+                const srcAttr = await attrOf(ref);
+                if (!srcAttr) continue;
+                await upsertLineageEdge({
+                  scope: "ATTRIBUTE_LEVEL", sourceAssetId: srcAttr, targetAssetId: targetAttr.id, transformationTypeCode: typeCode,
+                  transformationLogicText: typeCode === "FILTER" ? `DAX filter: ${ref.table}[${ref.column}] decides which rows feed ${table.name}[${col.name}]. ${logic}` : logic,
+                  processId: calcProcessId, confidenceCode: "HIGH", connectionId,
+                });
+                edgesCreated++;
+              }
             }
-            if (linked) traced++; else untraced++;
           }
           if (untraced > 0) warnings.push(`Calculated table "${table.name}" (${ds.name}): ${untraced} column(s) could not be traced through its DAX definition — table-level lineage only for those.`);
         }

@@ -19,6 +19,7 @@ export type ReportVisual = {
   id: string; type: string; typeLabel: string; title: string | null;
   fields: ReportField[];
   filterTables: string[];             // tables only referenced by the visual's filters
+  filters: { table: string; name: string; kind: "column" | "measure" }[];  // fields the visual is filtered by
 };
 export type ReportPage = { id: string; name: string; visuals: ReportVisual[] };
 
@@ -78,6 +79,15 @@ function labelOf(f: Omit<ReportField, "role" | "label">, shown: unknown): string
   return f.aggregation ? `${f.aggregation} of ${f.name}` : f.name;
 }
 
+function filterFieldsOf(filters: Json, alias: Record<string, string>): ReportVisual["filters"] {
+  const out = new Map<string, ReportVisual["filters"][number]>();
+  for (const flt of Array.isArray(filters) ? filters : []) {
+    const r = resolveField(flt?.field ?? flt?.expression, alias);
+    if (r) out.set(`${r.table}\u0000${r.name}`.toLowerCase(), { table: r.table, name: r.name, kind: r.kind });
+  }
+  return [...out.values()];
+}
+
 function filterTablesOf(filters: Json, alias: Record<string, string>, used: Set<string>): string[] {
   const out = new Set<string>();
   for (const flt of Array.isArray(filters) ? filters : []) {
@@ -116,6 +126,7 @@ function readPbir(files: Record<string, Uint8Array>): ReportPage[] | null {
         id: v.name ?? vf.split("/")[5], type: visual.visualType, typeLabel: typeLabel(visual.visualType),
         title: literalText(visual.visualContainerObjects?.title?.[0]?.properties?.text),
         fields, filterTables: filterTablesOf(v.filterConfig?.filters, {}, new Set(fields.map((f) => f.table))),
+        filters: filterFieldsOf(v.filterConfig?.filters, {}),
         y: Number(v.position?.y ?? 0), x: Number(v.position?.x ?? 0),
       });
     }
@@ -156,6 +167,7 @@ function readLegacy(files: Record<string, Uint8Array>): ReportPage[] | null {
         id: cfg.name ?? String(vc.id ?? visuals.length), type: sv.visualType, typeLabel: typeLabel(sv.visualType),
         title: literalText(sv.vcObjects?.title?.[0]?.properties?.text),
         fields, filterTables: filterTablesOf(filters, alias, new Set(fields.map((f) => f.table))),
+        filters: filterFieldsOf(filters, alias),
         y: Number(vc.y ?? 0), x: Number(vc.x ?? 0),
       });
     }
