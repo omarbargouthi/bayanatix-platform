@@ -17,14 +17,14 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { connectionName, dbTypeCode, portNumber, databaseName, serviceName, defaultSchema, usernameText, passwordText, sslEnabled } = body;
   const hostAddress = typeof body.hostAddress === "string" ? cleanSourcePath(body.hostAddress) : body.hostAddress;
-  const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL", "JSON", "REST_API", "SOAP_API"];
+  const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL", "JSON", "PBIX_FOLDER", "REST_API", "SOAP_API"];
   if (!VALID.includes(dbTypeCode)) return NextResponse.json({ error: `dbTypeCode must be one of ${VALID.join(", ")}` }, { status: 400 });
-  // File sources (CSV/EXCEL/JSON) store their path in hostAddress and have no real port,
+  // File sources (CSV/EXCEL/JSON/PBIX_FOLDER) store their path in hostAddress and have no real port,
   // username, or database — those fields stay null for them. Spec sources (REST_API/
   // SOAP_API) store the spec's file path or URL in hostAddress the same way, but DO
   // accept an optional username/password — sent as HTTP Basic Auth when the spec is
   // fetched from a URL behind auth.
-  const isFileType = dbTypeCode === "CSV" || dbTypeCode === "EXCEL" || dbTypeCode === "JSON";
+  const isFileType = dbTypeCode === "CSV" || dbTypeCode === "EXCEL" || dbTypeCode === "JSON" || dbTypeCode === "PBIX_FOLDER";
   const isSpecType = dbTypeCode === "REST_API" || dbTypeCode === "SOAP_API";
   const noPortNeeded = isFileType || isSpecType;
   if (!connectionName || !hostAddress || (!noPortNeeded && !portNumber))

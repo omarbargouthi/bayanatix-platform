@@ -1296,6 +1296,13 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
         ? { ok: true, message: `Found ${files.length} ${cfg.dbTypeCode} file(s)` }
         : { ok: false, message: `No ${extLabel} files found at that path` };
     }
+    if (cfg.dbTypeCode === "PBIX_FOLDER") {
+      const { listPbixFiles } = await import("./lineage/pbix-folder-scan");
+      const { files } = listPbixFiles(cfg.hostAddress ?? "");
+      return files.length > 0
+        ? { ok: true, message: `Found ${files.length} .pbix file(s)` }
+        : { ok: false, message: "No .pbix files found at that path" };
+    }
     if (cfg.dbTypeCode === "REST_API") {
       const text = await fetchSpecText(cfg);
       const spec = await parseOpenApiSpec(text);

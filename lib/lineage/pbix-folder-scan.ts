@@ -5,15 +5,32 @@
 // opts.force), so a nightly re-scan of a slowly-refreshed export folder is cheap.
 // Reuses the same crawl_jobs/connection_registry status plumbing as lib/crawler.ts's
 // crawlDataSource so this shows up in the same admin "crawl history" UI.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { sql } from "../db";
 import { getConnection } from "../queries/sources";
 import { createCrawlJob, addCrawlJobLog, finishCrawlJob, failCrawlJob } from "../queries/crawl-jobs";
 import { updateCrawlStatus } from "../queries/sources";
 import { ingestPbixFile } from "./pbix-parser";
+import { cleanSourcePath } from "../source-path";
 
 export type PbixFolderScanResult = { filesScanned: number; filesSkipped: number; edgesCreated: number; warnings: string[] };
+
+/** The .pbix files a connection's path points at: every .pbix in a folder, or the one
+ *  file when the path is a .pbix file itself. */
+export function listPbixFiles(rawPath: string): { dir: string; files: string[] } {
+  const root = cleanSourcePath(rawPath);
+  if (!root) throw new Error("Directory path is required");
+  if (!existsSync(root)) throw new Error(`Path not found: ${root}`);
+  if (statSync(root).isFile()) {
+    if (!root.toLowerCase().endsWith(".pbix")) throw new Error(`Not a .pbix file: ${root}`);
+    return { dir: path.dirname(root), files: [path.basename(root)] };
+  }
+  const files = readdirSync(root, { withFileTypes: true })
+    .filter((d) => d.isFile() && d.name.toLowerCase().endsWith(".pbix"))
+    .map((d) => d.name);
+  return { dir: root, files };
+}
 
 export async function scanPbixFolder(
   connectionId: number,
@@ -31,13 +48,11 @@ export async function scanPbixFolder(
   const warnings: string[] = [];
 
   try {
-    const files = readdirSync(conn.hostAddress, { withFileTypes: true })
-      .filter((d) => d.isFile() && d.name.toLowerCase().endsWith(".pbix"))
-      .map((d) => d.name);
+    const { dir, files } = listPbixFiles(conn.hostAddress);
     await addCrawlJobLog(jobId, "INFO", `Found ${files.length} .pbix file(s)`);
 
     for (const fileName of files) {
-      const filePath = path.join(conn.hostAddress, fileName);
+      const filePath = path.join(dir, fileName);
       const mtime = statSync(filePath).mtime;
 
       const [state] = await sql<{ fileMtime: Date }[]>`
