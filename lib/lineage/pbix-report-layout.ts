@@ -21,7 +21,10 @@ export type ReportVisual = {
   filterTables: string[];             // tables only referenced by the visual's filters
   filters: { table: string; name: string; kind: "column" | "measure" }[];  // fields the visual is filtered by
 };
-export type ReportPage = { id: string; name: string; visuals: ReportVisual[] };
+// filters: filters set on the page itself, and those set on the whole report (which
+// apply to every page) — each affects all the visuals of the page.
+export type ReportPageFilter = ReportVisual["filters"][number] & { scope: "page" | "report" };
+export type ReportPage = { id: string; name: string; visuals: ReportVisual[]; filters: ReportPageFilter[] };
 
 const AGGREGATIONS = ["Sum", "Average", "Distinct count", "Min", "Max", "Count", "Median", "Standard deviation", "Variance"];
 
@@ -97,6 +100,18 @@ function filterTablesOf(filters: Json, alias: Record<string, string>, used: Set<
   return [...out];
 }
 
+function parseMaybeString(v: Json): Json {
+  if (typeof v !== "string") return v ?? [];
+  try { return JSON.parse(v); } catch { return []; }
+}
+
+function pageFilters(pageLevel: Json, reportLevel: Json, alias: Record<string, string> = {}): ReportPageFilter[] {
+  return [
+    ...filterFieldsOf(pageLevel, alias).map((f) => ({ ...f, scope: "page" as const })),
+    ...filterFieldsOf(reportLevel, alias).map((f) => ({ ...f, scope: "report" as const })),
+  ];
+}
+
 // ── Enhanced report format (PBIR) ────────────────────────────────────────────
 
 function readPbir(files: Record<string, Uint8Array>): ReportPage[] | null {
@@ -104,6 +119,7 @@ function readPbir(files: Record<string, Uint8Array>): ReportPage[] | null {
   const pageFiles = [...norm.keys()].filter((k) => /^Report\/definition\/pages\/[^/]+\/page\.json$/i.test(k));
   if (pageFiles.length === 0) return null;
   const order: string[] = parseJson(files[norm.get("Report/definition/pages/pages.json") ?? ""] ?? new Uint8Array())?.pageOrder ?? [];
+  const reportFilters = parseJson(files[norm.get("Report/definition/report.json") ?? ""] ?? new Uint8Array())?.filterConfig?.filters;
 
   const pages: (ReportPage & { pos: number })[] = [];
   for (const pf of pageFiles) {
@@ -132,7 +148,7 @@ function readPbir(files: Record<string, Uint8Array>): ReportPage[] | null {
     }
     visuals.sort((a, b) => a.y - b.y || a.x - b.x);
     const idx = order.indexOf(page.name ?? pageId);
-    pages.push({ id: page.name ?? pageId, name: page.displayName ?? pageId, visuals, pos: idx < 0 ? 9999 : idx });
+    pages.push({ id: page.name ?? pageId, name: page.displayName ?? pageId, visuals, filters: pageFilters(page.filterConfig?.filters, reportFilters), pos: idx < 0 ? 9999 : idx });
   }
   return pages.sort((a, b) => a.pos - b.pos);
 }
@@ -172,12 +188,12 @@ function readLegacy(files: Record<string, Uint8Array>): ReportPage[] | null {
       });
     }
     visuals.sort((a, b) => a.y - b.y || a.x - b.x);
-    return { id: s.name ?? `section-${si}`, name: s.displayName ?? `Page ${si + 1}`, visuals };
+    return { id: s.name ?? `section-${si}`, name: s.displayName ?? `Page ${si + 1}`, visuals, filters: pageFilters(parseMaybeString(s.filters), parseMaybeString(layout.filters)) };
   });
 }
 
 /** The report's pages in display order, or null when the file has no readable report part. */
 export function readPbixReportPages(pbixBuf: Uint8Array): ReportPage[] | null {
-  const files = unzipSync(pbixBuf, { filter: (f) => /^\/?Report\/(Layout$|definition\/pages\/)/i.test(f.name) });
+  const files = unzipSync(pbixBuf, { filter: (f) => /^\/?Report\/(Layout$|definition\/report\.json$|definition\/pages\/)/i.test(f.name) });
   return readPbir(files) ?? readLegacy(files);
 }

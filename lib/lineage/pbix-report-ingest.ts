@@ -86,7 +86,7 @@ export async function ingestPbixReportPages(o: {
 
       // One attribute per field the visual shows, fed by the model column / measure.
       const fieldNames = new Set<string>();
-      const fieldAttrs: { attrId: number; srcAttr: number | undefined }[] = [];
+      const fieldAttrs: { attrId: number; srcAttr: number | undefined; table: string }[] = [];
       for (const f of v.fields) {
         const srcEntity = tableEntity.get(f.table.toLowerCase());
         const srcAttr = srcEntity ? (await attrsOf(srcEntity)).get(f.name.toLowerCase()) : undefined;
@@ -96,7 +96,7 @@ export async function ingestPbixReportPages(o: {
         const dataType = f.kind === "measure" ? "measure" : f.aggregation ? clip(`${f.aggregation.toLowerCase()} of column`, 50) : "column";
         const attrId = await ensureAttribute(entityId, label, dataType, f.kind === "measure" ? { attributeClassCode: "MEASURE" } : {});
         fieldCount++;
-        fieldAttrs.push({ attrId, srcAttr });
+        fieldAttrs.push({ attrId, srcAttr, table: f.table.toLowerCase() });
         if (!srcAttr) { unresolved.add(`${f.table}[${f.name}]`); continue; }
         await upsertLineageEdge({
           scope: "ATTRIBUTE_LEVEL", sourceAssetId: srcAttr, targetAssetId: attrId,
@@ -109,15 +109,23 @@ export async function ingestPbixReportPages(o: {
 
       // Filters set on the visual: the filtered column doesn't supply any field's value,
       // it decides which rows every field is computed over.
-      for (const flt of v.filters) {
+      // A filter set on the page, or on the whole report, reaches the visual too — but
+      // only its fields from the filtered table: whether it also reaches fields of other
+      // tables depends on the model's relationships, which are not followed here.
+      const linked = new Set<string>();
+      for (const flt of [...v.filters.map((f) => ({ ...f, scope: "visual" as const })), ...page.filters]) {
         const fltEntity = tableEntity.get(flt.table.toLowerCase());
         const fltAttr = fltEntity ? (await attrsOf(fltEntity)).get(flt.name.toLowerCase()) : undefined;
         if (!fltAttr) continue;
         for (const fa of fieldAttrs) {
           if (fa.srcAttr === fltAttr) continue; // already the field's value
+          if (flt.scope !== "visual" && fa.table !== flt.table.toLowerCase()) continue;
+          if (linked.has(`${fltAttr}>${fa.attrId}`)) continue; // the closest filter (visual, then page, then report) names the link
+          linked.add(`${fltAttr}>${fa.attrId}`);
+          const what = flt.scope === "visual" ? "Visual filter" : flt.scope === "page" ? `Page filter (page ${pageName})` : "Report filter (all pages)";
           await upsertLineageEdge({
             scope: "ATTRIBUTE_LEVEL", sourceAssetId: fltAttr, targetAssetId: fa.attrId, transformationTypeCode: "FILTER",
-            transformationLogicText: `Visual filter on ${flt.table}[${flt.name}]`, processId, confidenceCode: "HIGH", connectionId: o.connectionId,
+            transformationLogicText: `${what} on ${flt.table}[${flt.name}]`, processId, confidenceCode: "HIGH", connectionId: o.connectionId,
           });
           edgesCreated++;
         }
