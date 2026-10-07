@@ -517,11 +517,11 @@ function TypeGroup({ title, types, regions, expandedId, onToggleExpand, onPatchT
                   value={t.classificationCode ?? ""}
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => onPatchType(t.sitTypeId, { classification_code: e.target.value || null })}
-                  className="text-[10px] font-semibold border border-line rounded-full px-1.5 py-0.5 bg-canvas-soft text-muted"
+                  className="text-[10px] font-semibold border border-line rounded-full px-1.5 py-0.5 bg-canvas-soft text-muted w-[124px]"
                 >
                   {CLASSIFICATION_OPTIONS.map((c) => <option key={c} value={c}>{c || "— none —"}</option>)}
                 </select>
-                <span className="text-[11px] text-muted">{t.patternCount} pattern{t.patternCount !== 1 ? "s" : ""}</span>
+                <span className="text-[11px] text-muted w-[64px] text-end whitespace-nowrap">{t.patternCount} pattern{t.patternCount !== 1 ? "s" : ""}</span>
                 <span onClick={(e) => { e.stopPropagation(); onRemoveType(t.sitTypeId); }} className="text-[11px] text-red-600 hover:underline">Delete</span>
                 <span className="text-muted text-[11px]">{expandedId === t.sitTypeId ? "▲" : "▼"}</span>
               </div>
