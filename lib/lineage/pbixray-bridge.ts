@@ -13,7 +13,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export type PbixRayColumn = { name: string; dataType: string };
+export type PbixRayColumn = { name: string; dataType: string; sourceColumn?: string | null };
 export type PbixRayMeasure = { name: string; expression: string };
 // daxExpression: the definition of a DAX calculated table (null for imported tables).
 export type PbixRayTable = { name: string; columns: PbixRayColumn[]; measures: PbixRayMeasure[]; mExpression: string | null; daxExpression?: string | null };

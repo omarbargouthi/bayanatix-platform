@@ -164,7 +164,7 @@ export async function ingestPbixFile(
   if (pbixrayTables && pbixrayTables.length > 0) {
     tables = pbixrayTables.map((t) => ({
       name: t.name,
-      columns: t.columns.map((c) => ({ name: c.name, dataType: c.dataType })),
+      columns: t.columns.map((c) => ({ name: c.name, dataType: c.dataType, sourceColumn: c.sourceColumn ?? undefined })),
       measures: t.measures.map((m) => ({ name: m.name, expression: m.expression })),
       source: t.mExpression ? [{ expression: t.mExpression }] : undefined,
       daxExpression: t.daxExpression ?? undefined,

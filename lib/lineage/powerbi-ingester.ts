@@ -8,10 +8,13 @@ import { ensureSchema, ensureEntity, ensureAttribute } from "./catalog-upsert";
 import { resolveStitch, type ExternalRef, type Confidence } from "./stitching";
 import type { ObjectTypeCode } from "../object-types";
 import { csvRowOfEntity } from "./file-headers";
+import { daxNamedExpressions, daxColumnRefs, type DaxColumnRef } from "./dax-columns";
 
 // ── scanResult shape (trimmed to the fields this ingester consumes) ─────────
 
-export type SrColumn = { name: string; dataType?: string };
+// sourceColumn (calculated tables): where the model says the column comes from in the
+// table's DAX — "Other table[column]" when passed through, "[Name]" when added by name.
+export type SrColumn = { name: string; dataType?: string; sourceColumn?: string };
 type SrMeasure = { name: string; expression: string; description?: string };
 export type SrTableSource = { expression?: string; lakehouseItemId?: string; tableName?: string };
 // daxExpression: set for a DAX calculated table — it is derived from other model tables, not loaded from a source.
@@ -307,6 +310,43 @@ export async function ingestPowerBiScanResult(
             edgesCreated++;
           }
           if (referenced.size === 0) warnings.push(`Calculated table "${table.name}" (${ds.name}): its DAX definition names no other table of the model — cataloged, unlinked.`);
+
+          // Column level. A passed-through column maps to the column the model names as its
+          // source; a column added by name ("Name", <expression>) maps to every model column
+          // its expression reads.
+          const named = daxNamedExpressions(dax);
+          const targetAttrs = await sql<{ id: number; name: string }[]>`SELECT attribute_id AS id, physical_name_text AS name FROM bayanat.data_attributes WHERE entity_id = ${targetId}`;
+          let traced = 0, untraced = 0;
+          for (const col of table.columns) {
+            const targetAttr = targetAttrs.find((a) => a.name === col.name);
+            const src = col.sourceColumn?.trim();
+            if (!targetAttr || !src) continue;
+            const passThrough = /^(?:'((?:[^']|'')+)'|([^\[\]]+))\[([^\]]+)\]$/.exec(src);
+            let refs: DaxColumnRef[] = [], logic = "", typeCode = "DIRECT";
+            if (passThrough) {
+              refs = [{ table: (passThrough[1] ?? passThrough[2]).replace(/''/g, "'").trim(), column: passThrough[3] }];
+              logic = `DAX: ${table.name}[${col.name}] is ${src}`;
+            } else {
+              const daxName = src.replace(/^\[|\]$/g, "");
+              const expr = named.get(daxName.toLowerCase());
+              if (expr == null) { untraced++; continue; }
+              refs = daxColumnRefs(expr, named);
+              typeCode = "EXPRESSION";
+              logic = `DAX: ${table.name}[${col.name}] = ${expr.replace(/\s+/g, " ").slice(0, 1500)}`;
+              if (refs.length === 0) continue; // a constant — it reads no column
+            }
+            let linked = false;
+            for (const ref of refs) {
+              const refEntity = datasetTableEntity.get(`${ds.id}::${ref.table}`) ?? [...datasetTableEntity].find(([k]) => k.toLowerCase() === `${ds.id}::${ref.table}`.toLowerCase())?.[1];
+              if (!refEntity) continue;
+              const [srcAttr] = await sql<{ id: number }[]>`SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${refEntity} AND lower(physical_name_text) = lower(${ref.column})`;
+              if (!srcAttr) continue;
+              await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: srcAttr.id, targetAssetId: targetAttr.id, transformationTypeCode: typeCode, transformationLogicText: logic, processId: calcProcessId, confidenceCode: "HIGH", connectionId });
+              edgesCreated++; linked = true;
+            }
+            if (linked) traced++; else untraced++;
+          }
+          if (untraced > 0) warnings.push(`Calculated table "${table.name}" (${ds.name}): ${untraced} column(s) could not be traced through its DAX definition — table-level lineage only for those.`);
         }
       }
 

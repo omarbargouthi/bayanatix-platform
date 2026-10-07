@@ -36,14 +36,17 @@ def calculated_tables(model, measures, already):
         handler = SQLiteHandler(get_data_slice(model._metadata_handler._data_model, "metadata.sqlitedb"))
         rows = handler.execute_query(
             "SELECT t.Name AS TableName, COALESCE(c.ExplicitName, c.InferredName) AS ColumnName, "
-            "COALESCE(NULLIF(c.ExplicitDataType, 1), c.InferredDataType) AS DataType "
+            "COALESCE(NULLIF(c.ExplicitDataType, 1), c.InferredDataType) AS DataType, c.SourceColumn AS SourceColumn "
             "FROM Column c JOIN [Table] t ON c.TableId = t.ID WHERE c.Type = 4 ORDER BY t.Name, c.ID"
         )
         for _, r in rows.iterrows():
             if r["ColumnName"] is None:
                 continue
             columns_by_table.setdefault(str(r["TableName"]), []).append(
-                {"name": str(r["ColumnName"]), "dataType": str(AMO_PANDAS_TYPE_MAPPING.get(r["DataType"], "object"))}
+                # sourceColumn is the model's own record of where the column comes from in the
+                # table's DAX: "Other table[column]" (passed through) or "[Name]" (added by name).
+                {"name": str(r["ColumnName"]), "dataType": str(AMO_PANDAS_TYPE_MAPPING.get(r["DataType"], "object")),
+                 "sourceColumn": None if r["SourceColumn"] is None else str(r["SourceColumn"])}
             )
     except Exception:
         pass  # the table is still cataloged, from its definition and measures, without columns
