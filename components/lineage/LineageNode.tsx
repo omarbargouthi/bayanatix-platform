@@ -19,13 +19,15 @@ export const TYPE_COLORS: Record<string, string> = {
   API_RESOURCE:      "bg-violet-100 text-violet-700",
   SEMANTIC_MODEL:    "bg-amber-100 text-amber-700",
   REPORT:            "bg-orange-100 text-orange-700",
+  REPORT_PAGE:       "bg-rose-100 text-rose-700",
+  REPORT_VISUAL:     "bg-fuchsia-100 text-fuchsia-700",
   UNKNOWN:           "bg-slate-100 text-slate-500",
 };
 
 export const TYPE_DOT: Record<string, string> = {
   TABLE: "bg-indigo-500", VIEW: "bg-teal-500", MATERIALIZED_VIEW: "bg-emerald-500", FOREIGN_TABLE: "bg-sky-500",
   LAKEHOUSE_TABLE: "bg-cyan-500", FILE: "bg-lime-600", API_RESOURCE: "bg-violet-500", SEMANTIC_MODEL: "bg-amber-500",
-  REPORT: "bg-orange-500", UNKNOWN: "bg-slate-400",
+  REPORT: "bg-orange-500", REPORT_PAGE: "bg-rose-500", REPORT_VISUAL: "bg-fuchsia-500", UNKNOWN: "bg-slate-400",
 };
 
 // Engine glyph — small colored monogram badge showing which system a node's

@@ -9,6 +9,8 @@
 import { unzipSync } from "fflate";
 import { ingestPowerBiScanResult, type ScanResult, type SrTable } from "./powerbi-ingester";
 import { extractViaPbixray } from "./pbixray-bridge";
+import { readPbixReportPages } from "./pbix-report-layout";
+import { ingestPbixReportPages } from "./pbix-report-ingest";
 
 // ── DataMashup binary stream (MS-QDEFF) ──────────────────────────────────────
 // Layout: uint32le version, then four length-prefixed byte sections in order:
@@ -154,7 +156,7 @@ export async function ingestPbixFile(
   // given, the report is cataloged there — in a schema named after the report — and its
   // assets are keyed per connection, so two connections never share them.
   opts: { dataSourceId?: number } = {},
-): Promise<{ scanRunId: number; edgesCreated: number; tablesIngested: number; columnsIngested: number; warnings: string[] }> {
+): Promise<{ scanRunId: number; edgesCreated: number; tablesIngested: number; columnsIngested: number; pagesIngested: number; visualsIngested: number; warnings: string[] }> {
   const warnings: string[] = [];
   let tables: SrTable[];
 
@@ -180,22 +182,36 @@ export async function ingestPbixFile(
   }
 
   const datasetName = fileName.replace(/\.pbix$/i, "");
+  const datasetId = opts.dataSourceId ? `pbix:${connectionId}:${fileName}` : `pbix:${fileName}`;
   const scanResult: ScanResult = {
     workspaces: [
       {
         id: `pbix-desktop:${fileName}`,
         name: opts.dataSourceId ? datasetName : "Power BI Desktop Uploads",
-        datasets: [{ id: opts.dataSourceId ? `pbix:${connectionId}:${fileName}` : `pbix:${fileName}`, name: datasetName, tables }],
+        datasets: [{ id: datasetId, name: datasetName, tables }],
       },
     ],
   };
 
   const result = await ingestPowerBiScanResult(scanResult, connectionId, triggeredByUserId, opts);
+
+  // The report itself: its pages, the visuals on them and the model fields each one uses.
+  let report = { pages: 0, visuals: 0, fields: 0, edgesCreated: 0, warnings: [] as string[] };
+  try {
+    const pages = readPbixReportPages(pbixBuf);
+    if (pages) report = await ingestPbixReportPages({ pages, datasetId, datasetName, connectionId, fileName });
+    else warnings.push("No report pages were found in this .pbix — only the semantic model was cataloged.");
+  } catch (err) {
+    warnings.push(`Report pages could not be read (${err instanceof Error ? err.message : String(err)}) — only the semantic model was cataloged.`);
+  }
+
   return {
     scanRunId: result.scanRunId,
-    edgesCreated: result.edgesCreated,
-    tablesIngested: tables.length,
-    columnsIngested: tables.reduce((sum, t) => sum + t.columns.length, 0),
-    warnings: [...warnings, ...result.warnings],
+    edgesCreated: result.edgesCreated + report.edgesCreated,
+    tablesIngested: tables.length + report.pages + report.visuals,
+    columnsIngested: tables.reduce((sum, t) => sum + t.columns.length, 0) + report.fields,
+    pagesIngested: report.pages,
+    visualsIngested: report.visuals,
+    warnings: [...warnings, ...result.warnings, ...report.warnings],
   };
 }

@@ -74,6 +74,7 @@ export async function scanPbixFolder(
         const buf = readFileSync(filePath);
         const result = await ingestPbixFile(buf, fileName, triggeredByUserId, connectionId, { dataSourceId });
         for (const w of result.warnings) await addCrawlJobLog(jobId, "WARN", w);
+        await addCrawlJobLog(jobId, "INFO", `  → ${fileName}: ${result.pagesIngested} report page(s), ${result.visualsIngested} visual(s)`);
         edgesCreated += result.edgesCreated;
         tablesTotal += result.tablesIngested;
         columnsTotal += result.columnsIngested;

@@ -1363,6 +1363,8 @@ export type I18nStrings = {
       API_RESOURCE:       string;
       SEMANTIC_MODEL:     string;
       REPORT:             string;
+      REPORT_PAGE:        string;
+      REPORT_VISUAL:      string;
       UNKNOWN:            string;
     };
     engines: {

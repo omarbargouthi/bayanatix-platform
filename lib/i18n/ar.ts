@@ -1253,6 +1253,8 @@ export const ar: I18nStrings = {
       API_RESOURCE:       "مورد API",
       SEMANTIC_MODEL:     "نموذج دلالي",
       REPORT:             "تقرير",
+      REPORT_PAGE:        "صفحة تقرير",
+      REPORT_VISUAL:      "عنصر مرئي في التقرير",
       UNKNOWN:            "نوع غير معروف",
     },
     engines: {

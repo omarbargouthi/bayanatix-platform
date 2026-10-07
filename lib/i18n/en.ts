@@ -1253,6 +1253,8 @@ export const en: I18nStrings = {
       API_RESOURCE:       "API resource",
       SEMANTIC_MODEL:     "Semantic model",
       REPORT:             "Report",
+      REPORT_PAGE:        "Report page",
+      REPORT_VISUAL:      "Report visual",
       UNKNOWN:            "Type unknown",
     },
     engines: {

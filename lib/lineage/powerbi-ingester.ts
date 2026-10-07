@@ -6,6 +6,7 @@
 import { sql } from "../db";
 import { ensureSchema, ensureEntity, ensureAttribute } from "./catalog-upsert";
 import { resolveStitch, type ExternalRef, type Confidence } from "./stitching";
+import type { ObjectTypeCode } from "../object-types";
 import { csvRowOfEntity } from "./file-headers";
 
 // ── scanResult shape (trimmed to the fields this ingester consumes) ─────────
@@ -70,9 +71,9 @@ function extractDaxColumnRefs(dax: string): { table: string | null; column: stri
 
 // ── GUID-keyed catalog upsert (asset_external_ids) ───────────────────────────
 
-async function ensureEntityByExternalId(
+export async function ensureEntityByExternalId(
   systemCode: string, externalIdText: string,
-  schemaId: number, tableName: string, objectType: "SEMANTIC_MODEL" | "REPORT" | "LAKEHOUSE_TABLE",
+  schemaId: number, tableName: string, objectType: ObjectTypeCode,
   displayName?: string,
 ): Promise<number> {
   const [existing] = await sql<{ entityId: number }[]>`
@@ -91,7 +92,7 @@ async function ensureEntityByExternalId(
 const CONFIDENCE_RANK: Record<Confidence, number> = { HIGH: 2, MEDIUM: 1, LOW: 0 };
 function worseOf(a: Confidence, b: Confidence): Confidence { return CONFIDENCE_RANK[a] <= CONFIDENCE_RANK[b] ? a : b; }
 
-async function upsertLineageEdge(opts: {
+export async function upsertLineageEdge(opts: {
   scope: "ENTITY_LEVEL" | "ATTRIBUTE_LEVEL"; sourceAssetId: number; targetAssetId: number;
   transformationTypeCode: string; transformationLogicText: string; processId: number;
   confidenceCode: Confidence; connectionId: number;
@@ -111,7 +112,7 @@ async function upsertLineageEdge(opts: {
   `;
 }
 
-async function ensureProcess(connectionId: number, processTypeCode: string, processName: string, externalRefText: string, definitionText: string): Promise<{ id: number; isNew: boolean }> {
+export async function ensureProcess(connectionId: number, processTypeCode: string, processName: string, externalRefText: string, definitionText: string): Promise<{ id: number; isNew: boolean }> {
   const [existing] = await sql<{ id: number }[]>`
     SELECT process_id AS id FROM bayanat.lineage_processes WHERE connection_id = ${connectionId} AND process_name = ${processName} AND process_type_code = ${processTypeCode}
   `;
