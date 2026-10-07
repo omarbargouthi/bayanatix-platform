@@ -15,7 +15,8 @@ const execFileAsync = promisify(execFile);
 
 export type PbixRayColumn = { name: string; dataType: string };
 export type PbixRayMeasure = { name: string; expression: string };
-export type PbixRayTable = { name: string; columns: PbixRayColumn[]; measures: PbixRayMeasure[]; mExpression: string | null };
+// daxExpression: the definition of a DAX calculated table (null for imported tables).
+export type PbixRayTable = { name: string; columns: PbixRayColumn[]; measures: PbixRayMeasure[]; mExpression: string | null; daxExpression?: string | null };
 
 export async function extractViaPbixray(pbixBuf: Buffer): Promise<PbixRayTable[] | null> {
   const dir = await mkdtemp(path.join(tmpdir(), "pbix-"));

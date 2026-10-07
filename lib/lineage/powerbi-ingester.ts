@@ -14,7 +14,8 @@ import { csvRowOfEntity } from "./file-headers";
 export type SrColumn = { name: string; dataType?: string };
 type SrMeasure = { name: string; expression: string; description?: string };
 export type SrTableSource = { expression?: string; lakehouseItemId?: string; tableName?: string };
-export type SrTable = { name: string; columns: SrColumn[]; measures?: SrMeasure[]; source?: SrTableSource[] };
+// daxExpression: set for a DAX calculated table — it is derived from other model tables, not loaded from a source.
+export type SrTable = { name: string; columns: SrColumn[]; measures?: SrMeasure[]; source?: SrTableSource[]; daxExpression?: string };
 export type SrDataset = { id: string; name: string; targetStorageMode?: string; tables: SrTable[] };
 type SrReport = { id: string; name: string; datasetId: string };
 type SrDataflowQuery = { queryName: string; expression: string; destination?: { type: string; itemId: string; tableName: string } };
@@ -280,6 +281,32 @@ export async function ingestPowerBiScanResult(
             }
             if (resolved === 0) warnings.push(`Measure "${meas.name}" (${ds.name}): no column references resolved within its own table — LOW confidence, unlinked.`);
           }
+        }
+      }
+
+      // Calculated tables <- the model tables their DAX definition reads. Done after every
+      // table of the model is cataloged, since a definition may refer to any of them.
+      for (const ds of ws.datasets ?? []) {
+        const calculated = ds.tables.filter((t) => t.daxExpression);
+        if (calculated.length === 0) continue;
+        const { id: calcProcessId } = await ensureProcess(connectionId, "PBI_DATASET", `${ds.name} (calculated tables)`, `${ds.id}/calculated`, "DAX calculated tables derived from other tables of the semantic model");
+        for (const table of calculated) {
+          const targetId = datasetTableEntity.get(`${ds.id}::${table.name}`);
+          if (!targetId) continue;
+          const dax = table.daxExpression!;
+          const referenced = new Set<string>();
+          for (const other of ds.tables) {
+            if (other.name === table.name) continue;
+            const quoted = `'${other.name.replace(/'/g, "''")}'`;
+            if (dax.includes(quoted) || new RegExp(`(^|[^\\w'])${other.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\[`).test(dax)) referenced.add(other.name);
+          }
+          for (const name of referenced) {
+            const sourceId = datasetTableEntity.get(`${ds.id}::${name}`);
+            if (!sourceId) continue;
+            await upsertLineageEdge({ scope: "ENTITY_LEVEL", sourceAssetId: sourceId, targetAssetId: targetId, transformationTypeCode: "EXPRESSION", transformationLogicText: `DAX: ${table.name} = ${dax.replace(/\s+/g, " ").slice(0, 1500)}`, processId: calcProcessId, confidenceCode: "HIGH", connectionId });
+            edgesCreated++;
+          }
+          if (referenced.size === 0) warnings.push(`Calculated table "${table.name}" (${ds.name}): its DAX definition names no other table of the model — cataloged, unlinked.`);
         }
       }
 

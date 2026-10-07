@@ -167,6 +167,7 @@ export async function ingestPbixFile(
       columns: t.columns.map((c) => ({ name: c.name, dataType: c.dataType })),
       measures: t.measures.map((m) => ({ name: m.name, expression: m.expression })),
       source: t.mExpression ? [{ expression: t.mExpression }] : undefined,
+      daxExpression: t.daxExpression ?? undefined,
     }));
     warnings.push("Read from the .pbix's compiled data model (via pbixray) — full column list and DAX measures included.");
   } else {
