@@ -567,12 +567,20 @@ function LineageTable({ graph, selectedId, onSelect }: { graph: Graph; selectedI
   const nodeById = new Map(graph.nodes.map((n) => [n.entityId, n]));
   const end = (entityId: number, column: string | null) => {
     const n = nodeById.get(entityId);
-    return (
+    const entityName = n?.entityName ?? `#${entityId}`;
+    const where = [n?.sourceName, n?.schemaName].filter(Boolean).join(" · ");
+    // Column-level: the column leads — a long table name would otherwise push it out of
+    // the cell and make every row of the same table look alike.
+    return column ? (
       <div className="min-w-0">
-        <div className="text-[13px] font-medium text-ink truncate" dir="auto" title={n?.entityName}>
-          {n?.entityName ?? `#${entityId}`}{column ? <span className="text-brand-purple">.{column}</span> : null}
-        </div>
-        <div className="text-[11px] text-muted truncate" dir="auto">{[n?.sourceName, n?.schemaName].filter(Boolean).join(" · ")}</div>
+        <div className="text-[13px] font-semibold text-brand-purple truncate" dir="auto" title={column}>{column}</div>
+        <div className="text-[12px] text-ink truncate" dir="auto" title={entityName}>{entityName}</div>
+        <div className="text-[11px] text-muted truncate" dir="auto" title={where}>{where}</div>
+      </div>
+    ) : (
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium text-ink truncate" dir="auto" title={entityName}>{entityName}</div>
+        <div className="text-[11px] text-muted truncate" dir="auto" title={where}>{where}</div>
       </div>
     );
   };
@@ -607,8 +615,8 @@ function LineageTable({ graph, selectedId, onSelect }: { graph: Graph; selectedI
                 </span>
                 {e.isConfirmed && <span className="ms-1.5 text-[11px] text-emerald-600">✓ {lt.confirmed}</span>}
               </td>
-              <td className="px-4 py-2 max-w-[320px]">
-                <div className="text-[11px] font-mono text-ink-soft truncate" title={e.transformationLogicText ?? undefined} dir="ltr">{e.transformationLogicText ?? ""}</div>
+              <td className="px-4 py-2 max-w-[380px]">
+                <div className="text-[11px] font-mono text-ink-soft line-clamp-3 break-words text-left" title={e.transformationLogicText ?? undefined} dir="ltr">{e.transformationLogicText ?? ""}</div>
               </td>
             </tr>
           ))}
