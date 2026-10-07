@@ -150,6 +150,10 @@ export async function ingestPbixFile(
   fileName: string,
   triggeredByUserId: string,
   connectionId: number,
+  // dataSourceId: the connection's own catalog source (folder / file connections). When
+  // given, the report is cataloged there — in a schema named after the report — and its
+  // assets are keyed per connection, so two connections never share them.
+  opts: { dataSourceId?: number } = {},
 ): Promise<{ scanRunId: number; edgesCreated: number; tablesIngested: number; columnsIngested: number; warnings: string[] }> {
   const warnings: string[] = [];
   let tables: SrTable[];
@@ -180,13 +184,13 @@ export async function ingestPbixFile(
     workspaces: [
       {
         id: `pbix-desktop:${fileName}`,
-        name: "Power BI Desktop Uploads",
-        datasets: [{ id: `pbix:${fileName}`, name: datasetName, tables }],
+        name: opts.dataSourceId ? datasetName : "Power BI Desktop Uploads",
+        datasets: [{ id: opts.dataSourceId ? `pbix:${connectionId}:${fileName}` : `pbix:${fileName}`, name: datasetName, tables }],
       },
     ],
   };
 
-  const result = await ingestPowerBiScanResult(scanResult, connectionId, triggeredByUserId);
+  const result = await ingestPowerBiScanResult(scanResult, connectionId, triggeredByUserId, opts);
   return {
     scanRunId: result.scanRunId,
     edgesCreated: result.edgesCreated,

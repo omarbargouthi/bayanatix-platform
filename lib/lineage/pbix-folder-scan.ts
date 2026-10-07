@@ -13,6 +13,8 @@ import { createCrawlJob, addCrawlJobLog, finishCrawlJob, failCrawlJob } from "..
 import { updateCrawlStatus } from "../queries/sources";
 import { ingestPbixFile } from "./pbix-parser";
 import { cleanSourcePath } from "../source-path";
+import { ensureDataSource } from "./catalog-upsert";
+import { pruneOrphanPlaceholders } from "./stitching";
 
 export type PbixFolderScanResult = { filesScanned: number; filesSkipped: number; edgesCreated: number; warnings: string[] };
 
@@ -49,6 +51,9 @@ export async function scanPbixFolder(
 
   try {
     const { dir, files } = listPbixFiles(conn.hostAddress);
+    // The connection's own source in the catalog, so what was crawled is found under
+    // the name the connection was given (each report becomes a schema inside it).
+    const dataSourceId = await ensureDataSource(conn.connectionName, "POWERBI", cleanSourcePath(conn.hostAddress), null, { connectionId });
     await addCrawlJobLog(jobId, "INFO", `Found ${files.length} .pbix file(s)`);
 
     for (const fileName of files) {
@@ -67,7 +72,8 @@ export async function scanPbixFolder(
       await addCrawlJobLog(jobId, "INFO", `Ingesting "${fileName}" (modified ${mtime.toISOString()})`);
       try {
         const buf = readFileSync(filePath);
-        const result = await ingestPbixFile(buf, fileName, triggeredByUserId, connectionId);
+        const result = await ingestPbixFile(buf, fileName, triggeredByUserId, connectionId, { dataSourceId });
+        for (const w of result.warnings) await addCrawlJobLog(jobId, "WARN", w);
         edgesCreated += result.edgesCreated;
         tablesTotal += result.tablesIngested;
         columnsTotal += result.columnsIngested;
@@ -86,6 +92,8 @@ export async function scanPbixFolder(
       }
     }
 
+    await pruneOrphanPlaceholders();
+    await addCrawlJobLog(jobId, "INFO", `Cataloged under source "${conn.connectionName}" (Data Catalog), ${tablesTotal} table(s), ${columnsTotal} column(s)`);
     await addCrawlJobLog(jobId, "INFO", `Done: ${filesScanned} scanned, ${filesSkipped} unchanged/skipped, ${edgesCreated} lineage edge(s) created`);
     await finishCrawlJob(jobId, 1, tablesTotal, columnsTotal);
     await updateCrawlStatus(connectionId, "COMPLETED", undefined, { schemas: 1, tables: tablesTotal, columns: columnsTotal });

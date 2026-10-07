@@ -6,6 +6,7 @@
 import { sql } from "../db";
 import { ensureSchema, ensureEntity, ensureAttribute } from "./catalog-upsert";
 import { resolveStitch, type ExternalRef, type Confidence } from "./stitching";
+import { csvRowOfEntity } from "./file-headers";
 
 // ── scanResult shape (trimmed to the fields this ingester consumes) ─────────
 
@@ -129,7 +130,12 @@ async function ensureProcess(connectionId: number, processTypeCode: string, proc
 
 // ── Main ingest ───────────────────────────────────────────────────────────────
 
-export async function ingestPowerBiScanResult(scanResult: ScanResult, connectionId: number, triggeredByUserId: string): Promise<{ scanRunId: number; warnings: string[]; edgesCreated: number }> {
+export async function ingestPowerBiScanResult(
+  scanResult: ScanResult, connectionId: number, triggeredByUserId: string,
+  // dataSourceId: catalog the workspace under this data source (a .pbix connection's own)
+  // instead of the first registered Power BI / Fabric source.
+  opts: { dataSourceId?: number } = {},
+): Promise<{ scanRunId: number; warnings: string[]; edgesCreated: number }> {
   const warnings: string[] = [];
   let edgesCreated = 0;
 
@@ -145,7 +151,9 @@ export async function ingestPowerBiScanResult(scanResult: ScanResult, connection
       const fabric = isFabricWorkspace(ws);
       const systemCode = fabric ? "FABRIC" : "POWERBI";
       const sourceTypeCode = fabric ? "FABRIC" : "POWERBI";
-      const [dataSource] = await sql<{ id: number }[]>`SELECT data_source_id AS id FROM bayanat.data_sources WHERE source_type_code = ${sourceTypeCode} LIMIT 1`;
+      const [dataSource] = opts.dataSourceId
+        ? [{ id: opts.dataSourceId }]
+        : await sql<{ id: number }[]>`SELECT data_source_id AS id FROM bayanat.data_sources WHERE source_type_code = ${sourceTypeCode} LIMIT 1`;
       if (!dataSource) { warnings.push(`Workspace "${ws.name}": no registered ${sourceTypeCode} data source — skipped (register one first).`); continue; }
       const schemaId = await ensureSchema(dataSource.id, ws.name);
 
@@ -222,7 +230,38 @@ export async function ingestPowerBiScanResult(scanResult: ScanResult, connection
                   edgesCreated++;
                 }
               } else if (stitch.status === "RESOLVED") {
-                warnings.push(`Table "${table.name}" (${ds.name}): M expression too complex to map columns (merge/custom column/etc.) — entity-level only, LOW confidence.`);
+                // The query does more than load the source (custom columns, merges, filters…),
+                // so not every model column comes straight from it. Columns that are still
+                // traceable — same name as a source column, or reached by following the
+                // query's renames back — are mapped, at LOW confidence; the rest (calculated
+                // columns) stay unmapped.
+                const srcAttrs = await sql<{ id: number; name: string }[]>`SELECT attribute_id AS id, physical_name_text AS name FROM bayanat.data_attributes WHERE entity_id = ${srcEntityId} ORDER BY attribute_id`;
+                const srcByName = new Map(srcAttrs.map((a) => [a.name.trim().toLowerCase(), a]));
+                // "Removed Top Rows" then "Promoted Headers": the report names its columns
+                // after a later row of the file than the catalog does (which uses the first).
+                // Read that row and line the two up by position.
+                const skip = parsed.ref.engine === "CSV" ? src.expression.match(/Table\.Skip\([^,]+,\s*(\d+)\s*\)[\s\S]*?Table\.PromoteHeaders/) : null;
+                if (skip) {
+                  const promoted = await csvRowOfEntity(srcEntityId, Number(skip[1]));
+                  if (promoted && promoted.length === srcAttrs.length) {
+                    promoted.forEach((label, i) => { const k = label.trim().toLowerCase(); if (k && !srcByName.has(k)) srcByName.set(k, srcAttrs[i]); });
+                  }
+                }
+                let mapped = 0;
+                for (const col of table.columns) {
+                  let name = col.name, srcAttr = srcByName.get(name.trim().toLowerCase());
+                  for (let hop = 0; hop < 10; hop++) {
+                    let previous: string | null = null;
+                    for (const [oldName, newName] of parsed.renameMap) if (newName === name && oldName !== name) { previous = oldName; break; }
+                    if (previous == null) break;
+                    name = previous;
+                    srcAttr = srcByName.get(name.trim().toLowerCase()) ?? srcAttr;
+                  }
+                  if (!srcAttr) continue;
+                  await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: srcAttr.id, targetAssetId: colAttrId.get(col.name)!, transformationTypeCode: "DIRECT", transformationLogicText: srcAttr.name === col.name ? `M: column "${col.name}" loaded from the source` : `M: source column "${srcAttr.name}" loaded as "${col.name}"`, processId: dsProcessId, confidenceCode: "LOW", connectionId });
+                  edgesCreated++; mapped++;
+                }
+                warnings.push(`Table "${table.name}" (${ds.name}): the query transforms its source (custom columns / merges), so ${mapped} of ${table.columns.length} column(s) were traced back to the source (by name, rename or position), at LOW confidence; the others are calculated in the report.`);
               }
             }
           }

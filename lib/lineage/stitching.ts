@@ -92,6 +92,84 @@ async function resolveViaCandidate(dataSourceId: number, ref: ExternalRef): Prom
   return null;
 }
 
+// ── File references (CSV / Excel / JSON) ─────────────────────────────────────
+// A report reads a file by its full path; the crawler catalogs the same file as an
+// entity named after the file (without extension) inside the folder it was crawled
+// from. So a file reference is matched on the file name — HIGH when the crawled
+// source is that very file or its folder, MEDIUM when a file of that name was crawled
+// from a different folder (a copy / a moved export) and it is the only one.
+const FILE_ENGINES = ["CSV", "EXCEL", "JSON"];
+
+function normPath(p: string | null): string {
+  return (p ?? "").trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+async function resolveFileRef(ref: ExternalRef): Promise<{ entityId: number; attributeId: number | null; confidence: Confidence } | null> {
+  const filePath = normPath(ref.host);
+  const fileName = (filePath.split("/").pop() || ref.object).trim();
+  const baseName = fileName.replace(/\.[a-z0-9]+$/i, "");
+  // Crawled sources only (connection_id set) — never another unresolved placeholder.
+  const candidates = await sql<{ entityId: number; hostAddressText: string | null }[]>`
+    SELECT e.entity_id AS "entityId", ds.host_address_text AS "hostAddressText"
+    FROM bayanat.data_entities e
+    JOIN bayanat.data_schemas s ON s.schema_id = e.schema_id
+    JOIN bayanat.data_sources ds ON ds.data_source_id = s.data_source_id
+    WHERE ds.source_type_code = ${ref.engine} AND ds.connection_id IS NOT NULL
+      AND lower(e.entity_name_text) IN (lower(${baseName}), lower(${fileName}))
+    ORDER BY e.entity_id
+  `;
+  if (candidates.length === 0) return null;
+  const fileDir = filePath.split("/").slice(0, -1).join("/");
+  const samePlace = candidates.filter((c) => { const h = normPath(c.hostAddressText); return h === filePath || h === fileDir; });
+  const pick = samePlace.length === 1 ? { entityId: samePlace[0].entityId, confidence: "HIGH" as Confidence }
+    : samePlace.length === 0 && candidates.length === 1 ? { entityId: candidates[0].entityId, confidence: "MEDIUM" as Confidence }
+    : null;
+  if (!pick) return null; // several files of that name — a steward decides (Stitching Review)
+  let attributeId: number | null = null;
+  if (ref.column) {
+    const [attr] = await sql<{ id: number }[]>`
+      SELECT attribute_id AS id FROM bayanat.data_attributes WHERE entity_id = ${pick.entityId} AND lower(physical_name_text) = lower(${ref.column})
+    `;
+    attributeId = attr?.id ?? null;
+  }
+  return { ...pick, attributeId };
+}
+
+/** Removes placeholder entities the scanner created for references that have since been
+ *  matched to a real asset: nothing points at them any more, so they'd only clutter the
+ *  catalog and the Stitching Review queue. Placeholders still used by an edge are kept. */
+export async function pruneOrphanPlaceholders(): Promise<number> {
+  const orphans = await sql<{ entityId: number; schemaId: number }[]>`
+    SELECT e.entity_id AS "entityId", e.schema_id AS "schemaId"
+    FROM bayanat.data_entities e
+    WHERE e.entity_id IN (SELECT placeholder_entity_id FROM bayanat.lineage_stitch_queue WHERE status_code = 'OPEN')
+      AND e.description_text LIKE 'Auto-created by the lineage scanner%'
+      AND NOT EXISTS (SELECT 1 FROM bayanat.data_attributes a WHERE a.entity_id = e.entity_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM bayanat.data_lineage l
+        WHERE l.lineage_scope_code = 'ENTITY_LEVEL' AND (l.source_asset_id = e.entity_id OR l.target_asset_id = e.entity_id)
+      )
+  `;
+  for (const o of orphans) {
+    try {
+      await sql.begin(async (tx) => {
+        await tx`DELETE FROM bayanat.lineage_stitch_queue WHERE placeholder_entity_id = ${o.entityId}`;
+        await tx`DELETE FROM bayanat.data_entities WHERE entity_id = ${o.entityId}`;
+        await tx`
+          DELETE FROM bayanat.data_schemas s WHERE s.schema_id = ${o.schemaId}
+            AND NOT EXISTS (SELECT 1 FROM bayanat.data_entities e WHERE e.schema_id = s.schema_id)
+        `;
+        await tx`
+          DELETE FROM bayanat.data_sources ds
+          WHERE ds.connection_id IS NULL AND ds.description_text LIKE 'Auto-created%'
+            AND NOT EXISTS (SELECT 1 FROM bayanat.data_schemas s WHERE s.data_source_id = ds.data_source_id)
+        `;
+      });
+    } catch { /* something else still references it — leave it for the review queue */ }
+  }
+  return orphans.length;
+}
+
 async function findAlias(engine: string, host: string | null, database: string | null): Promise<{ connectionId: number; hostAddress: string; databaseName: string | null } | null> {
   const fingerprint = `${engine}|${host ?? ""}|${database ?? ""}`.toLowerCase();
   const [alias] = await sql<{ connectionId: number }[]>`
@@ -153,6 +231,14 @@ export async function resolveStitch(rawRef: ExternalRef, scanRunId: number | nul
   }
 
   const ref = normalizeRef(rawRef);
+
+  // Files are matched on the file itself (see resolveFileRef), not host+database.
+  if (FILE_ENGINES.includes(ref.engine)) {
+    const hit = await resolveFileRef(ref);
+    if (hit) return { status: "RESOLVED", entityId: hit.entityId, attributeId: hit.attributeId, confidence: hit.confidence };
+    const queued = await enqueueStitch(ref, scanRunId);
+    return { status: "QUEUED", placeholderEntityId: queued.placeholderEntityId, stitchId: queued.stitchId };
+  }
 
   // Step 2: exact host+database match.
   const exactCandidates = (await findDataSourceCandidates(ref.engine, ref.host, ref.database)).filter((c) => hostsMatch(c.hostAddressText, ref.host));

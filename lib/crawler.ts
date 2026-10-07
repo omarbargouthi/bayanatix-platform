@@ -796,6 +796,12 @@ async function crawlFile(cfg: ConnCfg, config: CrawlConfig | null, logger: JobLo
 
       const sheet = workbook.Sheets[sheetName];
       const grid: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+      // Excel-style CSV exports may start with a "sep=," line naming the delimiter — it
+      // is not a header row.
+      if (cfg.dbTypeCode === "CSV" && grid.length > 0) {
+        const first = (grid[0] as unknown[]).filter((c) => c != null && String(c).trim() !== "");
+        if (first.length === 1 && /^sep=.?$/i.test(String(first[0]).trim())) grid.shift();
+      }
       if (grid.length === 0) { await logger.warn(`  ${tableName}: empty sheet, skipped`); continue; }
 
       const headers = (grid[0] as unknown[]).map((h, i) => (h == null || String(h).trim() === "") ? `column_${i + 1}` : String(h).trim());
