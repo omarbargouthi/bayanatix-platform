@@ -99,15 +99,32 @@ function safeRegex(pattern: string): RegExp | null {
   }
 }
 
-export function bandFor(confidence: number): SitConfidenceBand {
-  return confidence >= 0.85 ? "HIGH" : confidence >= 0.5 ? "MEDIUM" : "LOW";
+// The term assignment weights (Administration › Configuration › Sensitive Information
+// Types › Term Assignment Weights, bayanat.sit_settings). Nothing in the scoring below
+// is a fixed number: each pattern has its own weight, and these settings scale and
+// band the result.
+export type SitScoringConfig = {
+  /** Multiplies the weight of every pattern of that kind (1 = the pattern's own weight). */
+  nameWeightFactor: number; valueWeightFactor: number; checksumWeightFactor: number;
+  /** Confidence from which a suggestion is HIGH / MEDIUM. */
+  highBandThreshold: number; mediumBandThreshold: number;
+  /** Least weight of a name match when the table's values could not be sampled at all. */
+  nameOnlyMatchWeight: number;
+};
+export const DEFAULT_SIT_SCORING: SitScoringConfig = {
+  nameWeightFactor: 1, valueWeightFactor: 1, checksumWeightFactor: 1,
+  highBandThreshold: 0.85, mediumBandThreshold: 0.5, nameOnlyMatchWeight: 0.85,
+};
+
+export function bandFor(confidence: number, cfg: Pick<SitScoringConfig, "highBandThreshold" | "mediumBandThreshold"> = DEFAULT_SIT_SCORING): SitConfidenceBand {
+  return confidence >= cfg.highBandThreshold ? "HIGH" : confidence >= cfg.mediumBandThreshold ? "MEDIUM" : "LOW";
 }
 
 // nameOnlyWeight: set when the column's values could not be sampled at all (no live
 // connection). A name pattern then carries at least this weight — the patterns' own
 // weights (0.40 in the shipped catalog) assume a value match adds to them, which can't
 // happen here, so on their own they could never reach the HIGH band.
-function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[], nameOnlyWeight?: number): SitTermScore {
+function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[], cfg: SitScoringConfig, nameOnlyWeight?: number): SitTermScore {
   const glossaryId = patterns[0].glossaryId;
   const nameHaystack = [input.name, input.friendlyName, input.description].filter(Boolean).join(" ");
   const hits: SitEvidenceHit[] = [];
@@ -117,7 +134,8 @@ function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[], nameOnl
     if (p.patternType === "NAME_REGEX") {
       const re = safeRegex(p.patternText);
       if (re && re.test(nameHaystack)) {
-        const weight = nameOnlyWeight != null ? Math.max(p.confidenceWeight, nameOnlyWeight) : p.confidenceWeight;
+        const own = p.confidenceWeight * cfg.nameWeightFactor;
+        const weight = nameOnlyWeight != null ? Math.max(own, nameOnlyWeight) : own;
         score += weight;
         hits.push({ patternType: p.patternType, patternText: p.patternText, weight, matchRatio: 1, contribution: weight });
       }
@@ -132,9 +150,10 @@ function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[], nameOnl
       const matched = input.sampleValues.filter((v) => re.test(v)).length;
       const ratio = matched / input.sampleValues.length;
       if (ratio > 0) {
-        const contribution = ratio * p.confidenceWeight;
+        const weight = p.confidenceWeight * cfg.valueWeightFactor;
+        const contribution = ratio * weight;
         score += contribution;
-        hits.push({ patternType: p.patternType, patternText: p.patternText, weight: p.confidenceWeight, matchRatio: ratio, contribution });
+        hits.push({ patternType: p.patternType, patternText: p.patternText, weight, matchRatio: ratio, contribution });
       }
     } else if (p.patternType === "CHECKSUM") {
       const fn = CHECKSUM_FNS[p.patternText];
@@ -144,15 +163,16 @@ function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[], nameOnl
       }).length;
       const ratio = passed / input.sampleValues.length;
       if (ratio > 0) {
-        const contribution = ratio * p.confidenceWeight;
+        const weight = p.confidenceWeight * cfg.checksumWeightFactor;
+        const contribution = ratio * weight;
         score += contribution;
-        hits.push({ patternType: p.patternType, patternText: p.patternText, weight: p.confidenceWeight, matchRatio: ratio, contribution });
+        hits.push({ patternType: p.patternType, patternText: p.patternText, weight, matchRatio: ratio, contribution });
       }
     }
   }
 
   const confidence = Math.round(Math.min(1, score) * 1000) / 1000;
-  return { glossaryId, confidence, band: bandFor(confidence), hits };
+  return { glossaryId, confidence, band: bandFor(confidence, cfg), hits };
 }
 
 // Scores a column against every candidate SIT term and returns the single
@@ -162,12 +182,15 @@ export function scoreColumnAgainstSit(
   input: ColumnSitInput,
   patternsByTerm: Map<number, SitPattern[]>,
   minConfidenceThreshold: number,
-  opts: { nameOnlyWeight?: number } = {},
+  // config: the term assignment weights. nameOnly: the table's values could not be
+  // sampled, so config.nameOnlyMatchWeight applies to name matches.
+  opts: { config?: SitScoringConfig; nameOnly?: boolean } = {},
 ): SitSuggestion {
+  const cfg = opts.config ?? DEFAULT_SIT_SCORING;
   let best: SitTermScore | null = null;
   for (const patterns of patternsByTerm.values()) {
     if (patterns.length === 0) continue;
-    const result = scoreAgainstTerm(input, patterns, opts.nameOnlyWeight);
+    const result = scoreAgainstTerm(input, patterns, cfg, opts.nameOnly ? cfg.nameOnlyMatchWeight : undefined);
     if (!best || result.confidence > best.confidence) best = result;
   }
   if (!best || best.confidence < minConfidenceThreshold) return null;

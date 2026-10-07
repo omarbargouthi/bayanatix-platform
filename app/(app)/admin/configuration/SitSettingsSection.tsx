@@ -8,6 +8,11 @@ type Settings = {
   minConfidenceThreshold: number;
   autoAcceptBand: "NONE" | "HIGH";
   nameOnlyMatchWeight: number;
+  nameWeightFactor: number;
+  valueWeightFactor: number;
+  checksumWeightFactor: number;
+  highBandThreshold: number;
+  mediumBandThreshold: number;
 };
 
 type Region = { regionCode: string; regionNameText: string };
@@ -288,26 +293,79 @@ export function SitSettingsSection() {
             <input type="number" value={settings.sampleSize} onChange={(e) => set("sampleSize", Number(e.target.value))}
               className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
           </div>
-          <div>
-            <label className="block text-[11px] text-muted mb-1">Minimum Confidence Threshold</label>
-            <input type="number" step="0.05" min="0" max="1" value={settings.minConfidenceThreshold}
-              onChange={(e) => set("minConfidenceThreshold", Number(e.target.value))}
-              className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+        </div>
+
+        {/* Term assignment weights: everything that turns pattern matches into the
+            confidence of a suggested term. */}
+        <div className="border-t border-line pt-4">
+          <h3 className="text-sm font-bold text-ink">Term Assignment Weights</h3>
+          <p className="text-[11px] text-muted mt-1 leading-relaxed">
+            How a suggested term&apos;s confidence is worked out. Each pattern has its own weight (edit it on the pattern, in
+            the catalog below). A column&apos;s confidence for a term is the sum of the patterns that match, capped at 1:
+            a name pattern adds its weight, a value or checksum pattern adds its weight times the share of sampled values
+            that match. The settings here scale and band that result.
+          </p>
+
+          <div className="text-[11px] font-semibold text-ink mt-4 mb-2">Weight by kind of evidence <span className="font-normal text-muted">— multiplies every pattern of that kind (1 = the pattern&apos;s own weight)</span></div>
+          <div className="grid grid-cols-3 gap-4">
+            {([
+              ["nameWeightFactor", "Column name match", "Name, friendly name and description"],
+              ["valueWeightFactor", "Sampled value match", "Values matching a value pattern"],
+              ["checksumWeightFactor", "Checksum match", "Luhn, IBAN, national ID…"],
+            ] as const).map(([key, label, hint]) => (
+              <div key={key}>
+                <label className="block text-[11px] text-muted mb-1">{label}</label>
+                <input type="number" step="0.05" min="0" max="5" value={settings[key]}
+                  onChange={(e) => set(key, Number(e.target.value))}
+                  className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+                <div className="text-[10px] text-muted mt-1">{hint}</div>
+              </div>
+            ))}
           </div>
-          <div className="col-span-2">
+
+          <div className="text-[11px] font-semibold text-ink mt-5 mb-2">Confidence levels</div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-[11px] text-muted mb-1">Minimum to suggest</label>
+              <input type="number" step="0.05" min="0" max="1" value={settings.minConfidenceThreshold}
+                onChange={(e) => set("minConfidenceThreshold", Number(e.target.value))}
+                className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+              <div className="text-[10px] text-muted mt-1">Below this, no term is suggested</div>
+            </div>
+            <div>
+              <label className="block text-[11px] text-muted mb-1">MEDIUM from</label>
+              <input type="number" step="0.05" min="0" max="1" value={settings.mediumBandThreshold}
+                onChange={(e) => set("mediumBandThreshold", Number(e.target.value))}
+                className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+              <div className="text-[10px] text-muted mt-1">Below this a suggestion is LOW</div>
+            </div>
+            <div>
+              <label className="block text-[11px] text-muted mb-1">HIGH from</label>
+              <input type="number" step="0.05" min="0" max="1" value={settings.highBandThreshold}
+                onChange={(e) => set("highBandThreshold", Number(e.target.value))}
+                className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+              <div className="text-[10px] text-muted mt-1">The level auto-accept applies to</div>
+            </div>
+          </div>
+          {settings.mediumBandThreshold > settings.highBandThreshold && (
+            <p className="text-[11px] text-red-600 mt-2">The MEDIUM level can&apos;t be higher than the HIGH level.</p>
+          )}
+
+          <div className="text-[11px] font-semibold text-ink mt-5 mb-2">When values can&apos;t be sampled</div>
+          <div>
             <label className="block text-[11px] text-muted mb-1">Name-only Match Weight</label>
             <input type="number" step="0.05" min="0" max="1" value={settings.nameOnlyMatchWeight}
               onChange={(e) => set("nameOnlyMatchWeight", Number(e.target.value))}
               className="w-40 border border-line rounded-lg px-3 py-2 text-sm" />
             <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
-              The confidence a column-name match gets when a table&apos;s values can&apos;t be sampled (no live connection),
-              so the name is the only evidence. Bands: HIGH from 0.85, MEDIUM from 0.50.{" "}
-              {settings.nameOnlyMatchWeight >= 0.85
+              The least confidence a column-name match gets when a table has no live connection, so the name is the only
+              evidence.{" "}
+              {settings.nameOnlyMatchWeight >= settings.highBandThreshold
                 ? <span className="text-amber-700 font-semibold">At this value a name match alone is HIGH{settings.autoAcceptBand === "HIGH" ? " — and will be auto-accepted." : "."}</span>
-                : settings.nameOnlyMatchWeight >= 0.5
+                : settings.nameOnlyMatchWeight >= settings.mediumBandThreshold
                   ? <span>At this value a name match alone is MEDIUM and always waits for review.</span>
-                  : <span>At this value a name match alone is below MEDIUM.</span>}{" "}
-              Where values can be sampled, each pattern keeps its own weight.
+                  : <span>At this value a name match alone is LOW.</span>}{" "}
+              Where values can be sampled, the weights above apply instead.
             </p>
           </div>
         </div>

@@ -7,8 +7,8 @@
 
 import { sql } from "./db";
 import { isLiveQueryable, getLiveSampleRows } from "./sample-data";
-import { scoreColumnAgainstSit, type SitPattern, type ColumnSitInput } from "./sit-classifier";
-import { acceptSitSuggestion } from "./queries/sit-classification";
+import { scoreColumnAgainstSit, type SitPattern, type ColumnSitInput, type SitScoringConfig } from "./sit-classifier";
+import { acceptSitSuggestion, getSitSettings } from "./queries/sit-classification";
 
 export type SitScopeType = "DATA_SOURCE" | "SCHEMA" | "ENTITY" | "FULL";
 export type SitScopeMode = "NEW_ONLY" | "ALL";
@@ -83,18 +83,12 @@ async function resolveTargetAttributes(scopeType: SitScopeType, scopeId: number 
 }
 
 async function loadActiveSettings() {
-  const [row] = await sql<{ activeRegion: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: string; nameOnlyMatchWeight: number }[]>`
-    SELECT active_region_code AS "activeRegion", sample_size AS "sampleSize", min_confidence_threshold AS "minConfidenceThreshold",
-           auto_accept_band AS "autoAcceptBand", name_only_match_weight AS "nameOnlyMatchWeight"
-    FROM bayanat.sit_settings WHERE settings_id = 1
-  `;
-  return {
-    autoAcceptBand: row.autoAcceptBand === "HIGH" ? "HIGH" as const : "NONE" as const,
-    nameOnlyMatchWeight: Number(row.nameOnlyMatchWeight),
-    activeRegion: row.activeRegion,
-    sampleSize: row.sampleSize,
-    minConfidenceThreshold: Number(row.minConfidenceThreshold),
+  const s = await getSitSettings();
+  const scoring: SitScoringConfig = {
+    nameWeightFactor: s.nameWeightFactor, valueWeightFactor: s.valueWeightFactor, checksumWeightFactor: s.checksumWeightFactor,
+    highBandThreshold: s.highBandThreshold, mediumBandThreshold: s.mediumBandThreshold, nameOnlyMatchWeight: s.nameOnlyMatchWeight,
   };
+  return { activeRegion: s.activeRegionCode, sampleSize: s.sampleSize, minConfidenceThreshold: s.minConfidenceThreshold, autoAcceptBand: s.autoAcceptBand, scoring };
 }
 
 // Patterns live on a sit_types row, not directly on a business term — each
@@ -173,7 +167,7 @@ export async function runSitClassification(opts: SitRunOptions): Promise<SitRunS
         };
         // No live sample for the table at all: the name is the only evidence there is.
         const suggestion = scoreColumnAgainstSit(input, patternsByTerm, settings.minConfidenceThreshold,
-          valuesByColumn == null ? { nameOnlyWeight: settings.nameOnlyMatchWeight } : {});
+          { config: settings.scoring, nameOnly: valuesByColumn == null });
 
         const rationale = suggestion
           ? { run_id: runId, sampled_live: suggestion.sampledLive, hits: suggestion.hits, confidence: suggestion.confidence, band: suggestion.band }

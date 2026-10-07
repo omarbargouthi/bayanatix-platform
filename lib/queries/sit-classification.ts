@@ -22,10 +22,11 @@ export type SitSuggestionRow = {
   currentTermName: string | null;
 };
 
+// Bands follow the configured thresholds (sit_settings), same as lib/sit-classifier.ts.
 function bandExpr() {
   return sql`CASE
-    WHEN a.sit_suggestion_confidence >= 0.85 THEN 'HIGH'
-    WHEN a.sit_suggestion_confidence >= 0.50 THEN 'MEDIUM'
+    WHEN a.sit_suggestion_confidence >= (SELECT high_band_threshold FROM bayanat.sit_settings WHERE settings_id = 1) THEN 'HIGH'
+    WHEN a.sit_suggestion_confidence >= (SELECT medium_band_threshold FROM bayanat.sit_settings WHERE settings_id = 1) THEN 'MEDIUM'
     WHEN a.sit_suggestion_confidence IS NOT NULL THEN 'LOW'
     ELSE NULL
   END`;
@@ -194,18 +195,35 @@ export type SitSettings = {
   minConfidenceThreshold: number;
   autoAcceptBand: "NONE" | "HIGH";
   /** Weight of a name-pattern match when a table's values can't be sampled (no live
-   *  connection). 0.85 or more lets a name-only match reach the HIGH band. */
+   *  connection). At or above the HIGH threshold a name-only match is HIGH. */
   nameOnlyMatchWeight: number;
+  /** Multipliers on every pattern's own weight, per kind of evidence. */
+  nameWeightFactor: number;
+  valueWeightFactor: number;
+  checksumWeightFactor: number;
+  /** Confidence from which a suggestion is HIGH / MEDIUM. */
+  highBandThreshold: number;
+  mediumBandThreshold: number;
 };
 
+const NUMERIC_SETTINGS = [
+  "minConfidenceThreshold", "nameOnlyMatchWeight", "nameWeightFactor", "valueWeightFactor",
+  "checksumWeightFactor", "highBandThreshold", "mediumBandThreshold",
+] as const;
+
 export async function getSitSettings(): Promise<SitSettings> {
-  const [row] = await sql<{ activeRegionCode: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: "NONE" | "HIGH"; nameOnlyMatchWeight: number }[]>`
+  const [row] = await sql<SitSettings[]>`
     SELECT active_region_code AS "activeRegionCode", sample_size AS "sampleSize",
            min_confidence_threshold AS "minConfidenceThreshold", auto_accept_band AS "autoAcceptBand",
-           name_only_match_weight AS "nameOnlyMatchWeight"
+           name_only_match_weight AS "nameOnlyMatchWeight",
+           name_weight_factor AS "nameWeightFactor", value_weight_factor AS "valueWeightFactor",
+           checksum_weight_factor AS "checksumWeightFactor",
+           high_band_threshold AS "highBandThreshold", medium_band_threshold AS "mediumBandThreshold"
     FROM bayanat.sit_settings WHERE settings_id = 1
   `;
-  return { ...row, minConfidenceThreshold: Number(row.minConfidenceThreshold), nameOnlyMatchWeight: Number(row.nameOnlyMatchWeight) };
+  const out = { ...row };
+  for (const k of NUMERIC_SETTINGS) out[k] = Number(row[k]); // numeric columns arrive as strings
+  return out;
 }
 
 export async function updateSitSettings(patch: Partial<SitSettings>): Promise<void> {
@@ -215,7 +233,12 @@ export async function updateSitSettings(patch: Partial<SitSettings>): Promise<vo
       sample_size               = coalesce(${patch.sampleSize ?? null}, sample_size),
       min_confidence_threshold  = coalesce(${patch.minConfidenceThreshold ?? null}, min_confidence_threshold),
       auto_accept_band          = coalesce(${patch.autoAcceptBand ?? null}, auto_accept_band),
-      name_only_match_weight    = coalesce(${patch.nameOnlyMatchWeight ?? null}, name_only_match_weight)
+      name_only_match_weight    = coalesce(${patch.nameOnlyMatchWeight ?? null}, name_only_match_weight),
+      name_weight_factor        = coalesce(${patch.nameWeightFactor ?? null}, name_weight_factor),
+      value_weight_factor       = coalesce(${patch.valueWeightFactor ?? null}, value_weight_factor),
+      checksum_weight_factor    = coalesce(${patch.checksumWeightFactor ?? null}, checksum_weight_factor),
+      high_band_threshold       = coalesce(${patch.highBandThreshold ?? null}, high_band_threshold),
+      medium_band_threshold     = coalesce(${patch.mediumBandThreshold ?? null}, medium_band_threshold)
     WHERE settings_id = 1
   `;
 }
@@ -402,6 +425,7 @@ export async function suggestSitTypesForTerm(glossaryId: number): Promise<SitTyp
     WHERE sp.is_enabled = true AND sp.pattern_type = 'NAME_REGEX'
   `;
 
+  const { nameWeightFactor } = await getSitSettings();
   const bySitType = new Map<number, { sitName: string; score: number; evidence: string[] }>();
   for (const p of patternRows) {
     let re: RegExp;
@@ -409,7 +433,7 @@ export async function suggestSitTypesForTerm(glossaryId: number): Promise<SitTyp
     for (const candidate of nameCandidates) {
       if (re.test(candidate)) {
         const entry = bySitType.get(p.sitTypeId) ?? { sitName: p.sitName, score: 0, evidence: [] };
-        const weight = Number(p.confidenceWeight);
+        const weight = Number(p.confidenceWeight) * nameWeightFactor;
         entry.score = Math.min(1, entry.score + weight);
         entry.evidence.push(`"${candidate}" matches /${p.patternText}/`);
         bySitType.set(p.sitTypeId, entry);
