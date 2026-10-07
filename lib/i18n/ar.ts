@@ -684,6 +684,7 @@ export const ar: I18nStrings = {
     collabThreadsTooltip:  "مواضيع التعاون",
     discussionTitlePrefix: "نقاش: {name}",
     columnsEvaluatedSummary: "تم تقييم {count} عمود، تغيّر {changed} اقتراح",
+    autoAcceptedSummary: "تم قبول {count} تلقائياً (ثقة عالية)",
     classificationFailed:  "فشل تنفيذ التصنيف",
     certifyAssetTitle:        "اعتماد الأصل",
     certifyAssetDesc:         "حدّد مستويات اعتماد مستقلة لجودة البيانات الوصفية وجودة البيانات.",

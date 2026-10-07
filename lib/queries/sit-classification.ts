@@ -77,6 +77,9 @@ export async function getSitSuggestionsQueue(filter: {
   return { rows, total: cnt };
 }
 
+/** Stamped as the classifier when a suggestion is accepted by the run, not by a person. */
+export const SIT_AUTO_ACCEPT_ACTOR = "SYSTEM:SIT-AUTO-ACCEPT";
+
 async function applyClassificationTerm(attributeId: number, glossaryId: number, userId: string): Promise<void> {
   const [term] = await sql<{ classificationCode: string | null }[]>`
     SELECT classification_code AS "classificationCode" FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
@@ -107,7 +110,11 @@ async function applyClassificationTerm(attributeId: number, glossaryId: number, 
   ]);
 }
 
-export async function acceptSitSuggestion(attributeId: number, userId: string): Promise<void> {
+// opts.auto: accepted by the run itself under the "auto-accept HIGH confidence" setting,
+// not by a steward. The term link still carries the user who started the run (it must
+// be a real user), while the classification is stamped as the system's and the audit
+// entry says so.
+export async function acceptSitSuggestion(attributeId: number, userId: string, opts: { auto?: boolean } = {}): Promise<void> {
   const [attr] = await sql<{ suggestedGlossaryId: number | null }[]>`
     SELECT suggested_sit_glossary_id AS "suggestedGlossaryId" FROM bayanat.data_attributes WHERE attribute_id = ${attributeId}
   `;
@@ -117,11 +124,12 @@ export async function acceptSitSuggestion(attributeId: number, userId: string): 
   await applyClassificationTerm(attributeId, attr.suggestedGlossaryId, userId);
   await sql`
     UPDATE bayanat.data_attributes SET
-      sit_suggestion_status_code = 'ACCEPTED', sit_classified_by_user_id = ${userId}, sit_classified_at_timestamp = NOW()
+      sit_suggestion_status_code = 'ACCEPTED', sit_classified_by_user_id = ${opts.auto ? SIT_AUTO_ACCEPT_ACTOR : userId}, sit_classified_at_timestamp = NOW()
     WHERE attribute_id = ${attributeId}
   `;
   await logUpdate("DATA_ATTRIBUTES", attributeId, userId, [
     { field: "sit_suggestion_status_code", oldVal: "PENDING", newVal: "ACCEPTED", force: true },
+    ...(opts.auto ? [{ field: "sit_auto_accepted", oldVal: null, newVal: "Accepted automatically: HIGH confidence (SIT settings › Auto-accept Band)", force: true }] : []),
   ]);
 }
 

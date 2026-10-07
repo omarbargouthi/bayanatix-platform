@@ -684,6 +684,7 @@ export const en: I18nStrings = {
     collabThreadsTooltip:  "Collaboration threads",
     discussionTitlePrefix: "Discussion: {name}",
     columnsEvaluatedSummary: "{count} column(s) evaluated, {changed} suggestion(s) changed",
+    autoAcceptedSummary: "{count} accepted automatically (high confidence)",
     classificationFailed:  "Failed to run classification",
     certifyAssetTitle:        "Certify Asset",
     certifyAssetDesc:         "Set independent certification levels for metadata quality and data quality.",

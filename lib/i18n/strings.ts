@@ -745,6 +745,7 @@ export type I18nStrings = {
     collabThreadsTooltip:  string;
     discussionTitlePrefix: string;   // "Discussion: {name}"
     columnsEvaluatedSummary: string; // "{count} column(s) evaluated, {changed} suggestion(s) changed"
+    autoAcceptedSummary: string;
     classificationFailed:  string;
     // CertifyAssetModal.tsx
     certifyAssetTitle:        string;

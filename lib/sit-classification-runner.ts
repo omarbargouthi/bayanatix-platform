@@ -8,6 +8,7 @@
 import { sql } from "./db";
 import { isLiveQueryable, getLiveSampleRows } from "./sample-data";
 import { scoreColumnAgainstSit, type SitPattern, type ColumnSitInput } from "./sit-classifier";
+import { acceptSitSuggestion } from "./queries/sit-classification";
 
 export type SitScopeType = "DATA_SOURCE" | "SCHEMA" | "ENTITY" | "FULL";
 export type SitScopeMode = "NEW_ONLY" | "ALL";
@@ -23,6 +24,8 @@ export type SitRunSummary = {
   runId: number;
   attributesEvaluated: number;
   suggestionsChanged: number;
+  /** Suggestions accepted by the run itself (SIT settings: auto-accept HIGH confidence). */
+  autoAccepted: number;
   entitiesSampledLive: number;
   entitiesNameOnly: number;
   byBand: Record<"HIGH" | "MEDIUM" | "LOW", number>;
@@ -80,11 +83,13 @@ async function resolveTargetAttributes(scopeType: SitScopeType, scopeId: number 
 }
 
 async function loadActiveSettings() {
-  const [row] = await sql<{ activeRegion: string; sampleSize: number; minConfidenceThreshold: number }[]>`
-    SELECT active_region_code AS "activeRegion", sample_size AS "sampleSize", min_confidence_threshold AS "minConfidenceThreshold"
+  const [row] = await sql<{ activeRegion: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: string }[]>`
+    SELECT active_region_code AS "activeRegion", sample_size AS "sampleSize", min_confidence_threshold AS "minConfidenceThreshold",
+           auto_accept_band AS "autoAcceptBand"
     FROM bayanat.sit_settings WHERE settings_id = 1
   `;
   return {
+    autoAcceptBand: row.autoAcceptBand === "HIGH" ? "HIGH" as const : "NONE" as const,
     activeRegion: row.activeRegion,
     sampleSize: row.sampleSize,
     minConfidenceThreshold: Number(row.minConfidenceThreshold),
@@ -129,6 +134,7 @@ export async function runSitClassification(opts: SitRunOptions): Promise<SitRunS
 
     const byBand: Record<"HIGH" | "MEDIUM" | "LOW", number> = { HIGH: 0, MEDIUM: 0, LOW: 0 };
     let suggestionsChanged = 0;
+    let autoAccepted = 0;
     let entitiesSampledLive = 0;
     let entitiesNameOnly = 0;
 
@@ -202,6 +208,14 @@ export async function runSitClassification(opts: SitRunOptions): Promise<SitRunS
               sit_suggestion_status_code = 'PENDING'
             WHERE attribute_id = ${attr.id}
           `;
+          // Auto-accept (SIT settings): a HIGH-confidence suggestion is applied straight
+          // away, exactly as if a steward had accepted it. Never for a column a steward
+          // already decided on (those take the STALE path above), and a column flagged
+          // STALE keeps waiting for the steward's second look.
+          if (settings.autoAcceptBand === "HIGH" && suggestion!.band === "HIGH" && attr.sitSuggestionStatus !== "STALE") {
+            await acceptSitSuggestion(attr.id, opts.triggeredByUserId, { auto: true });
+            autoAccepted++;
+          }
         } else if (attr.sitSuggestionStatus === "PENDING" || attr.sitSuggestionStatus === "STALE") {
           // Previously suggested, now nothing clears the threshold — clear it back to NONE.
           await sql`
@@ -220,11 +234,11 @@ export async function runSitClassification(opts: SitRunOptions): Promise<SitRunS
         status_code = 'COMPLETED', finished_at = NOW(),
         attributes_evaluated_count = ${attrs.length},
         suggestions_changed_count = ${suggestionsChanged},
-        summary_json = ${JSON.stringify({ by_band: byBand, entities_sampled_live: entitiesSampledLive, entities_name_only: entitiesNameOnly, patterns_loaded_count: [...patternsByTerm.values()].reduce((n, l) => n + l.length, 0) })}::jsonb
+        summary_json = ${JSON.stringify({ auto_accepted: autoAccepted, by_band: byBand, entities_sampled_live: entitiesSampledLive, entities_name_only: entitiesNameOnly, patterns_loaded_count: [...patternsByTerm.values()].reduce((n, l) => n + l.length, 0) })}::jsonb
       WHERE run_id = ${runId}
     `;
 
-    return { runId, attributesEvaluated: attrs.length, suggestionsChanged, entitiesSampledLive, entitiesNameOnly, byBand };
+    return { runId, attributesEvaluated: attrs.length, suggestionsChanged, autoAccepted, entitiesSampledLive, entitiesNameOnly, byBand };
   } catch (err) {
     await sql`
       UPDATE bayanat.sit_classification_runs SET status_code = 'FAILED', finished_at = NOW(),

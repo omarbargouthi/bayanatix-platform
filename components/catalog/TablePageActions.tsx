@@ -56,7 +56,10 @@ export function TablePageActions({
       const res = await fetch(`/api/catalog/entities/${entityId}/classify-sit`, { method: "POST" });
       if (res.ok) {
         const summary = await res.json();
-        setSitResult(c.columnsEvaluatedSummary.replace("{count}", String(summary.attributesEvaluated)).replace("{changed}", String(summary.suggestionsChanged)));
+        setSitResult(
+          c.columnsEvaluatedSummary.replace("{count}", String(summary.attributesEvaluated)).replace("{changed}", String(summary.suggestionsChanged))
+          + (summary.autoAccepted > 0 ? ` · ${c.autoAcceptedSummary.replace("{count}", String(summary.autoAccepted))}` : ""),
+        );
         router.refresh();
       } else {
         setSitResult(c.classificationFailed);
