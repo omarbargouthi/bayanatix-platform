@@ -128,7 +128,15 @@ export function daxColumnRefs(expr: string, named: Map<string, string> = new Map
 //     VAR CurrentName = T[name]  …  FILTER ( T, T[name] = CurrentName )
 // makes T[name] a filter column. A column that does both counts as a value column.
 
-export type DaxRoles = { value: DaxColumnRef[]; filter: DaxColumnRef[] };
+// names:  [Name] references with no table that are not a named column of the expression
+//         itself — in a measure these are other measures (or a column of its own table).
+// tables: tables referred to as a whole ( COUNTROWS ( 'Table' ) ), lower-cased.
+// Both are split by role the same way as columns.
+export type DaxRoles = {
+  value: DaxColumnRef[]; filter: DaxColumnRef[];
+  names: { value: string[]; filter: string[] };
+  tables: { value: string[]; filter: string[] };
+};
 
 /** For each function, the index of the first argument that is a row condition. */
 const CONDITION_FROM: Record<string, number> = {
@@ -168,7 +176,11 @@ function splitVars(text: string): { vars: [string, string][]; body: string } | n
  * `skipNamed`: leave the named expressions themselves out (used to find the conditions
  * that apply to the table as a whole, i.e. to every column of it).
  */
-export function daxColumnRoles(expr: string, named: Map<string, string> = new Map(), opts: { skipNamed?: boolean } = {}): DaxRoles {
+export function daxColumnRoles(expr: string, named: Map<string, string> = new Map(), opts: { skipNamed?: boolean; tableNames?: string[] } = {}): DaxRoles {
+  // tableNames: the model's tables, so an unquoted table name ( COUNTROWS ( Sales ) ) is recognised.
+  const knownTables = new Set((opts.tableNames ?? []).map((t) => t.toLowerCase()));
+  const names = { value: new Set<string>(), filter: new Set<string>() };
+  const tables = { value: new Set<string>(), filter: new Set<string>() };
   const value = new Map<string, DaxColumnRef>(), filter = new Map<string, DaxColumnRef>();
   const keyOf = (r: DaxColumnRef) => `${r.table}\u0000${r.column}`.toLowerCase();
   const add = (r: DaxColumnRef, inFilter: boolean) => (inFilter ? filter : value).set(keyOf(r), r);
@@ -185,12 +197,17 @@ export function daxColumnRoles(expr: string, named: Map<string, string> = new Ma
       if (text[i] === '"') { i = skipQuoted(text, i); continue; }
       const ref = /^(?:'((?:[^']|'')+)'|([A-Za-z_][\w.]*))\s*\[([^\]]+)\]/.exec(text.slice(i));
       if (ref) { add({ table: (ref[1] ?? ref[2]).replace(/''/g, "'"), column: ref[3] }, inFilter); i += ref[0].length; continue; }
-      if (text[i] === "'") { i = skipQuoted(text, i); continue; }
+      if (text[i] === "'") {
+        const end = skipQuoted(text, i);
+        (inFilter ? tables.filter : tables.value).add(text.slice(i + 1, end - 1).replace(/''/g, "'").toLowerCase());
+        i = end; continue;
+      }
       if (text[i] === "[") {
         const end = skipQuoted(text, i);
         const name = text.slice(i + 1, end - 1).toLowerCase();
         const other = named.get(name);
-        if (other && !guard.has(`[${name}`)) walk(other, inFilter, scope, new Set(guard).add(`[${name}`));
+        if (other) { if (!guard.has(`[${name}`)) walk(other, inFilter, scope, new Set(guard).add(`[${name}`)); }
+        else (inFilter ? names.filter : names.value).add(name);
         i = end; continue;
       }
       const word = /^[A-Za-z_][\w.]*/.exec(text.slice(i));
@@ -210,11 +227,18 @@ export function daxColumnRoles(expr: string, named: Map<string, string> = new Ma
         i = close + 1; continue;
       }
       const v = scope.get(word[0].toLowerCase());
-      if (v !== undefined && !guard.has(word[0].toLowerCase())) walk(v, inFilter, scope, new Set(guard).add(word[0].toLowerCase()));
+      if (v !== undefined) { if (!guard.has(word[0].toLowerCase())) walk(v, inFilter, scope, new Set(guard).add(word[0].toLowerCase())); }
+      else if (knownTables.has(word[0].toLowerCase())) (inFilter ? tables.filter : tables.value).add(word[0].toLowerCase());
       i += word[0].length;
     }
   };
   walk(stripComments(expr), false, new Map(), new Set());
   for (const k of value.keys()) filter.delete(k);
-  return { value: [...value.values()], filter: [...filter.values()] };
+  for (const k of names.value) names.filter.delete(k);
+  for (const k of tables.value) tables.filter.delete(k);
+  return {
+    value: [...value.values()], filter: [...filter.values()],
+    names: { value: [...names.value], filter: [...names.filter] },
+    tables: { value: [...tables.value], filter: [...tables.filter] },
+  };
 }

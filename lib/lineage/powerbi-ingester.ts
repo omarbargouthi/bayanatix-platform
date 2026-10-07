@@ -166,11 +166,13 @@ export async function ingestPowerBiScanResult(
 
       // Semantic model (dataset) tables, columns, measures.
       const datasetTableEntity = new Map<string, number>(); // `${datasetId}::${tableName}` -> entityId
+      const datasetProcessId = new Map<string, number>();   // datasetId -> its import/refresh process
       for (const ds of ws.datasets ?? []) {
         // "Direct Lake" (two words) is Microsoft's own product term for targetStorageMode="DirectLake".
         const storageModeLabel = ds.targetStorageMode === "DirectLake" ? "Direct Lake" : (ds.targetStorageMode ?? "Import");
         const dataflowProcessName = ds.targetStorageMode === "DirectLake" ? `${ds.name} (${storageModeLabel})` : `${ds.name} (${storageModeLabel} refresh)`;
         const { id: dsProcessId } = await ensureProcess(connectionId, "PBI_DATASET", dataflowProcessName, ds.id, `Semantic model import${ds.targetStorageMode === "DirectLake" ? " (Direct Lake)" : ""} from source`);
+        datasetProcessId.set(ds.id, dsProcessId);
 
         for (const table of ds.tables) {
           const entityName = `${ds.name} [${table.name}]`;
@@ -262,25 +264,6 @@ export async function ingestPowerBiScanResult(
             }
           }
 
-          // ── Measures: attribute <- referenced columns in the same model table ──
-          // A column the measure aggregates is a value link (MEASURE); one that only
-          // appears in its CALCULATE / FILTER conditions is a FILTER link.
-          const colByLower = new Map([...colAttrId].map(([name, id]) => [name.toLowerCase(), id]));
-          for (const meas of table.measures ?? []) {
-            const roles = daxColumnRoles(meas.expression);
-            const own = (refs: DaxColumnRef[]) => refs.filter((r) => r.table.toLowerCase() === table.name.toLowerCase());
-            let resolved = 0;
-            for (const [refs, typeCode] of [[own(roles.value), "MEASURE"], [own(roles.filter), "FILTER"]] as const) {
-              for (const ref of refs) {
-                const attrId = colByLower.get(ref.column.toLowerCase());
-                if (!attrId) continue;
-                resolved++;
-                await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: attrId, targetAssetId: measureAttrId.get(meas.name)!, transformationTypeCode: typeCode, transformationLogicText: `${meas.name} = ${meas.expression}`, processId: dsProcessId, confidenceCode: "MEDIUM", connectionId });
-                edgesCreated++;
-              }
-            }
-            if (resolved === 0) warnings.push(`Measure "${meas.name}" (${ds.name}): no column references resolved within its own table — LOW confidence, unlinked.`);
-          }
         }
       }
 
@@ -359,6 +342,65 @@ export async function ingestPowerBiScanResult(
             }
           }
           if (untraced > 0) warnings.push(`Calculated table "${table.name}" (${ds.name}): ${untraced} column(s) could not be traced through its DAX definition — table-level lineage only for those.`);
+        }
+      }
+
+      // Measures <- what their DAX reads, anywhere in the model: columns of any table, other
+      // measures, and tables read as a whole. Done after every table is cataloged, since a
+      // measure may refer to any of them. What the measure aggregates is a value link
+      // (MEASURE); what only appears in its CALCULATE / FILTER conditions is a FILTER link.
+      for (const ds of ws.datasets ?? []) {
+        const processId = datasetProcessId.get(ds.id);
+        if (processId == null || !ds.tables.some((t) => t.measures?.length)) continue;
+        const attrsByTable = new Map<string, Map<string, { id: number; isMeasure: boolean }>>();
+        const measureByName = new Map<string, number>();
+        for (const t of ds.tables) {
+          const entityId = datasetTableEntity.get(`${ds.id}::${t.name}`);
+          if (!entityId) continue;
+          const rows = await sql<{ id: number; name: string; cls: string | null }[]>`SELECT attribute_id AS id, physical_name_text AS name, attribute_class_code AS cls FROM bayanat.data_attributes WHERE entity_id = ${entityId}`;
+          const measureNames = new Set((t.measures ?? []).map((m) => m.name.toLowerCase()));
+          const byName = new Map<string, { id: number; isMeasure: boolean }>();
+          for (const r of rows) {
+            const isMeasure = r.cls === "MEASURE" && measureNames.has(r.name.toLowerCase());
+            byName.set(r.name.toLowerCase(), { id: r.id, isMeasure });
+            if (isMeasure) measureByName.set(r.name.toLowerCase(), r.id);
+          }
+          attrsByTable.set(t.name.toLowerCase(), byName);
+        }
+        const tableNames = ds.tables.map((t) => t.name);
+
+        for (const table of ds.tables) {
+          const own = attrsByTable.get(table.name.toLowerCase());
+          for (const meas of table.measures ?? []) {
+            const target = own?.get(meas.name.toLowerCase())?.id;
+            if (!target) continue;
+            const roles = daxColumnRoles(meas.expression, new Map(), { tableNames });
+            // A table named together with one of its columns ( FILTER ( T, T[c] = 1 ) ) is just
+            // what the expression iterates; only a table read purely as a whole
+            // ( COUNTROWS ( T ) ) depends on all of its columns.
+            const tablesWithColumns = new Set([...roles.value, ...roles.filter].map((r) => r.table.toLowerCase()));
+            const sources = new Map<number, "MEASURE" | "FILTER">(); // value links win over filter links
+            const put = (id: number | undefined, type: "MEASURE" | "FILTER") => {
+              if (id == null || id === target) return;
+              if (type === "MEASURE" || !sources.has(id)) sources.set(id, type);
+            };
+            for (const [type, refs, names, wholeTables] of [
+              ["MEASURE", roles.value, roles.names.value, roles.tables.value],
+              ["FILTER", roles.filter, roles.names.filter, roles.tables.filter],
+            ] as const) {
+              for (const ref of refs) put(attrsByTable.get(ref.table.toLowerCase())?.get(ref.column.toLowerCase())?.id, type);
+              for (const name of names) put(measureByName.get(name) ?? own?.get(name)?.id, type);
+              for (const t of wholeTables) {
+                if (tablesWithColumns.has(t)) continue;
+                for (const a of attrsByTable.get(t)?.values() ?? []) if (!a.isMeasure) put(a.id, type);
+              }
+            }
+            for (const [sourceId, type] of sources) {
+              await upsertLineageEdge({ scope: "ATTRIBUTE_LEVEL", sourceAssetId: sourceId, targetAssetId: target, transformationTypeCode: type, transformationLogicText: `${meas.name} = ${meas.expression}`, processId, confidenceCode: "MEDIUM", connectionId });
+              edgesCreated++;
+            }
+            if (sources.size === 0) warnings.push(`Measure "${meas.name}" (${ds.name}): its DAX refers to no column, measure or table of the model — unlinked.`);
+          }
         }
       }
 
