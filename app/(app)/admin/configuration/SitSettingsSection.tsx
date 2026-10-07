@@ -7,6 +7,7 @@ type Settings = {
   sampleSize: number;
   minConfidenceThreshold: number;
   autoAcceptBand: "NONE" | "HIGH";
+  nameOnlyMatchWeight: number;
 };
 
 type Region = { regionCode: string; regionNameText: string };
@@ -292,6 +293,22 @@ export function SitSettingsSection() {
             <input type="number" step="0.05" min="0" max="1" value={settings.minConfidenceThreshold}
               onChange={(e) => set("minConfidenceThreshold", Number(e.target.value))}
               className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[11px] text-muted mb-1">Name-only Match Weight</label>
+            <input type="number" step="0.05" min="0" max="1" value={settings.nameOnlyMatchWeight}
+              onChange={(e) => set("nameOnlyMatchWeight", Number(e.target.value))}
+              className="w-40 border border-line rounded-lg px-3 py-2 text-sm" />
+            <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
+              The confidence a column-name match gets when a table&apos;s values can&apos;t be sampled (no live connection),
+              so the name is the only evidence. Bands: HIGH from 0.85, MEDIUM from 0.50.{" "}
+              {settings.nameOnlyMatchWeight >= 0.85
+                ? <span className="text-amber-700 font-semibold">At this value a name match alone is HIGH{settings.autoAcceptBand === "HIGH" ? " — and will be auto-accepted." : "."}</span>
+                : settings.nameOnlyMatchWeight >= 0.5
+                  ? <span>At this value a name match alone is MEDIUM and always waits for review.</span>
+                  : <span>At this value a name match alone is below MEDIUM.</span>}{" "}
+              Where values can be sampled, each pattern keeps its own weight.
+            </p>
           </div>
         </div>
 

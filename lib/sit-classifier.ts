@@ -103,7 +103,11 @@ export function bandFor(confidence: number): SitConfidenceBand {
   return confidence >= 0.85 ? "HIGH" : confidence >= 0.5 ? "MEDIUM" : "LOW";
 }
 
-function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[]): SitTermScore {
+// nameOnlyWeight: set when the column's values could not be sampled at all (no live
+// connection). A name pattern then carries at least this weight — the patterns' own
+// weights (0.40 in the shipped catalog) assume a value match adds to them, which can't
+// happen here, so on their own they could never reach the HIGH band.
+function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[], nameOnlyWeight?: number): SitTermScore {
   const glossaryId = patterns[0].glossaryId;
   const nameHaystack = [input.name, input.friendlyName, input.description].filter(Boolean).join(" ");
   const hits: SitEvidenceHit[] = [];
@@ -113,9 +117,9 @@ function scoreAgainstTerm(input: ColumnSitInput, patterns: SitPattern[]): SitTer
     if (p.patternType === "NAME_REGEX") {
       const re = safeRegex(p.patternText);
       if (re && re.test(nameHaystack)) {
-        const contribution = p.confidenceWeight;
-        score += contribution;
-        hits.push({ patternType: p.patternType, patternText: p.patternText, weight: p.confidenceWeight, matchRatio: 1, contribution });
+        const weight = nameOnlyWeight != null ? Math.max(p.confidenceWeight, nameOnlyWeight) : p.confidenceWeight;
+        score += weight;
+        hits.push({ patternType: p.patternType, patternText: p.patternText, weight, matchRatio: 1, contribution: weight });
       }
       continue;
     }
@@ -158,11 +162,12 @@ export function scoreColumnAgainstSit(
   input: ColumnSitInput,
   patternsByTerm: Map<number, SitPattern[]>,
   minConfidenceThreshold: number,
+  opts: { nameOnlyWeight?: number } = {},
 ): SitSuggestion {
   let best: SitTermScore | null = null;
   for (const patterns of patternsByTerm.values()) {
     if (patterns.length === 0) continue;
-    const result = scoreAgainstTerm(input, patterns);
+    const result = scoreAgainstTerm(input, patterns, opts.nameOnlyWeight);
     if (!best || result.confidence > best.confidence) best = result;
   }
   if (!best || best.confidence < minConfidenceThreshold) return null;

@@ -193,15 +193,19 @@ export type SitSettings = {
   sampleSize: number;
   minConfidenceThreshold: number;
   autoAcceptBand: "NONE" | "HIGH";
+  /** Weight of a name-pattern match when a table's values can't be sampled (no live
+   *  connection). 0.85 or more lets a name-only match reach the HIGH band. */
+  nameOnlyMatchWeight: number;
 };
 
 export async function getSitSettings(): Promise<SitSettings> {
-  const [row] = await sql<{ activeRegionCode: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: "NONE" | "HIGH" }[]>`
+  const [row] = await sql<{ activeRegionCode: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: "NONE" | "HIGH"; nameOnlyMatchWeight: number }[]>`
     SELECT active_region_code AS "activeRegionCode", sample_size AS "sampleSize",
-           min_confidence_threshold AS "minConfidenceThreshold", auto_accept_band AS "autoAcceptBand"
+           min_confidence_threshold AS "minConfidenceThreshold", auto_accept_band AS "autoAcceptBand",
+           name_only_match_weight AS "nameOnlyMatchWeight"
     FROM bayanat.sit_settings WHERE settings_id = 1
   `;
-  return { ...row, minConfidenceThreshold: Number(row.minConfidenceThreshold) };
+  return { ...row, minConfidenceThreshold: Number(row.minConfidenceThreshold), nameOnlyMatchWeight: Number(row.nameOnlyMatchWeight) };
 }
 
 export async function updateSitSettings(patch: Partial<SitSettings>): Promise<void> {
@@ -210,7 +214,8 @@ export async function updateSitSettings(patch: Partial<SitSettings>): Promise<vo
       active_region_code       = coalesce(${patch.activeRegionCode ?? null}, active_region_code),
       sample_size               = coalesce(${patch.sampleSize ?? null}, sample_size),
       min_confidence_threshold  = coalesce(${patch.minConfidenceThreshold ?? null}, min_confidence_threshold),
-      auto_accept_band          = coalesce(${patch.autoAcceptBand ?? null}, auto_accept_band)
+      auto_accept_band          = coalesce(${patch.autoAcceptBand ?? null}, auto_accept_band),
+      name_only_match_weight    = coalesce(${patch.nameOnlyMatchWeight ?? null}, name_only_match_weight)
     WHERE settings_id = 1
   `;
 }

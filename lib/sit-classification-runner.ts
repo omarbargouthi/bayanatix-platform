@@ -83,13 +83,14 @@ async function resolveTargetAttributes(scopeType: SitScopeType, scopeId: number 
 }
 
 async function loadActiveSettings() {
-  const [row] = await sql<{ activeRegion: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: string }[]>`
+  const [row] = await sql<{ activeRegion: string; sampleSize: number; minConfidenceThreshold: number; autoAcceptBand: string; nameOnlyMatchWeight: number }[]>`
     SELECT active_region_code AS "activeRegion", sample_size AS "sampleSize", min_confidence_threshold AS "minConfidenceThreshold",
-           auto_accept_band AS "autoAcceptBand"
+           auto_accept_band AS "autoAcceptBand", name_only_match_weight AS "nameOnlyMatchWeight"
     FROM bayanat.sit_settings WHERE settings_id = 1
   `;
   return {
     autoAcceptBand: row.autoAcceptBand === "HIGH" ? "HIGH" as const : "NONE" as const,
+    nameOnlyMatchWeight: Number(row.nameOnlyMatchWeight),
     activeRegion: row.activeRegion,
     sampleSize: row.sampleSize,
     minConfidenceThreshold: Number(row.minConfidenceThreshold),
@@ -170,7 +171,9 @@ export async function runSitClassification(opts: SitRunOptions): Promise<SitRunS
           description: attr.description,
           sampleValues: valuesByColumn?.get(attr.name) ?? [],
         };
-        const suggestion = scoreColumnAgainstSit(input, patternsByTerm, settings.minConfidenceThreshold);
+        // No live sample for the table at all: the name is the only evidence there is.
+        const suggestion = scoreColumnAgainstSit(input, patternsByTerm, settings.minConfidenceThreshold,
+          valuesByColumn == null ? { nameOnlyWeight: settings.nameOnlyMatchWeight } : {});
 
         const rationale = suggestion
           ? { run_id: runId, sampled_live: suggestion.sampledLive, hits: suggestion.hits, confidence: suggestion.confidence, band: suggestion.band }
