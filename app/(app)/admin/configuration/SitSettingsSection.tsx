@@ -1,6 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DEFAULT_TERM_ASSIGNMENT_WEIGHTS } from "@/lib/sit-classifier";
+
+type WeightKey = keyof typeof DEFAULT_TERM_ASSIGNMENT_WEIGHTS;
+const WEIGHT_KEYS = Object.keys(DEFAULT_TERM_ASSIGNMENT_WEIGHTS) as WeightKey[];
+
+// "Default 0.85" under a weight field; flagged when the current value differs from it.
+function DefaultHint({ value, k }: { value: number; k: WeightKey }) {
+  const def = DEFAULT_TERM_ASSIGNMENT_WEIGHTS[k];
+  const changed = Number(value) !== def;
+  return (
+    <div className={`text-[10px] mt-0.5 ${changed ? "text-amber-700 font-semibold" : "text-muted"}`}>
+      Default {def}{changed ? " · changed" : ""}
+    </div>
+  );
+}
 
 type Settings = {
   activeRegionCode: string;
@@ -187,14 +202,26 @@ export function SitSettingsSection() {
   }
   useEffect(() => { void load(); }, []);
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Puts the shipped values back in the form; nothing is stored until Save Settings.
+  function resetWeights() {
+    setSettings((cur) => (cur ? { ...cur, ...DEFAULT_TERM_ASSIGNMENT_WEIGHTS } : cur));
+  }
+
   async function save() {
     if (!settings) return;
     setSaving(true);
     try {
-      await fetch("/api/sit/settings", {
+      setSaveError(null);
+      const r = await fetch("/api/sit/settings", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setSaveError(d.error ?? "The settings could not be saved.");
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       await load();
@@ -298,7 +325,14 @@ export function SitSettingsSection() {
         {/* Term assignment weights: everything that turns pattern matches into the
             confidence of a suggested term. */}
         <div className="border-t border-line pt-4">
-          <h3 className="text-sm font-bold text-ink">Term Assignment Weights</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-ink">Term Assignment Weights</h3>
+            <button type="button" onClick={resetWeights}
+              disabled={WEIGHT_KEYS.every((k) => Number(settings[k]) === DEFAULT_TERM_ASSIGNMENT_WEIGHTS[k])}
+              className="btn btn-sm text-xs disabled:opacity-40" title="Puts the default values back in the fields below — press Save Settings to apply">
+              Reset to defaults
+            </button>
+          </div>
           <p className="text-[11px] text-muted mt-1 leading-relaxed">
             How a suggested term&apos;s confidence is worked out. Each pattern has its own weight (edit it on the pattern, in
             the catalog below). A column&apos;s confidence for a term is the sum of the patterns that match, capped at 1:
@@ -319,6 +353,7 @@ export function SitSettingsSection() {
                   onChange={(e) => set(key, Number(e.target.value))}
                   className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
                 <div className="text-[10px] text-muted mt-1">{hint}</div>
+                <DefaultHint value={settings[key]} k={key} />
               </div>
             ))}
           </div>
@@ -331,6 +366,7 @@ export function SitSettingsSection() {
                 onChange={(e) => set("minConfidenceThreshold", Number(e.target.value))}
                 className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
               <div className="text-[10px] text-muted mt-1">Below this, no term is suggested</div>
+              <DefaultHint value={settings.minConfidenceThreshold} k="minConfidenceThreshold" />
             </div>
             <div>
               <label className="block text-[11px] text-muted mb-1">MEDIUM from</label>
@@ -338,6 +374,7 @@ export function SitSettingsSection() {
                 onChange={(e) => set("mediumBandThreshold", Number(e.target.value))}
                 className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
               <div className="text-[10px] text-muted mt-1">Below this a suggestion is LOW</div>
+              <DefaultHint value={settings.mediumBandThreshold} k="mediumBandThreshold" />
             </div>
             <div>
               <label className="block text-[11px] text-muted mb-1">HIGH from</label>
@@ -345,6 +382,7 @@ export function SitSettingsSection() {
                 onChange={(e) => set("highBandThreshold", Number(e.target.value))}
                 className="w-full border border-line rounded-lg px-3 py-2 text-sm" />
               <div className="text-[10px] text-muted mt-1">The level auto-accept applies to</div>
+              <DefaultHint value={settings.highBandThreshold} k="highBandThreshold" />
             </div>
           </div>
           {settings.mediumBandThreshold > settings.highBandThreshold && (
@@ -357,6 +395,7 @@ export function SitSettingsSection() {
             <input type="number" step="0.05" min="0" max="1" value={settings.nameOnlyMatchWeight}
               onChange={(e) => set("nameOnlyMatchWeight", Number(e.target.value))}
               className="w-40 border border-line rounded-lg px-3 py-2 text-sm" />
+            <DefaultHint value={settings.nameOnlyMatchWeight} k="nameOnlyMatchWeight" />
             <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
               The least confidence a column-name match gets when a table has no live connection, so the name is the only
               evidence.{" "}
@@ -373,6 +412,7 @@ export function SitSettingsSection() {
         <div className="flex items-center gap-3 pt-1">
           <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : "Save Settings"}</button>
           {saved && <span className="text-xs text-green-700 font-semibold">✓ Saved</span>}
+          {saveError && <span className="text-xs text-red-600 font-semibold">{saveError}</span>}
         </div>
       </div>
 

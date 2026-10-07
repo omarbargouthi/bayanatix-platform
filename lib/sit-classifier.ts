@@ -116,6 +116,10 @@ export const DEFAULT_SIT_SCORING: SitScoringConfig = {
   highBandThreshold: 0.85, mediumBandThreshold: 0.5, nameOnlyMatchWeight: 0.85,
 };
 
+/** The shipped values of every Term Assignment Weights setting (the column defaults of
+ *  bayanat.sit_settings, db/131 · 155 · 156) — what "Reset to defaults" restores. */
+export const DEFAULT_TERM_ASSIGNMENT_WEIGHTS = { ...DEFAULT_SIT_SCORING, minConfidenceThreshold: 0.5 } as const;
+
 export function bandFor(confidence: number, cfg: Pick<SitScoringConfig, "highBandThreshold" | "mediumBandThreshold"> = DEFAULT_SIT_SCORING): SitConfidenceBand {
   return confidence >= cfg.highBandThreshold ? "HIGH" : confidence >= cfg.mediumBandThreshold ? "MEDIUM" : "LOW";
 }
