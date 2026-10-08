@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.vercel
+.env
+.env.local
+.env*.local
+*.log
+*.txt
+!scripts/requirements-pbixray.txt
+logs
+test-data
+tsconfig.tsbuildinfo
+db/backups
+deploy
+*license-private-key*.pem

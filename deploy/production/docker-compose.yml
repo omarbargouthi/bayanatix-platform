@@ -1,0 +1,72 @@
+# Bayanis on one server: the app, its two schedulers, PostgreSQL and HTTPS.
+# Lives on the server in /opt/bayanis next to a .env file (see .env.example).
+# The release workflow (.github/workflows/release.yml) copies this file there and
+# sets APP_VERSION to the tag being released.
+
+x-app: &app
+  image: ghcr.io/omarbargouthi/bayanatix-platform:${APP_VERSION:-latest}
+  restart: unless-stopped
+  env_file: .env
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KPI_SANDBOX_ROLE_PASSWORD: ${KPI_SANDBOX_ROLE_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bayanatix"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    <<: *app
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/bayanatix
+      KPI_SANDBOX_DATABASE_URL: postgres://bayanatix_kpi_readonly:${KPI_SANDBOX_ROLE_PASSWORD}@db:5432/bayanatix
+      NEXT_PUBLIC_APP_URL: https://${APP_DOMAIN}
+    volumes:
+      # Files the file-based sources read (CSV / Excel / JSON / .pbix). A connection's
+      # path is written as /data/sources/<folder>.
+      - ./sources:/data/sources:ro
+
+  # Both schedulers only call the app's own "is anything due?" endpoints.
+  scheduler:
+    <<: *app
+    command: ["node", "scripts/scheduler.mjs"]
+    environment:
+      NEXT_PUBLIC_APP_URL: http://app:3000
+    depends_on: [app]
+
+  pbix-scheduler:
+    <<: *app
+    command: ["node", "scripts/pbix-scheduler.mjs"]
+    environment:
+      NEXT_PUBLIC_APP_URL: http://app:3000
+    depends_on: [app]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getPublicAuthConfig } from "@/lib/queries/auth-settings";
 
+// Reads the database on every request — never pre-computed at build time.
+export const dynamic = "force-dynamic";
+
 // Unauthenticated by design — the login page needs this before anyone is signed
 // in, to decide whether to render a password form or an SSO button. Deliberately
 // returns nothing beyond the provider type: no URLs, ids, or config details.

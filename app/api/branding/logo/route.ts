@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getLogoBlob } from "@/lib/queries/branding";
 
+// Reads the database on every request — never pre-computed at build time.
+export const dynamic = "force-dynamic";
+
 // Public (see middleware.ts's PUBLIC_PREFIXES) — the login page needs to render
 // this before a session exists, same reasoning as /api/languages there.
 // This is an ADDITIONAL customer logo shown alongside the Bayanatix logo, not a

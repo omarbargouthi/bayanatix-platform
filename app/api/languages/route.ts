@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getLanguages, getLanguagePolicy } from "@/lib/queries/languages";
 
+// Reads the database on every request — never pre-computed at build time.
+export const dynamic = "force-dynamic";
+
 /**
  * Runtime language picker list (spec FR-4.4) — respects the self-selection policy's
  * choosable-language subset and coverage threshold, not just is_enabled_indicator.

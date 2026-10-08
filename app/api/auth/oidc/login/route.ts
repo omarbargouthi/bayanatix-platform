@@ -3,6 +3,9 @@ import { getResolvedAuthConfig } from "@/lib/queries/auth-settings";
 import { startOidcLogin } from "@/lib/auth/oidc";
 import { OIDC_STATE_COOKIE, OIDC_VERIFIER_COOKIE, oidcCookieOptions } from "@/lib/auth/oidc-cookies";
 
+// Reads the database on every request — never pre-computed at build time.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   const config = await getResolvedAuthConfig();
   if (!config.oidcEnabled) {
