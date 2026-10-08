@@ -92,7 +92,8 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
 
   async function deleteDoc(docId: number) {
     if (!confirm(t.common.delete + "?")) return;
-    await fetch(`/api/governance/framework/${docId}`, { method: "DELETE" });
+    const r = await fetch(`/api/governance/framework/${docId}`, { method: "DELETE" });
+    if (!r.ok) { const b = await r.json().catch(() => ({})); alert(b.error ?? "Could not delete."); return; }
     setDocs((p) => p.filter((d) => d.docId !== docId));
   }
 
@@ -145,6 +146,9 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                           className="font-semibold text-ink hover:text-brand-purple text-left">
                           {doc.title}
                         </button>
+                        {doc.frameworkId != null && doc.isApplicable === false && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0" title="Marked as not applicable in the configuration — hidden from the Compliance page">Hidden</span>
+                        )}
                         {doc.sourceUrl && (
                           <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" title={doc.sourceUrl}
                             onClick={(e) => e.stopPropagation()} className="text-muted hover:text-brand-purple shrink-0">
@@ -152,6 +156,17 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                           </a>
                         )}
                       </div>
+                      {doc.frameworkId != null && (
+                        <div className="text-[11px] text-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {[doc.regulatoryBody, doc.countriesInScope ?? doc.regionName].filter(Boolean).map((x, i) => (
+                            <span key={i} dir="auto">{i > 0 ? "· " : ""}{x}</span>
+                          ))}
+                          <span>{(doc.regulatoryBody || doc.countriesInScope || doc.regionName) ? "· " : ""}{doc.requirementCount ?? 0} requirement{doc.requirementCount === 1 ? "" : "s"}</span>
+                          {doc.isApplicable !== false && (
+                            <a href={`/governance/compliance?fw=${doc.frameworkId}`} className="text-brand-purple hover:underline">· Open in Compliance</a>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[doc.statusCode] ?? "bg-gray-100 text-gray-600"}`}>

@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { linkRegistryEntry, syncRegistryEntryFromRegulation } from "./regulation-registry";
 import { logUpdate } from "../audit";
 import { startWorkflow } from "../workflow";
 import { translatedColumnSql } from "../i18n-admin/translated-column";
@@ -307,6 +308,9 @@ export async function createFramework(
   name: string, code: string, version: string | null, description: string | null,
   assessmentMode: "COMPLIANCE_ONLY" | "MATURITY" = "COMPLIANCE_ONLY",
   regulationGroupCode: string | null = null,
+  // registryDocId: the Regulatory entry this regulation was registered from, when it was
+  // added on the Governance Framework > Regulatory page (the entry already exists).
+  opts: { registryDocId?: number; userId?: string } = {},
 ): Promise<number> {
   const rows = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_compliance_frameworks (name, code, version, description, assessment_mode, regulation_group_code)
@@ -364,6 +368,9 @@ export async function createFramework(
     `;
   }
 
+  // Every regulation has an entry on Governance Framework > Regulatory (the registry).
+  if (opts.registryDocId != null) await linkRegistryEntry(opts.registryDocId, frameworkId);
+  await syncRegistryEntryFromRegulation(frameworkId, opts.userId ?? null);
   return frameworkId;
 }
 
@@ -398,6 +405,7 @@ export async function updateRegulationDetails(frameworkId: number, d: Regulation
     { field: "regulatory_body", oldVal: before.body, newVal: d.regulatoryBody },
     { field: "official_url", oldVal: before.url, newVal: d.officialUrl },
   ]);
+  await syncRegistryEntryFromRegulation(frameworkId, userId);
   return true;
 }
 

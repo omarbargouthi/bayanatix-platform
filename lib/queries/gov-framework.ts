@@ -1,4 +1,6 @@
 import { sql } from "../db";
+import { createFramework } from "./gov-compliance";
+import { syncRegulationFromRegistryEntry, syncRegistryEntryFromRegulation, uniqueRegulationCode, regulationOfRegistryEntry } from "./regulation-registry";
 
 export type GovDoc = {
   docId:         number;
@@ -16,6 +18,14 @@ export type GovDoc = {
   updatedAt:     string;
   createdBy:     string | null;
   attachmentCount: number;
+  // Regulatory entries only (db/163): the regulation this entry registers, and what the
+  // Compliance / configuration pages know about it.
+  frameworkId:      number | null;
+  isApplicable:     boolean | null;
+  regulatoryBody:   string | null;
+  regionName:       string | null;
+  countriesInScope: string | null;
+  requirementCount: number | null;
 };
 
 export type GovAttachment = {
@@ -45,13 +55,18 @@ export async function listGovDocs(sectionCode?: string): Promise<GovDoc[]> {
       d.created_at::text AS "createdAt",
       d.updated_at::text AS "updatedAt",
       d.created_by      AS "createdBy",
-      COUNT(a.attachment_id)::int AS "attachmentCount"
+      COUNT(a.attachment_id)::int AS "attachmentCount",
+      d.framework_id    AS "frameworkId",
+      f.is_applicable_indicator AS "isApplicable",
+      f.regulatory_body AS "regulatoryBody", f.region_name AS "regionName", f.countries_in_scope AS "countriesInScope",
+      (SELECT count(*)::int FROM bayanat.gov_compliance_requirements r WHERE r.framework_id = d.framework_id) AS "requirementCount"
     FROM bayanat.gov_framework_docs d
     LEFT JOIN bayanat.users u ON u.user_id = d.owner_user_id
     LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id
+    LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
     ${sectionCode ? sql`WHERE d.section_code = ${sectionCode}` : sql``}
-    GROUP BY d.doc_id, u.full_name
-    ORDER BY d.updated_at DESC
+    GROUP BY d.doc_id, u.full_name, f.framework_id
+    ORDER BY d.section_code, lower(d.title)
   `;
 }
 
@@ -72,12 +87,17 @@ export async function getGovDoc(docId: number): Promise<GovDoc | null> {
       d.created_at::text AS "createdAt",
       d.updated_at::text AS "updatedAt",
       d.created_by      AS "createdBy",
-      COUNT(a.attachment_id)::int AS "attachmentCount"
+      COUNT(a.attachment_id)::int AS "attachmentCount",
+      d.framework_id    AS "frameworkId",
+      f.is_applicable_indicator AS "isApplicable",
+      f.regulatory_body AS "regulatoryBody", f.region_name AS "regionName", f.countries_in_scope AS "countriesInScope",
+      (SELECT count(*)::int FROM bayanat.gov_compliance_requirements r WHERE r.framework_id = d.framework_id) AS "requirementCount"
     FROM bayanat.gov_framework_docs d
     LEFT JOIN bayanat.users u ON u.user_id = d.owner_user_id
     LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id
+    LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
     WHERE d.doc_id = ${docId}
-    GROUP BY d.doc_id, u.full_name
+    GROUP BY d.doc_id, u.full_name, f.framework_id
   `;
   return rows[0] ?? null;
 }
@@ -98,7 +118,23 @@ export async function createGovDoc(data: {
     )
     RETURNING doc_id AS "docId"
   `;
-  return rows[0].docId;
+  const docId = rows[0].docId;
+  // The Regulatory page is the registry of regulations and frameworks: an entry added
+  // here is a regulation, so it is created as one (assessable on the Compliance page,
+  // listed in the configuration) under the same name.
+  if (data.sectionCode === "REGULATORY") {
+    const frameworkId = await createFramework(
+      data.title, await uniqueRegulationCode(data.title), data.versionText ?? null, data.description ?? null,
+      "COMPLIANCE_ONLY", null, { registryDocId: docId, userId: data.createdBy },
+    );
+    await sql`
+      UPDATE bayanat.gov_compliance_frameworks
+      SET effective_date = ${data.effectiveDate ?? null}::date, official_url = ${data.sourceUrl ?? null}
+      WHERE framework_id = ${frameworkId}
+    `;
+    await syncRegistryEntryFromRegulation(frameworkId, data.createdBy);
+  }
+  return docId;
 }
 
 export async function updateGovDoc(docId: number, data: {
@@ -119,10 +155,28 @@ export async function updateGovDoc(docId: number, data: {
       updated_at     = NOW()
     WHERE doc_id = ${docId}
   `;
+  // A Regulatory entry and its regulation share one name and one set of details.
+  await syncRegulationFromRegistryEntry(docId);
 }
 
+export class RegulationInUseError extends Error {}
+
+/** Deletes a document. A Regulatory entry takes its regulation with it — which is only
+ *  allowed while that regulation has no requirements; one that does is hidden instead
+ *  (configuration: not applicable), never deleted from here. */
 export async function deleteGovDoc(docId: number): Promise<void> {
+  const regulation = await regulationOfRegistryEntry(docId);
+  if (regulation && regulation.requirementCount > 0) {
+    throw new RegulationInUseError(
+      `"${regulation.name}" has ${regulation.requirementCount} requirement(s) and cannot be deleted from the registry. To stop using it, mark it as not applicable in the configuration — it is then hidden from the Compliance page.`,
+    );
+  }
   await sql`DELETE FROM bayanat.gov_framework_docs WHERE doc_id = ${docId}`;
+  if (regulation) {
+    await sql`DELETE FROM bayanat.gov_compliance_level_config WHERE framework_id = ${regulation.frameworkId}`;
+    await sql`DELETE FROM bayanat.compliance_config_items WHERE framework_id = ${regulation.frameworkId}`;
+    await sql`DELETE FROM bayanat.gov_compliance_frameworks WHERE framework_id = ${regulation.frameworkId}`;
+  }
 }
 
 export async function listAttachments(docId: number): Promise<GovAttachment[]> {

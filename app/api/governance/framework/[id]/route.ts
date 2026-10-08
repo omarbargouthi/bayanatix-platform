@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canAccessDomain, canManageDomain } from "@/lib/can";
-import { getGovDoc, updateGovDoc, deleteGovDoc, listAttachments } from "@/lib/queries/gov-framework";
+import { getGovDoc, updateGovDoc, deleteGovDoc, listAttachments, RegulationInUseError } from "@/lib/queries/gov-framework";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -26,6 +26,11 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await canManageDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  await deleteGovDoc(Number(params.id));
+  try {
+    await deleteGovDoc(Number(params.id));
+  } catch (e) {
+    if (e instanceof RegulationInUseError) return NextResponse.json({ error: e.message }, { status: 409 });
+    throw e;
+  }
   return NextResponse.json({ ok: true });
 }

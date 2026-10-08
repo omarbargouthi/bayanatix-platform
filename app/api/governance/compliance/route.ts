@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   try {
     const id = await createFramework(
       name, String(code).trim().toUpperCase().replace(/\s+/g, "_"), version ?? null, description ?? null,
-      assessmentMode ?? "COMPLIANCE_ONLY", regulationGroupCode ?? null,
+      assessmentMode ?? "COMPLIANCE_ONLY", regulationGroupCode ?? null, { userId: session.userId },
     );
     return NextResponse.json({ frameworkId: id }, { status: 201 });
   } catch (e) {
