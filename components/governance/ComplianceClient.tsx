@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { RegulationDetails } from "./RegulationDetails";
 import { useRouter } from "next/navigation";
 import type {
   ComplianceFramework, ComplianceRequirement,
@@ -686,6 +687,9 @@ export function ComplianceClient({
           <p className="text-sm text-ink-soft mt-0.5">
             {activeFramework?.name}{activeFramework?.version ? ` · ${activeFramework.version}` : ""}
           </p>
+          {activeFramework && (
+            <RegulationDetails details={activeFramework} canEdit={currentUser.role !== "VIEWER"} onSaved={() => router.refresh()} />
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {frameworks.length > 1 && (

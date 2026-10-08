@@ -13,6 +13,15 @@ export type ComplianceFramework = {
   regulationGroupCode: string | null;
   isApplicable:        boolean;
   assessmentMode:      "MATURITY" | "COMPLIANCE_ONLY";
+  // Registration details (db/162): where it applies, who issues it, since when, official links.
+  regionName:          string | null;
+  countriesInScope:    string | null;
+  scopeNote:           string | null;
+  regulatoryBody:      string | null;
+  effectiveDate:       string | null;
+  effectiveDateNote:   string | null;
+  officialUrl:         string | null;
+  referenceLinks:      { label: string; url: string }[];
   reqCount:            number;
   completeCount:       number;
   naCount:             number;
@@ -141,6 +150,9 @@ export async function listFrameworks(includeInactive = true): Promise<Compliance
       f.name, f.code, f.version, f.description,
       f.regulation_group_code AS "regulationGroupCode", f.is_applicable_indicator AS "isApplicable",
       f.assessment_mode AS "assessmentMode",
+      f.region_name AS "regionName", f.countries_in_scope AS "countriesInScope", f.scope_note AS "scopeNote",
+      f.regulatory_body AS "regulatoryBody", to_char(f.effective_date, 'YYYY-MM-DD') AS "effectiveDate",
+      f.effective_date_note AS "effectiveDateNote", f.official_url AS "officialUrl", f.reference_links AS "referenceLinks",
       COUNT(r.req_id)::int AS "reqCount",
       -- COMPLETE/COMPLIANCE, NOT_COMPLETE/PARTIAL_COMPLIANCE/NON_COMPLIANCE: NDI's
       -- Complete/Not-Completed/N-A codes and the simplified Compliance/Partial/Non/N-A
@@ -360,6 +372,33 @@ export async function updateFrameworkApplicability(frameworkId: number, isApplic
   await logUpdate("GOV_COMPLIANCE_FRAMEWORKS", frameworkId, userId, [
     { field: "is_applicable_indicator", oldVal: null, newVal: String(isApplicable), force: true },
   ]);
+}
+
+export type RegulationDetailsPatch = {
+  regionName: string | null; countriesInScope: string | null; scopeNote: string | null; regulatoryBody: string | null;
+  effectiveDate: string | null; effectiveDateNote: string | null; officialUrl: string | null;
+  referenceLinks: { label: string; url: string }[];
+};
+
+/** Replaces a regulation's registration details (db/162) with the given values. */
+export async function updateRegulationDetails(frameworkId: number, d: RegulationDetailsPatch, userId: string): Promise<boolean> {
+  const [before] = await sql<{ body: string | null; url: string | null }[]>`
+    SELECT regulatory_body AS body, official_url AS url FROM bayanat.gov_compliance_frameworks WHERE framework_id = ${frameworkId}
+  `;
+  if (!before) return false;
+  await sql`
+    UPDATE bayanat.gov_compliance_frameworks SET
+      region_name = ${d.regionName}, countries_in_scope = ${d.countriesInScope}, scope_note = ${d.scopeNote},
+      regulatory_body = ${d.regulatoryBody}, effective_date = ${d.effectiveDate}::date, effective_date_note = ${d.effectiveDateNote},
+      official_url = ${d.officialUrl}, reference_links = ${sql.json(d.referenceLinks)}
+    WHERE framework_id = ${frameworkId}
+  `;
+  await logUpdate("GOV_COMPLIANCE_FRAMEWORKS", frameworkId, userId, [
+    { field: "regulation_details", oldVal: null, newVal: "updated", force: true },
+    { field: "regulatory_body", oldVal: before.body, newVal: d.regulatoryBody },
+    { field: "official_url", oldVal: before.url, newVal: d.officialUrl },
+  ]);
+  return true;
 }
 
 // ── Requirements ─────────────────────────────────────────────────────────────
