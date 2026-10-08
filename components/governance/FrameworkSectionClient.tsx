@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { GovDoc } from "@/lib/queries/gov-framework";
+import { RegulationForm, type RegulationDetailsData } from "./RegulationDetails";
 import { useLang } from "@/lib/lang-context";
 
 type Props = {
@@ -51,7 +52,27 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [error, setError]             = useState("");
 
-  function openNew() { setForm(EMPTY_FORM); setEditDoc(null); setShowModal(true); setError(""); }
+  // The Regulatory section is the registry of regulations: its entries are added and
+  // edited with the same full form as on the Compliance page. (Status, owner and expiry —
+  // the document side of an entry — keep the plain document dialog, under "Document".)
+  const isRegistry = sectionCode === "REGULATORY";
+  const [regulationForm, setRegulationForm] = useState<{ details?: RegulationDetailsData } | null>(null);
+
+  async function reloadDocs() {
+    const r = await fetch(`/api/governance/framework?section=${sectionCode}`);
+    if (r.ok) setDocs((await r.json()).docs);
+  }
+  async function openRegulation(frameworkId: number) {
+    const r = await fetch("/api/governance/compliance");
+    const list: RegulationDetailsData[] = r.ok ? await r.json() : [];
+    const details = (Array.isArray(list) ? list : []).find((f) => f.frameworkId === frameworkId);
+    if (details) setRegulationForm({ details }); else alert("This regulation could not be loaded.");
+  }
+
+  function openNew() {
+    if (isRegistry) { setRegulationForm({}); return; }
+    setForm(EMPTY_FORM); setEditDoc(null); setShowModal(true); setError("");
+  }
   function openEdit(doc: GovDoc) {
     setForm({
       title: doc.title, description: doc.description ?? "",
@@ -114,7 +135,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
           <h1 className="text-2xl font-bold text-brand-deep">{sectionLabel}</h1>
           <p className="text-sm text-ink-soft mt-0.5">{sectionDescription}</p>
         </div>
-        <button onClick={openNew} className="btn btn-primary">{fw.addDocument}</button>
+        <button onClick={openNew} className="btn btn-primary">{isRegistry ? "+ New Regulation" : fw.addDocument}</button>
       </div>
 
       <div className="card overflow-hidden mt-5">
@@ -128,6 +149,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
             <thead>
               <tr className="bg-canvas-soft border-b border-line text-left">
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colTitle}</th>
+                {isRegistry && <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">Countries in scope</th>}
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colStatus}</th>
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colVersion}</th>
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colEffective}</th>
@@ -158,16 +180,22 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                       </div>
                       {doc.frameworkId != null && (
                         <div className="text-[11px] text-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
-                          {[doc.regulatoryBody, doc.countriesInScope ?? doc.regionName].filter(Boolean).map((x, i) => (
+                          {[doc.regulatoryBody].filter(Boolean).map((x, i) => (
                             <span key={i} dir="auto">{i > 0 ? "· " : ""}{x}</span>
                           ))}
-                          <span>{(doc.regulatoryBody || doc.countriesInScope || doc.regionName) ? "· " : ""}{doc.requirementCount ?? 0} requirement{doc.requirementCount === 1 ? "" : "s"}</span>
+                          <span>{doc.regulatoryBody ? "· " : ""}{doc.requirementCount ?? 0} requirement{doc.requirementCount === 1 ? "" : "s"}</span>
                           {doc.isApplicable !== false && (
                             <a href={`/governance/compliance?fw=${doc.frameworkId}`} className="text-brand-purple hover:underline">· Open in Compliance</a>
                           )}
                         </div>
                       )}
                     </td>
+                    {isRegistry && (
+                      <td className="px-4 py-3 text-ink-soft text-[13px] max-w-[200px]" dir="auto">
+                        {doc.countriesInScope ?? "—"}
+                        {doc.regionName && <div className="text-[11px] text-muted">{doc.regionName}</div>}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[doc.statusCode] ?? "bg-gray-100 text-gray-600"}`}>
                         {STATUS_LABEL[doc.statusCode] ?? doc.statusCode}
@@ -185,14 +213,21 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-end">
-                        <button onClick={() => openEdit(doc)} className="text-[11px] text-ink-soft hover:text-brand-purple">{t.common.edit}</button>
+                        {isRegistry && doc.frameworkId != null ? (
+                          <>
+                            <button onClick={() => openRegulation(doc.frameworkId!)} className="text-[11px] text-ink-soft hover:text-brand-purple">{t.common.edit}</button>
+                            <button onClick={() => openEdit(doc)} className="text-[11px] text-ink-soft hover:text-brand-purple" title="Status, owner and expiry of the registry entry">Document</button>
+                          </>
+                        ) : (
+                          <button onClick={() => openEdit(doc)} className="text-[11px] text-ink-soft hover:text-brand-purple">{t.common.edit}</button>
+                        )}
                         <button onClick={() => deleteDoc(doc.docId)} className="text-[11px] text-ink-soft hover:text-red-500">{t.common.delete}</button>
                       </div>
                     </td>
                   </tr>
                   {expandedId === doc.docId && (doc.description || doc.sourceUrl) && (
                     <tr key={`${doc.docId}-exp`} className="bg-canvas-soft border-b border-line-soft">
-                      <td colSpan={7} className="px-6 py-3 text-sm text-ink-soft space-y-1.5">
+                      <td colSpan={isRegistry ? 8 : 7} className="px-6 py-3 text-sm text-ink-soft space-y-1.5">
                         {doc.description && <p>{doc.description}</p>}
                         {doc.sourceUrl && (
                           <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer"
@@ -209,6 +244,11 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
           </table>
         )}
       </div>
+
+      {regulationForm && (
+        <RegulationForm details={regulationForm.details} onClose={() => setRegulationForm(null)}
+          onSaved={() => { setRegulationForm(null); reloadDocs(); }} />
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
