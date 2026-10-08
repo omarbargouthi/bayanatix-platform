@@ -106,6 +106,44 @@ export function RegulationDetails({ details, canEdit, onSaved }: { details: Regu
   );
 }
 
+/** The assessment mode of one regulation as a drop-down that saves on change (used on the
+ *  Maturity Index Setup page). Locked once the regulation has requirements. */
+export function AssessmentModeSelect({ frameworkId, mode, reqCount, onChanged }: {
+  frameworkId: number; mode: AssessmentMode; reqCount: number; onChanged: (mode: AssessmentMode) => void;
+}) {
+  const modeLabel = useModeLabel();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const locked = reqCount > 0;
+
+  async function change(next: AssessmentMode) {
+    if (next === mode) return;
+    if (!confirm(`Change the assessment mode to "${modeLabel(next)}"? The regulation's level scale and status list are rebuilt for the new mode.`)) return;
+    setSaving(true); setError(null);
+    try {
+      const r = await fetch(`/api/governance/compliance/${frameworkId}/details`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assessmentMode: next }),
+      });
+      if (!r.ok) { const b = await r.json().catch(() => ({})); setError(b.error ?? "The mode could not be changed."); return; }
+      onChanged(next);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-ink-soft">
+      <span>Assessment mode</span>
+      <select value={mode} disabled={locked || saving} onChange={(e) => change(e.target.value as AssessmentMode)}
+        className="field w-auto text-xs py-1 disabled:opacity-60 disabled:cursor-not-allowed"
+        title={locked ? `Fixed: this regulation already has ${reqCount} requirement(s), which are scored in this mode.` : "Can be changed until requirements are added"}>
+        <option value="COMPLIANCE_ONLY">{modeLabel("COMPLIANCE_ONLY")}</option>
+        <option value="MATURITY">{modeLabel("MATURITY")}</option>
+      </select>
+      {locked && <span className="text-[11px] text-muted">fixed — has requirements</span>}
+      {error && <span className="text-[11px] text-red-600">{error}</span>}
+    </span>
+  );
+}
+
 /** The one form for a regulation: `details` given = edit it; omitted = register a new one. */
 export function RegulationForm({ details, onClose, onSaved }: {
   details?: RegulationDetailsData; onClose: () => void; onSaved: (frameworkId: number) => void;

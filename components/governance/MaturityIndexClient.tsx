@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { AssessmentModeSelect } from "./RegulationDetails";
 import type {
   ComplianceFramework, ComplianceRequirement,
   LevelConfig, UserOption, ConfigItem, DomainConfig,
@@ -75,6 +76,7 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
   const [editing,     setEditing]     = useState<ComplianceRequirement | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [applicabilityOverrides, setApplicabilityOverrides] = useState<Record<number, boolean>>({});
+  const [modeOverrides, setModeOverrides] = useState<Record<number, "COMPLIANCE_ONLY" | "MATURITY">>({});
 
   // collapse state — keyed by domainCode / "domainCode::standard"
   const [collapsedDomains,    setCollapsedDomains]    = useState<Set<string>>(new Set());
@@ -284,6 +286,11 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
             <input type="checkbox" checked={isApplicable} onChange={toggleApplicable} className="w-3.5 h-3.5 accent-brand-purple" />
             Applicable to organization
           </label>
+          {selectedFw && (
+            <AssessmentModeSelect frameworkId={selectedFw.frameworkId} mode={modeOverrides[selectedFw.frameworkId] ?? selectedFw.assessmentMode}
+              reqCount={selectedFw.reqCount}
+              onChanged={(m) => { setModeOverrides((prev) => ({ ...prev, [selectedFw.frameworkId]: m })); window.location.reload(); }} />
+          )}
         </div>
       )}
       {frameworks.length === 1 && (
@@ -298,6 +305,11 @@ export function MaturityIndexClient({ frameworks, users }: Props) {
             <input type="checkbox" checked={isApplicable} onChange={toggleApplicable} className="w-3.5 h-3.5 accent-brand-purple" />
             Applicable to organization
           </label>
+          {selectedFw && (
+            <AssessmentModeSelect frameworkId={selectedFw.frameworkId} mode={modeOverrides[selectedFw.frameworkId] ?? selectedFw.assessmentMode}
+              reqCount={selectedFw.reqCount}
+              onChanged={(m) => { setModeOverrides((prev) => ({ ...prev, [selectedFw.frameworkId]: m })); window.location.reload(); }} />
+          )}
         </div>
       )}
 
