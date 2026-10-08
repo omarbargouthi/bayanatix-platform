@@ -10,3 +10,18 @@ sn: Viewer
 displayName: Test Viewer
 mail: testviewer@bayanatix.local
 userPassword: TestViewer123!
+
+# A second population in its own branch — for trying several LDAP directories
+# (Administration > Configuration > Authentication: one directory per Base DN).
+dn: ou=Contractors,dc=bayanatix,dc=local
+objectClass: organizationalUnit
+ou: Contractors
+
+dn: uid=contractor1,ou=Contractors,dc=bayanatix,dc=local
+objectClass: inetOrgPerson
+uid: contractor1
+cn: Casey Contractor
+sn: Contractor
+displayName: Casey Contractor
+mail: casey.contractor@partner.local
+userPassword: Contractor123!

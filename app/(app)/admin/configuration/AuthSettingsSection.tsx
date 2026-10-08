@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LdapDirectoriesEditor } from "./LdapDirectoriesEditor";
 
 type AuthSettings = {
   localEnabled: boolean;
@@ -31,7 +32,6 @@ export function AuthSettingsSection() {
   const [settings, setSettings] = useState<AuthSettings | null>(null);
   const [sources, setSources] = useState<DataSourceLite[]>([]);
   const [form, setForm] = useState<AuthSettings | null>(null);
-  const [ldapBindPassword, setLdapBindPassword] = useState(BLANK_SECRET);
   const [oidcClientSecret, setOidcClientSecret] = useState(BLANK_SECRET);
   const [scopeMode, setScopeMode] = useState<"GLOBAL" | "SPECIFIC">("GLOBAL");
   const [saving, setSaving] = useState(false);
@@ -60,20 +60,12 @@ export function AuthSettingsSection() {
         localEnabled: form.localEnabled,
         ldapEnabled: form.ldapEnabled,
         oidcEnabled: form.oidcEnabled,
-        ldapUrl: form.ldapUrl,
-        ldapUseStartTls: form.ldapUseStartTls,
-        ldapBindDn: form.ldapBindDn,
-        ldapBaseDn: form.ldapBaseDn,
-        ldapUserFilter: form.ldapUserFilter,
-        ldapEmailAttr: form.ldapEmailAttr,
-        ldapNameAttr: form.ldapNameAttr,
         oidcIssuerUrl: form.oidcIssuerUrl,
         oidcClientId: form.oidcClientId,
         oidcRedirectUri: form.oidcRedirectUri,
         oidcScopes: form.oidcScopes,
         autoProvisionSourceIds: scopeMode === "GLOBAL" ? null : form.autoProvisionSourceIds,
       };
-      if (ldapBindPassword.trim()) patch.ldapBindPassword = ldapBindPassword.trim();
       if (oidcClientSecret.trim()) patch.oidcClientSecret = oidcClientSecret.trim();
 
       const r = await fetch("/api/admin/auth-settings", {
@@ -83,7 +75,6 @@ export function AuthSettingsSection() {
       if (!r.ok) { setSaveError(body.error || "Failed to save"); return; }
       setSettings(body);
       setForm(body);
-      setLdapBindPassword(BLANK_SECRET);
       setOidcClientSecret(BLANK_SECRET);
     } finally {
       setSaving(false);
@@ -113,7 +104,7 @@ export function AuthSettingsSection() {
   }
 
   const dirty = JSON.stringify(form) !== JSON.stringify(settings)
-    || ldapBindPassword.trim() !== "" || oidcClientSecret.trim() !== ""
+    || oidcClientSecret.trim() !== ""
     || (scopeMode === "GLOBAL") !== !settings.autoProvisionSourceIds?.length;
 
   const enabledCount = [form.localEnabled, form.ldapEnabled, form.oidcEnabled].filter(Boolean).length;
@@ -140,36 +131,11 @@ export function AuthSettingsSection() {
         {/* ── LDAP ── */}
         <ProviderCard
           title="LDAP / Active Directory"
-          description="On-prem Active Directory or any LDAPv3 directory, via search + bind."
+          description="On-prem Active Directory or any LDAPv3 directory, via search + bind. Add one directory per user population (employees, contractors…); people choose theirs on the sign-in screen."
           enabled={form.ldapEnabled}
           onToggle={(v) => setForm({ ...form, ldapEnabled: v })}
         >
-          <Field label="Server URL" placeholder="ldaps://dc01.corp.example.com:636"
-            value={form.ldapUrl ?? ""} onChange={(v) => setForm({ ...form, ldapUrl: v || null })} />
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input type="checkbox" className="w-4 h-4 accent-brand-purple" checked={form.ldapUseStartTls}
-              onChange={(e) => setForm({ ...form, ldapUseStartTls: e.target.checked })} />
-            Use StartTLS (for a plain <code className="font-mono text-xs">ldap://</code> URL — not needed for <code className="font-mono text-xs">ldaps://</code>)
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Bind DN (service account)" placeholder="CN=svc-bayanis,OU=Service Accounts,DC=corp,DC=example,DC=com"
-              value={form.ldapBindDn ?? ""} onChange={(v) => setForm({ ...form, ldapBindDn: v || null })} />
-            <Field label={`Bind password ${settings.ldapHasBindCredential ? "(set — leave blank to keep)" : ""}`}
-              type="password" placeholder={settings.ldapHasBindCredential ? "••••••••" : ""}
-              value={ldapBindPassword} onChange={setLdapBindPassword} />
-          </div>
-          <Field label="Base DN" placeholder="OU=Users,DC=corp,DC=example,DC=com"
-            value={form.ldapBaseDn ?? ""} onChange={(v) => setForm({ ...form, ldapBaseDn: v || null })} />
-          <Field label="User search filter" placeholder="(mail={{username}})"
-            value={form.ldapUserFilter ?? ""} onChange={(v) => setForm({ ...form, ldapUserFilter: v || null })} />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Email attribute" placeholder="mail"
-              value={form.ldapEmailAttr ?? ""} onChange={(v) => setForm({ ...form, ldapEmailAttr: v || null })} />
-            <Field label="Display name attribute" placeholder="displayName"
-              value={form.ldapNameAttr ?? ""} onChange={(v) => setForm({ ...form, ldapNameAttr: v || null })} />
-          </div>
-          <TestRow result={testResults.LDAP} testing={testing === "LDAP"} disabled={dirty}
-            onTest={() => handleTest("LDAP")} />
+          <LdapDirectoriesEditor />
         </ProviderCard>
 
         {/* ── OIDC ── */}

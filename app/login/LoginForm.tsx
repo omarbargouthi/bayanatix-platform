@@ -19,11 +19,21 @@ export default function LoginForm({ redirectTo, initialError }: { redirectTo: st
   const [password, setPassword] = useState("Bayanatix123!");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
+  // LDAP: the directories an administrator has enabled (employees, contractors…), and
+  // the one this person is signing in to.
+  const [directories, setDirectories] = useState<{ id: number; name: string }[]>([]);
+  const [directoryId, setDirectoryId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/config")
       .then((r) => r.json())
-      .then((d: { local: boolean; ldap: boolean; oidc: boolean }) => {
+      .then((d: { local: boolean; ldap: boolean; oidc: boolean; ldapDirectories?: { id: number; name: string }[] }) => {
+        const dirs = d.ldapDirectories ?? [];
+        setDirectories(dirs);
+        // Remember the last directory used on this browser; otherwise the first one.
+        let remembered: number | null = null;
+        try { remembered = Number(window.localStorage.getItem("bayanis.ldapDirectory")) || null; } catch { /* storage unavailable */ }
+        setDirectoryId(dirs.find((x) => x.id === remembered)?.id ?? dirs[0]?.id ?? null);
         const methods: ProviderType[] = [
           ...(d.local ? (["LOCAL"] as const) : []),
           ...(d.ldap ? (["LDAP"] as const) : []),
@@ -57,12 +67,15 @@ export default function LoginForm({ redirectTo, initialError }: { redirectTo: st
       const r = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: active, email, password }),
+        body: JSON.stringify({ provider: active, email, password, ...(active === "LDAP" && directoryId != null ? { directoryId } : {}) }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
         setError(j.error || "Sign-in failed");
         return;
+      }
+      if (active === "LDAP" && directoryId != null) {
+        try { window.localStorage.setItem("bayanis.ldapDirectory", String(directoryId)); } catch { /* storage unavailable */ }
       }
       router.replace(redirectTo);
       router.refresh();
@@ -119,6 +132,14 @@ export default function LoginForm({ redirectTo, initialError }: { redirectTo: st
         </a>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
+          {active === "LDAP" && directories.length > 1 && (
+            <div>
+              <label className="field-label" htmlFor="directory">Sign in to</label>
+              <select id="directory" className="field-input" value={directoryId ?? ""} onChange={(e) => setDirectoryId(Number(e.target.value))}>
+                {directories.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="field-label" htmlFor="email">{active === "LDAP" ? "Username or email" : "Work email"}</label>
             <input

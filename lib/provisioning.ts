@@ -56,6 +56,8 @@ export type ExternalIdentity = {
   fullName: string;
   subject: string; // LDAP DN or OIDC `sub`
   provider: "LDAP" | "OIDC";
+  /** LDAP only: the directory the identity was verified against. */
+  ldapDirectoryId?: number;
 };
 
 /**
@@ -67,26 +69,36 @@ export async function findOrCreateExternalUser(identity: ExternalIdentity): Prom
   const existingBySubject = await sql<Array<{
     userId: string; email: string; fullName: string; role: SessionUser["role"];
     preferredLanguageCode: string | null; avatarColorCode: string | null; isActive: boolean;
+    authProvider: string | null; ldapDirectoryId: number | null;
   }>>`
     SELECT user_id AS "userId", email, full_name AS "fullName", role,
            preferred_language_code AS "preferredLanguageCode", avatar_color_code AS "avatarColorCode",
-           is_active AS "isActive"
+           is_active AS "isActive", auth_provider_code AS "authProvider", ldap_directory_id AS "ldapDirectoryId"
     FROM bayanat.users WHERE external_subject_text = ${identity.subject} AND auth_provider_code = ${identity.provider}
+      AND (${identity.ldapDirectoryId ?? null}::int IS NULL OR ldap_directory_id IS NULL OR ldap_directory_id = ${identity.ldapDirectoryId ?? null}::int)
   `;
   const existingByEmail = existingBySubject[0] ? [] : await sql<typeof existingBySubject>`
     SELECT user_id AS "userId", email, full_name AS "fullName", role,
            preferred_language_code AS "preferredLanguageCode", avatar_color_code AS "avatarColorCode",
-           is_active AS "isActive"
+           is_active AS "isActive", auth_provider_code AS "authProvider", ldap_directory_id AS "ldapDirectoryId"
     FROM bayanat.users WHERE lower(email) = lower(${identity.email})
   `;
   const existing = existingBySubject[0] ?? existingByEmail[0];
+
+  // The same e-mail in two directories is two different people: an account that belongs
+  // to one directory can't be signed in to (and so taken over) through another.
+  if (existing && identity.provider === "LDAP" && identity.ldapDirectoryId != null
+      && existing.authProvider === "LDAP" && existing.ldapDirectoryId != null && existing.ldapDirectoryId !== identity.ldapDirectoryId) {
+    throw new Error("This account belongs to a different directory. Choose that directory on the sign-in screen.");
+  }
 
   if (existing) {
     if (!existing.isActive) throw new Error("This account has been deactivated. Contact your administrator.");
     // Keep the directory's current name and subject linkage fresh on every login.
     await sql`
       UPDATE bayanat.users SET full_name = ${identity.fullName}, external_subject_text = ${identity.subject},
-        auth_provider_code = ${identity.provider}, last_login_at = NOW()
+        auth_provider_code = ${identity.provider}, last_login_at = NOW(),
+        ldap_directory_id = coalesce(${identity.ldapDirectoryId ?? null}::int, ldap_directory_id)
       WHERE user_id = ${existing.userId}
     `;
     return {
@@ -99,8 +111,8 @@ export async function findOrCreateExternalUser(identity: ExternalIdentity): Prom
   const userId = await uniqueUserId(slugifyUserId(identity.email));
 
   await sql`
-    INSERT INTO bayanat.users (user_id, email, full_name, role, password_hash, auth_provider_code, external_subject_text, last_login_at)
-    VALUES (${userId}, ${identity.email}, ${identity.fullName}, 'VIEWER', NULL, ${identity.provider}, ${identity.subject}, NOW())
+    INSERT INTO bayanat.users (user_id, email, full_name, role, password_hash, auth_provider_code, external_subject_text, last_login_at, ldap_directory_id)
+    VALUES (${userId}, ${identity.email}, ${identity.fullName}, 'VIEWER', NULL, ${identity.provider}, ${identity.subject}, NOW(), ${identity.ldapDirectoryId ?? null})
   `;
 
   if (authConfig.autoProvisionRoleId) {

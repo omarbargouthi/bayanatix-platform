@@ -4,6 +4,7 @@ import { findUserByEmail } from "@/lib/queries/users";
 import { setSessionCookie, signSession, verifyPassword } from "@/lib/auth";
 import { getResolvedAuthConfig } from "@/lib/queries/auth-settings";
 import { authenticateLdap, LdapAuthError } from "@/lib/auth/ldap";
+import { getLdapDirectoryConfig, listEnabledLdapDirectoryNames } from "@/lib/queries/ldap-directories";
 import { findOrCreateExternalUser } from "@/lib/provisioning";
 import { isLoginRateLimited, recordLoginAttempt } from "@/lib/auth/rate-limit";
 
@@ -11,11 +12,15 @@ import { isLoginRateLimited, recordLoginAttempt } from "@/lib/auth/rate-limit";
 // says which one they picked (OIDC is redirect-only and never posts here, see
 // /api/auth/oidc/login instead). Defaults to LOCAL for older clients/scripts that
 // don't send it.
+// LDAP: `directoryId` says which directory (employees, contractors…) to authenticate
+// against, and the identifier may be a plain username — whatever that directory's
+// search filter expects — not necessarily an e-mail address.
 const Body = z.object({
   provider: z.enum(["LOCAL", "LDAP"]).default("LOCAL"),
-  email: z.string().email(),
+  directoryId: z.number().int().positive().optional(),
+  email: z.string().trim().min(1).max(255),
   password: z.string().min(1),
-});
+}).refine((b) => b.provider === "LDAP" || z.string().email().safeParse(b.email).success);
 
 export async function POST(req: Request) {
   let parsed;
@@ -36,7 +41,14 @@ export async function POST(req: Request) {
       if (!config.ldapEnabled) {
         return NextResponse.json({ error: "LDAP sign-in is not enabled." }, { status: 400 });
       }
-      return await handleLdapLogin(parsed.email, parsed.password, config);
+      // The chosen directory must be an enabled one; with a single enabled directory
+      // there is nothing to choose, so the client may leave it out.
+      const enabled = await listEnabledLdapDirectoryNames();
+      const directoryId = parsed.directoryId ?? (enabled.length === 1 ? enabled[0].id : null);
+      if (directoryId == null || !enabled.some((d) => d.id === directoryId)) {
+        return NextResponse.json({ error: enabled.length === 0 ? "No directory is enabled for sign-in." : "Choose which directory to sign in to." }, { status: 400 });
+      }
+      return await handleLdapLogin(parsed.email, parsed.password, directoryId);
     }
 
     if (!config.localEnabled) {
@@ -71,11 +83,13 @@ async function handleLocalLogin(user: NonNullable<Awaited<ReturnType<typeof find
 async function handleLdapLogin(
   username: string,
   password: string,
-  config: Awaited<ReturnType<typeof getResolvedAuthConfig>>,
+  directoryId: number,
 ): Promise<NextResponse> {
-  const identity = await authenticateLdap(config, username, password);
+  const directory = await getLdapDirectoryConfig(directoryId);
+  if (!directory) throw new LdapAuthError("Unknown directory");
+  const identity = await authenticateLdap(directory, username, password);
   const sessionUser = await findOrCreateExternalUser({
-    email: identity.email, fullName: identity.fullName, subject: identity.dn, provider: "LDAP",
+    email: identity.email, fullName: identity.fullName, subject: identity.dn, provider: "LDAP", ldapDirectoryId: directoryId,
   });
   await recordLoginAttempt(username, true);
   return issueSession(sessionUser);

@@ -194,10 +194,18 @@ export async function updateAuthSettings(patch: AuthSettingsPatch, userId: strin
   ]);
 }
 
-/** Public, unauthenticated shape — just enough for the login page to build its provider picker. No secrets, no internal ids. */
-export async function getPublicAuthConfig(): Promise<{ local: boolean; ldap: boolean; oidc: boolean }> {
+/** Public, unauthenticated shape — just enough for the login page to build its provider
+ *  picker: which methods are on, and the names of the LDAP directories to choose from.
+ *  No secrets, no connection details. LDAP only counts as on when a directory is enabled. */
+export async function getPublicAuthConfig(): Promise<{ local: boolean; ldap: boolean; oidc: boolean; ldapDirectories: { id: number; name: string }[] }> {
   const [row] = await sql<{ local: boolean; ldap: boolean; oidc: boolean }[]>`
     SELECT local_enabled AS local, ldap_enabled AS ldap, oidc_enabled AS oidc FROM bayanat.auth_settings WHERE id = 1
   `;
-  return row ?? { local: true, ldap: false, oidc: false };
+  const base = row ?? { local: true, ldap: false, oidc: false };
+  const ldapDirectories = base.ldap
+    ? await sql<{ id: number; name: string }[]>`
+        SELECT directory_id AS id, directory_name AS name FROM bayanat.ldap_directories
+        WHERE is_enabled ORDER BY sort_order, directory_name`
+    : [];
+  return { ...base, ldap: base.ldap && ldapDirectories.length > 0, ldapDirectories: [...ldapDirectories] };
 }
