@@ -318,7 +318,16 @@ export async function createFramework(
     RETURNING framework_id AS id
   `;
   const frameworkId = rows[0].id;
+  await applyAssessmentModeSetup(frameworkId, assessmentMode);
 
+  // Every regulation has an entry on Governance Framework > Regulatory (the registry).
+  if (opts.registryDocId != null) await linkRegistryEntry(opts.registryDocId, frameworkId);
+  await syncRegistryEntryFromRegulation(frameworkId, opts.userId ?? null);
+  return frameworkId;
+}
+
+/** The level scale and status list a regulation needs for its assessment mode. */
+async function applyAssessmentModeSetup(frameworkId: number, assessmentMode: "COMPLIANCE_ONLY" | "MATURITY"): Promise<void> {
   if (assessmentMode === "COMPLIANCE_ONLY") {
     await sql`
       INSERT INTO bayanat.gov_compliance_level_config (framework_id, level_num, name, color_hex, description)
@@ -367,11 +376,6 @@ export async function createFramework(
       VALUES (${frameworkId}, 'COMPLIANCE_TYPE', 'نضج', 'Maturity', 'نضج', '#5CA85C', 2)
     `;
   }
-
-  // Every regulation has an entry on Governance Framework > Regulatory (the registry).
-  if (opts.registryDocId != null) await linkRegistryEntry(opts.registryDocId, frameworkId);
-  await syncRegistryEntryFromRegulation(frameworkId, opts.userId ?? null);
-  return frameworkId;
 }
 
 export async function updateFrameworkApplicability(frameworkId: number, isApplicable: boolean, userId: string): Promise<void> {
@@ -381,29 +385,59 @@ export async function updateFrameworkApplicability(frameworkId: number, isApplic
   ]);
 }
 
-export type RegulationDetailsPatch = {
+export type RegulationDetailsPatch = Partial<{
+  name: string; version: string | null; description: string | null; assessmentMode: "COMPLIANCE_ONLY" | "MATURITY";
   regionName: string | null; countriesInScope: string | null; scopeNote: string | null; regulatoryBody: string | null;
   effectiveDate: string | null; effectiveDateNote: string | null; officialUrl: string | null;
   referenceLinks: { label: string; url: string }[];
-};
+}>;
 
-/** Replaces a regulation's registration details (db/162) with the given values. */
+export class RegulationUpdateError extends Error {}
+
+/** Updates the given parts of a regulation's registration (db/162); anything left out is
+ *  kept. The assessment mode decides how requirements are scored, so it can only change
+ *  while the regulation has none — its level scale and status list are then rebuilt. */
 export async function updateRegulationDetails(frameworkId: number, d: RegulationDetailsPatch, userId: string): Promise<boolean> {
-  const [before] = await sql<{ body: string | null; url: string | null }[]>`
-    SELECT regulatory_body AS body, official_url AS url FROM bayanat.gov_compliance_frameworks WHERE framework_id = ${frameworkId}
+  const [before] = await sql<{ name: string; mode: "COMPLIANCE_ONLY" | "MATURITY"; body: string | null; url: string | null; reqs: number }[]>`
+    SELECT f.name, f.assessment_mode AS mode, f.regulatory_body AS body, f.official_url AS url,
+           (SELECT count(*)::int FROM bayanat.gov_compliance_requirements r WHERE r.framework_id = f.framework_id) AS reqs
+    FROM bayanat.gov_compliance_frameworks f WHERE f.framework_id = ${frameworkId}
   `;
   if (!before) return false;
+  if (d.name !== undefined && !d.name.trim()) throw new RegulationUpdateError("A name is required.");
+  const modeChanges = d.assessmentMode !== undefined && d.assessmentMode !== before.mode;
+  if (modeChanges && before.reqs > 0) {
+    throw new RegulationUpdateError(`The assessment mode can't be changed: this regulation already has ${before.reqs} requirement(s) scored in the current mode.`);
+  }
+
+  const keep = <T,>(v: T | undefined, column: ReturnType<typeof sql>) => (v !== undefined ? sql`${v as never}` : column);
   await sql`
     UPDATE bayanat.gov_compliance_frameworks SET
-      region_name = ${d.regionName}, countries_in_scope = ${d.countriesInScope}, scope_note = ${d.scopeNote},
-      regulatory_body = ${d.regulatoryBody}, effective_date = ${d.effectiveDate}::date, effective_date_note = ${d.effectiveDateNote},
-      official_url = ${d.officialUrl}, reference_links = ${sql.json(d.referenceLinks)}
+      name                = ${keep(d.name?.trim(), sql`name`)},
+      version             = ${keep(d.version, sql`version`)},
+      description         = ${keep(d.description, sql`description`)},
+      assessment_mode     = ${keep(d.assessmentMode, sql`assessment_mode`)},
+      region_name         = ${keep(d.regionName, sql`region_name`)},
+      countries_in_scope  = ${keep(d.countriesInScope, sql`countries_in_scope`)},
+      scope_note          = ${keep(d.scopeNote, sql`scope_note`)},
+      regulatory_body     = ${keep(d.regulatoryBody, sql`regulatory_body`)},
+      effective_date      = ${d.effectiveDate !== undefined ? sql`${d.effectiveDate}::date` : sql`effective_date`},
+      effective_date_note = ${keep(d.effectiveDateNote, sql`effective_date_note`)},
+      official_url        = ${keep(d.officialUrl, sql`official_url`)},
+      reference_links     = ${d.referenceLinks !== undefined ? sql`${sql.json(d.referenceLinks)}` : sql`reference_links`}
     WHERE framework_id = ${frameworkId}
   `;
+  if (modeChanges) {
+    await sql`DELETE FROM bayanat.gov_compliance_level_config WHERE framework_id = ${frameworkId}`;
+    await sql`DELETE FROM bayanat.compliance_config_items WHERE framework_id = ${frameworkId}`;
+    await applyAssessmentModeSetup(frameworkId, d.assessmentMode!);
+  }
   await logUpdate("GOV_COMPLIANCE_FRAMEWORKS", frameworkId, userId, [
     { field: "regulation_details", oldVal: null, newVal: "updated", force: true },
-    { field: "regulatory_body", oldVal: before.body, newVal: d.regulatoryBody },
-    { field: "official_url", oldVal: before.url, newVal: d.officialUrl },
+    { field: "name", oldVal: before.name, newVal: d.name?.trim() ?? before.name },
+    { field: "assessment_mode", oldVal: before.mode, newVal: d.assessmentMode ?? before.mode },
+    { field: "regulatory_body", oldVal: before.body, newVal: d.regulatoryBody !== undefined ? d.regulatoryBody : before.body },
+    { field: "official_url", oldVal: before.url, newVal: d.officialUrl !== undefined ? d.officialUrl : before.url },
   ]);
   await syncRegistryEntryFromRegulation(frameworkId, userId);
   return true;

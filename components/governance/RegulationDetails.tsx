@@ -1,14 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { useLang } from "@/lib/lang-context";
 
-// A regulation's registration details (db/162): where it applies, who issues or
-// enforces it, since when, and where the official text is. Shown under the regulation's
-// name on the Compliance page; people who manage the Governance domain can edit it.
+// A regulation's registration (db/162, db/163): its name and version, how it is
+// assessed, where it applies, who issues or enforces it, since when, and where the
+// official text is. The summary sits under the regulation's name on the Compliance
+// page; one form (RegulationForm) is used both to register a new regulation and to
+// edit an existing one, so the two always ask for the same information.
 
 export type RegulationLink = { label: string; url: string };
+export type AssessmentMode = "COMPLIANCE_ONLY" | "MATURITY";
 export type RegulationDetailsData = {
   frameworkId: number;
+  name: string;
+  code: string;
+  version: string | null;
+  description: string | null;
+  assessmentMode: AssessmentMode;
+  reqCount: number;
   regionName: string | null;
   countriesInScope: string | null;
   scopeNote: string | null;
@@ -19,9 +29,18 @@ export type RegulationDetailsData = {
   referenceLinks: RegulationLink[];
 };
 
+// Labels come from the "Assessment Mode" lookup group (Administration > Configuration),
+// so they can be reworded or translated there; these are only the fallback.
+const MODE_FALLBACK: Record<AssessmentMode, string> = { COMPLIANCE_ONLY: "Compliance checklist", MATURITY: "Maturity (levels 0–5)" };
+function useModeLabel() {
+  const { lookupLabel } = useLang();
+  return (m: AssessmentMode) => { const l = lookupLabel("ASSESSMENT_MODE", m); return l && l !== m ? l : MODE_FALLBACK[m]; };
+}
+
 const isHttpUrl = (u: string) => /^https?:\/\/\S+$/i.test(u.trim());
 const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 const fmtDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+const codeFromName = (name: string) => name.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 30);
 
 function ExternalLink({ url, label }: RegulationLink) {
   return (
@@ -34,10 +53,10 @@ function ExternalLink({ url, label }: RegulationLink) {
 export function RegulationDetails({ details, canEdit, onSaved }: { details: RegulationDetailsData; canEdit: boolean; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const modeLabel = useModeLabel();
   const d = details;
-  const empty = !d.regionName && !d.countriesInScope && !d.regulatoryBody && !d.effectiveDate && !d.effectiveDateNote && !d.officialUrl && !d.scopeNote && d.referenceLinks.length === 0;
 
-  const summary = [d.regulatoryBody, d.countriesInScope ?? d.regionName, d.effectiveDate ? `In force ${fmtDate(d.effectiveDate)}` : null].filter(Boolean) as string[];
+  const summary = [d.regulatoryBody, d.countriesInScope ?? d.regionName, d.effectiveDate ? `In force ${fmtDate(d.effectiveDate)}` : null, modeLabel(d.assessmentMode)].filter(Boolean) as string[];
 
   return (
     <div className="mt-2 text-[12px]">
@@ -47,13 +66,15 @@ export function RegulationDetails({ details, canEdit, onSaved }: { details: Regu
             {i > 0 && <span className="text-muted">·</span>}<span dir="auto">{s}</span>
           </span>
         ))}
-        {empty && <span className="text-muted">No regulation details registered yet.</span>}
-        {!empty && <button onClick={() => setOpen((v) => !v)} className="text-brand-purple font-medium hover:underline">{open ? "Hide details" : "Regulation details"}</button>}
-        {canEdit && <button onClick={() => setEditing(true)} className="text-brand-purple font-medium hover:underline">{empty ? "Add details" : "Edit"}</button>}
+        <button onClick={() => setOpen((v) => !v)} className="text-brand-purple font-medium hover:underline">{open ? "Hide details" : "Regulation details"}</button>
+        {canEdit && <button onClick={() => setEditing(true)} className="text-brand-purple font-medium hover:underline">Edit</button>}
       </div>
 
-      {open && !empty && (
+      {open && (
         <dl className="mt-3 grid grid-cols-[150px_1fr] gap-x-4 gap-y-2 max-w-3xl rounded-lg border border-line bg-white px-4 py-3">
+          <dt className="text-muted">Name</dt><dd className="text-ink" dir="auto">{d.name}{d.version ? ` · ${d.version}` : ""} <span className="text-muted font-mono text-[11px]" dir="ltr">({d.code})</span></dd>
+          {d.description && (<><dt className="text-muted">Description</dt><dd className="text-ink leading-snug" dir="auto">{d.description}</dd></>)}
+          <dt className="text-muted">Assessment mode</dt><dd className="text-ink">{modeLabel(d.assessmentMode)}</dd>
           {d.regulatoryBody && (<><dt className="text-muted">Regulatory body</dt><dd className="text-ink" dir="auto">{d.regulatoryBody}</dd></>)}
           {d.regionName && (<><dt className="text-muted">Region</dt><dd className="text-ink" dir="auto">{d.regionName}</dd></>)}
           {d.countriesInScope && (<><dt className="text-muted">Countries in scope</dt><dd className="text-ink" dir="auto">{d.countriesInScope}</dd></>)}
@@ -80,48 +101,96 @@ export function RegulationDetails({ details, canEdit, onSaved }: { details: Regu
         </dl>
       )}
 
-      {editing && <EditModal details={d} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setOpen(true); onSaved(); }} />}
+      {editing && <RegulationForm details={d} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setOpen(true); onSaved(); }} />}
     </div>
   );
 }
 
-function EditModal({ details, onClose, onSaved }: { details: RegulationDetailsData; onClose: () => void; onSaved: () => void }) {
+/** The one form for a regulation: `details` given = edit it; omitted = register a new one. */
+export function RegulationForm({ details, onClose, onSaved }: {
+  details?: RegulationDetailsData; onClose: () => void; onSaved: (frameworkId: number) => void;
+}) {
+  const isNew = !details;
+  const modeLabel = useModeLabel();
   const [f, setF] = useState({
-    regionName: details.regionName ?? "", countriesInScope: details.countriesInScope ?? "", scopeNote: details.scopeNote ?? "",
-    regulatoryBody: details.regulatoryBody ?? "", effectiveDate: details.effectiveDate?.slice(0, 10) ?? "",
-    effectiveDateNote: details.effectiveDateNote ?? "", officialUrl: details.officialUrl ?? "",
+    name: details?.name ?? "", code: details?.code ?? "", version: details?.version ?? "", description: details?.description ?? "",
+    assessmentMode: (details?.assessmentMode ?? "COMPLIANCE_ONLY") as AssessmentMode,
+    regionName: details?.regionName ?? "", countriesInScope: details?.countriesInScope ?? "", scopeNote: details?.scopeNote ?? "",
+    regulatoryBody: details?.regulatoryBody ?? "", effectiveDate: details?.effectiveDate?.slice(0, 10) ?? "",
+    effectiveDateNote: details?.effectiveDateNote ?? "", officialUrl: details?.officialUrl ?? "",
   });
-  const [links, setLinks] = useState<RegulationLink[]>(details.referenceLinks.length ? details.referenceLinks : []);
+  const [codeTouched, setCodeTouched] = useState(!isNew);
+  const [links, setLinks] = useState<RegulationLink[]>(details?.referenceLinks ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const set = (k: keyof typeof f, v: string) => setF((cur) => ({ ...cur, [k]: v }));
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((cur) => ({ ...cur, [k]: v }));
+  // The mode decides how requirements are scored, so it is fixed once there are any.
+  const modeLocked = !isNew && (details?.reqCount ?? 0) > 0;
 
   async function save() {
     const cleanLinks = links.map((l) => ({ label: l.label.trim(), url: l.url.trim() })).filter((l) => l.url);
+    if (!f.name.trim()) { setError("A name is required."); return; }
+    if (isNew && !f.code.trim()) { setError("A code is required."); return; }
     if (f.officialUrl.trim() && !isHttpUrl(f.officialUrl)) { setError("The official link must start with http:// or https://"); return; }
     if (cleanLinks.some((l) => !isHttpUrl(l.url))) { setError("Every reference link must start with http:// or https://"); return; }
     setSaving(true); setError(null);
     try {
-      const r = await fetch(`/api/governance/compliance/${details.frameworkId}/details`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...f, referenceLinks: cleanLinks }),
-      });
-      if (!r.ok) { const b = await r.json().catch(() => ({})); setError(b.error ?? "The details could not be saved."); return; }
-      onSaved();
+      const body = { ...f, referenceLinks: cleanLinks };
+      const r = isNew
+        ? await fetch("/api/governance/compliance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        : await fetch(`/api/governance/compliance/${details!.frameworkId}/details`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(b.error ?? "The regulation could not be saved."); return; }
+      onSaved(isNew ? Number(b.frameworkId) : details!.frameworkId);
     } finally { setSaving(false); }
   }
 
-  const input = "w-full border border-line rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30 focus:border-brand-purple";
+  const input = "w-full border border-line rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30 focus:border-brand-purple disabled:bg-canvas-soft disabled:text-muted";
   const label = "block text-[11px] uppercase tracking-wider text-muted mb-1.5";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-y-auto py-10">
-      <div className="bg-white rounded-xl shadow-2xl w-[640px] border border-line">
+      <div className="bg-white rounded-xl shadow-2xl w-[680px] border border-line text-[13px]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
-          <h2 className="font-bold text-brand-deep">Regulation details</h2>
+          <div>
+            <h2 className="font-bold text-brand-deep text-base">{isNew ? "New regulation" : "Regulation details"}</h2>
+            {isNew && <p className="text-[11px] text-muted mt-0.5">Registers the regulation: it appears on Governance Framework › Regulatory and can then be assessed here. Import its requirements afterwards.</p>}
+          </div>
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
         <div className="px-6 py-5 space-y-4">
+          <div className="grid grid-cols-[1fr_190px_110px] gap-4">
+            <div>
+              <label className={label}>Name *</label>
+              <input className={input} value={f.name} placeholder="e.g. PIPEDA"
+                onChange={(e) => { const v = e.target.value; setF((cur) => ({ ...cur, name: v, code: codeTouched ? cur.code : codeFromName(v) })); }} />
+            </div>
+            <div>
+              <label className={label}>Code {isNew ? "*" : ""}</label>
+              <input className={`${input} font-mono`} dir="ltr" value={f.code} disabled={!isNew} title={isNew ? "Short identifier, fixed once created" : "The code is fixed once the regulation is created"}
+                onChange={(e) => { setCodeTouched(true); set("code", e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_")); }} />
+            </div>
+            <div>
+              <label className={label}>Version</label>
+              <input className={input} value={f.version} onChange={(e) => set("version", e.target.value)} placeholder="1.0" />
+            </div>
+          </div>
+          <div>
+            <label className={label}>Description</label>
+            <textarea className={input} rows={2} value={f.description} onChange={(e) => set("description", e.target.value)} />
+          </div>
+          <div>
+            <label className={label}>Assessment mode</label>
+            <select className={input} value={f.assessmentMode} disabled={modeLocked} onChange={(e) => set("assessmentMode", e.target.value as AssessmentMode)}>
+              <option value="COMPLIANCE_ONLY">{modeLabel("COMPLIANCE_ONLY")}</option>
+              <option value="MATURITY">{modeLabel("MATURITY")}</option>
+            </select>
+            <p className="text-[11px] text-muted mt-1">
+              {modeLocked
+                ? `Fixed: this regulation already has ${details!.reqCount} requirement(s), which are scored in this mode.`
+                : "Compliance checklist: each requirement is met, partly met or not met. Maturity: requirements are grouped into levels 0–5 per standard. It can be changed until requirements are added."}
+            </p>
+          </div>
           <div>
             <label className={label}>Regulatory body</label>
             <input className={input} value={f.regulatoryBody} onChange={(e) => set("regulatoryBody", e.target.value)} placeholder="Who issues or enforces it" />
@@ -173,7 +242,7 @@ function EditModal({ details, onClose, onSaved }: { details: RegulationDetailsDa
           {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
           <div className="flex justify-end gap-2 pt-2 border-t border-line-soft">
             <button type="button" onClick={onClose} className="btn btn-sm">Cancel</button>
-            <button type="button" onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : "Save"}</button>
+            <button type="button" onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : isNew ? "Create regulation" : "Save"}</button>
           </div>
         </div>
       </div>

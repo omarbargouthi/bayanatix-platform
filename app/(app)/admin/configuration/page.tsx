@@ -25,6 +25,7 @@ type GroupEntry = { group: string; count: number };
 
 const GROUP_LABELS: Record<string, string> = {
   TABLE_TYPE:      "Table Types",
+  ASSESSMENT_MODE: "Assessment Modes",
   ASSET_TYPE:      "Asset Types",
   CLASSIFICATION:  "Data Classification",
   DATA_DOMAIN:     "Data Domains",
