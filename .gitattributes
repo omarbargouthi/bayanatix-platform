@@ -2,3 +2,7 @@
 # Linux containers (e.g. deploy/llm-self-hosted/health-check.sh), regardless of the
 # checking-out OS's core.autocrlf setting.
 *.sh text eol=lf
+# Files that run inside Linux containers must keep LF line endings on every checkout.
+*.sh text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
