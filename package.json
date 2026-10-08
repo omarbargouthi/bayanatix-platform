@@ -9,6 +9,7 @@
     "lint": "next lint",
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrate:tracked": "node scripts/migrate-tracked.mjs",
+    "demo:seed-source": "node scripts/seed-demo-source.mjs",
     "scheduler:pbix": "node scripts/pbix-scheduler.mjs",
     "scheduler": "node scripts/scheduler.mjs",
     "license:generate-keys": "node scripts/license/generate-keypair.mjs",

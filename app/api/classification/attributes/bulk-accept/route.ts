@@ -22,7 +22,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, accepted: accepted.length, acceptedIds: accepted });
     }
 
+    // A blanket accept must name what it covers. Without this, an empty or unreadable
+    // request body would accept every HIGH-band suggestion in the whole catalog.
     const filter = body.filter ?? {};
+    if (filter.entityId == null && filter.schemaId == null && filter.dataSourceId == null) {
+      return NextResponse.json({ error: "Provide attribute_ids, or a filter with entityId, schemaId or dataSourceId." }, { status: 400 });
+    }
     const count = await bulkAcceptHighBand(
       {
         entityId: filter.entityId != null ? Number(filter.entityId) : undefined,
