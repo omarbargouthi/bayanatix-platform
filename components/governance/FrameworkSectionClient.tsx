@@ -168,9 +168,6 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                           className="font-semibold text-ink hover:text-brand-purple text-left">
                           {doc.title}
                         </button>
-                        {doc.frameworkId != null && doc.isApplicable === false && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0" title="Marked as not applicable in the configuration — hidden from the Compliance page">Hidden</span>
-                        )}
                         {doc.sourceUrl && (
                           <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" title={doc.sourceUrl}
                             onClick={(e) => e.stopPropagation()} className="text-muted hover:text-brand-purple shrink-0">
@@ -184,9 +181,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                             <span key={i} dir="auto">{i > 0 ? "· " : ""}{x}</span>
                           ))}
                           <span>{doc.regulatoryBody ? "· " : ""}{doc.requirementCount ?? 0} requirement{doc.requirementCount === 1 ? "" : "s"}</span>
-                          {doc.isApplicable !== false && (
-                            <a href={`/governance/compliance?fw=${doc.frameworkId}`} className="text-brand-purple hover:underline">· Open in Compliance</a>
-                          )}
+                          <a href={`/governance/compliance?fw=${doc.frameworkId}`} className="text-brand-purple hover:underline">· Open in Compliance</a>
                         </div>
                       )}
                     </td>

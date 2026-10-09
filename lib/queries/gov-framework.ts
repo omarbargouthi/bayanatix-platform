@@ -64,7 +64,10 @@ export async function listGovDocs(sectionCode?: string): Promise<GovDoc[]> {
     LEFT JOIN bayanat.users u ON u.user_id = d.owner_user_id
     LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id
     LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
-    ${sectionCode ? sql`WHERE d.section_code = ${sectionCode}` : sql``}
+    -- A regulation marked "not applicable to the organization" (configuration) is not
+    -- shown in the registry either; ticking it again brings its entry back.
+    WHERE (f.framework_id IS NULL OR f.is_applicable_indicator)
+      ${sectionCode ? sql`AND d.section_code = ${sectionCode}` : sql``}
     GROUP BY d.doc_id, u.full_name, f.framework_id
     ORDER BY d.section_code, lower(d.title)
   `;
@@ -219,9 +222,11 @@ export async function getAttachmentData(attachmentId: number): Promise<{ fileNam
 
 export async function getSectionCounts(): Promise<Record<string, number>> {
   const rows = await sql<{ sectionCode: string; cnt: number }[]>`
-    SELECT section_code AS "sectionCode", COUNT(*)::int AS cnt
-    FROM bayanat.gov_framework_docs
-    GROUP BY section_code
+    SELECT d.section_code AS "sectionCode", COUNT(*)::int AS cnt
+    FROM bayanat.gov_framework_docs d
+    LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
+    WHERE (f.framework_id IS NULL OR f.is_applicable_indicator) -- same rule as listGovDocs
+    GROUP BY d.section_code
   `;
   return Object.fromEntries(rows.map((r) => [r.sectionCode, r.cnt]));
 }
