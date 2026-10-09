@@ -519,10 +519,133 @@ function AttributeEditModal({ attr, onClose, canEdit }: { attr: DataAttribute; o
   );
 }
 
+// ── Sort menu ───────────────────────────────────────────────────────────────
+
+type SortId = "source" | "nameAsc" | "nameDesc" | "type" | "class" | "nullDesc" | "qualityAsc";
+// Most sensitive first when sorting by classification; anything unknown sorts after these.
+const CLASS_RANK = ["TOP_SECRET", "SECRET", "CONFIDENTIAL", "RESTRICTED", "INTERNAL", "PUBLIC"];
+const classCodeOf = (a: DataAttribute) => (a.classTermClassCode ?? a.classificationCode ?? "").toUpperCase();
+
+function SortMenu({ value, onChange }: { value: SortId; onChange: (v: SortId) => void }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  const OPTIONS: { id: SortId; label: string }[] = [
+    { id: "source", label: c.colSortSource }, { id: "nameAsc", label: c.colSortNameAsc }, { id: "nameDesc", label: c.colSortNameDesc },
+    { id: "type", label: c.colSortType }, { id: "class", label: c.colSortClass },
+    { id: "nullDesc", label: c.colSortNullDesc }, { id: "qualityAsc", label: c.colSortQualityAsc },
+  ];
+  const active = value !== "source";
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen((v) => !v)}
+        className={`btn btn-sm ${open || active ? "bg-brand-purple/10 border-brand-purple/40 text-brand-purple" : ""}`}>
+        <span>{c.sortBtn}{active && <span className="font-normal">: {OPTIONS.find((o) => o.id === value)?.label}</span>}</span>
+      </button>
+      {open && (
+        <div className="absolute end-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl border border-line w-64 overflow-hidden py-1">
+          {OPTIONS.map((o) => (
+            <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }}
+              className={`w-full text-start px-4 py-2 text-sm hover:bg-canvas-soft ${o.id === value ? "text-brand-purple font-semibold" : "text-ink"}`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Bulk edit ───────────────────────────────────────────────────────────────
+// The header's Edit button: friendly name, column type and description of every listed
+// column in one grid, saved together. Everything else stays in the per-column editor.
+
+type BulkDraft = { friendlyName: string; columnType: string; description: string };
+
+function BulkEditGrid({ attributes, onDone }: { attributes: DataAttribute[]; onDone: () => void }) {
+  const router = useRouter();
+  const { t } = useLang();
+  const c = t.catalog;
+  const original = (a: DataAttribute): BulkDraft => ({ friendlyName: a.friendlyName ?? "", columnType: a.columnType ?? "", description: a.description ?? "" });
+  const [drafts, setDrafts] = useState<Record<number, BulkDraft>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const draftOf = (a: DataAttribute) => drafts[a.attributeId] ?? original(a);
+  const isDirty = (a: DataAttribute) => {
+    const d = drafts[a.attributeId]; if (!d) return false;
+    const o = original(a);
+    return d.friendlyName !== o.friendlyName || d.columnType !== o.columnType || d.description !== o.description;
+  };
+  const dirty = attributes.filter(isDirty);
+  const set = (a: DataAttribute, patch: Partial<BulkDraft>) => setDrafts((prev) => ({ ...prev, [a.attributeId]: { ...draftOf(a), ...patch } }));
+
+  async function save() {
+    setSaving(true); setError(null);
+    let failed = 0;
+    for (const a of dirty) {
+      const d = draftOf(a);
+      const r = await fetch(`/api/catalog/attributes/${a.attributeId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: d.description, friendlyName: d.friendlyName, isEncrypted: a.isEncrypted ?? false, columnType: d.columnType || null }),
+      }).catch(() => null);
+      if (!r || !r.ok) failed++;
+    }
+    setSaving(false);
+    router.refresh();
+    if (failed > 0) { setError(c.colBulkFailed.replace("{n}", String(failed))); return; }
+    onDone();
+  }
+
+  const input = "w-full border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink bg-white focus:outline-none focus:border-brand-purple";
+  const grid = "grid grid-cols-[1.1fr_1.1fr_0.8fr_2fr] gap-3 px-5";
+  return (
+    <div>
+      <div className="px-5 py-2.5 text-[12px] text-muted bg-brand-purple/[0.04] border-b border-line-soft">{c.colBulkHint}</div>
+      <div className={`${grid} py-3 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold`}>
+        <div>{c.colHeaderColumn}</div><div>{c.colHeaderFriendlyName}</div><div>{c.colHeaderColumnType}</div><div>{c.colDetailDescription}</div>
+      </div>
+      {attributes.map((a) => {
+        const d = draftOf(a);
+        return (
+          <div key={a.attributeId} className={`${grid} py-2 items-center border-b border-line-soft ${isDirty(a) ? "bg-amber-50/50" : ""}`}>
+            <div className="min-w-0">
+              <div className="font-semibold text-brand-deep text-sm truncate" dir="ltr">{a.physicalName}</div>
+              <div className="font-mono text-[11px] text-muted truncate" dir="ltr">{a.dataType}</div>
+            </div>
+            <input className={input} value={d.friendlyName} onChange={(e) => set(a, { friendlyName: e.target.value })} />
+            <select className={input} value={d.columnType} onChange={(e) => set(a, { columnType: e.target.value })}>
+              <option value="">{c.colEditNoneOption}</option>
+              <option value="BUSINESS">{c.colEditBusinessOption}</option>
+              <option value="TECHNICAL">{c.colEditTechnicalOption}</option>
+            </select>
+            <input className={input} value={d.description} onChange={(e) => set(a, { description: e.target.value })} placeholder={a.sourceDescription ?? ""} />
+          </div>
+        );
+      })}
+      <div className="flex items-center justify-end gap-2 px-5 py-3 bg-canvas-soft">
+        {error && <span className="text-[12px] text-red-700 me-auto">{error}</span>}
+        <button onClick={onDone} disabled={saving} className="btn btn-sm">{t.common.cancel}</button>
+        <button onClick={save} disabled={saving || dirty.length === 0} className="btn btn-sm btn-primary disabled:opacity-50">
+          {saving ? t.common.saving : c.colBulkSave.replace("{n}", String(dirty.length))}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ColumnsTable ───────────────────────────────────────────────────────
 
 export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribute[]; canEdit: boolean }) {
-  const { t } = useLang();
+  const { t, lookupLabel } = useLang();
   const g = t.catalog;
 
   const ALL_GRID_COLS = buildGridCols(g);
@@ -532,6 +655,13 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
   const [expandedId,   setExpandedId]   = useState<number | null>(null);
   const [activeColIds, setActiveColIds] = useState<GridColId[]>(DEFAULT_COLS);
   const [showDeprecated, setShowDeprecated] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [query,      setQuery]      = useState("");
+  const [typeFilter, setTypeFilter] = useState("");     // "", BUSINESS, TECHNICAL, NONE
+  const [classFilter, setClassFilter] = useState("");   // "", a classification code, NONE
+  const [flags, setFlags] = useState({ keys: false, pii: false, cde: false, encrypted: false });
+  const [sortBy, setSortBy] = useState<SortId>("source");
+  const [bulkEdit, setBulkEdit] = useState(false);
 
   // Load localStorage prefs on mount (client only)
   useEffect(() => { setActiveColIds(loadColPrefs()); }, []);
@@ -541,6 +671,39 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
     () => showDeprecated ? attributes : attributes.filter((a) => a.lifecycleStatus !== "DEPRECATED"),
     [attributes, showDeprecated],
   );
+
+  const classCodes = useMemo(() => Array.from(new Set(attributes.map(classCodeOf).filter(Boolean))).sort(), [attributes]);
+  const filterCount = (query.trim() ? 1 : 0) + (typeFilter ? 1 : 0) + (classFilter ? 1 : 0) + Object.values(flags).filter(Boolean).length;
+  function clearFilters() { setQuery(""); setTypeFilter(""); setClassFilter(""); setFlags({ keys: false, pii: false, cde: false, encrypted: false }); }
+
+  // What the grid lists: the visible columns, narrowed by the filters, in the chosen order.
+  const shownAttributes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const rows = visibleAttributes.filter((a) => {
+      if (q && ![a.physicalName, a.friendlyName, a.description, a.sourceDescription].some((v) => v?.toLowerCase().includes(q))) return false;
+      if (typeFilter && (typeFilter === "NONE" ? !!a.columnType : a.columnType !== typeFilter)) return false;
+      if (classFilter && (classFilter === "NONE" ? !!classCodeOf(a) : classCodeOf(a) !== classFilter)) return false;
+      if (flags.keys && !(a.isPrimaryKey || a.physicalName.endsWith("_id"))) return false;
+      if (flags.pii && !a.classTermIsPii) return false;
+      if (flags.cde && !isCde(a)) return false;
+      if (flags.encrypted && !a.isEncrypted) return false;
+      return true;
+    });
+    if (sortBy === "source") return rows;
+    const num = (v: unknown) => (v == null ? null : Number(v));
+    // Columns with no value go last whichever way the numbers run.
+    const byNum = (x: number | null, y: number | null, dir: 1 | -1) => (x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * dir);
+    const rank = (a: DataAttribute) => { const i = CLASS_RANK.indexOf(classCodeOf(a)); return i >= 0 ? i : classCodeOf(a) ? CLASS_RANK.length : CLASS_RANK.length + 1; };
+    const cmp: Record<Exclude<SortId, "source">, (a: DataAttribute, b: DataAttribute) => number> = {
+      nameAsc:    (a, b) => a.physicalName.localeCompare(b.physicalName),
+      nameDesc:   (a, b) => b.physicalName.localeCompare(a.physicalName),
+      type:       (a, b) => (a.dataType ?? "").localeCompare(b.dataType ?? "") || a.physicalName.localeCompare(b.physicalName),
+      class:      (a, b) => rank(a) - rank(b) || a.physicalName.localeCompare(b.physicalName),
+      nullDesc:   (a, b) => byNum(num(a.nullPercentage), num(b.nullPercentage), -1),
+      qualityAsc: (a, b) => byNum(num(a.qualityScore), num(b.qualityScore), 1),
+    };
+    return [...rows].sort(cmp[sortBy]);
+  }, [visibleAttributes, query, typeFilter, classFilter, flags, sortBy]);
 
   const activeColDefs = activeColIds
     .map((id) => ALL_GRID_COLS.find((gc) => gc.id === id))
@@ -567,7 +730,11 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
         <div className="flex items-center justify-between px-5 py-4 border-b border-line-soft">
           <h3 className="font-bold">
             {g.columns}
-            <span className="text-muted text-xs font-normal ml-1.5">{visibleAttributes.length} {g.attributes}</span>
+            <span className="text-muted text-xs font-normal ml-1.5">
+              {shownAttributes.length === visibleAttributes.length
+                ? visibleAttributes.length
+                : g.colCountOf.replace("{n}", String(shownAttributes.length)).replace("{total}", String(visibleAttributes.length))} {g.attributes}
+            </span>
           </h3>
           <div className="flex items-center gap-3">
             {hasDeprecated && (
@@ -582,13 +749,57 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
               </label>
             )}
             <div className="flex items-center gap-2">
-              <button className="btn btn-sm">{g.filterBtn}</button>
-              <button className="btn btn-sm">{g.sortBtn}</button>
-              <ColumnChooser activeColIds={activeColIds} onChange={setActiveColIds} />
-              {canEdit && <button className="btn btn-sm">{t.common.edit}</button>}
+              <button onClick={() => setShowFilter((v) => !v)}
+                className={`btn btn-sm ${showFilter || filterCount > 0 ? "bg-brand-purple/10 border-brand-purple/40 text-brand-purple" : ""}`}>
+                {g.filterBtn}{filterCount > 0 && <span className="ms-1 text-[10px] font-bold px-1.5 rounded-full bg-brand-purple text-white">{filterCount}</span>}
+              </button>
+              <SortMenu value={sortBy} onChange={setSortBy} />
+              {!bulkEdit && <ColumnChooser activeColIds={activeColIds} onChange={setActiveColIds} />}
+              {canEdit && (
+                <button onClick={() => { setBulkEdit((v) => !v); setExpandedId(null); }}
+                  className={`btn btn-sm ${bulkEdit ? "bg-brand-purple/10 border-brand-purple/40 text-brand-purple" : ""}`}>
+                  {t.common.edit}
+                </button>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Filter bar */}
+        {showFilter && (
+          <div className="flex items-center gap-3 flex-wrap px-5 py-3 border-b border-line-soft bg-canvas-soft/60">
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={g.colFilterSearchPlaceholder} autoFocus
+              className="flex-1 min-w-[240px] border border-line rounded-md px-3 py-1.5 text-[13px] bg-white focus:outline-none focus:border-brand-purple" />
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+              className="border border-line rounded-md px-2.5 py-1.5 text-[13px] bg-white focus:outline-none focus:border-brand-purple">
+              <option value="">{g.colFilterAllTypes}</option>
+              <option value="BUSINESS">{COLUMN_TYPE_LABEL.BUSINESS ?? "Business"}</option>
+              <option value="TECHNICAL">{COLUMN_TYPE_LABEL.TECHNICAL ?? "Technical"}</option>
+              <option value="NONE">{g.colFilterNoType}</option>
+            </select>
+            <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}
+              className="border border-line rounded-md px-2.5 py-1.5 text-[13px] bg-white focus:outline-none focus:border-brand-purple">
+              <option value="">{g.colFilterAllClass}</option>
+              {classCodes.map((code) => <option key={code} value={code}>{lookupLabel("CLASSIFICATION", code) ?? code}</option>)}
+              <option value="NONE">{g.colFilterUnclassified}</option>
+            </select>
+            {([["keys", g.colFilterKeys], ["pii", g.colHeaderPii], ["cde", g.colHeaderCde], ["encrypted", g.colFilterEncrypted]] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setFlags((f) => ({ ...f, [key]: !f[key] }))}
+                className={`px-2.5 py-1 rounded-full border text-[12px] font-semibold transition-colors ${flags[key] ? "bg-brand-purple text-white border-brand-purple" : "bg-white text-ink-soft border-line hover:border-brand-purple"}`}>
+                {label}
+              </button>
+            ))}
+            {filterCount > 0 && <button onClick={clearFilters} className="text-[12px] text-brand-purple font-medium hover:underline">{g.colFilterClear}</button>}
+          </div>
+        )}
+
+        {shownAttributes.length === 0 && visibleAttributes.length > 0 && (
+          <div className="px-5 py-8 text-center text-sm text-muted">{g.colFilterNoMatch}</div>
+        )}
+
+        {shownAttributes.length === 0 ? null : bulkEdit ? (
+          <BulkEditGrid attributes={shownAttributes} onDone={() => setBulkEdit(false)} />
+        ) : (<>
 
         {/* Header row */}
         <div
@@ -602,7 +813,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
         </div>
 
         {/* Data rows */}
-        {visibleAttributes.map((a) => (
+        {shownAttributes.map((a) => (
           <div key={a.attributeId}>
             {/* Main row */}
             <div
@@ -783,6 +994,7 @@ export function ColumnsTable({ attributes, canEdit }: { attributes: DataAttribut
             )}
           </div>
         ))}
+        </>)}
       </div>
     </>
   );

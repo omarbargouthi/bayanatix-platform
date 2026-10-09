@@ -19,7 +19,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       friendlyName: typeof friendlyName === "string" ? friendlyName : "",
       isEncrypted:  isEncrypted === true,
       columnType:   columnType   ?? null,
-      glossaryTerm: typeof glossaryTerm === "string" ? glossaryTerm : "",
+      glossaryTerm: typeof glossaryTerm === "string" ? glossaryTerm : undefined,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {

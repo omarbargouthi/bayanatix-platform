@@ -94,10 +94,10 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
     return (
       <div className="card p-10 text-center">
         <div className="text-4xl mb-3">🏷</div>
-        <h3 className="font-semibold text-ink mb-1">Custom Attributes</h3>
+        <h3 className="font-semibold text-ink mb-1">Custom Fields</h3>
         <p className="text-sm text-muted max-w-sm mx-auto">
           No custom fields are defined for this asset type yet. Define them under
-          Administration → Configuration → Custom Attributes.
+          Administration → Configuration → Fields Setting.
         </p>
       </div>
     );
@@ -126,7 +126,7 @@ export function CustomAttributesPanel({ assetType, assetId, canEdit, showEmptySt
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-line-soft">
-        <h3 className="text-sm font-bold text-brand-deep">Custom Attributes</h3>
+        <h3 className="text-sm font-bold text-brand-deep">Custom Fields</h3>
         {canEdit && !editing && (
           <button onClick={startEdit} className="text-[11px] font-semibold text-brand-purple hover:underline">Edit</button>
         )}

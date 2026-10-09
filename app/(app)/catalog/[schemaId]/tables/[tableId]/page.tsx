@@ -1,12 +1,11 @@
 import { Suspense } from "react";
-import { FromSourceMark } from "@/components/catalog/FromSourceMark";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { canEditMetadata, canViewCatalogAsset } from "@/lib/can";
 import { getEntityById, getEntityProfile, CDE_CLASSIFICATION_CODES } from "@/lib/queries/catalog";
-import { CertTag, ClassificationTag, Tag, LifecycleBadge } from "@/components/ui/Tag";
+import { CertBadge, ClassificationTag, Tag, LifecycleBadge } from "@/components/ui/Tag";
 import { IconTable, IconChevron } from "@/components/layout/icons";
 import { TableHealthPanel } from "@/components/catalog/TableHealthPanel";
 import { TableTabs } from "@/components/catalog/TableTabs";
@@ -128,23 +127,8 @@ export default async function TablePage({
             <IconTable className="w-6 h-6 text-brand-purple shrink-0" />
             <span className="min-w-0 truncate" dir="auto" title={entity.entityName}>{entity.entityName}</span>
             <LifecycleBadge status={entity.lifecycleStatus} deprecatedAt={entity.deprecatedAt} />
-            <span className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider text-muted">{t.catalog.metadataCert}</span>
-              <CertTag code={entity.certCode} />
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider text-muted">{t.catalog.dataCert}</span>
-              <CertTag code={entity.dataCertCode} />
-            </span>
-            <TableTypeBadge
-              entityId={entity.entityId}
-              category={entity.category}
-              categoryConfidence={entity.categoryConfidence}
-              categoryIsConfirmed={entity.categoryIsConfirmed}
-              canEdit={canEdit}
-            />
-            <FromSourceMark synced={entity.sourceSynced} field="TABLE_TYPE" />
-            <Tag>{(t.lineage.objectTypes as Record<string, string>)[entity.objectTypeCode ?? ""] ?? (entity.isView ? t.catalog.viewBadge : t.catalog.tableBadge)} · {fmtNumber(entity.rowCount as number | null)} {t.catalog.rowsWord}</Tag>
+            <CertBadge code={entity.certCode} kind="metadata" />
+            <CertBadge code={entity.dataCertCode} kind="data" />
           </h1>
           <TablePageActions
             entityId={entity.entityId}
@@ -174,7 +158,15 @@ export default async function TablePage({
                   sourceSynced={entity.sourceSynced}
                 />
 
-                <div className="flex flex-wrap gap-2 mt-4">
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <Tag>{(t.lineage.objectTypes as Record<string, string>)[entity.objectTypeCode ?? ""] ?? (entity.isView ? t.catalog.viewBadge : t.catalog.tableBadge)} · {fmtNumber(entity.rowCount as number | null)} {t.catalog.rowsWord}</Tag>
+                  <TableTypeBadge
+                    entityId={entity.entityId}
+                    category={entity.category}
+                    categoryConfidence={entity.categoryConfidence}
+                    categoryIsConfirmed={entity.categoryIsConfirmed}
+                    canEdit={canEdit}
+                  />
                   <Tag>PK: <strong className="ml-1">{entity.attributes.find((a) => a.isPrimaryKey)?.physicalName ?? "—"}</strong></Tag>
                   {entity.schema && (
                     // A real link, not a plain label — this is the table's actual

@@ -716,7 +716,8 @@ export async function updateAttribute(
     friendlyName: string;
     isEncrypted:  boolean;
     columnType:   string | null;
-    glossaryTerm: string;
+    /** Left out = keep the column's glossary term as it is. */
+    glossaryTerm?: string;
   },
 ): Promise<void> {
   const [old] = await sql<{
@@ -740,7 +741,7 @@ export async function updateAttribute(
       friendly_name_text   = ${patch.friendlyName || null},
       is_encrypted          = ${patch.isEncrypted},
       attribute_class_code = ${patch.columnType},
-      glossary_term_text   = ${patch.glossaryTerm || null},
+      glossary_term_text   = ${patch.glossaryTerm === undefined ? sql`glossary_term_text` : (patch.glossaryTerm || null)},
       -- Explicit ::varchar cast — a bare "$n IS NOT NULL" comparison with a
       -- null-valued parameter and no other type context confuses Postgres's
       -- parameter type inference ("could not determine data type of parameter").
@@ -755,7 +756,7 @@ export async function updateAttribute(
       { field: "friendly_name_text",   oldVal: old.friendly_name_text,   newVal: patch.friendlyName || null },
       { field: "is_encrypted",         oldVal: String(old.is_encrypted), newVal: String(patch.isEncrypted) },
       { field: "attribute_class_code", oldVal: old.attribute_class_code, newVal: patch.columnType },
-      { field: "glossary_term_text",   oldVal: old.glossary_term_text,   newVal: patch.glossaryTerm || null },
+      { field: "glossary_term_text",   oldVal: old.glossary_term_text,   newVal: patch.glossaryTerm === undefined ? old.glossary_term_text : (patch.glossaryTerm || null) },
     ]);
   }
 }

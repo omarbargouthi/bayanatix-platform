@@ -48,6 +48,26 @@ export function CertTag({ code }: { code?: string | null }) {
   return <Tag>{upper}</Tag>;
 }
 
+// Compact certification badge for page headers: one pill per kind (metadata / data).
+// Uncertified shows as a dimmed pill rather than spelling the word out; the full
+// status is in the tooltip.
+export function CertBadge({ code, kind }: { code?: string | null; kind: "metadata" | "data" }) {
+  const { t } = useLang();
+  const c = t.catalog;
+  const label = kind === "metadata" ? c.certMetadataShort : c.certDataShort;
+  const upper = code?.toUpperCase();
+  const level = upper === "GOLD" ? c.certGold : upper === "SILVER" ? c.certSilver : upper === "BRONZE" ? c.certBronze : null;
+  if (!level) {
+    return (
+      <span title={`${label}: ${upper ?? c.certUncertified}`} className="tag border-dashed font-medium opacity-50">
+        <CertBadgeIcon />{label}
+      </span>
+    );
+  }
+  const variant: Variant = upper === "GOLD" ? "gold" : upper === "SILVER" ? "gray" : "orange";
+  return <span title={`${label}: ${level}`}><Tag variant={variant}><CertBadgeIcon />{label} · {level}</Tag></span>;
+}
+
 const CLASSIFICATION_VARIANT: Record<string, Variant> = {
   CONFIDENTIAL: "amber",
   RESTRICTED:   "amber",

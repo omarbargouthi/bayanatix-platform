@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Tag, CertTag } from "@/components/ui/Tag";
+import { Tag, CertBadge } from "@/components/ui/Tag";
 import { IconDB, IconHistory, IconCollaborate } from "@/components/layout/icons";
 import { AssetHistoryDrawer } from "./AssetHistoryDrawer";
 import { TagPicker } from "./TagPicker";
@@ -63,18 +63,8 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
         {/* Top bar: tags + action icons */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider text-muted">Metadata</span>
-              <CertTag code={schema.certCode} />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider text-muted">Data</span>
-              <CertTag code={schema.dataCertCode} />
-            </div>
-            <Tag variant="purple">Finance</Tag>
-            {schema.source && (
-              <Tag>{schema.source.sourceName}</Tag>
-            )}
+            <CertBadge code={schema.certCode} kind="metadata" />
+            <CertBadge code={schema.dataCertCode} kind="data" />
           </div>
 
           {/* Action icons */}

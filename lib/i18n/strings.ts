@@ -638,6 +638,28 @@ export type I18nStrings = {
     resetBtn:                  string;
     // ColumnsTable.tsx — expanded column detail panel
     colDetailDescription:      string;
+    certMetadataShort: string;
+    certDataShort: string;
+    colFilterSearchPlaceholder: string;
+    colFilterAllTypes: string;
+    colFilterNoType: string;
+    colFilterAllClass: string;
+    colFilterUnclassified: string;
+    colFilterKeys: string;
+    colFilterEncrypted: string;
+    colFilterClear: string;
+    colFilterNoMatch: string;
+    colCountOf: string;
+    colSortSource: string;
+    colSortNameAsc: string;
+    colSortNameDesc: string;
+    colSortType: string;
+    colSortClass: string;
+    colSortNullDesc: string;
+    colSortQualityAsc: string;
+    colBulkHint: string;
+    colBulkSave: string;
+    colBulkFailed: string;
     colDetailNoDescription:    string;
     colDetailNoClassTerm:      string;
     colDetailTermWord:         string;
