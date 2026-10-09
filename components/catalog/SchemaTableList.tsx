@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { DataEntity } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
-import { CertTag, Tag, LifecycleBadge } from "@/components/ui/Tag";
+import { CertBadge, Tag, LifecycleBadge } from "@/components/ui/Tag";
 import {
   IconTable,
   IconHistory,
@@ -488,15 +488,9 @@ export function SchemaTableList({
                     : <span className="text-muted text-[12px]">—</span>}
                 </div>
 
-                <div className="min-w-0 flex flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] uppercase tracking-wider text-muted w-6 shrink-0">M</span>
-                    <CertTag code={entity.certCode} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] uppercase tracking-wider text-muted w-6 shrink-0">D</span>
-                    <CertTag code={entity.dataCertCode} />
-                  </div>
+                <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                  <CertBadge code={entity.certCode} kind="metadata" />
+                  <CertBadge code={entity.dataCertCode} kind="data" />
                 </div>
 
                 <div className="min-w-0">
@@ -638,7 +632,7 @@ export function SchemaTableList({
                           </PropRow>
                           <PropRow label={c.metadataCert}>
                             <div className="flex items-center gap-1.5">
-                              <CertTag code={entity.certCode} />
+                              <CertBadge code={entity.certCode} kind="metadata" />
                               {canEdit && (
                                 <button
                                   onClick={() => setCertifyEntity(entity)}
@@ -650,7 +644,7 @@ export function SchemaTableList({
                             </div>
                           </PropRow>
                           <PropRow label={c.dataCert}>
-                            <CertTag code={entity.dataCertCode} />
+                            <CertBadge code={entity.dataCertCode} kind="data" />
                           </PropRow>
                           <PropRow label={c.lifecycleStatusLabel}>
                             {entity.lifecycleStatus === "DEPRECATED"

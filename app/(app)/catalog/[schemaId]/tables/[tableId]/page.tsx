@@ -6,7 +6,7 @@ import { getSession } from "@/lib/auth";
 import { canEditMetadata, canViewCatalogAsset } from "@/lib/can";
 import { getEntityById, getEntityProfile, CDE_CLASSIFICATION_CODES } from "@/lib/queries/catalog";
 import { CertBadge, ClassificationTag, Tag, LifecycleBadge } from "@/components/ui/Tag";
-import { IconTable, IconChevron } from "@/components/layout/icons";
+import { IconTable } from "@/components/layout/icons";
 import { TableHealthPanel } from "@/components/catalog/TableHealthPanel";
 import { TableTabs } from "@/components/catalog/TableTabs";
 import { TableEditPanel } from "@/components/catalog/TableEditPanel";
@@ -107,28 +107,16 @@ export default async function TablePage({
 
       <main className="px-8 py-7 pb-14">
         {/* ── Page header ─────────────────────────────────────────────── */}
-        {entity.schema && (
-          <Link
-            href={`/catalog/${entity.schema.schemaId}`}
-            className="inline-flex items-center gap-1 mb-2 min-w-0 max-w-full text-[12px] font-semibold text-muted hover:text-brand-purple transition-colors"
-          >
-            {/* IconChevron defaults to pointing down; rotated to point back toward the
-                start of the reading direction — left in English, right in Arabic — so
-                it reads as "back" rather than a fixed left arrow that would point the
-                wrong way once the page flips to RTL. */}
-            <IconChevron className="w-3.5 h-3.5 shrink-0 rtl:-rotate-90 rotate-90" />
-            {/* dir="auto" so an English schema name inside an Arabic page truncates from
-                its own trailing edge, not the page's — see the same fix in AssetTree.tsx. */}
-            <span className="min-w-0 truncate" dir="auto" title={entity.schema.schemaName}>{entity.schema.schemaName}</span>
-          </Link>
-        )}
+        {/* Certification badges sit above the name, as on the schema page. */}
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <CertBadge code={entity.certCode} kind="metadata" />
+          <CertBadge code={entity.dataCertCode} kind="data" />
+        </div>
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap min-w-0">
             <IconTable className="w-6 h-6 text-brand-purple shrink-0" />
             <span className="min-w-0 truncate" dir="auto" title={entity.entityName}>{entity.entityName}</span>
             <LifecycleBadge status={entity.lifecycleStatus} deprecatedAt={entity.deprecatedAt} />
-            <CertBadge code={entity.certCode} kind="metadata" />
-            <CertBadge code={entity.dataCertCode} kind="data" />
           </h1>
           <TablePageActions
             entityId={entity.entityId}

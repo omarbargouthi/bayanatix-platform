@@ -61,7 +61,7 @@ export function SchemaHero({ schema, tables, views, totalCols, canEdit }: Props)
     <>
       <div className="rounded-xl border border-line bg-gradient-to-br from-[#f5f5ff] to-[#ecedf9] p-6 mb-6">
         {/* Top bar: tags + action icons */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 flex-wrap">
             <CertBadge code={schema.certCode} kind="metadata" />
             <CertBadge code={schema.dataCertCode} kind="data" />
