@@ -1,6 +1,7 @@
 "use client";
 
 import { BuiltinFieldMappings } from "./BuiltinFieldMappings";
+import { SourceMappingEditor, type SourceMapping } from "./SourceMappingEditor";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { CustomAttributeDefinition, CustomAttributeAssetType, CustomAttributeDataType, CustomAttributeSourceMapping } from "@/lib/types";
@@ -63,8 +64,10 @@ export function CustomAttributesConfigSection() {
   const [form, setForm] = useState({ ...BLANK });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [mapping, setMapping] = useState<{ def: CustomAttributeDefinition; draft: MappingDraft } | null>(null);
-  const [mapErr, setMapErr] = useState("");
+  // The page has two parts: fields the organisation defines, and Bayanis's own fields.
+  const [mainTab, setMainTab] = useState<"CUSTOM" | "BUILTIN">("CUSTOM");
+  // The custom field whose data sources are being edited (by id, so it follows reloads).
+  const [mappingId, setMappingId] = useState<number | null>(null);
 
   async function load() {
     setLoading(true);
@@ -130,28 +133,20 @@ export function CustomAttributesConfigSection() {
     await load();
   }
 
-  function openMapping(d: CustomAttributeDefinition) {
-    const draft: MappingDraft = {};
-    for (const st of SOURCE_TYPES) {
-      const m = d.sourceMappings?.find((x) => x.sourceTypeCode === st.code);
-      draft[st.code] = { methodCode: m?.methodCode ?? (st.code === "MSSQL" ? "EXTENDED_PROPERTY" : "COMMENT_KEY"), sourceKey: m?.sourceKey ?? "" };
-    }
-    setMapErr("");
-    setMapping({ def: d, draft });
-  }
+  const mapping = mappingId != null ? defs.find((d) => d.attrDefId === mappingId) ?? null : null;
 
-  async function saveMapping() {
-    if (!mapping) return;
-    setSaving(true); setMapErr("");
-    try {
-      const r = await fetch(`/api/admin/custom-attributes/${mapping.def.attrDefId}/source-mappings`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mappings: Object.entries(mapping.draft).map(([sourceTypeCode, m]) => ({ sourceTypeCode, ...m })) }),
-      });
-      if (!r.ok) { setMapErr((await r.json().catch(() => ({}))).error ?? "Failed to save"); return; }
-      setMapping(null);
-      await load();
-    } finally { setSaving(false); }
+  // The API stores a field's sources as one list, so one source is saved by sending the
+  // list with that source added, changed or (with an empty key) left out.
+  async function putSources(def: CustomAttributeDefinition, change: SourceMapping): Promise<string | null> {
+    const others = (def.sourceMappings ?? []).filter((m) => m.sourceTypeCode !== change.sourceTypeCode)
+      .map((m) => ({ sourceTypeCode: m.sourceTypeCode, methodCode: m.methodCode, sourceKey: m.sourceKey }));
+    const r = await fetch(`/api/admin/custom-attributes/${def.attrDefId}/source-mappings`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mappings: change.sourceKey ? [...others, change] : others }),
+    });
+    if (!r.ok) return (await r.json().catch(() => ({}))).error ?? "The source could not be saved.";
+    await load();
+    return null;
   }
 
   const mappable = MAPPABLE.includes(activeType);
@@ -165,14 +160,31 @@ export function CustomAttributesConfigSection() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-bold text-ink">Custom Attributes</h2>
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-ink">Fields Setting</h2>
         <p className="text-xs text-muted mt-1">
-          Define extra metadata fields for each asset level. Once defined, a field
-          becomes editable on every asset of that level — a table, column, schema,
-          data source, or business term.
+          The descriptive fields on your assets: the ones you define yourself, and Bayanis&apos;s own. For both you
+          can name the data sources a crawl reads the value from.
         </p>
       </div>
+
+      <div className="flex gap-2 mb-6">
+        {([["CUSTOM", "Custom Fields"], ["BUILTIN", "Built-in Fields"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setMainTab(key)}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${
+              mainTab === key ? "bg-brand-purple text-white border-brand-purple" : "bg-white text-ink-soft border-line hover:border-brand-purple hover:text-brand-purple"
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === "BUILTIN" ? <BuiltinFieldMappings /> : (<>
+      <p className="text-xs text-muted mb-4 max-w-3xl">
+        Define extra metadata fields for each asset level. Once defined, a field becomes editable on every asset of
+        that level — a table, column, schema, data source, or business term. Table and column fields can also be
+        filled from the source system (the database icon on the field).
+      </p>
 
       <div className="flex gap-1 border-b border-line mb-6">
         {ASSET_TYPES.map((t) => (
@@ -248,56 +260,29 @@ export function CustomAttributesConfigSection() {
       )}
 
       {mapping && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setMapping(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setMappingId(null)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-line max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-line">
-              <h3 className="text-[16px] font-bold text-brand-deep">Fill “{mapping.def.attrName}” from the source</h3>
+              <h3 className="text-[16px] font-bold text-brand-deep">Fill “{mapping.attrName}” from the source</h3>
               <p className="text-[12px] text-muted mt-1">
-                On every crawl, the value is read from the source and replaces the one in Bayanis. When a later crawl
-                finds a different value, the change goes into the table’s metadata-update review. Leave a key empty to not map that source.
+                Add the data sources this field is read from. On every crawl the value is read from the source and replaces
+                the one in Bayanis; when a later crawl finds a different value, the change goes into the table’s metadata-update review.
               </p>
             </div>
-            <div className="px-6 py-5 space-y-3">
-              {SOURCE_TYPES.map((st) => {
-                const m = mapping.draft[st.code];
-                const set = (patch: Partial<typeof m>) => setMapping({ ...mapping, draft: { ...mapping.draft, [st.code]: { ...m, ...patch } } });
-                return (
-                  <div key={st.code} className="grid grid-cols-[1.3fr_1fr_1fr] gap-3 items-center">
-                    <div className="text-sm font-medium text-ink">{st.label}</div>
-                    {st.code === "MSSQL" ? (
-                      <select className="input w-full text-sm" value={m.methodCode} onChange={(e) => set({ methodCode: e.target.value as typeof m.methodCode })}>
-                        <option value="EXTENDED_PROPERTY">Extended property</option>
-                        <option value="COMMENT_KEY">Key in MS_Description</option>
-                      </select>
-                    ) : (
-                      <div className="text-[12px] text-ink-soft">Key in the comment</div>
-                    )}
-                    <input
-                      className="input w-full font-mono text-sm"
-                      placeholder={m.methodCode === "EXTENDED_PROPERTY" ? "e.g. DataOwner" : "e.g. owner"}
-                      value={m.sourceKey}
-                      onChange={(e) => set({ sourceKey: e.target.value })}
-                    />
-                  </div>
-                );
-              })}
-              <div className="rounded-lg bg-canvas-soft border border-line-soft px-4 py-3 text-[12px] text-ink-soft space-y-1.5">
-                <div className="font-semibold text-ink">How to tag values at the source</div>
-                <div><span className="font-semibold">SQL Server</span> (extended property):</div>
-                <pre className="font-mono text-[11px] whitespace-pre-wrap">{`EXEC sp_addextendedproperty @name = N'DataOwner', @value = N'Finance',
-  @level0type = 'SCHEMA', @level0name = N'crm', @level1type = 'TABLE', @level1name = N'customer',
-  @level2type = 'COLUMN', @level2name = N'email';`}</pre>
-                <div><span className="font-semibold">PostgreSQL / Oracle</span> (key in the comment — <span className="font-mono">key: value</span> pairs separated by <span className="font-mono">;</span>, or a JSON object):</div>
-                <pre className="font-mono text-[11px] whitespace-pre-wrap">{`COMMENT ON COLUMN crm.customer.email IS 'Customer email address; owner: Finance; retention: 7y';
-COMMENT ON COLUMN crm.customer.email IS 'Customer email address {"owner": "Finance"}';`}</pre>
-                <div><span className="font-semibold">MySQL</span>: the same format in the column’s <span className="font-mono">COMMENT</span>.</div>
-                <div className="text-muted">Values are checked against the field type (Yes/No accepts yes/no/true/false/1/0; dropdowns must match an option). Invalid values are skipped and listed in the crawl log.</div>
-              </div>
-              {mapErr && <p className="text-red-600 text-xs bg-red-50 px-3 py-2 rounded-md">{mapErr}</p>}
+            <div className="px-6 py-5">
+              <SourceMappingEditor
+                level={mapping.assetType === "DATA_ATTRIBUTES" ? "COLUMN" : "TABLE"}
+                mappings={(mapping.sourceMappings ?? []).map((m) => ({ sourceTypeCode: m.sourceTypeCode, methodCode: m.methodCode, sourceKey: m.sourceKey }))}
+                valueHint={mapping.dataType === "BOOLEAN" ? "yes / no, true / false, 1 / 0"
+                  : mapping.dataType === "ENUM" ? "one of the field's dropdown options"
+                  : mapping.dataType === "NUMBER" ? "a number" : mapping.dataType === "DATE" ? "a date as YYYY-MM-DD" : undefined}
+                exampleValue={mapping.dataType === "BOOLEAN" ? "yes" : mapping.dataType === "NUMBER" ? "7" : mapping.dataType === "DATE" ? "2026-01-31" : "Finance"}
+                onSave={(m) => putSources(mapping, m)}
+                onRemove={async (sourceTypeCode) => { await putSources(mapping, { sourceTypeCode, methodCode: "COMMENT_KEY", sourceKey: "" }); }}
+              />
             </div>
             <div className="flex justify-end gap-2 px-6 py-3 border-t border-line">
-              <button onClick={() => setMapping(null)} className="btn btn-sm">Cancel</button>
-              <button onClick={saveMapping} disabled={saving} className="btn btn-primary btn-sm">{saving ? "Saving…" : "Save mapping"}</button>
+              <button onClick={() => setMappingId(null)} className="btn btn-primary btn-sm">Done</button>
             </div>
           </div>
         </div>
@@ -332,7 +317,7 @@ COMMENT ON COLUMN crm.customer.email IS 'Customer email address {"owner": "Finan
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
               </ActionIcon>
               {mappable && (
-                <ActionIcon title="Fill from source system" onClick={() => openMapping(d)}>
+                <ActionIcon title="Fill from source system" onClick={() => setMappingId(d.attrDefId)}>
                   <ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" /><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
                 </ActionIcon>
               )}
@@ -351,8 +336,7 @@ COMMENT ON COLUMN crm.customer.email IS 'Customer email address {"owner": "Finan
           <div className="py-10 text-center text-muted text-sm">No custom fields defined for {ASSET_TYPE_LABELS[activeType].toLowerCase()} yet.</div>
         )}
       </div>
-
-      <BuiltinFieldMappings />
+      </>)}
     </div>
   );
 }

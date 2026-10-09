@@ -234,8 +234,8 @@ export default function ConfigurationPage() {
             onClick={() => { resetNav(); setSelectedGroup(null); setShowCustomAttributes(true); }}
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showCustomAttributes ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
-            <div className="font-medium text-ink">Custom Attributes</div>
-            <div className="text-[10px] text-muted mt-0.5">Source · Schema · Table · Column · Term</div>
+            <div className="font-medium text-ink">Fields Setting</div>
+            <div className="text-[10px] text-muted mt-0.5">Custom fields · Built-in fields · Read from source</div>
           </button>
           <button
             onClick={() => { resetNav(); setSelectedGroup(null); setShowSampleData(true); }}
