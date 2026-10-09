@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  CATEGORY_PRIORITY, DEFAULT_TABLE_TYPE_CONFIG,
-  type CategoryCode, type TableTypeConfig, type TableTypeLimits, type TableTypeWeights,
+  CATEGORY_PRIORITY, COLUMN_PATTERN_KEYS, DEFAULT_TABLE_TYPE_CONFIG,
+  type CategoryCode, type TableTypeColumnPatterns, type TableTypeConfig, type TableTypeLimits, type TableTypeWeights,
 } from "@/lib/table-type-rules";
 
-// Configuration > Table Type Rules (db/168): the keywords, points, size limits and
-// confidence gaps a crawl uses to suggest a table's type. Each field shows its default;
+// Configuration > Table Type Rules (db/168): the keywords, column-name patterns, system
+// prefixes, points, size limits and confidence gaps a crawl uses to suggest a table's type. Each field shows its default;
 // "Preview" scores the tables already in the catalog with the rules on screen.
 
 const TYPE_LABEL: Record<CategoryCode, string> = {
@@ -17,12 +17,12 @@ const TYPE_ORDER: CategoryCode[] = ["MASTER", "TRANSACTIONAL", "REFERENCE", "SET
 
 const WEIGHTS: { key: keyof TableTypeWeights; label: string; to: string; note: string }[] = [
   { key: "nameKeyword",       label: "Table name contains a keyword",         to: "the keyword's type", note: "Once per type, however many of its keywords match." },
-  { key: "systemPrefix",      label: "System naming",                         to: "System",        note: "Schema starts with sys, pg_ or information_schema, or the table starts with sys_ or pg_." },
-  { key: "timestampColumn",   label: "Has a date or time column",             to: "Transactional", note: "A column ending in _at, _on, _date, _time, or starting with created, updated, modified, date, time." },
-  { key: "manyKeyColumns",    label: "Two or more key columns",               to: "Transactional", note: "Columns ending in _id or _fk." },
+  { key: "systemPrefix",      label: "System naming",                         to: "System",        note: "The schema or the table name starts with a system prefix (listed above)." },
+  { key: "timestampColumn",   label: "Has a date or time column",             to: "Transactional", note: "At least one column recognised as a date / time column (patterns above)." },
+  { key: "manyKeyColumns",    label: "Two or more key columns",               to: "Transactional", note: "Columns recognised as key columns (patterns above)." },
   { key: "oneKeyColumn",      label: "Exactly one key column",                to: "Transactional", note: "Used instead of the line above when there is only one." },
   { key: "largeTable",        label: "Large table",                           to: "Transactional", note: "More rows than the “large table” limit below." },
-  { key: "smallWithCodeDesc", label: "Small table with a code and a name",    to: "Reference",     note: "Within the “small table” limits, with a code column and a name / description / label / title column." },
+  { key: "smallWithCodeDesc", label: "Small table with a code and a name",    to: "Reference",     note: "Within the “small table” limits, with a code column and a name / description column (patterns above)." },
   { key: "smallTable",        label: "Small table without that pair",         to: "Reference",     note: "Used instead of the line above." },
   { key: "wideEntity",        label: "Wide table describing one thing",       to: "Master",        note: "At least the “wide table” number of columns, no code-and-name pair, at most one key column." },
   { key: "masterDefault",     label: "Default",                               to: "Master",        note: "Always added, so Master is suggested when nothing else stands out." },
@@ -33,6 +33,24 @@ const LIMITS: { key: keyof TableTypeLimits; label: string; unit: string }[] = [
   { key: "smallMaxRows",    label: "Small table: fewer than",       unit: "rows" },
   { key: "wideMinColumns",  label: "Wide table: at least",          unit: "columns" },
 ];
+
+// The text lists besides the type keywords: how columns are recognised from their names,
+// and which schema / table names mark a system object. `id` addresses the list in the form.
+type ListId = `col.${keyof TableTypeColumnPatterns}` | "sys.schema" | "sys.table";
+const COLUMN_LISTS: { id: ListId; label: string; note: string }[] = [
+  { id: "col.timestampSuffixes", label: "Date / time column: ends with",   note: "created_at, order_date" },
+  { id: "col.timestampPrefixes", label: "Date / time column: starts with", note: "created, updated_by_time" },
+  { id: "col.keySuffixes",       label: "Key column: ends with",           note: "customer_id — a column pointing at another table" },
+  { id: "col.codeNames",         label: "Code column: named",              note: "The name is exactly this, or ends with _ and this: code, status_code" },
+  { id: "col.nameSuffixes",      label: "Name / description column: ends with", note: "status_name, short_desc, title" },
+];
+const SYSTEM_LISTS: { id: ListId; label: string; note: string }[] = [
+  { id: "sys.schema", label: "Schema name starts with", note: "Every table in such a schema counts as a system table." },
+  { id: "sys.table",  label: "Table name starts with",  note: "" },
+];
+const ALL_LISTS = [...COLUMN_LISTS, ...SYSTEM_LISTS];
+const listOf = (c: TableTypeConfig, id: ListId): string[] =>
+  id === "sys.schema" ? c.systemPrefixes.schema : id === "sys.table" ? c.systemPrefixes.table : c.columnPatterns[id.slice(4) as keyof TableTypeColumnPatterns];
 
 type Change = { entityId: number; schema: string; table: string; fromCode: string | null; fromConfidence: string | null; toCode: CategoryCode; toConfidence: string };
 type Preview = { scored: number; typeChanged: number; confidenceChanged: number; changes: Change[]; applied: boolean };
@@ -50,6 +68,7 @@ export function TableTypeRulesSection() {
   const [cfg, setCfg] = useState<TableTypeConfig | null>(null);
   // Keywords are edited as free text and split on save, so typing a comma does not jump the cursor.
   const [kwText, setKwText] = useState<Record<CategoryCode, string>>({ MASTER: "", TRANSACTIONAL: "", REFERENCE: "", SETUP: "", SYSTEM: "" });
+  const [listText, setListText] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<"" | "save" | "preview" | "apply">("");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -58,6 +77,7 @@ export function TableTypeRulesSection() {
   const show = useCallback((c: TableTypeConfig) => {
     setCfg(clone(c));
     setKwText(Object.fromEntries(CATEGORY_PRIORITY.map((k) => [k, c.keywords[k].join(", ")])) as Record<CategoryCode, string>);
+    setListText(Object.fromEntries(ALL_LISTS.map((l) => [l.id, listOf(c, l.id).join(", ")])));
   }, []);
 
   useEffect(() => {
@@ -70,8 +90,13 @@ export function TableTypeRulesSection() {
   if (!cfg || !saved) return <div className="text-sm text-muted">{error ?? "Loading…"}</div>;
 
   const splitKw = (text: string) => Array.from(new Set(text.split(/[,\n]/).map((k) => k.trim().toLowerCase()).filter(Boolean)));
-  // What is on screen, with the keyword boxes folded in.
-  const current = (): TableTypeConfig => ({ ...cfg, keywords: Object.fromEntries(CATEGORY_PRIORITY.map((k) => [k, splitKw(kwText[k])])) as Record<CategoryCode, string[]> });
+  // What is on screen, with the text boxes folded in.
+  const current = (): TableTypeConfig => ({
+    ...cfg,
+    keywords: Object.fromEntries(CATEGORY_PRIORITY.map((k) => [k, splitKw(kwText[k])])) as Record<CategoryCode, string[]>,
+    columnPatterns: Object.fromEntries(COLUMN_PATTERN_KEYS.map((k) => [k, splitKw(listText[`col.${k}`] ?? "")])) as TableTypeColumnPatterns,
+    systemPrefixes: { schema: splitKw(listText["sys.schema"] ?? ""), table: splitKw(listText["sys.table"] ?? "") },
+  });
   const dirty = !same(current(), saved);
   const isDefault = same(current(), DEFAULT_TABLE_TYPE_CONFIG);
 
@@ -107,6 +132,34 @@ export function TableTypeRulesSection() {
       setNote(`Applied: ${d.typeChanged} table type${d.typeChanged === 1 ? "" : "s"} changed, ${d.confidenceChanged} confidence level${d.confidenceChanged === 1 ? "" : "s"} updated.`);
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
   }
+
+  // One row per text list: label, what it matches, the comma-separated values, its default.
+  const listRows = (lists: typeof ALL_LISTS) => (
+    <div className="space-y-3">
+      {lists.map((l) => {
+        const def = listOf(DEFAULT_TABLE_TYPE_CONFIG, l.id);
+        const changed = !same(splitKw(listText[l.id] ?? ""), def);
+        return (
+          <div key={l.id} className="grid grid-cols-[230px_1fr] gap-3 items-start">
+            <div>
+              <div className="text-[13px] font-semibold text-ink">{l.label}</div>
+              {l.note && <div className="text-[10px] text-muted leading-snug">{l.note}</div>}
+              {changed && (
+                <div className="text-[10px] text-amber-700 font-semibold">
+                  changed · <button onClick={() => setListText({ ...listText, [l.id]: def.join(", ") })} className="text-brand-purple font-normal hover:underline">use default</button>
+                </div>
+              )}
+            </div>
+            <div>
+              <input dir="ltr" value={listText[l.id] ?? ""} onChange={(e) => setListText({ ...listText, [l.id]: e.target.value })}
+                className="w-full border border-line rounded-md px-2.5 py-1.5 text-[13px] font-mono text-ink bg-white focus:outline-none focus:border-brand-purple" />
+              <div className="text-[10px] text-muted mt-0.5" dir="ltr">Default: {def.join(", ")}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const num = "w-20 border border-line rounded-md px-2 py-1 text-[13px] text-ink bg-white text-end focus:outline-none focus:border-brand-purple";
   const card = "rounded-lg border border-line bg-white px-5 py-4";
@@ -152,6 +205,21 @@ export function TableTypeRulesSection() {
           })}
         </div>
         <p className="text-[11px] text-muted mt-3">When two types end with the same points, the order System, Setup, Reference, Transactional, Master decides.</p>
+      </div>
+
+      <div className={`${card} mt-4`}>
+        <div className="text-sm font-bold text-ink">Column name patterns</div>
+        <p className="text-[11px] text-muted mt-0.5 mb-3">
+          How a column is recognised from its name. Plain text separated with commas, ignoring case — not regular expressions.
+          A column that counts as a code column is never counted as a key column.
+        </p>
+        {listRows(COLUMN_LISTS)}
+      </div>
+
+      <div className={`${card} mt-4`}>
+        <div className="text-sm font-bold text-ink">System prefixes</div>
+        <p className="text-[11px] text-muted mt-0.5 mb-3">A schema or table whose name starts with one of these gets the “System naming” points.</p>
+        {listRows(SYSTEM_LISTS)}
       </div>
 
       <div className={`${card} mt-4`}>

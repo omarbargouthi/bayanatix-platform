@@ -8,8 +8,8 @@
 // on purpose — a steward has to be able to look at a suggestion and judge it — and it
 // is only ever a suggestion: a type a steward confirmed is never overwritten.
 //
-// The keywords, the points per signal, the size limits and the confidence gaps are
-// settings. This file has no database access so the configuration screen can import
+// The keywords, the column-name patterns, the system prefixes, the points per signal,
+// the size limits and the confidence gaps are settings. This file has no database access so the configuration screen can import
 // the defaults; reading and saving the settings is in lib/queries/table-type-rules.ts.
 
 export type CategoryCode = "MASTER" | "TRANSACTIONAL" | "REFERENCE" | "SETUP" | "SYSTEM";
@@ -37,8 +37,23 @@ export type TableTypeLimits = {
   smallMaxRows: number;       // ... and fewer rows than this
   wideMinColumns: number;     // "wide" = at least this many columns
 };
+// How a column is recognised from its name. Plain text, not regular expressions, so an
+// administrator can maintain the lists; matching ignores case.
+export type TableTypeColumnPatterns = {
+  timestampSuffixes: string[];  // date/time column: the name ends with one of these ...
+  timestampPrefixes: string[];  // ... or starts with one of these
+  keySuffixes: string[];        // key column (points at another table): ends with one of these
+  codeNames: string[];          // code column: the name is one of these, or ends with "_" + one of these
+  nameSuffixes: string[];       // name / description column: ends with one of these
+};
+export const COLUMN_PATTERN_KEYS: (keyof TableTypeColumnPatterns)[] = ["timestampSuffixes", "timestampPrefixes", "keySuffixes", "codeNames", "nameSuffixes"];
+// A schema or table whose name starts with one of these is a system object.
+export type TableTypeSystemPrefixes = { schema: string[]; table: string[] };
+
 export type TableTypeConfig = {
   keywords: Record<CategoryCode, string[]>;
+  columnPatterns: TableTypeColumnPatterns;
+  systemPrefixes: TableTypeSystemPrefixes;
   weights: TableTypeWeights;
   limits: TableTypeLimits;
   confidence: { highGap: number; mediumGap: number };
@@ -52,6 +67,14 @@ export const DEFAULT_TABLE_TYPE_CONFIG: TableTypeConfig = {
     TRANSACTIONAL: ["order", "invoice", "payment", "transaction", "shipment", "booking", "event", "activity", "receipt", "claim", "ticket", "interaction", "campaign_response"],
     MASTER:        ["customer", "product", "employee", "vendor", "supplier", "location", "user", "account", "item", "party", "organization", "asset", "member", "person"],
   },
+  columnPatterns: {
+    timestampSuffixes: ["_at", "_on", "_date", "_time"],
+    timestampPrefixes: ["date", "time", "timestamp", "created", "updated", "modified"],
+    keySuffixes: ["_id", "_fk"],
+    codeNames: ["code"],
+    nameSuffixes: ["name", "desc", "label", "title"],
+  },
+  systemPrefixes: { schema: ["sys", "pg_", "information_schema"], table: ["sys_", "pg_"] },
   weights: {
     systemPrefix: 6, nameKeyword: 4, timestampColumn: 2, manyKeyColumns: 2, oneKeyColumn: 1,
     largeTable: 2, smallWithCodeDesc: 4, smallTable: 2, wideEntity: 2, masterDefault: 1,
@@ -59,11 +82,6 @@ export const DEFAULT_TABLE_TYPE_CONFIG: TableTypeConfig = {
   limits: { largeRows: 5000, smallMaxColumns: 6, smallMaxRows: 500, wideMinColumns: 5 },
   confidence: { highGap: 4, mediumGap: 2 },
 };
-
-const TIMESTAMP_COL_RE = /(_at|_on|_date|_time)$|^(date|time|timestamp|created|updated|modified)/i;
-const FK_LIKE_COL_RE   = /(_id|_code|_fk)$/i;
-const CODE_COL_RE      = /(^|_)code$/i;
-const DESC_COL_RE      = /(name|desc|label|title)$/i;
 
 export function classifyTableType(
   schemaName: string,
@@ -78,17 +96,22 @@ export function classifyTableType(
 
   const score: Record<CategoryCode, number> = { MASTER: 0, TRANSACTIONAL: 0, REFERENCE: 0, SETUP: 0, SYSTEM: 0 };
 
+  const pat = cfg.columnPatterns;
+  const endsWithAny = (c: string, list: string[]) => list.some(x => x && c.endsWith(x));
+  const startsWithAny = (c: string, list: string[]) => list.some(x => x && c.startsWith(x));
+  const isCodeCol = (c: string) => pat.codeNames.some(x => x && (c === x || c.endsWith("_" + x)));
+
   // Strongest signal: system schema/table naming conventions.
-  if (/^(sys|pg_|information_schema)/i.test(schemaName) || /^(sys_|pg_)/i.test(name)) score.SYSTEM += w.systemPrefix;
+  if (startsWithAny(schemaName.toLowerCase(), cfg.systemPrefixes.schema) || startsWithAny(name, cfg.systemPrefixes.table)) score.SYSTEM += w.systemPrefix;
 
   for (const category of CATEGORY_PRIORITY) {
     const hit = cfg.keywords[category].some(kw => kw && name.includes(kw));
     if (hit) score[category] += w.nameKeyword;
   }
 
-  const timestampCols  = cols.filter(c => TIMESTAMP_COL_RE.test(c)).length;
-  const fkLikeCols      = cols.filter(c => FK_LIKE_COL_RE.test(c) && !CODE_COL_RE.test(c)).length;
-  const hasCodeDescPair = cols.some(c => CODE_COL_RE.test(c)) && cols.some(c => DESC_COL_RE.test(c));
+  const timestampCols  = cols.filter(c => endsWithAny(c, pat.timestampSuffixes) || startsWithAny(c, pat.timestampPrefixes)).length;
+  const fkLikeCols      = cols.filter(c => endsWithAny(c, pat.keySuffixes) && !isCodeCol(c)).length;
+  const hasCodeDescPair = cols.some(isCodeCol) && cols.some(c => endsWithAny(c, pat.nameSuffixes));
   const isSmallStatic   = colCount > 0 && colCount <= lim.smallMaxColumns && (rowCount === undefined || rowCount < lim.smallMaxRows);
   const isLarge         = rowCount !== undefined && rowCount > lim.largeRows;
 
@@ -125,8 +148,13 @@ export function withTableTypeDefaults(stored: unknown): TableTypeConfig {
     const list = s.keywords?.[code];
     if (Array.isArray(list)) keywords[code] = list.filter((k): k is string => typeof k === "string");
   }
+  const list = (v: unknown, def: string[]) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : def);
+  const columnPatterns = { ...d.columnPatterns };
+  for (const key of COLUMN_PATTERN_KEYS) columnPatterns[key] = list(s.columnPatterns?.[key], d.columnPatterns[key]);
   return {
     keywords,
+    columnPatterns,
+    systemPrefixes: { schema: list(s.systemPrefixes?.schema, d.systemPrefixes.schema), table: list(s.systemPrefixes?.table, d.systemPrefixes.table) },
     weights: { ...d.weights, ...(s.weights ?? {}) },
     limits: { ...d.limits, ...(s.limits ?? {}) },
     confidence: { ...d.confidence, ...(s.confidence ?? {}) },
@@ -146,6 +174,21 @@ export function validateTableTypeConfig(input: unknown): { config: TableTypeConf
     if (cleaned.length > 200) return { error: "A table type can have at most 200 keywords." };
     keywords[code] = cleaned;
   }
+  const clean = (items: string[]): string[] | string => {
+    const cleaned = Array.from(new Set(items.map((k) => k.trim().toLowerCase()).filter(Boolean)));
+    if (cleaned.some((k) => k.length > 60)) return "A pattern or prefix can be at most 60 characters.";
+    if (cleaned.length > 100) return "A list can have at most 100 entries.";
+    return cleaned;
+  };
+  const columnPatterns = {} as TableTypeColumnPatterns;
+  for (const key of COLUMN_PATTERN_KEYS) {
+    const r = clean(c.columnPatterns[key]);
+    if (typeof r === "string") return { error: r };
+    columnPatterns[key] = r;
+  }
+  const sysSchema = clean(c.systemPrefixes.schema), sysTable = clean(c.systemPrefixes.table);
+  if (typeof sysSchema === "string") return { error: sysSchema };
+  if (typeof sysTable === "string") return { error: sysTable };
   for (const [key, v] of Object.entries(c.weights)) {
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 20) return { error: `Points must be between 0 and 20 (${key} is ${v}).` };
   }
@@ -155,5 +198,5 @@ export function validateTableTypeConfig(input: unknown): { config: TableTypeConf
   const { highGap, mediumGap } = c.confidence;
   if (![highGap, mediumGap].every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 40)) return { error: "The confidence gaps must be between 0 and 40." };
   if (mediumGap > highGap) return { error: "The Medium gap cannot be larger than the High gap." };
-  return { config: { keywords, weights: c.weights, limits: c.limits, confidence: c.confidence } };
+  return { config: { keywords, columnPatterns, systemPrefixes: { schema: sysSchema, table: sysTable }, weights: c.weights, limits: c.limits, confidence: c.confidence } };
 }
