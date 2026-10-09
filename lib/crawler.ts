@@ -10,6 +10,7 @@ import { startWorkflow } from "./workflow";
 import { createNotification } from "./queries/notifications";
 import { applySourceAttributes, type AttributeChange } from "./source-attributes";
 import { applySourceBuiltinFields } from "./source-builtin-fields";
+import { applySourceDescriptions } from "./source-descriptions";
 
 // Actor id used for audit_logs entries the crawler writes on its own (table-type
 // suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
@@ -1909,6 +1910,25 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
       });
     } catch (e) {
       await logger.warn(`Built-in fields from source failed: ${(e as Error).message}`);
+    }
+
+    // Descriptions: the comment's prose (without the key/value pairs that feed fields)
+    // fills an empty description, and keeps following the source until a steward edits it.
+    try {
+      await applySourceDescriptions({
+        sourceId, dbTypeCode: cfgRow.dbTypeCode, schemas: result.schemas, isFirstCrawl, actor: SYSTEM_ACTOR,
+        log: (m) => logger.info(m),
+        onChange: (entityId, entityName, schemaId, change) => {
+          let c = changes.find((x) => x.entityId === entityId);
+          if (!c) {
+            c = { entityId, entityName, schemaId, isNewEntity: false, isRemovedEntity: false, addedColumns: [], modifiedColumns: [], removedColumns: [] };
+            changes.push(c);
+          }
+          (c.attributeChanges ??= []).push(change);
+        },
+      });
+    } catch (e) {
+      await logger.warn(`Descriptions from source comments failed: ${(e as Error).message}`);
     }
 
     if (changes.length > 0) {
