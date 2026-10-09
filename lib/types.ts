@@ -60,6 +60,8 @@ export type DataEntity = {
   suggestedCategory?: string | null;
   categoryConfidence?: "HIGH" | "MEDIUM" | "LOW" | null;
   categoryIsConfirmed?: boolean;
+  /** Built-in fields whose value was filled from the source during a crawl (db/166). */
+  sourceSynced?: Record<string, { sourceKey?: string; method?: string; crawledAt?: string } | undefined> | null;
   description: string | null;
   sourceDescription: string | null;
   isView: boolean;
@@ -123,6 +125,8 @@ export type DataAttribute = {
   qualityScore?: number | null;
   nullPercentage?: number | null;
   isEncrypted: boolean;
+  /** Built-in fields whose value was filled from the source during a crawl (db/166). */
+  sourceSynced?: Record<string, { sourceKey?: string; method?: string; crawledAt?: string } | undefined> | null;
   columnType: string | null;
   // Column Asset-Type Suggestion engine — see lib/column-classifier.ts
   suggestedColumnType?:  string | null;

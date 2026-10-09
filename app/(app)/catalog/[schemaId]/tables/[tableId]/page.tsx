@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FromSourceMark } from "@/components/catalog/FromSourceMark";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
@@ -142,6 +143,7 @@ export default async function TablePage({
               categoryIsConfirmed={entity.categoryIsConfirmed}
               canEdit={canEdit}
             />
+            <FromSourceMark synced={entity.sourceSynced} field="TABLE_TYPE" />
             <Tag>{(t.lineage.objectTypes as Record<string, string>)[entity.objectTypeCode ?? ""] ?? (entity.isView ? t.catalog.viewBadge : t.catalog.tableBadge)} · {fmtNumber(entity.rowCount as number | null)} {t.catalog.rowsWord}</Tag>
           </h1>
           <TablePageActions

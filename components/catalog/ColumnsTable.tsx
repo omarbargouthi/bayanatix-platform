@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { FromSourceMark } from "./FromSourceMark";
 import { useRouter } from "next/navigation";
 import type { DataAttribute } from "@/lib/types";
 import { Tag, ClassificationTag, LifecycleBadge } from "@/components/ui/Tag";
@@ -257,7 +258,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
       <div className="flex items-start gap-8 flex-wrap">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colHeaderFriendlyName}</div>
-          <div className="text-sm text-ink">{attr.friendlyName ?? <span className="text-muted">—</span>}</div>
+          <div className="text-sm text-ink">{attr.friendlyName ?? <span className="text-muted">—</span>}<FromSourceMark synced={attr.sourceSynced} field="FRIENDLY_NAME" /></div>
         </div>
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colHeaderColumnType}</div>
@@ -269,6 +270,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
               canEdit={canEdit}
             />
             {!attr.columnType && !attr.suggestedColumnType && <span className="text-muted">—</span>}
+            <FromSourceMark synced={attr.sourceSynced} field="COLUMN_TYPE" />
           </div>
         </div>
         <div>
@@ -277,6 +279,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
             {attr.isEncrypted
               ? <span className="font-semibold text-amber-700">🔒 {t.common.yes}</span>
               : <span className="text-muted">{t.common.no}</span>}
+            <FromSourceMark synced={attr.sourceSynced} field="ENCRYPTED" />
           </div>
         </div>
       </div>

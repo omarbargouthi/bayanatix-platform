@@ -59,6 +59,25 @@ export function matchEncrypted(raw: string): boolean | null {
   return null;
 }
 
+// What a crawl does with a mapped field when the source has no value for it (db/167).
+export type EmptySourceMode = "KEEP" | "CLEAR_SYNCED" | "CLEAR_ALWAYS";
+export const EMPTY_SOURCE_MODES: EmptySourceMode[] = ["KEEP", "CLEAR_SYNCED", "CLEAR_ALWAYS"];
+
+export async function getEmptySourceMode(): Promise<EmptySourceMode> {
+  const [row] = await sql<{ mode: EmptySourceMode }[]>`SELECT empty_source_value_mode AS mode FROM bayanat.source_field_sync_settings WHERE settings_id = 1`;
+  return row?.mode ?? "KEEP";
+}
+export async function setEmptySourceMode(mode: EmptySourceMode, userId: string): Promise<void> {
+  if (!EMPTY_SOURCE_MODES.includes(mode)) throw new Error("Unknown mode");
+  const before = await getEmptySourceMode();
+  await sql`
+    INSERT INTO bayanat.source_field_sync_settings (settings_id, empty_source_value_mode, updated_by_user_id)
+    VALUES (1, ${mode}, ${userId})
+    ON CONFLICT (settings_id) DO UPDATE SET empty_source_value_mode = EXCLUDED.empty_source_value_mode, updated_at = NOW(), updated_by_user_id = EXCLUDED.updated_by_user_id
+  `;
+  await logUpdate("SOURCE_FIELD_SYNC_SETTINGS", 1, userId, [{ field: "empty_source_value_mode", oldVal: before, newVal: mode }]).catch(() => {});
+}
+
 export async function listBuiltinFieldMappings(): Promise<BuiltinFieldMapping[]> {
   return sql<BuiltinFieldMapping[]>`
     SELECT field_code AS "fieldCode", source_type_code AS "sourceTypeCode", method_code AS "methodCode", source_key_text AS "sourceKey"
@@ -115,8 +134,13 @@ export async function applySourceBuiltinFields(opts: {
   `;
   const attrByName = new Map(attrs.map((a) => [`${a.entityId}|${a.name}`, a]));
 
+  // Empty at the source: keep the Bayanis value, clear it if it had come from the source,
+  // or always clear it — an administrator's choice (Configuration > Custom Attributes).
+  const emptyMode = await getEmptySourceMode();
+  const shouldClear = (wasSynced: boolean, hasValue: boolean) => hasValue && (emptyMode === "CLEAR_ALWAYS" || (emptyMode === "CLEAR_SYNCED" && wasSynced));
+
   const now = new Date().toISOString();
-  let written = 0, skipped = 0;
+  let written = 0, skipped = 0, cleared = 0;
   const show = (v: unknown) => (v == null || v === "" ? null : typeof v === "boolean" ? (v ? "Yes" : "No") : String(v));
   const read = (m: BuiltinFieldMapping, comment: string | null | undefined, extProps: Record<string, string> | undefined): string | undefined => {
     const key = m.sourceKey.toLowerCase();
@@ -135,7 +159,20 @@ export async function applySourceBuiltinFields(opts: {
         const synced: Synced = { ...(e.synced ?? {}) };
         const raw = read(tableTypeMap, table.comment, table.extProps);
         if (raw === undefined || !raw.trim()) {
-          if ("TABLE_TYPE" in synced) { delete synced.TABLE_TYPE; await sql`UPDATE bayanat.data_entities SET source_synced_json = ${sql.json(synced as never)} WHERE entity_id = ${entity.id}`; }
+          const wasSynced = "TABLE_TYPE" in synced;
+          delete synced.TABLE_TYPE;
+          if (shouldClear(wasSynced, e.tableType != null)) {
+            await sql`
+              UPDATE bayanat.data_entities SET entity_category_code = NULL, category_is_confirmed = false,
+                category_confirmed_by = NULL, category_confirmed_at = NULL, source_synced_json = ${sql.json(synced as never)}
+              WHERE entity_id = ${entity.id}
+            `;
+            cleared++; written++;
+            await logUpdate("DATA_ENTITIES", entity.id, opts.actor, [{ field: "entity_category_code", oldVal: e.tableType, newVal: null }]).catch(() => {});
+            if (!opts.isFirstCrawl) opts.onChange(entity.id, entity.name, entity.schemaId, { asset: table.name, attrName: "Table type", oldValue: e.tableType, newValue: null });
+          } else if (wasSynced) {
+            await sql`UPDATE bayanat.data_entities SET source_synced_json = ${sql.json(synced as never)} WHERE entity_id = ${entity.id}`;
+          }
         } else {
           const code = matchTableType(raw, tableTypes);
           if (!code) {
@@ -171,11 +208,27 @@ export async function applySourceBuiltinFields(opts: {
         const synced: Synced = { ...(a.synced ?? {}) };
         const audit: { field: string; oldVal: string | null; newVal: string | null }[] = [];
         let columnType = a.columnType, friendlyName = a.friendlyName, encrypted = a.encrypted;
+        let typeCleared = false;
 
         for (const m of columnMaps) {
           const raw = read(m, col.comment, col.extProps);
-          if (raw === undefined || !raw.trim()) { delete synced[m.fieldCode]; continue; }
           const field = BUILTIN_FIELDS.find((f) => f.code === m.fieldCode)!;
+          if (raw === undefined || !raw.trim()) {
+            const wasSynced = m.fieldCode in synced;
+            delete synced[m.fieldCode];
+            const current = m.fieldCode === "COLUMN_TYPE" ? columnType : m.fieldCode === "ENCRYPTED" ? encrypted : friendlyName;
+            // "Has a value" for the flag means it is switched on.
+            const hasValue = m.fieldCode === "ENCRYPTED" ? current === true : current != null && current !== "";
+            if (!shouldClear(wasSynced, hasValue)) continue;
+            if (m.fieldCode === "COLUMN_TYPE") { columnType = null; typeCleared = true; }
+            else if (m.fieldCode === "ENCRYPTED") encrypted = false;
+            else friendlyName = null;
+            cleared++;
+            const clearedField = m.fieldCode === "COLUMN_TYPE" ? "attribute_class_code" : m.fieldCode === "ENCRYPTED" ? "is_encrypted" : "friendly_name_text";
+            audit.push({ field: clearedField, oldVal: show(current), newVal: m.fieldCode === "ENCRYPTED" ? "No" : null });
+            if (!opts.isFirstCrawl) opts.onChange(entity.id, entity.name, entity.schemaId, { asset: label, attrName: field.label, oldValue: show(current), newValue: m.fieldCode === "ENCRYPTED" ? "No" : null });
+            continue;
+          }
           let value: string | boolean | null;
           if (m.fieldCode === "COLUMN_TYPE") value = matchColumnType(raw);
           else if (m.fieldCode === "ENCRYPTED") value = matchEncrypted(raw);
@@ -204,7 +257,7 @@ export async function applySourceBuiltinFields(opts: {
             attribute_class_code = ${columnType}, friendly_name_text = ${friendlyName}, is_encrypted = ${encrypted},
             source_synced_json = ${sql.json(synced as never)},
             -- A column type that comes from the source is a settled classification, not a suggestion.
-            suggestion_status_code  = CASE WHEN ${typeFromSource} THEN 'ACCEPTED' ELSE suggestion_status_code END,
+            suggestion_status_code  = CASE WHEN ${typeFromSource} THEN 'ACCEPTED' WHEN ${typeCleared} THEN 'NONE' ELSE suggestion_status_code END,
             classified_by_user_id   = CASE WHEN ${typeFromSource} AND attribute_class_code IS DISTINCT FROM ${columnType} THEN 'SYSTEM:SOURCE' ELSE classified_by_user_id END,
             classified_at_timestamp = CASE WHEN ${typeFromSource} AND attribute_class_code IS DISTINCT FROM ${columnType} THEN NOW() ELSE classified_at_timestamp END
           WHERE attribute_id = ${a.id}
@@ -216,5 +269,5 @@ export async function applySourceBuiltinFields(opts: {
       }
     }
   }
-  await opts.log(`Built-in fields from source: ${written} value(s) updated${skipped ? `, ${skipped} skipped as not matching Bayanis's definitions` : ""}`);
+  await opts.log(`Built-in fields from source: ${written} value(s) changed${cleared ? ` (${cleared} cleared — empty at the source)` : ""}${skipped ? `, ${skipped} skipped as not matching Bayanis's definitions` : ""}`);
 }
