@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
 import { DescriptionEnrichWidget } from "./DescriptionEnrichWidget";
+import { FromSourceMark, type SourceSynced } from "./FromSourceMark";
 
 const ENTITY_TYPE_OPTIONS_KEYS = [
   { value: "",              labelKey: "typeNone" as const },
@@ -21,9 +22,10 @@ interface Props {
   displayName:       string | null;
   category:          string | null;
   canEdit:           boolean;
+  sourceSynced?:     SourceSynced | null;
 }
 
-export function TableEditPanel({ entityId, description, sourceDescription, displayName, category, canEdit }: Props) {
+export function TableEditPanel({ entityId, description, sourceDescription, displayName, category, canEdit, sourceSynced }: Props) {
   const router = useRouter();
   const { t } = useLang();
   const c = t.catalog;
@@ -128,6 +130,7 @@ export function TableEditPanel({ entityId, description, sourceDescription, displ
         <>
           <p className="text-ink-soft text-[14px] leading-relaxed">
             {description ?? c.noDescYet}
+            <FromSourceMark synced={sourceSynced} field="DESCRIPTION" current={description} />
           </p>
           {canEdit && <DescriptionEnrichWidget assetType="DATA_ENTITIES" assetId={entityId} currentText={description} canEdit={canEdit} />}
         </>

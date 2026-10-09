@@ -171,6 +171,7 @@ export default async function TablePage({
                   displayName={entity.displayName}
                   category={entity.category}
                   canEdit={canEdit}
+                  sourceSynced={entity.sourceSynced}
                 />
 
                 <div className="flex flex-wrap gap-2 mt-4">

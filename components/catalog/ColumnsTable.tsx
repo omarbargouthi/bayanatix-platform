@@ -249,7 +249,7 @@ function ColumnDetail({ attr, onEdit, canEdit }: { attr: DataAttribute; onEdit: 
       <div>
         <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">{c.colDetailDescription}</div>
         {(attr.description || attr.sourceDescription)
-          ? <p className="text-sm text-ink leading-relaxed">{attr.description ?? attr.sourceDescription}</p>
+          ? <p className="text-sm text-ink leading-relaxed">{attr.description ?? attr.sourceDescription}<FromSourceMark synced={attr.sourceSynced} field="DESCRIPTION" current={attr.description ?? null} /></p>
           : <span className="text-sm text-muted italic">{c.colDetailNoDescription}</span>}
         {canEdit && <DescriptionEnrichWidget assetType="DATA_ATTRIBUTES" assetId={attr.attributeId} currentText={attr.description ?? null} canEdit={canEdit} />}
       </div>
