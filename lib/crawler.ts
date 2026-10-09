@@ -11,6 +11,8 @@ import { createNotification } from "./queries/notifications";
 import { applySourceAttributes, type AttributeChange } from "./source-attributes";
 import { applySourceBuiltinFields } from "./source-builtin-fields";
 import { applySourceDescriptions } from "./source-descriptions";
+import { classifyTableType } from "./table-type-rules";
+import { getTableTypeConfig } from "./queries/table-type-rules";
 
 // Actor id used for audit_logs entries the crawler writes on its own (table-type
 // suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
@@ -76,75 +78,9 @@ type ConnCfg = {
 };
 
 // ── Table type classification ────────────────────────────────────────────────
-// Suggests one of five table types from layout signals available right after a
-// crawl (name, columns, row count) — no separate content-scanning pass needed.
-// Deliberately a transparent, explainable rule scorer rather than a black box,
-// since a steward has to be able to look at a suggestion and judge it. This is
-// ALWAYS just a suggestion: saveCrawlResults() never overwrites a category a
-// steward has already confirmed, however this function scores it.
-
-export type CategoryCode = "MASTER" | "TRANSACTIONAL" | "REFERENCE" | "SETUP" | "SYSTEM";
-export type ConfidenceCode = "HIGH" | "MEDIUM" | "LOW";
-
-const CATEGORY_NAME_KEYWORDS: Record<CategoryCode, string[]> = {
-  SYSTEM:       ["sys", "audit", "session", "queue", "cache", "migration", "job_log", "error_log", "index", "metadata"],
-  SETUP:        ["config", "setting", "param", "role", "permission", "workflow_rule", "rule", "tax_rate", "preference", "policy", "feature_flag"],
-  REFERENCE:    ["type", "status", "category", "code", "lookup", "reference", "currency", "unit", "country", "region", "language", "gender", "classification", "segment"],
-  TRANSACTIONAL:["order", "invoice", "payment", "transaction", "shipment", "booking", "event", "activity", "receipt", "claim", "ticket", "interaction", "campaign_response"],
-  MASTER:       ["customer", "product", "employee", "vendor", "supplier", "location", "user", "account", "item", "party", "organization", "asset", "member", "person"],
-};
-
-// Checked in this order so a more specific signal (e.g. an explicit "sys_"
-// prefix) wins over a broader one (e.g. a generic "log" keyword elsewhere).
-const CATEGORY_PRIORITY: CategoryCode[] = ["SYSTEM", "SETUP", "REFERENCE", "TRANSACTIONAL", "MASTER"];
-
-const TIMESTAMP_COL_RE = /(_at|_on|_date|_time)$|^(date|time|timestamp|created|updated|modified)/i;
-const FK_LIKE_COL_RE   = /(_id|_code|_fk)$/i;
-const CODE_COL_RE      = /(^|_)code$/i;
-const DESC_COL_RE      = /(name|desc|label|title)$/i;
-
-function classifyTableType(schemaName: string, table: CrawlTable): { code: CategoryCode; confidence: ConfidenceCode } {
-  const name = table.name.toLowerCase();
-  const cols = table.columns.map(c => c.name.toLowerCase());
-  const colCount = cols.length;
-  const rowCount = table.rowCount;
-
-  const score: Record<CategoryCode, number> = { MASTER: 0, TRANSACTIONAL: 0, REFERENCE: 0, SETUP: 0, SYSTEM: 0 };
-
-  // Strongest signal: system schema/table naming conventions.
-  if (/^(sys|pg_|information_schema)/i.test(schemaName) || /^(sys_|pg_)/i.test(name)) score.SYSTEM += 6;
-
-  for (const category of CATEGORY_PRIORITY) {
-    const hit = CATEGORY_NAME_KEYWORDS[category].some(kw => name.includes(kw));
-    if (hit) score[category] += 4;
-  }
-
-  const timestampCols  = cols.filter(c => TIMESTAMP_COL_RE.test(c)).length;
-  const fkLikeCols      = cols.filter(c => FK_LIKE_COL_RE.test(c) && !CODE_COL_RE.test(c)).length;
-  const hasCodeDescPair = cols.some(c => CODE_COL_RE.test(c)) && cols.some(c => DESC_COL_RE.test(c));
-  const isSmallStatic   = colCount > 0 && colCount <= 6 && (rowCount === undefined || rowCount < 500);
-  const isLarge         = rowCount !== undefined && rowCount > 5000;
-
-  if (timestampCols > 0)  score.TRANSACTIONAL += 2;
-  if (fkLikeCols >= 2)    score.TRANSACTIONAL += 2;
-  else if (fkLikeCols === 1) score.TRANSACTIONAL += 1;
-  if (isLarge)             score.TRANSACTIONAL += 2;
-
-  if (isSmallStatic && hasCodeDescPair) score.REFERENCE += 4;
-  else if (isSmallStatic)               score.REFERENCE += 2;
-
-  if (colCount >= 5 && !hasCodeDescPair && fkLikeCols <= 1) score.MASTER += 2;
-  score.MASTER += 1; // weak tie-breaker: the most common default when nothing else stands out
-
-  const ranked = CATEGORY_PRIORITY
-    .map(code => ({ code, points: score[code] }))
-    .sort((a, b) => b.points - a.points || CATEGORY_PRIORITY.indexOf(a.code) - CATEGORY_PRIORITY.indexOf(b.code));
-  const [top, second] = ranked;
-  const gap = top.points - (second?.points ?? 0);
-  const confidence: ConfidenceCode = gap >= 4 ? "HIGH" : gap >= 2 ? "MEDIUM" : "LOW";
-
-  return { code: top.code, confidence };
-}
+// The rules are in lib/table-type-rules.ts and their keywords / points are settings
+// (Configuration > Table Type Rules). saveCrawlResults() reads the settings once per
+// crawl and never overwrites a category a steward has already confirmed.
 
 // ── Job logger ────────────────────────────────────────────────────────────────
 
@@ -1385,6 +1321,9 @@ async function saveCrawlResults(
   // following/stewarding a source that didn't exist yet, so there's no
   // audience for "new" notifications on an initial import of hundreds of tables.
   const isFirstCrawl = existing.length === 0;
+  // The table type rules as configured; a missing settings table (migration not applied
+  // yet) falls back to the built-in defaults rather than failing the crawl.
+  const tableTypeConfig = await getTableTypeConfig().catch(() => undefined);
   const changes = new Map<number, EntityChange>();
   function recordChange(entityId: number, entityName: string, schemaId: number): EntityChange {
     let c = changes.get(entityId);
@@ -1451,7 +1390,7 @@ async function saveCrawlResults(
                lifecycle_status_code AS "lifecycleStatus"
         FROM bayanat.data_entities WHERE schema_id = ${schemaId} AND entity_name_text = ${table.name}
       `;
-      const suggestion = classifyTableType(schema.name, table);
+      const suggestion = classifyTableType(schema.name, table, tableTypeConfig);
       let entityId: number;
       if (existingEntity) {
         entityId = existingEntity.id;

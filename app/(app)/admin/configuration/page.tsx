@@ -10,6 +10,7 @@ import { SampleDataConfigSection } from "./SampleDataConfigSection";
 import { PrivacyRetentionSection } from "./PrivacyRetentionSection";
 import { FollowSettingsSection } from "./FollowSettingsSection";
 import { SitSettingsSection } from "./SitSettingsSection";
+import { TableTypeRulesSection } from "./TableTypeRulesSection";
 import { AuthSettingsSection } from "./AuthSettingsSection";
 import { BrandingSettingsSection } from "./BrandingSettingsSection";
 import { SchedulingConfigSection } from "./SchedulingConfigSection";
@@ -52,6 +53,7 @@ export default function ConfigurationPage() {
   const [showFollowSettings, setShowFollowSettings] = useState(false);
   const [showPrivacyRetention, setShowPrivacyRetention] = useState(false);
   const [showSitSettings, setShowSitSettings] = useState(false);
+  const [showTableTypeRules, setShowTableTypeRules] = useState(false);
   const [showAuthSettings, setShowAuthSettings] = useState(false);
   const [showBrandingSettings, setShowBrandingSettings] = useState(false);
   const [showScheduling, setShowScheduling] = useState(false);
@@ -95,6 +97,7 @@ export default function ConfigurationPage() {
     setShowFollowSettings(false);
     setShowPrivacyRetention(false);
     setShowSitSettings(false);
+    setShowTableTypeRules(false);
     setShowAuthSettings(false);
     setShowBrandingSettings(false);
     setShowScheduling(false);
@@ -178,7 +181,7 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
-    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showAuthSettings
+    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showTableTypeRules && !showAuthSettings
     && !showBrandingSettings && !showScheduling;
 
   return (
@@ -265,6 +268,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Sensitive Information Types</div>
             <div className="text-[10px] text-muted mt-0.5">Active region · SIT patterns</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowTableTypeRules(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showTableTypeRules ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Table Type Rules</div>
+            <div className="text-[10px] text-muted mt-0.5">Keywords · Points · Confidence</div>
+          </button>
 
           {/* ── Branding section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
@@ -349,6 +359,9 @@ export default function ConfigurationPage() {
 
         {/* ── Sensitive Information Types panel ── */}
         {showSitSettings && <SitSettingsSection />}
+
+        {/* ── Table type rules panel ── */}
+        {showTableTypeRules && <TableTypeRulesSection />}
 
         {/* ── Authentication panel ── */}
         {showAuthSettings && <AuthSettingsSection />}
