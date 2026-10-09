@@ -109,6 +109,16 @@ async function seedCanada() {
       SELECT d.department_name, count(*) AS headcount, sum(e.annual_salary) AS total_salary, avg(e.annual_salary) AS average_salary
       FROM hr_ca.employees e JOIN hr_ca.departments d ON d.department_id = e.department_id GROUP BY d.department_name;
   `);
+  // Comments carrying "key: value" pairs — what Configuration > Custom Attributes > "Built-in
+  // fields from the source system" can map to table type, column type, friendly name and
+  // the Encrypted flag (keys table_type / column_type / friendly_name / encrypted).
+  await sql.unsafe(`
+    COMMENT ON TABLE hr_ca.employees IS 'Employees of the company. table_type: Master';
+    COMMENT ON TABLE hr_ca.corporate_cards IS 'Corporate cards issued to employees; table_type: reference';
+    COMMENT ON COLUMN hr_ca.employees.work_email IS 'Work e-mail address; friendly_name: Work Email Address; column_type: business; encrypted: no';
+    COMMENT ON COLUMN hr_ca.employees.created_at IS 'Row creation time; column_type: technical; friendly_name: Created At';
+    COMMENT ON COLUMN hr_ca.integration_credentials.secret_token IS 'Secret used to call the system; encrypted: yes; friendly_name: Secret Token';
+  `);
   await insert("hr_ca.departments", DEPTS.map((n, i) => ({ department_id: i + 1, department_name: n, cost_centre_code: `CC-${pad(100 + i * 10, 4)}` })));
   const emp = [], bank = [], cards = [];
   for (let i = 1; i <= N; i++) {

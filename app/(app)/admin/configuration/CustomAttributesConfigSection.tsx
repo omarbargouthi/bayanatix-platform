@@ -1,5 +1,6 @@
 "use client";
 
+import { BuiltinFieldMappings } from "./BuiltinFieldMappings";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { CustomAttributeDefinition, CustomAttributeAssetType, CustomAttributeDataType, CustomAttributeSourceMapping } from "@/lib/types";
@@ -350,6 +351,8 @@ COMMENT ON COLUMN crm.customer.email IS 'Customer email address {"owner": "Finan
           <div className="py-10 text-center text-muted text-sm">No custom fields defined for {ASSET_TYPE_LABELS[activeType].toLowerCase()} yet.</div>
         )}
       </div>
+
+      <BuiltinFieldMappings />
     </div>
   );
 }

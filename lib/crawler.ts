@@ -9,6 +9,7 @@ import { logUpdate, logCreate } from "./audit";
 import { startWorkflow } from "./workflow";
 import { createNotification } from "./queries/notifications";
 import { applySourceAttributes, type AttributeChange } from "./source-attributes";
+import { applySourceBuiltinFields } from "./source-builtin-fields";
 
 // Actor id used for audit_logs entries the crawler writes on its own (table-type
 // suggestions). audit_logs.user_id has no FK constraint into bayanat.users, so this
@@ -1701,7 +1702,7 @@ async function processEntityChanges(changes: EntityChange[], isFirstCrawl: boole
     if (c.modifiedColumns.length) descParts.push(`Type changed: ${c.modifiedColumns.map((x) => `${x.name} (${x.oldValue} → ${x.newValue})`).join(", ")}`);
     if (c.removedColumns.length)  descParts.push(`Removed: ${c.removedColumns.map((x) => x.name).join(", ")}`);
     if (c.attributeChanges?.length) {
-      descParts.push(`Custom attributes changed at the source: ${c.attributeChanges.slice(0, 20)
+      descParts.push(`Fields changed at the source: ${c.attributeChanges.slice(0, 20)
         .map((x) => `${x.attrName} on ${x.asset} (${x.oldValue ?? "empty"} → ${x.newValue ?? "empty"})`).join("; ")}${c.attributeChanges.length > 20 ? ` (+${c.attributeChanges.length - 20} more)` : ""}.`);
     }
 
@@ -1889,6 +1890,25 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
       });
     } catch (e) {
       await logger.warn(`Custom attributes from source failed: ${(e as Error).message}`);
+    }
+
+    // Built-in descriptive fields (table type, column type, friendly name, encrypted)
+    // mapped the same way. Changes join the same metadata-update review.
+    try {
+      await applySourceBuiltinFields({
+        sourceId, dbTypeCode: cfgRow.dbTypeCode, schemas: result.schemas, isFirstCrawl, actor: SYSTEM_ACTOR,
+        log: (m) => logger.info(m),
+        onChange: (entityId, entityName, schemaId, change) => {
+          let c = changes.find((x) => x.entityId === entityId);
+          if (!c) {
+            c = { entityId, entityName, schemaId, isNewEntity: false, isRemovedEntity: false, addedColumns: [], modifiedColumns: [], removedColumns: [] };
+            changes.push(c);
+          }
+          (c.attributeChanges ??= []).push(change);
+        },
+      });
+    } catch (e) {
+      await logger.warn(`Built-in fields from source failed: ${(e as Error).message}`);
     }
 
     if (changes.length > 0) {
