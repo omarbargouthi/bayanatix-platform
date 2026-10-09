@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { updateLookup, deleteLookup } from "@/lib/queries/app-lookups";
+import { updateLookup, deleteLookup, syncLookupTranslationKey } from "@/lib/queries/app-lookups";
 
 type Params = { params: { id: string } };
 
@@ -12,13 +12,13 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const body: {
     lookupLabel: string;
-    labelAr?:    string | null;
     description: string | null;
     sortOrder:   number;
     isActive:    boolean;
   } = await req.json();
 
   await updateLookup(Number(params.id), body);
+  await syncLookupTranslationKey(Number(params.id)).catch(() => {});
   return NextResponse.json({ ok: true });
 }
 

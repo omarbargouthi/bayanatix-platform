@@ -18,7 +18,7 @@ import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
   lookupId: number; lookupGroup: string; lookupCode: string;
-  lookupLabel: string; labelAr: string | null;
+  lookupLabel: string;
   description: string | null; sortOrder: number; isActive: boolean; isSystem: boolean;
 };
 
@@ -38,7 +38,17 @@ const GROUP_LABELS: Record<string, string> = {
 // Groups managed outside app_lookups — excluded from the flat lookup list
 const EXCLUDED_GROUPS = new Set(["DATASET_CATEGORY"]);
 
-const BLANK = { lookupCode: "", lookupLabel: "", labelAr: "", description: "", sortOrder: 0, isActive: true };
+// Labels are entered in English here; every other language is a translation.
+function TranslationNote() {
+  return (
+    <p className="text-[11px] text-muted mt-1">
+      Arabic and any other enabled language are added in{" "}
+      <Link href="/admin/languages" className="text-brand-purple hover:underline">Administration → Languages → Workbench</Link>.
+    </p>
+  );
+}
+
+const BLANK = { lookupCode: "", lookupLabel: "", description: "", sortOrder: 0, isActive: true };
 
 export default function ConfigurationPage() {
   const { reloadLookups } = useLang();
@@ -61,7 +71,7 @@ export default function ConfigurationPage() {
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
   const [editingId, setEditingId]       = useState<number | null>(null);
-  const [editForm, setEditForm]         = useState({ lookupLabel: "", labelAr: "", description: "", sortOrder: 0, isActive: true });
+  const [editForm, setEditForm]         = useState({ lookupLabel: "", description: "", sortOrder: 0, isActive: true });
   const [adding, setAdding]             = useState(false);
   const [addForm, setAddForm]           = useState({ ...BLANK });
   const [saving, setSaving]             = useState(false);
@@ -113,7 +123,6 @@ export default function ConfigurationPage() {
     setEditingId(l.lookupId);
     setEditForm({
       lookupLabel: l.lookupLabel,
-      labelAr:     l.labelAr ?? "",
       description: l.description ?? "",
       sortOrder:   l.sortOrder,
       isActive:    l.isActive,
@@ -127,7 +136,6 @@ export default function ConfigurationPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lookupLabel: editForm.lookupLabel,
-          labelAr:     editForm.labelAr || null,
           description: editForm.description || null,
           sortOrder:   editForm.sortOrder,
           isActive:    editForm.isActive,
@@ -162,7 +170,6 @@ export default function ConfigurationPage() {
           lookupGroup:  group,
           lookupCode:   addForm.lookupCode.trim().toUpperCase().replace(/\s+/g, "_"),
           lookupLabel:  addForm.lookupLabel,
-          labelAr:      addForm.labelAr || null,
           description:  addForm.description || null,
           sortOrder:    Number(addForm.sortOrder),
           isActive:     addForm.isActive,
@@ -455,8 +462,8 @@ export default function ConfigurationPage() {
               {/* Header */}
               <div className="grid grid-cols-[80px_1fr_1fr_60px_70px] gap-3 px-5 py-2.5 bg-canvas-soft border-b border-line text-[11px] uppercase tracking-wider text-muted font-bold">
                 <div className="min-w-0 truncate">Code</div>
-                <div className="min-w-0 truncate">English Label</div>
-                <div className="min-w-0 truncate">Arabic Label (عربي)</div>
+                <div className="min-w-0 truncate">Label</div>
+                <div className="min-w-0 truncate">Description</div>
                 <div className="min-w-0 truncate">Active</div>
                 <div className="min-w-0 truncate">Actions</div>
               </div>
@@ -470,15 +477,11 @@ export default function ConfigurationPage() {
                         {l.isSystem && <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded">system</span>}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label (EN) *</label>
+                        <div className="col-span-2">
+                          <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label *</label>
                           <input className="input w-full" value={editForm.lookupLabel}
                             onChange={e => setEditForm(f => ({ ...f, lookupLabel: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">التسمية (AR)</label>
-                          <input className="input w-full" dir="rtl" value={editForm.labelAr}
-                            onChange={e => setEditForm(f => ({ ...f, labelAr: e.target.value }))} />
+                          <TranslationNote />
                         </div>
                         <div className="col-span-2">
                           <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Description</label>
@@ -511,10 +514,8 @@ export default function ConfigurationPage() {
                         {l.lookupLabel}
                         {l.isSystem && <span className="ml-1.5 text-[10px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded">sys</span>}
                       </div>
-                      <div className="min-w-0 truncate">
-                        {l.labelAr
-                          ? <span className="font-medium text-sm text-ink" dir="rtl">{l.labelAr}</span>
-                          : <span className="text-muted text-[11px] italic">Not set</span>}
+                      <div className="min-w-0 truncate text-[12px] text-ink-soft" title={l.description ?? undefined}>
+                        {l.description || <span className="text-muted">—</span>}
                       </div>
                       <div className="min-w-0 text-center text-sm">
                         {l.isActive
@@ -562,15 +563,11 @@ function AddFields({
         <input type="number" className="input w-full" value={form.sortOrder}
           onChange={e => onChange({ ...form, sortOrder: Number(e.target.value) })} />
       </div>
-      <div>
-        <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label (EN) *</label>
+      <div className="col-span-2">
+        <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Label *</label>
         <input className="input w-full" placeholder="My Label" value={form.lookupLabel}
           onChange={e => onChange({ ...form, lookupLabel: e.target.value })} />
-      </div>
-      <div>
-        <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">التسمية (AR)</label>
-        <input className="input w-full" dir="rtl" placeholder="التسمية بالعربي" value={form.labelAr}
-          onChange={e => onChange({ ...form, labelAr: e.target.value })} />
+        <TranslationNote />
       </div>
       <div className="col-span-2">
         <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">Description</label>

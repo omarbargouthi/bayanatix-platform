@@ -75,19 +75,17 @@ export async function createLookup(data: {
   lookupGroup:  string;
   lookupCode:   string;
   lookupLabel:  string;
-  labelAr?:     string | null;
   description?: string | null;
   sortOrder?:   number | null;
   isActive?:    boolean | null;
 }): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.app_lookups
-      (lookup_group, lookup_code, lookup_label, label_ar, description, sort_order, is_active)
+      (lookup_group, lookup_code, lookup_label, description, sort_order, is_active)
     VALUES (
       ${data.lookupGroup},
       ${data.lookupCode},
       ${data.lookupLabel},
-      ${data.labelAr       ?? null},
       ${data.description   ?? null},
       ${data.sortOrder     ?? 0},
       ${data.isActive      ?? true}
@@ -104,7 +102,6 @@ export async function updateLookup(
   lookupId: number,
   data: {
     lookupLabel: string;
-    labelAr?:    string | null;
     description: string | null;
     sortOrder:   number;
     isActive:    boolean;
@@ -114,7 +111,6 @@ export async function updateLookup(
     UPDATE bayanat.app_lookups
     SET
       lookup_label = ${data.lookupLabel},
-      label_ar     = ${data.labelAr ?? null},
       description  = ${data.description ?? null},
       sort_order   = ${data.sortOrder},
       is_active    = ${data.isActive}
@@ -147,4 +143,20 @@ export async function deleteLookup(
 
   await sql`DELETE FROM bayanat.app_lookups WHERE lookup_id = ${lookupId}`;
   return { ok: true };
+}
+
+/**
+ * Keeps the translation key of a lookup value in step with its English label as soon
+ * as it is added or renamed (not on the next Workbench sync): the value shows up for
+ * translation at once, and a changed label marks its translations STALE. Same key the
+ * Workbench sync uses — see TRANSLATABLE_FIELDS in lib/i18n-admin/translatable-fields.ts.
+ */
+export async function syncLookupTranslationKey(lookupId: number): Promise<void> {
+  const [row] = await sql<{ grp: string; code: string; label: string; active: boolean }[]>`
+    SELECT lookup_group AS grp, lookup_code AS code, lookup_label AS label, coalesce(is_active, true) AS active
+    FROM bayanat.app_lookups WHERE lookup_id = ${lookupId}
+  `;
+  if (!row || !row.active || !row.label?.trim()) return;
+  const { upsertKey } = await import("../i18n-admin/translatable-fields");
+  await upsertKey({ keysCreated: 0, keysUpdatedStale: 0, secondarySeeded: 0 }, "LIST_LOOKUPS", `list.app_lookups.${row.grp}.${row.code}`, row.label, "en", "ar", null);
 }

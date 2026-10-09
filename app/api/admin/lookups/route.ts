@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listLookups, listLookupGroups, createLookup } from "@/lib/queries/app-lookups";
+import { listLookups, listLookupGroups, createLookup, syncLookupTranslationKey } from "@/lib/queries/app-lookups";
 
 export async function GET(req: Request) {
   const session = await getSession();
@@ -29,7 +29,6 @@ export async function POST(req: Request) {
     lookupGroup:  string;
     lookupCode:   string;
     lookupLabel:  string;
-    labelAr?:     string | null;
     description?: string | null;
     sortOrder?:   number | null;
     isActive?:    boolean | null;
@@ -43,5 +42,6 @@ export async function POST(req: Request) {
   }
 
   const lookupId = await createLookup(body);
+  await syncLookupTranslationKey(lookupId).catch(() => {});
   return NextResponse.json({ lookupId }, { status: 201 });
 }
