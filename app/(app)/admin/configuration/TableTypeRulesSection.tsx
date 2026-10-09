@@ -7,7 +7,7 @@ import {
 } from "@/lib/table-type-rules";
 
 // Configuration > Table Type Rules (db/168): the keywords, column-name patterns, system
-// prefixes, points, size limits and confidence gaps a crawl uses to suggest a table's type. Each field shows its default;
+// prefixes, points, size limits, confidence gaps and tie-break order a crawl uses to suggest a table's type. Each field shows its default;
 // "Preview" scores the tables already in the catalog with the rules on screen.
 
 const TYPE_LABEL: Record<CategoryCode, string> = {
@@ -102,6 +102,13 @@ export function TableTypeRulesSection() {
 
   const setWeight = (key: keyof TableTypeWeights, v: string) => setCfg({ ...cfg, weights: { ...cfg.weights, [key]: v === "" ? 0 : Number(v) } });
   const setLimit = (key: keyof TableTypeLimits, v: string) => setCfg({ ...cfg, limits: { ...cfg.limits, [key]: v === "" ? 0 : Number(v) } });
+  function moveTie(code: CategoryCode, dir: -1 | 1) {
+    const order = [...cfg!.tieBreakOrder];
+    const i = order.indexOf(code), j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    setCfg({ ...cfg!, tieBreakOrder: order });
+  }
   const setGap = (key: "highGap" | "mediumGap", v: string) => setCfg({ ...cfg, confidence: { ...cfg.confidence, [key]: v === "" ? 0 : Number(v) } });
 
   async function call(method: "PUT" | "POST", body: unknown) {
@@ -204,7 +211,6 @@ export function TableTypeRulesSection() {
             );
           })}
         </div>
-        <p className="text-[11px] text-muted mt-3">When two types end with the same points, the order System, Setup, Reference, Transactional, Master decides.</p>
       </div>
 
       <div className={`${card} mt-4`}>
@@ -273,6 +279,35 @@ export function TableTypeRulesSection() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className={`${card} mt-4`}>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-bold text-ink">Tie-break order</div>
+          {!same(cfg.tieBreakOrder, D.tieBreakOrder) && (
+            <span className="text-[10px] text-amber-700 font-semibold">
+              changed · <button onClick={() => setCfg({ ...cfg, tieBreakOrder: [...D.tieBreakOrder] })} className="text-brand-purple font-normal hover:underline">use default</button>
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-muted mt-0.5 mb-3">When two types end with the same points, the one earlier in this list is suggested. A tie always gives Low confidence.</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {cfg.tieBreakOrder.map((code, i) => (
+            <div key={code} className="flex items-center gap-1.5 rounded-md border border-line bg-canvas-soft ps-2.5 pe-1 py-1">
+              <span className="text-[11px] text-muted font-semibold">{i + 1}</span>
+              <span className="text-[13px] font-medium text-ink">{TYPE_LABEL[code]}</span>
+              <button onClick={() => moveTie(code, -1)} disabled={i === 0} title="Move earlier" aria-label={`Move ${TYPE_LABEL[code]} earlier`}
+                className="w-5 h-5 grid place-items-center rounded text-muted hover:bg-white hover:text-brand-purple disabled:opacity-25">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="rtl:rotate-180"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <button onClick={() => moveTie(code, 1)} disabled={i === cfg.tieBreakOrder.length - 1} title="Move later" aria-label={`Move ${TYPE_LABEL[code]} later`}
+                className="w-5 h-5 grid place-items-center rounded text-muted hover:bg-white hover:text-brand-purple disabled:opacity-25">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="rtl:rotate-180"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="text-[10px] text-muted mt-2">Default: {D.tieBreakOrder.map((c) => TYPE_LABEL[c]).join(", ")}</div>
       </div>
 
       <div className="flex items-center gap-2 mt-5 flex-wrap">

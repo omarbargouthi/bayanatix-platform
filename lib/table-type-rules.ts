@@ -15,8 +15,8 @@
 export type CategoryCode = "MASTER" | "TRANSACTIONAL" | "REFERENCE" | "SETUP" | "SYSTEM";
 export type ConfidenceCode = "HIGH" | "MEDIUM" | "LOW";
 
-// Checked in this order, which also breaks ties: a more specific type wins over a
-// broader one when both have the same points.
+// The five types. The order here is only the order they are scored and listed in; which
+// type wins a tie is the tieBreakOrder setting.
 export const CATEGORY_PRIORITY: CategoryCode[] = ["SYSTEM", "SETUP", "REFERENCE", "TRANSACTIONAL", "MASTER"];
 
 export type TableTypeWeights = {
@@ -57,6 +57,8 @@ export type TableTypeConfig = {
   weights: TableTypeWeights;
   limits: TableTypeLimits;
   confidence: { highGap: number; mediumGap: number };
+  /** Which type wins when two end with the same points: earlier in the list wins. All five types, once each. */
+  tieBreakOrder: CategoryCode[];
 };
 
 export const DEFAULT_TABLE_TYPE_CONFIG: TableTypeConfig = {
@@ -81,6 +83,7 @@ export const DEFAULT_TABLE_TYPE_CONFIG: TableTypeConfig = {
   },
   limits: { largeRows: 5000, smallMaxColumns: 6, smallMaxRows: 500, wideMinColumns: 5 },
   confidence: { highGap: 4, mediumGap: 2 },
+  tieBreakOrder: ["SYSTEM", "SETUP", "REFERENCE", "TRANSACTIONAL", "MASTER"],
 };
 
 export function classifyTableType(
@@ -128,12 +131,17 @@ export function classifyTableType(
 
   const ranked = CATEGORY_PRIORITY
     .map(code => ({ code, points: score[code] }))
-    .sort((a, b) => b.points - a.points || CATEGORY_PRIORITY.indexOf(a.code) - CATEGORY_PRIORITY.indexOf(b.code));
+    .sort((a, b) => b.points - a.points || cfg.tieBreakOrder.indexOf(a.code) - cfg.tieBreakOrder.indexOf(b.code));
   const [top, second] = ranked;
   const gap = top.points - (second?.points ?? 0);
   const confidence: ConfidenceCode = gap >= cfg.confidence.highGap ? "HIGH" : gap >= cfg.confidence.mediumGap ? "MEDIUM" : "LOW";
 
   return { code: top.code, confidence };
+}
+
+/** True when the value lists each of the five table types exactly once. */
+function isFullTypeOrder(v: unknown): v is CategoryCode[] {
+  return Array.isArray(v) && v.length === CATEGORY_PRIORITY.length && CATEGORY_PRIORITY.every((code) => v.includes(code));
 }
 
 /**
@@ -158,6 +166,7 @@ export function withTableTypeDefaults(stored: unknown): TableTypeConfig {
     weights: { ...d.weights, ...(s.weights ?? {}) },
     limits: { ...d.limits, ...(s.limits ?? {}) },
     confidence: { ...d.confidence, ...(s.confidence ?? {}) },
+    tieBreakOrder: isFullTypeOrder(s.tieBreakOrder) ? s.tieBreakOrder : d.tieBreakOrder,
   };
 }
 
@@ -198,5 +207,9 @@ export function validateTableTypeConfig(input: unknown): { config: TableTypeConf
   const { highGap, mediumGap } = c.confidence;
   if (![highGap, mediumGap].every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 40)) return { error: "The confidence gaps must be between 0 and 40." };
   if (mediumGap > highGap) return { error: "The Medium gap cannot be larger than the High gap." };
-  return { config: { keywords, columnPatterns, systemPrefixes: { schema: sysSchema, table: sysTable }, weights: c.weights, limits: c.limits, confidence: c.confidence } };
+  // withTableTypeDefaults() quietly replaces a broken order with the default, which is
+  // right for stored settings but would hide a bad request — so check what was sent.
+  const sentOrder = (input as Partial<TableTypeConfig> | null)?.tieBreakOrder;
+  if (sentOrder !== undefined && !isFullTypeOrder(sentOrder)) return { error: "The tie-break order must list each of the five table types exactly once." };
+  return { config: { keywords, columnPatterns, systemPrefixes: { schema: sysSchema, table: sysTable }, weights: c.weights, limits: c.limits, confidence: c.confidence, tieBreakOrder: c.tieBreakOrder } };
 }
