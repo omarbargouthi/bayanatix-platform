@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { startWorkflow } from "@/lib/workflow";
+import { startWorkflow, resolveAssetStakeholder } from "@/lib/workflow";
 
 export async function GET(req: Request) {
   const session = await getSession();
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
 
   const { requestTypeCode, title, descriptionText, priorityCode, targets } = await req.json();
 
-  const VALID_TYPES = ["FIX_DATA_ISSUE", "UPDATE_DEFINITION", "CERTIFY_ASSET", "GRANT_ACCESS", "REMOVE_ACCESS", "OTHER", "PI_CLEAR_TEXT_ACCESS"];
+  const VALID_TYPES = ["FIX_DATA_ISSUE", "UPDATE_DEFINITION", "CERTIFY_ASSET", "GRANT_ACCESS", "REMOVE_ACCESS", "OTHER", "PI_CLEAR_TEXT_ACCESS", "CLEANUP_DATA_ASSET"];
   if (!VALID_TYPES.includes(requestTypeCode))
     return NextResponse.json({ error: "Invalid request type" }, { status: 400 });
   if (!title?.trim())
@@ -117,6 +117,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
   if (!Array.isArray(targets) || targets.length === 0)
     return NextResponse.json({ error: "At least one target asset is required" }, { status: 400 });
+
+  // A clean-up is about tables or columns of a source system, and is raised by the IT
+  // side: the Technical Steward of each of them (an administrator may raise it for them).
+  if (requestTypeCode === "CLEANUP_DATA_ASSET") {
+    for (const t of targets) {
+      const id = Number(t.assetId);
+      if ((t.assetTypeCode !== "DATA_ENTITIES" && t.assetTypeCode !== "DATA_ATTRIBUTES") || !Number.isInteger(id)) {
+        return NextResponse.json({ error: "A clean-up request applies to tables or columns." }, { status: 400 });
+      }
+      if (session.role !== "ADMIN" && !(await resolveAssetStakeholder(t.assetTypeCode, id, "TECH_STEWARD")).includes(session.userId)) {
+        return NextResponse.json({
+          code: "NOT_TECH_STEWARD",
+          error: `Only the Technical Steward of "${t.assetName ?? "this asset"}" can raise a clean-up request for it.`,
+        }, { status: 403 });
+      }
+    }
+  }
 
   const [created] = await sql<{ requestId: number }[]>`
     INSERT INTO bayanat.asset_requests

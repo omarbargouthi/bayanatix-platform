@@ -12,6 +12,7 @@ const TYPE_LABEL: Record<string, string> = {
   CERTIFY_ASSET:     "Certify Asset",
   GRANT_ACCESS:      "Grant Access",
   REMOVE_ACCESS:     "Remove Access",
+  CLEANUP_DATA_ASSET: "Clean Up Data Asset",
   OTHER:             "Other",
 };
 const PRIORITY_COLOR: Record<string, string> = {

@@ -5,7 +5,7 @@ type StageRow = {
   stageId:        number;
   stageName:      string;
   stageOrder:     number;
-  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER" | "ASSET_OWNER" | "ASSET_STEWARD";
+  assigneeType:   "ROLE" | "TEAM" | "USER" | "REQUESTER" | "ASSET_OWNER" | "ASSET_STEWARD" | "ASSET_BIZ_STEWARD" | "ASSET_TECH_STEWARD";
   assigneeRoleId: number | null;
   assigneeTeamId: number | null;
   assigneeUserId: string | null;
@@ -76,8 +76,39 @@ export async function resolveAssetSteward(assetTypeCode: string, assetId: number
   return [];
 }
 
+/** Whoever holds one governance role (OWNER, BIZ_STEWARD, TECH_STEWARD) on an asset,
+ *  following the same inheritance as resolveAssetOwner (column -> table -> schema -> source). */
+export async function resolveAssetStakeholder(assetTypeCode: string, assetId: number, roleCode: "OWNER" | "BIZ_STEWARD" | "TECH_STEWARD"): Promise<string[]> {
+  if (roleCode === "OWNER") return resolveAssetOwner(assetTypeCode, assetId);
+  const rows =
+    assetTypeCode === "DATA_ATTRIBUTES" ? await sql<{ userId: string }[]>`SELECT user_id AS "userId" FROM bayanat.fn_resolve_effective_stakeholder(${assetId}, ${roleCode})`
+    : assetTypeCode === "DATA_ENTITIES" ? await sql<{ userId: string }[]>`SELECT user_id AS "userId" FROM bayanat.fn_resolve_entity_stakeholder(${assetId}, ${roleCode})`
+    : assetTypeCode === "DATA_SCHEMAS" ? await sql<{ userId: string }[]>`SELECT user_id AS "userId" FROM bayanat.fn_resolve_schema_stakeholder(${assetId}, ${roleCode})`
+    : assetTypeCode === "DATA_SOURCES" ? await sql<{ userId: string }[]>`
+        SELECT user_id AS "userId" FROM bayanat.asset_stakeholders
+        WHERE asset_type_code = 'DATA_SOURCES' AND asset_id = ${assetId} AND role_code = ${roleCode}`
+    : [];
+  return [...new Set(rows.map((r) => r.userId))];
+}
+
 async function resolveAssignees(stage: StageRow, requestId: number): Promise<string[]> {
   switch (stage.assigneeType) {
+    // One specific steward of the request's assets (ASSET_STEWARD below is all of them).
+    case "ASSET_BIZ_STEWARD":
+    case "ASSET_TECH_STEWARD": {
+      const roleCode = stage.assigneeType === "ASSET_BIZ_STEWARD" ? "BIZ_STEWARD" : "TECH_STEWARD";
+      const targets = await sql<{ assetTypeCode: string; assetId: number }[]>`
+        SELECT asset_type_code AS "assetTypeCode", asset_id AS "assetId"
+        FROM bayanat.asset_request_targets
+        WHERE request_id = ${requestId} AND asset_id IS NOT NULL
+      `;
+      const people = new Set<string>();
+      for (const t of targets) {
+        for (const userId of await resolveAssetStakeholder(t.assetTypeCode, t.assetId, roleCode)) people.add(userId);
+      }
+      return [...people];
+    }
+
     case "USER":
       return stage.assigneeUserId ? [stage.assigneeUserId] : [];
 

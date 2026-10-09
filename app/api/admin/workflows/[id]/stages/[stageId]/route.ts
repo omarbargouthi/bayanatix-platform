@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: Params) {
   // COALESCE can merge field-by-field — when the type changes, the other two
   // must be cleared, not left pointing at the previous type's target.
   if (assigneeType !== undefined) {
-    const VALID_TYPES = ["ROLE", "TEAM", "USER", "REQUESTER", "ASSET_OWNER", "ASSET_STEWARD"];
+    const VALID_TYPES = ["ROLE", "TEAM", "USER", "REQUESTER", "ASSET_OWNER", "ASSET_STEWARD", "ASSET_BIZ_STEWARD", "ASSET_TECH_STEWARD"];
     if (!VALID_TYPES.includes(assigneeType))
       return NextResponse.json({ error: "Invalid assigneeType" }, { status: 400 });
     if (assigneeType === "ROLE" && !assigneeRoleId)

@@ -800,6 +800,13 @@ export type I18nStrings = {
     reqTypeGrantAccessDesc:   string;
     reqTypeRemoveAccess:      string;
     reqTypeRemoveAccessDesc:  string;
+    reqTypeCleanup:           string;
+    reqTypeCleanupDesc:       string;
+    cleanupScopeLabel:        string;
+    cleanupScopeTable:        string;
+    cleanupScopeColumns:      string;
+    cleanupFlowNote:          string;
+    cleanupPickColumnsErr:    string;
     reqTypeOther:             string;
     reqTypeOtherDesc:         string;
     priorityLabel:      string;

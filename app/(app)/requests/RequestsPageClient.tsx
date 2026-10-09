@@ -11,6 +11,7 @@ const TYPE_LABEL: Record<string, string> = {
   CERTIFY_ASSET:     "Certify Asset",
   GRANT_ACCESS:      "Grant Access",
   REMOVE_ACCESS:     "Remove Access",
+  CLEANUP_DATA_ASSET: "Clean Up Data Asset",
   OTHER:             "Other",
 };
 
@@ -20,6 +21,7 @@ const TYPE_COLOR: Record<string, string> = {
   CERTIFY_ASSET:     "bg-amber-50  text-amber-700  border-amber-200",
   GRANT_ACCESS:      "bg-emerald-50 text-emerald-700 border-emerald-200",
   REMOVE_ACCESS:     "bg-orange-50 text-orange-700  border-orange-200",
+  CLEANUP_DATA_ASSET: "bg-rose-50 text-rose-700 border-rose-200",
   OTHER:             "bg-gray-50   text-gray-600   border-gray-200",
 };
 

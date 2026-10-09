@@ -488,6 +488,7 @@ export type RequestTypeCode =
   | "CERTIFY_ASSET"
   | "GRANT_ACCESS"
   | "REMOVE_ACCESS"
+  | "CLEANUP_DATA_ASSET"
   | "OTHER"
   | "CLASSIFY_ASSET"
   | "PUBLISH_OPEN_DATA"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RequestTypeCode, RequestPriority } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
@@ -18,6 +18,7 @@ function buildRequestTypes(c: I18nStrings["catalog"]): { code: RequestTypeCode; 
     { code: "CERTIFY_ASSET",     label: c.reqTypeCertifyAsset,      desc: c.reqTypeCertifyAssetDesc,      icon: "🏅" },
     { code: "GRANT_ACCESS",      label: c.reqTypeGrantAccess,       desc: c.reqTypeGrantAccessDesc,       icon: "🔓" },
     { code: "REMOVE_ACCESS",     label: c.reqTypeRemoveAccess,      desc: c.reqTypeRemoveAccessDesc,      icon: "🔒" },
+    { code: "CLEANUP_DATA_ASSET", label: c.reqTypeCleanup,          desc: c.reqTypeCleanupDesc,           icon: "🧹" },
     { code: "OTHER",             label: c.reqTypeOther,             desc: c.reqTypeOtherDesc,             icon: "💬" },
   ];
 }
@@ -57,6 +58,20 @@ export function RaiseRequestModal({
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState<string | null>(null);
 
+  // Clean-up: the whole table, or chosen columns of it (only when raised on a table).
+  const cleanupTable = prefilledTarget?.assetTypeCode === "DATA_ENTITIES" ? prefilledTarget : null;
+  const isCleanup = requestType === "CLEANUP_DATA_ASSET";
+  const [cleanupScope, setCleanupScope] = useState<"TABLE" | "COLUMNS">("TABLE");
+  const [columns, setColumns] = useState<{ attributeId: number; physicalName: string }[] | null>(null);
+  const [pickedColumns, setPickedColumns] = useState<number[]>([]);
+  useEffect(() => {
+    if (!isCleanup || cleanupScope !== "COLUMNS" || !cleanupTable || columns) return;
+    fetch(`/api/catalog/entities/${cleanupTable.assetId}/columns`).then((r) => (r.ok ? r.json() : [])).then((d) => setColumns(Array.isArray(d) ? d : Array.isArray(d?.columns) ? d.columns : []));
+  }, [isCleanup, cleanupScope, cleanupTable, columns]);
+  const columnTargets: Target[] = (columns ?? []).filter((col) => pickedColumns.includes(col.attributeId))
+    .map((col) => ({ assetTypeCode: "DATA_ATTRIBUTES", assetId: col.attributeId, assetName: `${cleanupTable?.assetName}.${col.physicalName}` }));
+  const useColumns = isCleanup && cleanupScope === "COLUMNS" && !!cleanupTable;
+
   // Additional entity targets from the same schema
   const availableEntities = (entities ?? []).filter(
     (e) => !targets.some((t) => t.assetTypeCode === "DATA_ENTITIES" && t.assetId === e.entityId)
@@ -74,6 +89,7 @@ export function RaiseRequestModal({
     if (!requestType) { setError(c.selectRequestTypeErr); return; }
     if (!title.trim())  { setError(c.enterTitleErr); return; }
     if (targets.length === 0) { setError(c.targetRequiredErr); return; }
+    if (useColumns && columnTargets.length === 0) { setError(c.cleanupPickColumnsErr); return; }
 
     setSaving(true);
     setError(null);
@@ -86,7 +102,7 @@ export function RaiseRequestModal({
           title: title.trim(),
           descriptionText: description.trim() || null,
           priorityCode: priority,
-          targets,
+          targets: useColumns ? columnTargets : targets,
         }),
       });
       if (!r.ok) {
@@ -135,6 +151,34 @@ export function RaiseRequestModal({
               ))}
             </div>
           </div>
+
+          {isCleanup && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2.5 space-y-2">
+              <p className="text-[11px] text-rose-900 leading-snug">{c.cleanupFlowNote}</p>
+              {cleanupTable && (
+                <div>
+                  <div className="text-[11px] font-semibold text-ink mb-1">{c.cleanupScopeLabel}</div>
+                  <div className="flex gap-4 text-[12px] text-ink">
+                    <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" className="accent-brand-purple" checked={cleanupScope === "TABLE"} onChange={() => setCleanupScope("TABLE")} />{c.cleanupScopeTable}</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" className="accent-brand-purple" checked={cleanupScope === "COLUMNS"} onChange={() => setCleanupScope("COLUMNS")} />{c.cleanupScopeColumns}</label>
+                  </div>
+                  {cleanupScope === "COLUMNS" && (
+                    <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-line bg-white px-2 py-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+                      {!columns && <span className="text-[11px] text-muted">…</span>}
+                      {columns && columns.length === 0 && <span className="text-[11px] text-muted col-span-2">No columns are cataloged for this table.</span>}
+                      {(columns ?? []).map((col) => (
+                        <label key={col.attributeId} className="flex items-center gap-1.5 text-[12px] font-mono text-ink cursor-pointer truncate" dir="ltr">
+                          <input type="checkbox" className="accent-brand-purple shrink-0" checked={pickedColumns.includes(col.attributeId)}
+                            onChange={(e) => setPickedColumns((p) => (e.target.checked ? [...p, col.attributeId] : p.filter((x) => x !== col.attributeId)))} />
+                          {col.physicalName}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Priority */}
           <div>

@@ -10,6 +10,7 @@ const ALL_TYPES = [
   { code: "CERTIFY_ASSET",        label: "Certify Asset" },
   { code: "GRANT_ACCESS",         label: "Grant Access" },
   { code: "REMOVE_ACCESS",        label: "Remove Access" },
+  { code: "CLEANUP_DATA_ASSET",   label: "Clean Up Data Asset" },
   { code: "OTHER",                label: "Other" },
   { code: "CLASSIFY_ASSET",       label: "Classify Asset" },
   { code: "COMPLIANCE_REVIEW",    label: "Compliance Review" },
@@ -29,6 +30,8 @@ const ASSIGNEE_TYPE_OPTIONS = [
   { value: "REQUESTER",     label: "Whoever Raised the Request" },
   { value: "ASSET_OWNER",   label: "The Asset's Governance Owner" },
   { value: "ASSET_STEWARD", label: "The Asset's Owner + Business/Technical Stewards" },
+  { value: "ASSET_BIZ_STEWARD",  label: "The Asset's Business Steward" },
+  { value: "ASSET_TECH_STEWARD", label: "The Asset's Technical Steward" },
 ];
 
 const ASSIGNEE_TYPE_COLOR: Record<string, string> = {
@@ -38,6 +41,8 @@ const ASSIGNEE_TYPE_COLOR: Record<string, string> = {
   REQUESTER:     "bg-emerald-50 text-emerald-700",
   ASSET_OWNER:   "bg-amber-50 text-amber-700",
   ASSET_STEWARD: "bg-teal-50 text-teal-700",
+  ASSET_BIZ_STEWARD:  "bg-teal-50 text-teal-700",
+  ASSET_TECH_STEWARD: "bg-teal-50 text-teal-700",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -46,6 +51,7 @@ const TYPE_COLOR: Record<string, string> = {
   CERTIFY_ASSET:        "bg-amber-50 text-amber-700 border-amber-200",
   GRANT_ACCESS:         "bg-emerald-50 text-emerald-700 border-emerald-200",
   REMOVE_ACCESS:        "bg-orange-50 text-orange-700 border-orange-200",
+  CLEANUP_DATA_ASSET:   "bg-rose-50 text-rose-700 border-rose-200",
   OTHER:                "bg-gray-50 text-gray-600 border-gray-200",
   CLASSIFY_ASSET:       "bg-indigo-50 text-indigo-700 border-indigo-200",
   COMPLIANCE_REVIEW:    "bg-teal-50 text-teal-700 border-teal-200",
