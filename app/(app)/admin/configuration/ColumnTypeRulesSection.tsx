@@ -233,24 +233,40 @@ export function ColumnTypeRulesSection() {
       <div className={`${card} mt-4`}>
         <div className="text-sm font-bold text-ink">Rules and their confidence</div>
         <p className="text-[11px] text-muted mt-0.5 mb-2">
-          Tried from top to bottom; the first that fits decides. The confidence is between 0 and 1. The order and the decision of
-          each rule are fixed, because every rule assumes the ones above it did not fit.
+          Tried from top to bottom; the first that fits decides. The confidence is between 0 and 1. A rule that is switched off is
+          skipped, and the columns it used to decide fall through to the rules below it. The order and the decision of each rule are
+          fixed, because every rule assumes the ones above it did not fit; the last rule catches everything left and is always on.
         </p>
         <div className="divide-y divide-line-soft">
-          {RULES.map((r) => (
-            <div key={r.key} className="grid grid-cols-[34px_1fr_90px_90px] gap-3 items-start py-2.5">
-              <div className="text-[12px] font-bold text-muted pt-0.5">{r.no}</div>
-              <div className="text-[13px] text-ink leading-snug">{r.when}</div>
-              <div className="pt-0.5">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${r.decision === "Business" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-100 text-gray-700 border-gray-300"}`}>{r.decision}</span>
+          {RULES.map((r) => {
+            const isOn = cfg.ruleEnabled[r.key];
+            const locked = r.key === "R11";
+            return (
+              <div key={r.key} className="grid grid-cols-[34px_34px_1fr_90px_90px] gap-3 items-start py-2.5">
+                <div className="pt-0.5">
+                  <button type="button" role="switch" aria-checked={isOn} aria-label={`Rule ${r.no} ${isOn ? "on" : "off"}`} disabled={locked}
+                    title={locked ? "The catch-all rule is always on" : isOn ? "Switch this rule off" : "Switch this rule on"}
+                    onClick={() => setCfg({ ...cfg, ruleEnabled: { ...cfg.ruleEnabled, [r.key]: !isOn } })}
+                    className={`relative w-8 h-[18px] rounded-full transition-colors ${isOn ? "bg-brand-purple" : "bg-gray-300"} ${locked ? "opacity-40 cursor-not-allowed" : ""}`}>
+                    <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all ${isOn ? "start-[16px]" : "start-[2px]"}`} />
+                  </button>
+                </div>
+                <div className={`text-[12px] font-bold pt-0.5 ${isOn ? "text-muted" : "text-muted/50"}`}>{r.no}</div>
+                <div className={`text-[13px] leading-snug ${isOn ? "text-ink" : "text-muted line-through"}`}>
+                  {r.when}
+                  {!isOn && <span className="ms-2 text-[10px] font-semibold text-amber-700 no-underline inline-block">off · default on</span>}
+                </div>
+                <div className={`pt-0.5 ${isOn ? "" : "opacity-40"}`}>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${r.decision === "Business" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-100 text-gray-700 border-gray-300"}`}>{r.decision}</span>
+                </div>
+                <div className={isOn ? "" : "opacity-40"}>
+                  <input type="number" min={0} max={1} step={0.01} className={num} value={cfg.ruleConfidence[r.key]} disabled={!isOn}
+                    onChange={(e) => setCfg({ ...cfg, ruleConfidence: { ...cfg.ruleConfidence, [r.key]: n(e.target.value) } })} />
+                  <DefaultHint value={cfg.ruleConfidence[r.key]} def={D.ruleConfidence[r.key]} />
+                </div>
               </div>
-              <div>
-                <input type="number" min={0} max={1} step={0.01} className={num} value={cfg.ruleConfidence[r.key]}
-                  onChange={(e) => setCfg({ ...cfg, ruleConfidence: { ...cfg.ruleConfidence, [r.key]: n(e.target.value) } })} />
-                <DefaultHint value={cfg.ruleConfidence[r.key]} def={D.ruleConfidence[r.key]} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
