@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { EvidenceAttachments } from "./EvidenceAttachments";
 import { RegulationDetails, RegulationForm } from "./RegulationDetails";
 import { useRouter } from "next/navigation";
 import type {
@@ -485,11 +486,11 @@ export function ComplianceClient({
     setSaving((s) => { const n = new Set(s); n.delete(req.reqId); return n; });
   }
 
-  async function uploadEvidence(req: ComplianceRequirement, file: File) {
-    if (!fwId) return;
-    const fd = new FormData(); fd.append("file", file);
-    await fetch(`/api/governance/compliance/${fwId}/evidence/${req.reqId}`, { method: "POST", body: fd });
-    setReqs((p) => p.map((r) => r.reqId === req.reqId ? { ...r, evidenceName: file.name } : r));
+  // The evidence list of a requirement changed (EvidenceAttachments): keep the row's summary in step.
+  function evidenceChanged(req: ComplianceRequirement, titles: string[]) {
+    const evidenceName = titles.length > 0 ? titles.join("; ") : null;
+    setReqs((p) => p.map((r) => (r.reqId === req.reqId && (r.evidenceName !== evidenceName || r.evidenceCount !== titles.length)
+      ? { ...r, evidenceName, evidenceCount: titles.length } : r)));
   }
 
   async function advanceWorkflow(req: ComplianceRequirement, action: "submit"|"confirm"|"endorse"|"reject") {
@@ -516,6 +517,11 @@ export function ComplianceClient({
 
   async function handleImport(file: File) {
     if (!fwId) return;
+    // An import replaces the regulation's requirements, with the assessments and evidence on them.
+    if (reqs.length > 0 && !confirm(`Importing replaces all ${reqs.length} requirements of this regulation, together with their assessments, comments and attached evidence. Continue with “${file.name}”?`)) {
+      if (importRef.current) importRef.current.value = "";
+      return;
+    }
     setImporting(true); setImportMsg("");
     try {
       const fd = new FormData(); fd.append("file", file);
@@ -1061,20 +1067,11 @@ export function ComplianceClient({
 
                                     {/* Evidence file */}
                                     <td className="px-3 py-3">
-                                      <label className="relative cursor-pointer block">
-                                        {req.evidenceName ? (
-                                          <a href={`/api/governance/compliance/${fwId}/evidence/${req.reqId}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="text-brand-purple text-[11px] truncate max-w-[72px] block hover:underline"
-                                            title={req.evidenceName}>
-                                            {req.evidenceName.length > 10 ? req.evidenceName.slice(0,9)+"…" : req.evidenceName}
-                                          </a>
-                                        ) : (
-                                          <span className="text-[11px] text-muted/50 italic">Upload…</span>
-                                        )}
-                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer"
-                                          onChange={(e) => e.target.files?.[0] && uploadEvidence(req, e.target.files[0])} />
-                                      </label>
+                                      {/* Opens the row, where documents and links are added, previewed and edited. */}
+                                      <button onClick={() => setExpanded(req.reqId)} title={req.evidenceName ?? undefined}
+                                        className={`text-[11px] whitespace-nowrap hover:underline ${req.evidenceCount > 0 ? "text-brand-purple font-medium" : "text-muted/60 italic"}`}>
+                                        {req.evidenceCount > 0 ? `${req.evidenceCount} item${req.evidenceCount === 1 ? "" : "s"}` : "Add…"}
+                                      </button>
                                     </td>
 
                                     {/* Expand */}
@@ -1094,6 +1091,7 @@ export function ComplianceClient({
                                           req={req}
                                           fwId={fwId ?? 0}
                                           role={currentUser.role}
+                                          onEvidenceChange={(titles) => evidenceChanged(req, titles)}
                                           onPatch={(updates) => patch(req, updates)}
                                           onWorkflow={(action) => advanceWorkflow(req, action)}
                                           translations={translations}
@@ -1137,9 +1135,10 @@ function WorkflowBadge({ status }: { status: string }) {
 
 // ── Evidence expanded row ─────────────────────────────────────────────────────
 function EvidenceExpanded({
-  req, fwId, role, onPatch, onWorkflow, translations, evidenceTypeMap,
+  req, fwId, role, onPatch, onWorkflow, onEvidenceChange, translations, evidenceTypeMap,
 }: {
   req: ComplianceRequirement; fwId: number; role: string;
+  onEvidenceChange: (titles: string[]) => void;
   onPatch: (u: Partial<ComplianceRequirement>) => void;
   onWorkflow: (action: "submit"|"confirm"|"endorse"|"reject") => void;
   translations: Record<string, string>;
@@ -1229,6 +1228,9 @@ function EvidenceExpanded({
           {evidenceImported || <span className="text-muted italic">—</span>}
         </div>
       </div>
+
+      {/* What the organisation attached to show the requirement is met */}
+      <EvidenceAttachments fwId={fwId} reqId={req.reqId} canEdit={role !== "VIEWER"} onChange={onEvidenceChange} />
 
       {/* Management & Supporting Sector */}
       <div>

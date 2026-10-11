@@ -77,6 +77,7 @@ export type ComplianceRequirement = {
   managementNotes:       string | null;
   comments:              string | null;
   evidenceName:          string | null;
+  evidenceCount:         number;
   assessedBy:            string | null;
   assessedAt:            string | null;
   // Workflow
@@ -536,7 +537,10 @@ export async function listRequirements(frameworkId: number): Promise<ComplianceR
       a.supporting_evidence_override AS "supportingEvidenceOverride",
       a.management_notes        AS "managementNotes",
       a.comments,
-      a.evidence_name           AS "evidenceName",
+      -- Titles of the evidence items attached (db/171), "; "-separated; null when none.
+      (SELECT string_agg(ei.title_text, '; ' ORDER BY ei.evidence_id)
+         FROM bayanat.gov_compliance_evidence_items ei WHERE ei.req_id = r.req_id) AS "evidenceName",
+      (SELECT count(*)::int FROM bayanat.gov_compliance_evidence_items ei WHERE ei.req_id = r.req_id) AS "evidenceCount",
       a.assessed_by             AS "assessedBy",
       a.assessed_at::text       AS "assessedAt",
       r.review_request_id       AS "reviewRequestId"
@@ -571,10 +575,15 @@ export async function importRequirements(
     domainOwner: string; managementSector: string; sortOrder: number;
   }>
 ): Promise<void> {
-  await sql`DELETE FROM bayanat.gov_compliance_requirements WHERE framework_id = ${frameworkId}`;
-  if (rows.length === 0) return;
+  // An import replaces the regulation's requirements, and with them every assessment and
+  // evidence item attached to them. A file that yields no rows (wrong file, wrong
+  // headers) must therefore change nothing, and a failure part-way must not leave the
+  // regulation half-replaced.
+  if (rows.length === 0) throw new Error("No requirement rows were found in the file, so nothing was changed. Check that it is the Excel template with a Question column.");
+  await sql.begin(async (tx) => {
+  await tx`DELETE FROM bayanat.gov_compliance_requirements WHERE framework_id = ${frameworkId}`;
   for (const r of rows) {
-    await sql`
+    await tx`
       INSERT INTO bayanat.gov_compliance_requirements
         (framework_id, req_code, standard, standard_code, req_text, domain, domain_code,
          maturity_level, supporting_evidence, admission_criteria, directory_code, directory_type,
@@ -601,6 +610,7 @@ export async function importRequirements(
       )
     `;
   }
+  });
 }
 
 // question/supportingEvidence/admissionCriteria/managementSector/directoryType
@@ -714,24 +724,6 @@ export async function upsertAssessment(reqId: number, fields: {
       `;
     }
   }
-}
-
-export async function attachEvidence(reqId: number, fileName: string, fileData: Buffer): Promise<void> {
-  await sql`
-    INSERT INTO bayanat.gov_compliance_assessments (req_id, submission_status, evidence_name, evidence_data)
-    VALUES (${reqId}, 'NOT_COMPLETE', ${fileName}, ${fileData})
-    ON CONFLICT (req_id) DO UPDATE SET
-      evidence_name = EXCLUDED.evidence_name,
-      evidence_data = EXCLUDED.evidence_data
-  `;
-}
-
-export async function getEvidenceData(reqId: number): Promise<{ evidenceName: string; evidenceData: Buffer | null } | null> {
-  const rows = await sql<{ evidenceName: string; evidenceData: Buffer | null }[]>`
-    SELECT evidence_name AS "evidenceName", evidence_data AS "evidenceData"
-    FROM bayanat.gov_compliance_assessments WHERE req_id = ${reqId}
-  `;
-  return rows[0] ?? null;
 }
 
 // ── Maturity level selection ──────────────────────────────────────────────────

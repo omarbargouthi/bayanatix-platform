@@ -172,6 +172,9 @@ export async function POST(req: Request, { params }: { params: { frameworkId: st
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
+  // The import replaces every requirement of the regulation, so refuse anything that is
+  // plainly not a spreadsheet before a job is even started.
+  if (!/\.(xlsx|xls|csv)$/i.test(file.name)) return NextResponse.json({ error: "Choose an Excel file (.xlsx, .xls or .csv)." }, { status: 400 });
   const buffer = Buffer.from(await file.arrayBuffer());
   const frameworkId = Number(params.frameworkId);
   const jobId = await createJob(JOB_TYPE_GOV_COMPLIANCE_IMPORT, { frameworkId, fileName: file.name }, session.userId);
