@@ -27,7 +27,7 @@ export const en: I18nStrings = {
     auditLogs:         "Audit & Logs",
     configuration:      "Configuration",
     aiProviders:        "AI Providers",
-    maturityIndexSetup: "Maturity Index Setup",
+    maturityIndexSetup: "Regulation Setup",
     reportsKpi:         "Report KPI Admin",
     customAssetTypes:   "Custom Asset Types",
     complianceConfig:   "Configuration",

@@ -30,7 +30,7 @@ const SECTION_LABELS: Record<string, string> = {
   "custom-assets":          "Custom Assets",
   "data-quality":           "Data Quality",
   "languages":              "Languages",
-  "maturity-index-setup":   "Maturity Index Setup",
+  "maturity-index-setup":   "Regulation Setup",
   "reports-kpi":            "Reports & KPIs",
   "ai-providers":           "AI Providers",
 };

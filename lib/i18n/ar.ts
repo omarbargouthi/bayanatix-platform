@@ -27,7 +27,7 @@ export const ar: I18nStrings = {
     auditLogs:         "التدقيق والسجلات",
     configuration:      "الإعدادات",
     aiProviders:        "مزودو الذكاء الاصطناعي",
-    maturityIndexSetup: "إعداد مؤشر النضج",
+    maturityIndexSetup: "إعداد الأنظمة واللوائح",
     reportsKpi:         "إدارة مؤشرات التقارير",
     customAssetTypes:   "أنواع الأصول المخصصة",
     complianceConfig:   "إعدادات الامتثال",

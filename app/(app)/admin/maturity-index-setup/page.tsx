@@ -15,7 +15,7 @@ export default async function MaturityIndexSetupPage() {
   return (
     <main className="px-8 py-7 pb-14">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-brand-deep">Maturity Index Setup</h1>
+        <h1 className="text-2xl font-bold text-brand-deep">Regulation Setup</h1>
         <p className="text-sm text-ink-soft mt-1">
           Edit requirement details, evidence codes, domains and assignments across compliance frameworks.
         </p>
