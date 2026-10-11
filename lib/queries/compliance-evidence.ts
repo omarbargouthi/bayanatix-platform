@@ -25,6 +25,23 @@ const TYPE_BY_EXTENSION: Record<string, string> = {
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
+/**
+ * cleanEvidenceLink() for a link typed into the application: a full address of this
+ * same site (copied from the address bar) is stored as the page path, so the link keeps
+ * working when the application is reached under another host name (localhost today, the
+ * hosted address tomorrow).
+ */
+export function cleanEvidenceLinkFrom(raw: unknown, req: Request): string | null {
+  const url = cleanEvidenceLink(raw);
+  if (!url || url.startsWith("/")) return url;
+  try {
+    const u = new URL(url);
+    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+    const sameSite = [req.headers.get("origin"), host ? `http://${host}` : null, host ? `https://${host}` : null].some((o) => o === u.origin);
+    return sameSite ? (u.pathname + u.search + u.hash) : url;
+  } catch { return url; }
+}
+
 /** The type to store for an upload. The extension decides; the browser's claim is not trusted. */
 export function evidenceMimeType(fileName: string): string {
   const ext = fileName.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";

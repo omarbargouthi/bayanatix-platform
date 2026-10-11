@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+
+// Loaded only when a PDF is actually previewed: pdf.js is large and browser-only.
+const PdfPreview = dynamic(() => import("./PdfPreview").then((m) => m.PdfPreview), { ssr: false, loading: () => <div className="h-full grid place-items-center text-sm text-muted">Loading…</div> });
 
 // The evidence attached to one compliance requirement (db/171): documents and links.
 // Each can be previewed or opened, renamed, annotated, replaced and removed.
@@ -8,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Preview: the application never allows its own pages inside a frame (X-Frame-Options
 // DENY, frame-ancestors 'none' — next.config.mjs, lib/csp.ts), so a document is not
 // shown in an iframe. Images are shown with <img>, text files are fetched and shown as
-// text, and a PDF opens in a new browser tab in the browser's own viewer.
+// text, and a PDF is drawn page by page by pdf.js (PdfPreview).
 
 export type EvidenceItem = {
   evidenceId: number; kind: "FILE" | "LINK"; title: string; note: string | null;
@@ -59,10 +63,8 @@ export function EvidenceAttachments({ fwId, reqId, canEdit, onChange }: {
     return () => { live = false; };
   }, [base, apply]);
 
-  // Images, text and "no preview" open the dialog; a PDF goes to a new tab.
   function showPreview(i: EvidenceItem) {
     const url = `${base}/${i.evidenceId}`;
-    if (i.canPreview && i.mimeType === "application/pdf") { window.open(url, "_blank", "noopener,noreferrer"); return; }
     setPreviewText(null); setPreview(i);
     if (i.canPreview && i.mimeType?.startsWith("text/")) {
       fetch(url).then((r) => (r.ok ? r.text() : Promise.reject()))
@@ -128,13 +130,13 @@ export function EvidenceAttachments({ fwId, reqId, canEdit, onChange }: {
           <label className={label}>{isEdit ? "Replace the document (optional)" : "Document"}</label>
           <input ref={fileInput} type="file" className="block text-[12px] text-ink-soft file:me-2 file:px-2.5 file:py-1 file:rounded-md file:border file:border-line file:bg-white file:text-[12px] file:text-ink file:cursor-pointer"
             onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); if (f && !isEdit && !form.title.trim()) setForm((x) => ({ ...x, title: f.name })); }} />
-          <div className="text-[10px] text-muted mt-1">Up to 25 MB. Images and text files are previewed here and PDFs in a new tab; other types (Word, Excel…) are downloaded.</div>
+          <div className="text-[10px] text-muted mt-1">Up to 25 MB. PDFs, images and text files are previewed here; other types (Word, Excel…) are downloaded.</div>
         </div>
       ) : (
         <div>
           <label className={label}>Link</label>
           <input className={`${input} font-mono`} dir="ltr" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="/catalog/12/tables/34   or   https://intranet.example.com/policy" />
-          <div className="text-[10px] text-muted mt-1">A page in Bayanis (copy the part of the address after the site name, starting with /) or any http(s) address such as an intranet page.</div>
+          <div className="text-[10px] text-muted mt-1">Paste the address of a page in Bayanis, or any http(s) address such as an intranet page.</div>
         </div>
       )}
       <div className="grid grid-cols-2 gap-2.5">
@@ -205,7 +207,7 @@ export function EvidenceAttachments({ fwId, reqId, canEdit, onChange }: {
                   <div className="flex items-center gap-3 shrink-0 pt-0.5">
                     {i.kind === "FILE" ? (
                       <>
-                        <button onClick={() => showPreview(i)} className={link} title={i.mimeType === "application/pdf" ? "Opens in a new tab" : undefined}>Preview</button>
+                        <button onClick={() => showPreview(i)} className={link}>Preview</button>
                         <a href={`${base}/${i.evidenceId}?download=1`} className={link}>Download</a>
                       </>
                     ) : (
@@ -242,6 +244,9 @@ export function EvidenceAttachments({ fwId, reqId, canEdit, onChange }: {
                 <div className="text-[11px] text-muted truncate" dir="ltr">{preview.fileName} · {fmtSize(preview.fileSize)}</div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
+                {preview.mimeType === "application/pdf" && (
+                  <a href={`${base}/${preview.evidenceId}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-brand-purple font-medium hover:underline">Open in a new tab</a>
+                )}
                 <a href={`${base}/${preview.evidenceId}?download=1`} className="btn btn-sm">Download</a>
                 <button onClick={() => setPreview(null)} aria-label="Close" className="text-muted hover:text-ink text-xl leading-none">&times;</button>
               </div>
@@ -254,6 +259,8 @@ export function EvidenceAttachments({ fwId, reqId, canEdit, onChange }: {
                     <div className="text-[12px] text-muted mt-1">Download it to open it in its own application.</div>
                   </div>
                 </div>
+              ) : preview.mimeType === "application/pdf" ? (
+                <PdfPreview url={`${base}/${preview.evidenceId}`} />
               ) : preview.mimeType?.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <div className="h-full overflow-auto grid place-items-center p-4"><img src={`${base}/${preview.evidenceId}`} alt={preview.title} className="max-w-full max-h-full" /></div>

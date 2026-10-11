@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { canManageDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import {
-  listEvidenceItems, addEvidenceFile, addEvidenceLink, cleanEvidenceLink, logEvidenceChange, MAX_EVIDENCE_FILE_BYTES,
+  listEvidenceItems, addEvidenceFile, addEvidenceLink, cleanEvidenceLinkFrom, logEvidenceChange, MAX_EVIDENCE_FILE_BYTES,
 } from "@/lib/queries/compliance-evidence";
 
 type Params = { params: { frameworkId: string; reqId: string } };
@@ -50,7 +50,7 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const body = await req.json().catch(() => null);
-  const url = cleanEvidenceLink(body?.url);
+  const url = cleanEvidenceLinkFrom(body?.url, req);
   if (!url) return NextResponse.json({ error: "Enter a link that starts with / (a page in Bayanis) or with http:// or https://." }, { status: 400 });
   const item = await addEvidenceLink(reqId, { title: text(body?.title, 300) ?? url.slice(0, 300), note: text(body?.note, 4000), url }, session.userId);
   await logEvidenceChange(reqId, fwId, null, `Added link: ${item.title}`, session.userId);

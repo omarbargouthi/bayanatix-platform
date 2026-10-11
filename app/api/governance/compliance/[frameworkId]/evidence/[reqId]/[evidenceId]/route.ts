@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canManageDomain } from "@/lib/can";
 import {
-  getEvidenceItem, getEvidenceFile, updateEvidenceItem, deleteEvidenceItem, cleanEvidenceLink, logEvidenceChange,
+  getEvidenceItem, getEvidenceFile, updateEvidenceItem, deleteEvidenceItem, cleanEvidenceLinkFrom, logEvidenceChange,
   MAX_EVIDENCE_FILE_BYTES, PREVIEWABLE_TYPES,
 } from "@/lib/queries/compliance-evidence";
 
@@ -68,7 +68,7 @@ export async function PATCH(req: Request, { params }: Params) {
   }
   if (fields.note !== undefined) patch.note = typeof fields.note === "string" && fields.note.trim() ? fields.note.trim().slice(0, 4000) : null;
   if (fields.url !== undefined && before.kind === "LINK") {
-    const url = cleanEvidenceLink(fields.url);
+    const url = cleanEvidenceLinkFrom(fields.url, req);
     if (!url) return NextResponse.json({ error: "Enter a link that starts with / (a page in Bayanis) or with http:// or https://." }, { status: 400 });
     patch.url = url;
   }
