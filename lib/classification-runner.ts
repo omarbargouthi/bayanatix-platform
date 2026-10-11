@@ -6,8 +6,8 @@
 import { sql } from "./db";
 import { logUpdate } from "./audit";
 import {
-  classifyColumn, isSurrogateLooking,
-  type ColumnInput, type PatternDictionary, type PatternGroup, type ConfidenceBand,
+  classifyColumn, isSurrogateLooking, withColumnTypeDefaults,
+  type ColumnInput, type PatternDictionary, type PatternGroup, type ConfidenceBand, type ColumnTypeConfig,
 } from "./column-classifier";
 
 const SYSTEM_ACTOR = "SYSTEM";
@@ -23,6 +23,18 @@ export type RunOptions = {
   autoAcceptBand?: "NONE" | "HIGH";
   inferFkByNaming?: boolean;
   crawlJobId?: number;
+  /** Rules to score with; left out = the saved configuration (Configuration > Column Type Rules). */
+  config?: ColumnTypeConfig;
+  /** Score only: nothing is written (no run record, no FK inference, no suggestion); `scored` has the result for every column. */
+  dryRun?: boolean;
+};
+
+export type DryRunResult = {
+  attributeId: number; table: string; column: string;
+  /** What the catalog holds now. */
+  storedSuggestion: string | null; confirmedClass: string | null;
+  /** What these rules give. */
+  suggestedClass: string; confidence: number; band: ConfidenceBand; rule: string;
 };
 
 export type RunSummary = {
@@ -31,7 +43,15 @@ export type RunSummary = {
   suggestionsChanged: number;
   byRule: Record<string, number>;
   byBand: Record<ConfidenceBand, number>;
+  /** Dry run only. */
+  scored?: DryRunResult[];
 };
+
+/** The saved column type rules; the defaults when nothing was saved or db/169 is not applied yet. */
+export async function getColumnTypeConfig(): Promise<ColumnTypeConfig> {
+  const rows = await sql<{ config: unknown }[]>`SELECT config_json AS config FROM bayanat.column_type_rule_settings WHERE settings_id = 1`.catch(() => []);
+  return withColumnTypeDefaults(rows[0]?.config);
+}
 
 // ── Name-inference FK fallback (spec §2.2b) ────────────────────────────────────
 // For sources with no declared FK constraints (or columns the introspector missed),
@@ -134,23 +154,25 @@ async function loadPatterns(dataSourceId: number | null): Promise<PatternDiction
 // ── Main entry point ─────────────────────────────────────────────────────────────
 
 export async function runColumnClassification(opts: RunOptions): Promise<RunSummary> {
-  const [runRow] = await sql<{ id: number }[]>`
+  const dry = opts.dryRun === true;
+  const runId = dry ? 0 : (await sql<{ id: number }[]>`
     INSERT INTO bayanat.classification_runs (scope_type_code, scope_id, triggered_by_user_id, status_code)
     VALUES (${opts.scopeType}, ${opts.scopeId}, ${opts.triggeredByUserId}, 'RUNNING')
     RETURNING run_id AS id
-  `;
-  const runId = runRow.id;
+  `)[0].id;
+  const scored: DryRunResult[] = [];
 
   try {
     const dataSourceId = await resolveDataSourceId(opts.scopeType, opts.scopeId);
 
     let inferredLinks = 0;
-    if (opts.inferFkByNaming !== false && dataSourceId != null) {
+    if (!dry && opts.inferFkByNaming !== false && dataSourceId != null) {
       inferredLinks = await inferNameBasedFkLinks(dataSourceId);
     }
 
     const attributeIds = await resolveScopeAttributeIds(opts.scopeType, opts.scopeId, opts.scopeMode);
     const patterns = await loadPatterns(dataSourceId);
+    const cfg = opts.config ?? await getColumnTypeConfig();
 
     const byRule: Record<string, number> = {};
     const byBand: Record<ConfidenceBand, number> = { HIGH: 0, MEDIUM: 0, LOW: 0 };
@@ -163,6 +185,7 @@ export async function runColumnClassification(opts: RunOptions): Promise<RunSumm
         entityId: number; categoryCode: string | null;
         attributeClassCode: string | null; suggestedClassCode: string | null;
         suggestionStatus: string; friendlyName: string | null;
+        entityName: string;
       }[]>`
         SELECT
           a.attribute_id AS id, a.physical_name_text AS name, a.data_type_text AS "dataType",
@@ -171,7 +194,8 @@ export async function runColumnClassification(opts: RunOptions): Promise<RunSumm
           coalesce(a.is_foreign_key_indicator, false) AS "isForeignKey",
           a.entity_id AS "entityId", e.entity_category_code AS "categoryCode",
           a.attribute_class_code AS "attributeClassCode", a.suggested_class_code AS "suggestedClassCode",
-          a.suggestion_status_code AS "suggestionStatus", a.friendly_name_text AS "friendlyName"
+          a.suggestion_status_code AS "suggestionStatus", a.friendly_name_text AS "friendlyName",
+          e.entity_name_text AS "entityName"
         FROM bayanat.data_attributes a
         JOIN bayanat.data_entities e ON e.entity_id = a.entity_id
         WHERE a.attribute_id = ANY(${attributeIds})
@@ -251,7 +275,7 @@ export async function runColumnClassification(opts: RunOptions): Promise<RunSumm
             referencedByMasterOrTransactional: referencedEntitySet.has(attr.entityId),
           },
           referencedColumn: refLink ? {
-            isSurrogatePk: refLink.refIsPk && refLink.refPkCount === 1 && isSurrogateLooking({ name: refLink.refName, dataType: refLink.refDataType ?? "", defaultValueText: refLink.refDefaultValue }, patterns),
+            isSurrogatePk: refLink.refIsPk && refLink.refPkCount === 1 && isSurrogateLooking({ name: refLink.refName, dataType: refLink.refDataType ?? "", defaultValueText: refLink.refDefaultValue }, patterns, cfg),
             discoveryMethod: refLink.discoveryMethod,
           } : null,
           hasGlossaryMatch: glossaryByAttr.has(attr.id),
@@ -259,12 +283,22 @@ export async function runColumnClassification(opts: RunOptions): Promise<RunSumm
           hasGovernanceSignals: governedSet.has(attr.id),
         };
 
-        const result = classifyColumn(input, patterns);
+        const result = classifyColumn(input, patterns, cfg);
         byRule[result.rationale.terminal_rule] = (byRule[result.rationale.terminal_rule] ?? 0) + 1;
         byBand[result.band]++;
 
         const changed = attr.suggestedClassCode !== result.suggestedClass;
         if (changed) suggestionsChanged++;
+
+        if (dry) {
+          const confirmed = attr.suggestionStatus === "ACCEPTED" || attr.suggestionStatus === "OVERRIDDEN";
+          scored.push({
+            attributeId: Number(attr.id), table: attr.entityName, column: attr.name,
+            storedSuggestion: attr.suggestedClassCode, confirmedClass: confirmed ? attr.attributeClassCode : null,
+            suggestedClass: result.suggestedClass, confidence: result.confidence, band: result.band, rule: result.rationale.terminal_rule,
+          });
+          continue;
+        }
 
         const rationale = { run_id: runId, ...result.rationale };
 
@@ -312,6 +346,8 @@ export async function runColumnClassification(opts: RunOptions): Promise<RunSumm
       }
     }
 
+    if (dry) return { runId, attributesEvaluated: attributeIds.length, suggestionsChanged, byRule, byBand, scored };
+
     await sql`
       UPDATE bayanat.classification_runs SET
         status_code = 'COMPLETED', finished_at = NOW(),
@@ -323,6 +359,7 @@ export async function runColumnClassification(opts: RunOptions): Promise<RunSumm
 
     return { runId, attributesEvaluated: attributeIds.length, suggestionsChanged, byRule, byBand };
   } catch (err) {
+    if (dry) throw err;
     await sql`
       UPDATE bayanat.classification_runs SET status_code = 'FAILED', finished_at = NOW(),
         summary_json = ${JSON.stringify({ error: (err as Error).message })}::jsonb
