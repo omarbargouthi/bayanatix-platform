@@ -101,11 +101,15 @@ export async function getRecentAssets(userId: string, limit = 6): Promise<Recent
 }
 
 export async function getRecentSearches(userId: string, limit = 5): Promise<string[]> {
+  // The most recent searches first, each text once (ignoring case and outer spaces),
+  // shown as it was last typed. Grouping before ordering matters: taking the LIMIT from
+  // a DISTINCT ON (query) list returns the first few alphabetically, not the latest.
   const rows = await sql<{ query: string }[]>`
-    SELECT DISTINCT ON (query) query, searched_at
+    SELECT (array_agg(query ORDER BY searched_at DESC))[1] AS query
     FROM bayanat.user_searches
     WHERE user_id = ${userId}
-    ORDER BY query, searched_at DESC
+    GROUP BY lower(btrim(query))
+    ORDER BY max(searched_at) DESC
     LIMIT ${limit}
   `;
   return rows.map((r) => r.query);

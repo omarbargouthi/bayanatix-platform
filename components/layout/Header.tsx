@@ -130,11 +130,17 @@ export function Header({ crumbs, user, contextTypes, collaborationHref, hideSear
     }
   }
 
+  // Remembers a search: on Enter, and when a result is opened straight from the list.
+  function rememberSearch(q: string) {
+    if (q.trim().length < 2) return;
+    fetch("/api/catalog/search/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q.trim() }) }).catch(() => {});
+  }
+
   function submitSearch(qOverride?: string) {
     const q = (qOverride ?? searchQuery).trim();
     if (!q) return;
     setSearchFocused(false);
-    fetch("/api/catalog/search/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }) }).catch(() => {});
+    rememberSearch(q);
     const params = new URLSearchParams({ q });
     if (quickTypes.size < ALL_TYPES.length) params.set("types", [...quickTypes].join(","));
     router.push(`/search?${params.toString()}`);
@@ -150,6 +156,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref, hideSear
     if (e.key === "Enter") {
       if (highlightIdx >= 0 && searchResults[highlightIdx]) {
         const hit = searchResults[highlightIdx];
+        rememberSearch(searchQuery);
         setSearchFocused(false); setSearchQuery("");
         router.push(hit.href);
       } else {
@@ -298,7 +305,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref, hideSear
                         <button
                           key={`${r.type}-${r.id}`}
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
+                          onClick={() => { rememberSearch(searchQuery); setSearchFocused(false); setSearchQuery(""); router.push(r.href); }}
                           className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-line-soft last:border-b-0 transition-colors ${flatIdx === highlightIdx ? "bg-canvas" : "hover:bg-canvas"}`}
                         >
                           <div className="flex-1 min-w-0">

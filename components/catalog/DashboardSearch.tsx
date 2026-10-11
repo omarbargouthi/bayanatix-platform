@@ -45,7 +45,7 @@ const RESULT_ICON: Record<string, React.ReactNode> = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function DashboardSearch({ recentAssets, recentSearches }: Props) {
+export function DashboardSearch({ recentAssets, recentSearches: initialRecentSearches }: Props) {
   const router = useRouter();
   const { t } = useLang();
 
@@ -78,6 +78,20 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
   const [userSugg,      setUserSugg]      = useState<UserOption[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<UserOption[]>([]);
   const userDebounce    = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Starts with what the page was rendered with and is re-read every time the box is
+  // opened, so a search made a moment ago (here or from another page's header) shows.
+  const [recentSearches, setRecentSearches] = useState(initialRecentSearches);
+  const refreshRecent = useCallback(() => {
+    fetch("/api/catalog/search/save").then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.recent) setRecentSearches((d.recent as string[]).slice(0, 5)); }).catch(() => {});
+  }, []);
+  // Remembers a search: on Enter / Search, and when a result is opened straight from the list.
+  const remember = useCallback((q: string) => {
+    if (q.trim().length < 2) return;
+    fetch("/api/catalog/search/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q.trim() }) })
+      .then(refreshRecent).catch(() => {});
+  }, [refreshRecent]);
 
   const showHistory = focused && query.length === 0;
   const showResults = focused && query.length >= 2;
@@ -121,10 +135,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
 
   function handleSubmit() {
     if (!query.trim()) return;
-    fetch("/api/catalog/search/save", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    }).catch(() => {});
+    remember(query);
     setFocused(false);
     router.push(buildSearchUrl());
   }
@@ -156,7 +167,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
           data-page-search
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={() => { setFocused(true); refreshRecent(); }}
           onBlur={() => setTimeout(() => setFocused(false), 180)}
           onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
           className="flex-1 bg-transparent border-0 outline-none text-[15px] placeholder:text-muted"
@@ -273,7 +284,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
                 <button
                   key={`${r.type}-${r.id}`}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { setFocused(false); router.push(r.href); }}
+                  onClick={() => { remember(query); setFocused(false); router.push(r.href); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-canvas text-left transition-colors border-b border-line-soft last:border-b-0"
                 >
                   <span className="w-8 h-8 rounded-lg bg-canvas-soft border border-line flex items-center justify-center text-brand-navy shrink-0">
