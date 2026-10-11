@@ -31,7 +31,8 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.dashboard }]} user={user} />
+      {/* The dashboard has its own search in the welcome banner, so the header leaves its search out. */}
+      <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.dashboard }]} user={user} hideSearch />
       <DashboardClient
         firstName={firstName}
         domains={domains}

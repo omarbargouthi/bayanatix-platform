@@ -60,7 +60,11 @@ function HeaderIconBtn({
   );
 }
 
-export function Header({ crumbs, user, contextTypes, collaborationHref }: { crumbs: Crumb[]; user: SessionUser; contextTypes?: string[]; collaborationHref?: string }) {
+export function Header({ crumbs, user, contextTypes, collaborationHref, hideSearch }: {
+  crumbs: Crumb[]; user: SessionUser; contextTypes?: string[]; collaborationHref?: string;
+  /** For a page that has its own search (the dashboard): leave the header's search out. */
+  hideSearch?: boolean;
+}) {
   const router    = useRouter();
   const { toggle } = useSidebar();
   const { isRtl, t } = useLang();
@@ -105,12 +109,14 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      // On a page with its own search (hideSearch) the shortcuts go to that one.
+      const box = () => searchRef.current ?? document.querySelector<HTMLInputElement>("[data-page-search]");
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        searchRef.current?.focus();
+        box()?.focus();
       } else if (e.key === "/" && !typing) {
         e.preventDefault();
-        searchRef.current?.focus();
+        box()?.focus();
       }
     }
     document.addEventListener("keydown", onKeyDown);
@@ -216,6 +222,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
       </nav>
 
       {/* Global search */}
+      {hideSearch ? <div className="flex-1" /> : (
       <div className={`${isRtl ? "mr-3" : "ml-3"} flex-1 max-w-lg relative`}>
         <div className={`flex items-center gap-2 bg-canvas border rounded-md px-3 py-2 transition-colors ${searchFocused ? "border-brand-purple ring-1 ring-brand-purple/20" : "border-line hover:border-brand-purple/40"}`}>
           <IconSearch className="w-4 h-4 text-muted shrink-0" />
@@ -326,6 +333,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref }: { crum
           </div>
         )}
       </div>
+      )}
 
       {/* Right actions: Language · Notification · Collaboration */}
       <div className={`${isRtl ? "mr-auto" : "ml-auto"} flex items-center gap-1`}>

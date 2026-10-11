@@ -153,6 +153,7 @@ export function DashboardSearch({ recentAssets, recentSearches }: Props) {
         <SearchIcon />
         <input
           ref={inputRef}
+          data-page-search
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setFocused(true)}

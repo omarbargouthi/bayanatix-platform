@@ -39,9 +39,13 @@ export function DashboardClient({
     <main className="px-8 py-7 pb-14">
 
       {/* Welcome banner */}
-      <section className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#f0f2ff] via-[#e7ecfb] to-[#e6e0f5] border border-line p-9 mb-6">
-        <div className="absolute -top-20 -right-10 w-56 h-56 rounded-full bg-brand-light/45 blur-2xl" />
-        <div className="absolute -bottom-16 left-[10%] w-48 h-48 rounded-full bg-brand-purple/25 blur-2xl" />
+      {/* The banner itself must not clip: the search's dropdown hangs below it, over the
+          cards (hence the z-index). Only the decorative blobs are clipped, in their own layer. */}
+      <section className="relative z-20 rounded-xl bg-gradient-to-br from-[#f0f2ff] via-[#e7ecfb] to-[#e6e0f5] border border-line p-9 mb-6">
+        <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none" aria-hidden="true">
+          <div className="absolute -top-20 -right-10 w-56 h-56 rounded-full bg-brand-light/45 blur-2xl" />
+          <div className="absolute -bottom-16 left-[10%] w-48 h-48 rounded-full bg-brand-purple/25 blur-2xl" />
+        </div>
         <div className="relative">
           <h1 className="text-2xl font-bold text-brand-deep mb-4">
             {t.dashboard.welcome.replace("{name}", firstName)}
