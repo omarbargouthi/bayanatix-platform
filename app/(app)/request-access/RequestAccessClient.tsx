@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { DOMAIN_MANAGE_ROLE_NAME } from "@/lib/domain-roles";
+import Link from "next/link";
+import { NewRequestForm, type NewRequestResult } from "@/components/requests/NewRequestForm";
 import { useLang } from "@/lib/lang-context";
 import type { DomainCode } from "@/lib/can";
 import type { AccessRequestRow, CatalogResourceType } from "@/lib/queries/access-requests";
 
-const ALL_DOMAINS: DomainCode[] = ["GOVERNANCE", "DATA_QUALITY", "DATA_PRIVACY", "SHARING", "FOI", "OPEN_DATA"];
-
-type CatalogItem = { id: number; name: string };
 type Tab = "new" | "mine" | "pending";
 
 export function RequestAccessClient() {
@@ -25,15 +23,13 @@ export function RequestAccessClient() {
   const [tab, setTab] = useState<Tab>("new");
   const [mine, setMine] = useState<AccessRequestRow[]>([]);
   const [pendingForMe, setPendingForMe] = useState<AccessRequestRow[]>([]);
-  const [domainAccess, setDomainAccess] = useState<Partial<Record<DomainCode, "WRITE" | "READ" | "NONE">>>({});
 
   const loadRequests = useCallback(async () => {
     const r = await fetch("/api/access-requests");
     if (!r.ok) return;
-    const d: { mine: AccessRequestRow[]; pendingForMe: AccessRequestRow[]; domainAccess?: Partial<Record<DomainCode, "WRITE" | "READ" | "NONE">> } = await r.json();
+    const d: { mine: AccessRequestRow[]; pendingForMe: AccessRequestRow[] } = await r.json();
     setMine(d.mine);
     setPendingForMe(d.pendingForMe);
-    setDomainAccess(d.domainAccess ?? {});
   }, []);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
@@ -43,91 +39,9 @@ export function RequestAccessClient() {
     if (requested === "pending" || requested === "mine" || requested === "new") setTab(requested);
   }, []);
 
-  // ── New request form state ──────────────────────────────────────────────
-  const [kind, setKind] = useState<"DOMAIN" | "CATALOG">("DOMAIN");
-  const [domain, setDomain] = useState<DomainCode | "">("");
-  const [level, setLevel] = useState<CatalogResourceType>("TABLE");
-  const [sources, setSources] = useState<CatalogItem[]>([]);
-  const [schemas, setSchemas] = useState<CatalogItem[]>([]);
-  const [tables, setTables] = useState<CatalogItem[]>([]);
-  const [sourceId, setSourceId] = useState("");
-  const [schemaId, setSchemaId] = useState("");
-  const [tableId, setTableId] = useState("");
-  const [justification, setJustification] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-
-  useEffect(() => {
-    if (kind === "CATALOG" && sources.length === 0) {
-      fetch("/api/access-requests/catalog-lookup?type=sources").then((r) => r.json()).then(setSources).catch(() => {});
-    }
-  }, [kind, sources.length]);
-
-  function selectSource(id: string) {
-    setSourceId(id); setSchemaId(""); setTableId(""); setSchemas([]); setTables([]);
-    if (id && level !== "DATA_SOURCE") {
-      fetch(`/api/access-requests/catalog-lookup?type=schemas&sourceId=${id}`).then((r) => r.json()).then(setSchemas).catch(() => {});
-    }
-  }
-
-  function selectSchema(id: string) {
-    setSchemaId(id); setTableId(""); setTables([]);
-    if (id && level === "TABLE") {
-      fetch(`/api/access-requests/catalog-lookup?type=tables&schemaId=${id}`).then((r) => r.json()).then(setTables).catch(() => {});
-    }
-  }
-
-  function resetForm() {
-    setDomain(""); setLevel("TABLE"); setSourceId(""); setSchemaId(""); setTableId("");
-    setSchemas([]); setTables([]); setJustification("");
-  }
-
-  // The chosen domain can't be requested when the user already has it (read or manage)
-  // or already has a request waiting: say so instead of taking another request.
-  const domainBlock: string | null = kind !== "DOMAIN" || !domain ? null
-    : domainAccess[domain] === "WRITE" ? t.accessApproval.alreadyManage.replace("{domain}", domainLabel(domain))
-    : domainAccess[domain] === "READ" ? t.accessApproval.alreadyRead.replace("{domain}", domainLabel(domain))
-    : mine.some((r) => r.requestKind === "DOMAIN" && r.domainCode === domain && r.statusCode === "PENDING") ? t.accessApproval.alreadyPending.replace("{domain}", domainLabel(domain))
-    : null;
-
-  async function submit() {
-    setMessage(null);
-    let body: Record<string, unknown>;
-    if (kind === "DOMAIN") {
-      if (!domain) return;
-      body = { kind: "DOMAIN", domain, justification: justification.trim() || undefined };
-    } else {
-      const resourceId = level === "DATA_SOURCE" ? sourceId : level === "SCHEMA" ? schemaId : tableId;
-      if (!resourceId) return;
-      const resourceName =
-        level === "DATA_SOURCE" ? sources.find((s) => String(s.id) === resourceId)?.name
-        : level === "SCHEMA" ? schemas.find((s) => String(s.id) === resourceId)?.name
-        : tables.find((s) => String(s.id) === resourceId)?.name;
-      body = { kind: "CATALOG", resourceType: level, resourceId, resourceName, justification: justification.trim() || undefined };
-    }
-
-    setSubmitting(true);
-    try {
-      const r = await fetch("/api/access-requests", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        const name = kind === "DOMAIN" && domain ? domainLabel(domain) : "";
-        const text = err.code === "ALREADY_READ" ? t.accessApproval.alreadyRead.replace("{domain}", name)
-          : err.code === "ALREADY_MANAGE" ? t.accessApproval.alreadyManage.replace("{domain}", name)
-          : err.code === "ALREADY_PENDING" ? t.accessApproval.alreadyPending.replace("{domain}", name || (body.resourceName as string) || "")
-          : c.submitFailed;
-        setMessage({ ok: false, text });
-        return;
-      }
-      setMessage({ ok: true, text: c.submitSuccess });
-      resetForm();
-      await loadRequests();
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  // ── New request (unified form) ──────────────────────────────────────────
+  const [formKey, setFormKey] = useState(0);
+  const [submitted, setSubmitted] = useState<NewRequestResult | null>(null);
 
   async function decide(requestId: number, decision: "APPROVED" | "REJECTED") {
     const r = await fetch(`/api/access-requests/${requestId}`, {
@@ -153,7 +67,7 @@ export function RequestAccessClient() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
       <p className="text-[13px] text-muted mb-5">{c.pageDesc}</p>
 
       <div className="flex gap-1 border-b border-line mb-5">
@@ -180,117 +94,25 @@ export function RequestAccessClient() {
       </div>
 
       {tab === "new" && (
-        <div className="card p-5 space-y-5">
-          <div>
-            <label className="field-label">{c.kindLabel}</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setKind("DOMAIN")}
-                className={`text-left px-3.5 py-3 rounded-lg border-2 transition-colors ${
-                  kind === "DOMAIN" ? "border-brand-purple bg-brand-purple/5" : "border-line hover:border-brand-purple/40"
-                }`}
-              >
-                <div className="text-[13px] font-semibold text-brand-deep">{c.kindDomainOption}</div>
-                <div className="text-[11px] text-muted mt-0.5">{c.kindDomainDesc}</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setKind("CATALOG")}
-                className={`text-left px-3.5 py-3 rounded-lg border-2 transition-colors ${
-                  kind === "CATALOG" ? "border-brand-purple bg-brand-purple/5" : "border-line hover:border-brand-purple/40"
-                }`}
-              >
-                <div className="text-[13px] font-semibold text-brand-deep">{c.kindCatalogOption}</div>
-                <div className="text-[11px] text-muted mt-0.5">{c.kindCatalogDesc}</div>
-              </button>
-            </div>
-          </div>
-
-          {kind === "DOMAIN" ? (
-            <div>
-              <label className="field-label">{c.domainLabel}</label>
-              <select className="input-field" value={domain} onChange={(e) => setDomain(e.target.value as DomainCode)}>
-                <option value="">{c.domainPlaceholder}</option>
-                {ALL_DOMAINS.map((d) => <option key={d} value={d}>{domainLabel(d)}</option>)}
-              </select>
-              {domain && !domainBlock && <p className="text-[11px] text-muted mt-1">{t.accessApproval.approvedBy.replace("{role}", DOMAIN_MANAGE_ROLE_NAME[domain])}</p>}
-              {domainBlock && (
-                <p className="text-[13px] text-sky-800 bg-sky-50 border border-sky-200 rounded-md px-3 py-2 mt-2">{domainBlock}</p>
+        <div className="card p-5">
+          {submitted && (
+            <p className="text-sm px-3 py-2 mb-5 rounded-md border text-emerald-700 bg-emerald-50 border-emerald-200">
+              {submitted.kind === "ACCESS" ? c.submitSuccess : c.assetRequestSubmitted}{" "}
+              {submitted.kind === "ASSET" && (
+                <Link href={submitted.requestId ? `/requests/${submitted.requestId}` : "/requests"} className="font-semibold underline">
+                  {c.viewAssetRequests}
+                </Link>
               )}
-            </div>
-          ) : (
-            <>
-              <div>
-                <label className="field-label">{c.resourceLevelLabel}</label>
-                <div className="flex gap-2">
-                  {(["DATA_SOURCE", "SCHEMA", "TABLE"] as CatalogResourceType[]).map((lvl) => (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => { setLevel(lvl); setSchemaId(""); setTableId(""); setTables([]); }}
-                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-[12px] font-bold transition-colors ${
-                        level === lvl ? "border-brand-purple bg-brand-purple/5 text-brand-purple" : "border-line text-ink hover:border-brand-purple/30"
-                      }`}
-                    >
-                      {resourceLevelLabel(lvl)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="field-label">{c.dataSourceLabel}</label>
-                <select className="input-field" value={sourceId} onChange={(e) => selectSource(e.target.value)}>
-                  <option value="">{c.dataSourcePlaceholder}</option>
-                  {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-
-              {(level === "SCHEMA" || level === "TABLE") && sourceId && (
-                <div>
-                  <label className="field-label">{c.schemaLabel}</label>
-                  <select className="input-field" value={schemaId} onChange={(e) => selectSchema(e.target.value)}>
-                    <option value="">{c.schemaPlaceholder}</option>
-                    {schemas.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {level === "TABLE" && schemaId && (
-                <div>
-                  <label className="field-label">{c.tableLabel}</label>
-                  <select className="input-field" value={tableId} onChange={(e) => setTableId(e.target.value)}>
-                    <option value="">{c.tablePlaceholder}</option>
-                    {tables.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              )}
-            </>
-          )}
-
-          <div>
-            <label className="field-label">{c.justificationLabel} <span className="text-muted font-normal normal-case">{c.justificationOptional}</span></label>
-            <textarea
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              rows={3}
-              className="input-field resize-none"
-              placeholder={c.justificationPlaceholder}
-            />
-          </div>
-
-          {message && (
-            <p className={`text-sm px-3 py-2 rounded-md border ${message.ok ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-red-600 bg-red-50 border-red-200"}`}>
-              {message.text}
             </p>
           )}
-
-          <div className="flex justify-end">
-            <button onClick={submit} disabled={submitting || !!domainBlock} className="btn btn-primary">
-              {submitting ? t.common.submitting : c.submitBtn}
-            </button>
-          </div>
+          <NewRequestForm
+            key={formKey}
+            onSaved={async (result) => {
+              setSubmitted(result);
+              setFormKey((k) => k + 1);
+              if (result.kind === "ACCESS") await loadRequests();
+            }}
+          />
         </div>
       )}
 

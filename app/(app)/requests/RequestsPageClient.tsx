@@ -111,6 +111,7 @@ function RequestsPageContent() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          <Link href="/request-access" className="btn btn-primary btn-sm">+ New Request</Link>
         </div>
       </div>
 

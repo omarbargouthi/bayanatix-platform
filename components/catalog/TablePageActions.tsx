@@ -137,7 +137,6 @@ export function TablePageActions({
       )}
       {showRequestAccess && (
         <RaiseRequestModal
-          initialRequestType="GRANT_ACCESS"
           prefilledTarget={{ assetTypeCode: "DATA_ENTITIES", assetId: entityId, assetName: entityName }}
           onClose={() => setShowRequestAccess(false)}
           onSaved={() => { setShowRequestAccess(false); router.refresh(); }}

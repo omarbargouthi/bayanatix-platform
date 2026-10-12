@@ -137,6 +137,8 @@ export type I18nStrings = {
     justificationPlaceholder: string;
     submitBtn:            string;
     submitSuccess:        string;
+    assetRequestSubmitted: string;
+    viewAssetRequests:    string;
     submitFailed:         string;
     myRequestsEmpty:      string;
     pendingApprovalEmpty: string;
@@ -818,6 +820,8 @@ export type I18nStrings = {
     reqTypeUpdateDefinitionDesc: string;
     reqTypeCertifyAsset:      string;
     reqTypeCertifyAssetDesc:  string;
+    reqTypeAccess:            string;
+    reqTypeAccessDesc:        string;
     reqTypeGrantAccess:       string;
     reqTypeGrantAccessDesc:   string;
     reqTypeRemoveAccess:      string;
@@ -844,6 +848,7 @@ export type I18nStrings = {
     detailsOptional:       string;
     detailsPlaceholder:    string;
     targetAssetsLabel:     string;
+    targetPickerHint:      string;
     addAnotherTable:       string;
     selectRequestTypeErr:  string;
     enterTitleErr:         string;
