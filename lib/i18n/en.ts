@@ -317,15 +317,6 @@ export const en: I18nStrings = {
     compliance:     "Compliance",
     complianceDesc: "Assess organisational compliance against NDI 2026 and other regulatory frameworks. Upload evidence per requirement.",
     complianceOpen: "Open Compliance",
-    maturity: {
-      title: "Maturity by Domain",
-      desc: "The maturity level of each domain, for every regulation assessed on a maturity scale.",
-      overall: "Overall maturity",
-      openAssessment: "Open assessment",
-      standardsAssessed: "{done} of {total} standards assessed",
-      none: "No regulation is assessed on a maturity scale yet.",
-      noDomains: "This regulation has no domains with maturity standards yet.",
-    },
     sectionLabels: {
       policy:     "Policies",
       process:    "Processes",

@@ -4,7 +4,6 @@ import { getSession } from "@/lib/auth";
 import { getSectionCounts } from "@/lib/queries/gov-framework";
 import { listRegisters } from "@/lib/queries/gov-registers";
 import { listFrameworks } from "@/lib/queries/gov-compliance";
-import { getMaturityByDomain } from "@/lib/queries/maturity-overview";
 import { GovernancePageClient } from "./GovernancePageClient";
 import { getServerT } from "@/lib/i18n/server";
 
@@ -14,11 +13,10 @@ export default async function GovernancePage() {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const [sectionCounts, registers, frameworks, maturity] = await Promise.all([
+  const [sectionCounts, registers, frameworks] = await Promise.all([
     getSectionCounts(),
     listRegisters(),
     listFrameworks(false), // only regulations the admin has marked applicable — matches /governance/compliance
-    getMaturityByDomain(),
   ]);
   const t = await getServerT(user);
 
@@ -32,7 +30,6 @@ export default async function GovernancePage() {
         sectionCounts={sectionCounts}
         registers={registers}
         frameworks={frameworks}
-        maturity={maturity}
       />
     </>
   );

@@ -317,15 +317,6 @@ export const ar: I18nStrings = {
     compliance:     "الامتثال",
     complianceDesc: "تقييم امتثال المنظمة لمؤشر البيانات الوطني 2026 وأطر الامتثال الأخرى. رفع الأدلة لكل متطلب.",
     complianceOpen: "فتح الامتثال",
-    maturity: {
-      title: "النضج حسب المجال",
-      desc: "مستوى نضج كل مجال، لكل لائحة تُقيَّم وفق مقياس نضج.",
-      overall: "النضج الإجمالي",
-      openAssessment: "فتح التقييم",
-      standardsAssessed: "تم تقييم {done} من {total} معيار",
-      none: "لا توجد لائحة تُقيَّم وفق مقياس نضج بعد.",
-      noDomains: "لا توجد مجالات تتضمن معايير نضج لهذه اللائحة بعد.",
-    },
     sectionLabels: {
       policy:     "السياسات",
       process:    "العمليات",

@@ -344,15 +344,6 @@ export type I18nStrings = {
     compliance:     string;
     complianceDesc: string;
     complianceOpen: string;
-    maturity: {
-      title: string;
-      desc: string;
-      overall: string;
-      openAssessment: string;
-      standardsAssessed: string;
-      none: string;
-      noDomains: string;
-    };
     // framework section labels
     sectionLabels: {
       policy: string; process: string; strategy: string;

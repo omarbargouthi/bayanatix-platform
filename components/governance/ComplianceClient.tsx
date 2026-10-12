@@ -13,6 +13,7 @@ import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { usePollBackgroundJob } from "@/components/shared/BackgroundJobsPanel";
 import { HalfDonut } from "@/components/ui/HalfDonut";
+import { Stars } from "@/components/catalog/DomainCard";
 import { ComplianceTrendChart } from "@/components/governance/ComplianceTrendChart";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -80,6 +81,9 @@ function parseLevelNum(ml: string | null): number | null {
   const n = m ? parseInt(m[1], 10) : null;
   return n !== null && n >= 0 && n <= 5 ? n : null;
 }
+// Level bands for an average maturity score, used when a regulation's levels have no ranges of their own.
+const DEFAULT_MATURITY_BANDS: [number, number][] = [[0, 0.24], [0.25, 1.24], [1.25, 2.49], [2.5, 3.99], [4, 4.74], [4.75, 5]];
+
 function deriveStandard(req: ComplianceRequirement): string {
   if (req.standard?.trim()) return req.standard.trim();
   if (req.standardCode?.trim()) return req.standardCode.trim();
@@ -315,6 +319,26 @@ export function ComplianceClient({
     const c = d.filter((r) => isCompleteStatus(r.submissionStatus)).length;
     const na = d.filter((r) => r.submissionStatus === "NA").length;
     return { total: d.length, complete: c, na, pct: Math.round(((c+na)/Math.max(d.length,1))*100) };
+  }
+  // Maturity of a domain, for a regulation assessed on a maturity scale: the average of
+  // the levels selected for its standards (a standard with no level yet counts as 0),
+  // every standard counting once — the same figure as the Dashboard's domain cards. It
+  // is worked out from what is on the page, so it moves as soon as a level is selected.
+  // The level shown is the band the average falls in: the regulation's own ranges when
+  // it has them (NDI), otherwise the standard bands.
+  function domainMaturity(domain: string): { score: number; levelNum: number } | null {
+    if (isComplianceOnly) return null;
+    const standards = new Set<string>();
+    reqs.forEach((r) => {
+      if ((r.domain ?? "Other") === domain && r.complianceOrMaturity === "نضج") standards.add(r.standardCode?.trim() || deriveStandard(r));
+    });
+    if (standards.size === 0) return null;
+    let sum = 0;
+    standards.forEach((std) => { sum += maturitySels[std] ?? 0; });
+    const score = Math.round((sum / standards.size) * 100) / 100;
+    const ranged = levelCfg.find((c) => c.rangeFrom != null && c.rangeTo != null && score >= Number(c.rangeFrom) && score <= Number(c.rangeTo));
+    const levelNum = ranged ? ranged.levelNum : Math.max(0, DEFAULT_MATURITY_BANDS.findIndex(([from, to]) => score >= from && score <= to));
+    return { score, levelNum };
   }
   function standardStats(domain: string, std: string) {
     const d = reqs.filter((r) => (r.domain ?? "Other") === domain && deriveStandard(r) === std);
@@ -751,6 +775,7 @@ export function ComplianceClient({
                       const arName = domainArMap.get(domain) ?? domain;
                       const displayName = isRtl ? arName : enName;
                       const subtitle    = isRtl ? (dc || null) : (dc || null);
+                      const maturity    = domainMaturity(domain);
                       return (
                         <button key={domain} onClick={() => selectDomain(domain)}
                           className="card p-5 text-left hover:shadow-md hover:border-brand-purple/60 transition-all group border border-line">
@@ -768,6 +793,18 @@ export function ComplianceClient({
                             <span className="text-emerald-600 font-semibold">{s.pct}% {ca.complete.toLowerCase()}</span>
                             <span className="text-muted">{s.complete} / {s.total}</span>
                           </div>
+                          {maturity && (
+                            <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-line-soft">
+                              <span className="text-[10px] uppercase tracking-wider text-muted">{t.dashboard.domainCard.maturity}</span>
+                              <span className="flex items-center gap-2">
+                                <Stars value={maturity.score} color={lvlColor(maturity.levelNum)} />
+                                <span className="flex items-baseline gap-1">
+                                  <span className="text-[11px] font-bold" style={{ color: lvlColor(maturity.levelNum) }}>{maturity.score.toFixed(2)}</span>
+                                  <span className="text-[10px] text-muted">/ 5 · {lvlName(maturity.levelNum)}</span>
+                                </span>
+                              </span>
+                            </div>
+                          )}
                         </button>
                       );
                     })}
