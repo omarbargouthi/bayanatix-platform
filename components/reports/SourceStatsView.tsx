@@ -19,10 +19,10 @@ const TIER_STYLE: Record<string, string> = {
 const TIERS = ["GOLD", "SILVER", "BRONZE"];
 
 /** The filter row: source, and — for those who see every source — steward. Filters live in the address (?source=&steward=). */
-export function SourceStatsFilters({ sources, stewards, sourceId, stewardId, ownByDefault = false, allChosen = false }: {
+export function SourceStatsFilters({ sources, stewards, sourceId, stewardId, ownByDefault = false }: {
   sources: SourceLite[]; stewards: StewardLite[] | null; sourceId: number | null; stewardId: string | null;
-  /** Dashboard: with nothing chosen the page shows the user's own sources, and "all" is a choice (?source=all). */
-  ownByDefault?: boolean; allChosen?: boolean;
+  /** Dashboard: the sources are the user's own unless a steward is chosen; there is no "all sources". */
+  ownByDefault?: boolean;
 }) {
   const s = useLang().t.sourceStats;
   const router = useRouter();
@@ -37,15 +37,14 @@ export function SourceStatsFilters({ sources, stewards, sourceId, stewardId, own
   }
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <select aria-label={s.filterSource} className="field w-auto max-w-[260px]" value={sourceId ?? (allChosen ? "all" : "")} onChange={(e) => set("source", e.target.value)}>
+      <select aria-label={s.filterSource} className="field w-auto max-w-[260px]" value={sourceId ?? ""} onChange={(e) => set("source", e.target.value)}>
         {/* The empty choice is "everything in view": the user's own sources, a chosen steward's, or all of them. */}
         <option value="">{!stewards || (ownByDefault && !stewardId) ? s.allMySources : stewardId ? s.allStewardSources : s.allSources}</option>
-        {stewards && ownByDefault && !stewardId && <option value="all">{s.allSources}</option>}
         {sources.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
       </select>
       {stewards && (
         <select aria-label={s.filterSteward} className="field w-auto max-w-[240px]" value={stewardId ?? ""} onChange={(e) => set("steward", e.target.value)}>
-          <option value="">{s.allStewards}</option>
+          <option value="">{ownByDefault ? s.stewardMe : s.allStewards}</option>
           {stewards.map((x) => <option key={x.userId} value={x.userId}>{x.fullName}</option>)}
         </select>
       )}

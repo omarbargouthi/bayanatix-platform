@@ -7,6 +7,8 @@ import { Avatar, AVATAR_COLOR_CODES } from "@/components/ui/Avatar";
 import { initials } from "@/lib/utils";
 import { useLang } from "@/lib/lang-context";
 import { NOTIFICATION_TYPES } from "@/lib/notification-types";
+import { AccessSummary } from "@/components/profile/AccessSummary";
+import type { UserAccessProfile } from "@/lib/queries/user-access";
 
 interface Props {
   fullName: string;
@@ -15,6 +17,7 @@ interface Props {
   userId: string;
   avatarColorCode: string | null;
   disabledNotificationTypes: string[];
+  access: UserAccessProfile;
 }
 
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -28,7 +31,7 @@ function SectionCard({ title, description, children }: { title: string; descript
   );
 }
 
-export function ProfilePageClient({ fullName, email, role, userId, avatarColorCode, disabledNotificationTypes }: Props) {
+export function ProfilePageClient({ fullName, email, role, userId, avatarColorCode, disabledNotificationTypes, access }: Props) {
   const router = useRouter();
   const { lang, setLang, languages, t } = useLang();
   const p = t.profile;
@@ -121,6 +124,9 @@ export function ProfilePageClient({ fullName, email, role, userId, avatarColorCo
         </p>
         <Link href="/homepage" className="btn btn-sm shrink-0">{p.goToHomepage}</Link>
       </div>
+
+      {/* Roles, teams, and the data sources the user has a governance role on */}
+      <AccessSummary access={access} />
 
       {/* Avatar */}
       <SectionCard title={p.avatarTitle} description={p.avatarDesc}>

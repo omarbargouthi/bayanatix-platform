@@ -22,10 +22,8 @@ type Props = {
   sourceId:       number | null;
   stewardId:      string | null;
   seesAllSources: boolean;
-  /** The statistics are the user's own sources (the default view). */
+  /** The statistics are the user's own sources, not a steward's the user picked. */
   showsOwnSources: boolean;
-  /** A user who sees all sources asked for all of them. */
-  allSourcesChosen: boolean;
   announcements:  GovAnnouncement[];
   canOpenGovernance:   boolean;
   canManageGovernance: boolean;
@@ -33,7 +31,7 @@ type Props = {
 
 export function DashboardClient({
   firstName, recentAssets, recentSearches,
-  sourceStats, topAssets, sources, stewards, sourceId, stewardId, seesAllSources, showsOwnSources, allSourcesChosen,
+  sourceStats, topAssets, sources, stewards, sourceId, stewardId, seesAllSources, showsOwnSources,
   announcements, canOpenGovernance, canManageGovernance,
 }: Props) {
   const { t } = useLang();
@@ -60,7 +58,7 @@ export function DashboardClient({
       {/* What the Governance Framework is announcing */}
       <GovAnnouncements items={announcements} canOpen={canOpenGovernance} canManage={canManageGovernance} />
 
-      {/* Source systems: the user's own, or all of them for the Data Management Office */}
+      {/* Source systems: the user's own, or a chosen steward's for the Data Management Office */}
       <section>
         <div className="flex items-end justify-between gap-4 flex-wrap mb-4">
           <div>
@@ -71,7 +69,7 @@ export function DashboardClient({
             </p>
           </div>
           {(seesAllSources || sources.length > 1) && (
-            <SourceStatsFilters sources={sources} stewards={stewards} sourceId={sourceId} stewardId={stewardId} ownByDefault allChosen={allSourcesChosen} />
+            <SourceStatsFilters sources={sources} stewards={stewards} sourceId={sourceId} stewardId={stewardId} ownByDefault />
           )}
         </div>
         <SourceStatsView stats={sourceStats} top={topAssets} emptyText={seesAllSources && showsOwnSources ? t.sourceStats.noOwnSourcesOffice : undefined} />

@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
 import { findUserById } from "@/lib/queries/users";
 import { ProfilePageClient } from "./ProfilePageClient";
+import { getUserAccessProfile } from "@/lib/queries/user-access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function ProfilePage() {
 
   const user = await findUserById(session.userId);
   if (!user) redirect("/login");
+  const access = await getUserAccessProfile(session.userId);
 
   return (
     <>
@@ -29,6 +31,7 @@ export default async function ProfilePage() {
         userId={user.user_id}
         avatarColorCode={user.avatar_color_code}
         disabledNotificationTypes={user.disabled_notification_types}
+        access={access}
       />
     </>
   );

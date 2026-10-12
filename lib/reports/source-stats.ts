@@ -107,26 +107,24 @@ export async function listSourceStewards(): Promise<StewardLite[]> {
  * and may narrow to one of them. Whatever the request asks, the result never leaves
  * what the user may see.
  *
- * `ownByDefault` (the Dashboard): with no filter chosen, even a user who may see every
- * source starts on the sources they personally hold a governance role on, and reaches
- * the rest by asking for them (`all`, a source, or a steward). `isOwn` says the result
- * is that personal view.
+ * `ownByDefault` (the Dashboard): the figures are personal. Even a user who may see every
+ * source gets the sources they hold a governance role on, and can only switch to another
+ * steward's sources; "every source" is the Source Systems report. `isOwn` says the result
+ * is the user's own sources.
  */
 export async function resolveSourceScope(
   session: SessionUser,
-  requested: { sourceId?: number | null; stewardId?: string | null; all?: boolean; ownByDefault?: boolean },
+  requested: { sourceId?: number | null; stewardId?: string | null; ownByDefault?: boolean },
 ): Promise<{ scope: SourceScope; seesAll: boolean; allowed: SourceScope; isOwn: boolean }> {
   const seesAll = await canSeeAllSources(session);
-  const hasSource = requested.sourceId != null && Number.isFinite(requested.sourceId);
-  const wantsOwn = !!requested.ownByDefault && !(seesAll && (requested.all || requested.stewardId || hasSource));
-  const own = !seesAll || wantsOwn ? await getGovernedSourceIds(session.userId) : [];
-  const allowed: SourceScope = seesAll ? null : own;
-  let scope: SourceScope = wantsOwn ? own : allowed;
-  if (seesAll && requested.stewardId) scope = await getGovernedSourceIds(requested.stewardId);
-  if (hasSource) {
-    scope = scope === null || scope.includes(requested.sourceId!) ? [requested.sourceId!] : [];
+  const personal = !seesAll || !!requested.ownByDefault;
+  const ofSteward = seesAll && !!requested.stewardId;
+  const allowed: SourceScope = personal ? await getGovernedSourceIds(session.userId) : null;
+  let scope: SourceScope = ofSteward ? await getGovernedSourceIds(requested.stewardId!) : allowed;
+  if (requested.sourceId != null && Number.isFinite(requested.sourceId)) {
+    scope = scope === null || scope.includes(requested.sourceId) ? [requested.sourceId] : [];
   }
-  return { scope, seesAll, allowed, isOwn: !seesAll || wantsOwn };
+  return { scope, seesAll, allowed, isOwn: personal && !ofSteward };
 }
 
 const inScope = (scope: SourceScope, column: string) =>

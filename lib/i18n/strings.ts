@@ -2738,6 +2738,30 @@ export type I18nStrings = {
   // ── Profile page (app/(app)/profile/ProfilePageClient.tsx) ───────────────────
   profile: {
     homepagePointer:      string;
+    rolesTitle: string;
+    rolesDesc: string;
+    noRoles: string;
+    viaTeam: string;
+    teamsTitle: string;
+    teamsDesc: string;
+    noTeams: string;
+    members: string;
+    govTitle: string;
+    govDesc: string;
+    noGov: string;
+    govWholeSource: string;
+    scopeTypes: {
+      GLOBAL: string;
+      DATA_SOURCE: string;
+      SCHEMA: string;
+      TABLE: string;
+      DOMAIN: string;
+    };
+    govLevels: {
+      SOURCE: string;
+      SCHEMA: string;
+      TABLE: string;
+    };
     goToHomepage:         string;
     avatarTitle:          string;
     avatarDesc:           string;
@@ -3601,6 +3625,7 @@ export type I18nStrings = {
     allSources: string;
     allMySources: string;
     allStewards: string;
+    stewardMe: string;
     noSources: string;
     countSources: string;
     countSchemas: string;
