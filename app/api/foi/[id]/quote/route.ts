@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { isFoiStaff } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getFoiConfig } from "@/lib/queries/foi";
+import { FOI_CURRENCY_CONFIG_KEY, normalizeCurrencyCode, formatFoiAmount } from "@/lib/foi-currency";
 
 type Ctx = { params: { id: string } };
 
@@ -28,6 +29,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const config      = await getFoiConfig();
     const dailyRate   = Number(body.dailyRateOverride ?? config.foi_daily_rate_sar ?? 2000);
     const validityDays = Number(config.foi_quote_validity_days ?? 30);
+    const currency    = normalizeCurrencyCode(config[FOI_CURRENCY_CONFIG_KEY]);
     const effortDays  = Number(assessment.estimated_effort_days);
     const isExempt    = assessment.payment_exempt === true;
 
@@ -52,6 +54,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const breakdown = {
       effortDays,
       dailyRateSar: dailyRate,
+      currency,
       subtotal: effortDays * dailyRate,
       total: quotedAmount,
       isExempt,
@@ -67,7 +70,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
     const [quote] = await sql`
       INSERT INTO bayanat.foi_quotes
-        (foi_request_id, assessment_id, daily_rate_sar, quoted_amount,
+        (foi_request_id, assessment_id, daily_rate_sar, quoted_amount, currency_code,
          breakdown_json, estimated_delivery_days, valid_until_date,
          status_code, issued_by_user_id, adjustment_reason)
       VALUES (
@@ -75,6 +78,7 @@ export async function POST(req: Request, { params }: Ctx) {
         ${assessment.assessment_id},
         ${dailyRate},
         ${quotedAmount},
+        ${currency},
         ${JSON.stringify(breakdown)},
         ${body.estimatedDeliveryDays ?? Math.ceil(effortDays * 2)},
         CURRENT_DATE + (${validityDays} * INTERVAL '1 day'),
@@ -97,7 +101,7 @@ export async function POST(req: Request, { params }: Ctx) {
     } else if (quotedAmount === 0) {
       commBody = `Your information request has been reviewed. The information you requested is already publicly available at no cost. Please see the details in your tracking link.`;
     } else {
-      commBody = `A quote of SAR ${quotedAmount.toFixed(2)} has been issued for your request.${adjustmentReason ? ' The amount has been manually adjusted by the reviewing officer.' : ''} Please review and accept or decline via your tracking link within ${validityDays} days.`;
+      commBody = `A quote of ${formatFoiAmount(quotedAmount, currency)} has been issued for your request.${adjustmentReason ? ' The amount has been manually adjusted by the reviewing officer.' : ''} Please review and accept or decline via your tracking link within ${validityDays} days.`;
     }
 
     await sql`

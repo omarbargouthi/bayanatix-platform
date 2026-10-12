@@ -136,6 +136,8 @@ export type FoiCaseDetail = {
   quoteId:                   number | null;
   quotedAmount:              number | null;
   dailyRateSar:              number | null;
+  // currency of the latest quote, or the configured FOI currency when no quote exists yet
+  currencyCode:              string;
   breakdownJson:             Record<string, unknown> | null;
   estimatedDeliveryDays:     number | null;
   validUntilDate:            string | null;
@@ -200,6 +202,7 @@ export async function getFoiCase(foiRequestId: number): Promise<FoiCaseDetail | 
       q.quote_id                 AS "quoteId",
       q.quoted_amount            AS "quotedAmount",
       q.daily_rate_sar           AS "dailyRateSar",
+      COALESCE(q.currency_code, (SELECT value FROM bayanat.system_config WHERE key = 'foi_currency_code'), 'SAR') AS "currencyCode",
       q.breakdown_json           AS "breakdownJson",
       q.estimated_delivery_days  AS "estimatedDeliveryDays",
       q.valid_until_date         AS "validUntilDate",
@@ -241,6 +244,7 @@ export type FoiTrackingView = {
   // quote for accept/decline
   quoteId:              number | null;
   quotedAmount:         number | null;
+  currencyCode:         string;
   estimatedDeliveryDays: number | null;
   validUntilDate:       string | null;
   quoteStatusCode:      string | null;
@@ -260,6 +264,7 @@ export async function getFoiByToken(token: string): Promise<FoiTrackingView | nu
       r.delivery_reference      AS "deliveryReference",
       q.quote_id                AS "quoteId",
       q.quoted_amount           AS "quotedAmount",
+      COALESCE(q.currency_code, (SELECT value FROM bayanat.system_config WHERE key = 'foi_currency_code'), 'SAR') AS "currencyCode",
       q.estimated_delivery_days AS "estimatedDeliveryDays",
       q.valid_until_date        AS "validUntilDate",
       q.status_code             AS "quoteStatusCode",
@@ -308,6 +313,7 @@ export type FoiPayment = {
   paymentId:            number;
   paymentTypeCode:      string;
   amount:               number;
+  currencyCode:         string;
   paymentReferenceText: string | null;
   receivedAt:           string;
   notesText:            string | null;
@@ -320,6 +326,7 @@ export async function getFoiPayments(foiRequestId: number): Promise<FoiPayment[]
       p.payment_id              AS "paymentId",
       p.payment_type_code       AS "paymentTypeCode",
       p.amount                  AS "amount",
+      p.currency_code           AS "currencyCode",
       p.payment_reference_text  AS "paymentReferenceText",
       p.received_at             AS "receivedAt",
       p.notes_text              AS "notesText",

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isFoiStaff } from "@/lib/can";
 import { sql } from "@/lib/db";
+import { getFoiConfig } from "@/lib/queries/foi";
+import { FOI_CURRENCY_CONFIG_KEY, normalizeCurrencyCode } from "@/lib/foi-currency";
 
 type Ctx = { params: { id: string } };
 
@@ -23,19 +25,23 @@ export async function POST(req: Request, { params }: Ctx) {
 
   try {
     const [quote] = await sql`
-      SELECT quote_id, quoted_amount FROM bayanat.foi_quotes
+      SELECT quote_id, quoted_amount, currency_code FROM bayanat.foi_quotes
       WHERE foi_request_id = ${id} AND status_code = 'ACCEPTED'
     `;
+    // A payment is in its quote's currency; without a quote, the configured one.
+    const currency = quote?.currency_code
+      ?? normalizeCurrencyCode((await getFoiConfig())[FOI_CURRENCY_CONFIG_KEY]);
 
     await sql`
       INSERT INTO bayanat.foi_payments
-        (foi_request_id, quote_id, payment_type_code, amount,
+        (foi_request_id, quote_id, payment_type_code, amount, currency_code,
          payment_reference_text, received_at, notes_text, recorded_by_user_id)
       VALUES (
         ${id},
         ${quote?.quote_id ?? null},
         ${body.paymentTypeCode ?? 'FULFILLMENT_FEE'},
         ${amount},
+        ${currency},
         ${body.referenceText?.trim() || null},
         ${body.receivedAt ?? new Date()},
         ${body.notes?.trim() || null},

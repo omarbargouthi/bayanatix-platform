@@ -2240,7 +2240,7 @@ export type I18nStrings = {
       exemptZeroCost:     string;
       exemptZeroCostDesc: string;
       daysAtRate:         string;   // "{days} days"
-      perDay:             string;   // "× SAR {rate} / day"
+      perDay:             string;   // "× {currency} {rate} / day"
       assessmentNotes:    string;
       assessmentNotesPlaceholder: string;
       grantExemption:     string;

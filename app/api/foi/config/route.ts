@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { canAccessDomain } from "@/lib/can";
 import { sql } from "@/lib/db";
 import { getFoiConfig, getRejectionGrounds } from "@/lib/queries/foi";
+import { FOI_CURRENCY_CONFIG_KEY, isValidCurrencyCode } from "@/lib/foi-currency";
 
 export async function GET() {
   const session = await getSession();
@@ -28,7 +29,16 @@ export async function PATCH(req: Request) {
   const allowed = [
     'foi_daily_rate_sar', 'foi_sla_business_days',
     'foi_appeal_window_days', 'foi_review_fee_sar', 'foi_quote_validity_days',
+    FOI_CURRENCY_CONFIG_KEY,
   ];
+
+  if (body[FOI_CURRENCY_CONFIG_KEY] != null) {
+    const code = String(body[FOI_CURRENCY_CONFIG_KEY]).trim().toUpperCase();
+    if (!isValidCurrencyCode(code)) {
+      return NextResponse.json({ error: "Currency must be a valid 3-letter ISO 4217 code (e.g. SAR, USD)" }, { status: 400 });
+    }
+    body[FOI_CURRENCY_CONFIG_KEY] = code;
+  }
 
   for (const key of allowed) {
     if (body[key] != null) {

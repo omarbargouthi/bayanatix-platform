@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FoiCaseDetail, FoiPayment } from "@/lib/queries/foi";
 import type { SessionUser } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
+import { formatFoiAmount } from "@/lib/foi-currency";
 
 type Props = {
   caseData:   FoiCaseDetail;
@@ -29,6 +30,7 @@ export function PaymentsTab({ caseData, payments, totalPaid, currentUser: _user,
   const [busy,      setBusy]      = useState(false);
   const [error,     setError]     = useState<string | null>(null);
 
+  const currency     = caseData.currencyCode;
   const quotedAmount = caseData.quotedAmount ? Number(caseData.quotedAmount) : null;
   const isPaid       = quotedAmount !== null && totalPaid >= quotedAmount;
   const canRecord    = ["QUOTE_ACCEPTED","IN_FULFILLMENT","AWAITING_PAYMENT"].includes(caseData.statusCode);
@@ -60,18 +62,18 @@ export function PaymentsTab({ caseData, payments, totalPaid, currentUser: _user,
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-3 bg-canvas-soft rounded-lg">
               <div className="text-[10px] text-muted uppercase font-bold mb-1">{c.quotedLabel}</div>
-              <div className="text-lg font-bold text-ink">SAR {quotedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
+              <div className="text-lg font-bold text-ink">{formatFoiAmount(quotedAmount, currency)}</div>
             </div>
             <div className="text-center p-3 bg-canvas-soft rounded-lg">
               <div className="text-[10px] text-muted uppercase font-bold mb-1">{c.receivedLabel}</div>
               <div className={`text-lg font-bold ${isPaid ? "text-green-600" : "text-amber-600"}`}>
-                SAR {totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {formatFoiAmount(totalPaid, currency)}
               </div>
             </div>
             <div className={`text-center p-3 rounded-lg ${isPaid ? "bg-green-50 border border-green-100" : "bg-amber-50 border border-amber-100"}`}>
               <div className="text-[10px] text-muted uppercase font-bold mb-1">{c.balanceLabel}</div>
               <div className={`text-lg font-bold ${isPaid ? "text-green-700" : "text-amber-700"}`}>
-                {isPaid ? c.paidInFull : "SAR " + (quotedAmount - totalPaid).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {isPaid ? c.paidInFull : formatFoiAmount(quotedAmount - totalPaid, currency)}
               </div>
             </div>
           </div>
@@ -88,7 +90,7 @@ export function PaymentsTab({ caseData, payments, totalPaid, currentUser: _user,
           <h2 className="font-semibold text-sm text-ink">{c.recordPaymentTitle}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.amountLabel} <span className="text-red-500">*</span></label>
+              <label className="block text-[11px] font-semibold text-muted uppercase mb-1">{c.amountLabel.replace("{currency}", currency)} <span className="text-red-500">*</span></label>
               <input type="number" min="0" step="0.01" className="input w-full" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
             </div>
             <div>
@@ -118,7 +120,7 @@ export function PaymentsTab({ caseData, payments, totalPaid, currentUser: _user,
 
       {/* Payment history */}
       <div className="card overflow-hidden">
-        <div className="px-5 py-2.5 border-b border-line bg-canvas-soft text-[10px] font-bold uppercase tracking-wider text-muted grid grid-cols-[120px_80px_160px_1fr_120px]">
+        <div className="px-5 py-2.5 border-b border-line bg-canvas-soft text-[10px] font-bold uppercase tracking-wider text-muted grid grid-cols-[120px_120px_160px_1fr_120px]">
           <div className="min-w-0 truncate">{c.colType}</div>
           <div className="min-w-0 truncate">{c.colAmount}</div>
           <div className="min-w-0 truncate">{c.colReference}</div>
@@ -128,12 +130,12 @@ export function PaymentsTab({ caseData, payments, totalPaid, currentUser: _user,
         {payments.length === 0 ? (
           <div className="p-8 text-center text-muted text-sm">{c.noneRecordedYet}</div>
         ) : payments.map(p => (
-          <div key={p.paymentId} className="grid grid-cols-[120px_80px_160px_1fr_120px] px-5 py-3 border-b border-line-soft items-center">
+          <div key={p.paymentId} className="grid grid-cols-[120px_120px_160px_1fr_120px] px-5 py-3 border-b border-line-soft items-center">
             <div className={`min-w-0 truncate text-[11px] font-semibold ${p.paymentTypeCode === 'REFUND' ? 'text-red-600' : 'text-green-700'}`}>
               {TYPE_LABELS[p.paymentTypeCode] ?? p.paymentTypeCode}
             </div>
             <div className={`min-w-0 truncate text-sm font-bold ${p.paymentTypeCode === 'REFUND' ? 'text-red-600' : 'text-ink'}`}>
-              {p.paymentTypeCode === 'REFUND' ? '-' : ''}SAR {Math.abs(Number(p.amount)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {p.paymentTypeCode === 'REFUND' ? '-' : ''}{formatFoiAmount(Math.abs(Number(p.amount)), p.currencyCode)}
             </div>
             <div className="min-w-0 text-[11px] font-mono text-muted truncate" dir="ltr">{p.paymentReferenceText ?? "—"}</div>
             <div className="min-w-0 text-[11px] text-muted truncate" dir="auto">{p.notesText ?? "—"}</div>

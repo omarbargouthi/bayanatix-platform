@@ -6,6 +6,7 @@ import type { FoiTrackingView } from "@/lib/queries/foi";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import { FoiLangBar } from "../../FoiLangBar";
+import { formatFoiAmount } from "@/lib/foi-currency";
 
 const STATUS_META: Record<string, { color: string; icon: string }> = {
   SUBMITTED:               { color: "blue",   icon: "📥" },
@@ -172,7 +173,7 @@ function TrackingPageInner() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white rounded-xl p-4 text-center">
                 <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">{c.totalCostLabel}</div>
-                <div className="text-2xl font-bold text-gray-900">SAR {Number(data.quotedAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
+                <div className="text-2xl font-bold text-gray-900">{formatFoiAmount(Number(data.quotedAmount), data.currencyCode)}</div>
               </div>
               <div className="bg-white rounded-xl p-4 text-center">
                 <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">{c.estDeliveryLabel}</div>

@@ -15,6 +15,7 @@ import { ColumnTypeRulesSection } from "./ColumnTypeRulesSection";
 import { AuthSettingsSection } from "./AuthSettingsSection";
 import { BrandingSettingsSection } from "./BrandingSettingsSection";
 import { SchedulingConfigSection } from "./SchedulingConfigSection";
+import { FoiSettingsSection } from "./FoiSettingsSection";
 import { useLang } from "@/lib/lang-context";
 
 type AppLookup = {
@@ -69,6 +70,7 @@ export default function ConfigurationPage() {
   const [showAuthSettings, setShowAuthSettings] = useState(false);
   const [showBrandingSettings, setShowBrandingSettings] = useState(false);
   const [showScheduling, setShowScheduling] = useState(false);
+  const [showFoiSettings, setShowFoiSettings] = useState(false);
 
   const [newGroupName, setNewGroupName] = useState("");
   const [lookups, setLookups]           = useState<AppLookup[]>([]);
@@ -114,6 +116,7 @@ export default function ConfigurationPage() {
     setShowAuthSettings(false);
     setShowBrandingSettings(false);
     setShowScheduling(false);
+    setShowFoiSettings(false);
     setAdding(false);
   }
 
@@ -192,7 +195,7 @@ export default function ConfigurationPage() {
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
     && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showTableTypeRules && !showColumnTypeRules && !showAuthSettings
-    && !showBrandingSettings && !showScheduling;
+    && !showBrandingSettings && !showScheduling && !showFoiSettings;
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden">
@@ -270,6 +273,13 @@ export default function ConfigurationPage() {
           >
             <div className="font-medium text-ink">Follow Settings</div>
             <div className="text-[10px] text-muted mt-0.5">Enable following at Schema / Data Source level</div>
+          </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowFoiSettings(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showFoiSettings ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">FOI Settings</div>
+            <div className="text-[10px] text-muted mt-0.5">Currency · Daily rate · Review fee</div>
           </button>
           <button
             onClick={() => { resetNav(); setSelectedGroup(null); setShowSitSettings(true); }}
@@ -391,6 +401,9 @@ export default function ConfigurationPage() {
 
         {/* ── Scheduling panel ── */}
         {showScheduling && <SchedulingConfigSection />}
+
+        {/* ── FOI Settings panel ── */}
+        {showFoiSettings && <FoiSettingsSection />}
 
         {/* ── Data Categories panel ── */}
         {showDataCategories && (

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { FoiCaseDetail } from "@/lib/queries/foi";
 import type { SessionUser } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
+import { formatFoiAmount } from "@/lib/foi-currency";
 import type { I18nStrings } from "@/lib/i18n/strings";
 
 type Props = { caseData: FoiCaseDetail; totalPaid: number; currentUser: SessionUser; onChanged: () => void };
@@ -109,6 +110,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
   const canIssueQuote = hasAssessment && caseData.statusCode === "ASSESSMENT" && (days > 0 || eligibility === "ALREADY_PUBLIC" || paymentExempt);
   const hasQuote = !!caseData.quoteId;
 
+  const currency  = caseData.currencyCode;
   const quotedAmt = caseData.quotedAmount ? Number(caseData.quotedAmount) : 0;
   const isPaid = paymentExempt || quotedAmt === 0 || totalPaid >= quotedAmt;
   const canStartFulfillment = hasQuote && caseData.quoteStatusCode === 'ACCEPTED'
@@ -287,16 +289,16 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                 <div className={`flex items-center justify-between pt-1 border-t ${paymentExempt ? "border-amber-200" : "border-blue-100"}`}>
                   {paymentExempt ? (
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-amber-800">{c.exemptZeroCost}</p>
+                      <p className="text-sm font-bold text-amber-800">{c.exemptZeroCost.replace("{currency}", currency)}</p>
                       <p className="text-[11px] text-amber-700 mt-0.5">{c.exemptZeroCostDesc}</p>
                     </div>
                   ) : (
                     <>
                       <div className="text-xs text-blue-700">
-                        <span className="font-bold">{c.daysAtRate.replace("{days}", String(days))}</span> {c.perDay.replace("{rate}", dailyRate.toLocaleString())}
+                        <span className="font-bold">{c.daysAtRate.replace("{days}", String(days))}</span> {c.perDay.replace("{currency}", currency).replace("{rate}", dailyRate.toLocaleString())}
                       </div>
                       <div className="text-base font-bold text-blue-800">
-                        SAR {computedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        {formatFoiAmount(computedCost, currency)}
                       </div>
                     </>
                   )}
@@ -387,7 +389,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                     {quotedAmt === 0 ? (
                       <span className="text-green-700">{c.freeLabel}</span>
                     ) : (
-                      `SAR ${quotedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                      formatFoiAmount(quotedAmt, currency)
                     )}
                   </div>
                   {caseData.adjustmentReason && (
@@ -396,7 +398,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                 </div>
                 <div>
                   <div className="text-[10px] text-muted uppercase font-bold">{c.dailyRateLabel}</div>
-                  <div className="text-sm text-ink">SAR {Number(caseData.dailyRateSar).toLocaleString()}</div>
+                  <div className="text-sm text-ink">{formatFoiAmount(Number(caseData.dailyRateSar), currency, 0)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted uppercase font-bold">{c.deliveryEstLabel}</div>
@@ -431,8 +433,8 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
 
               {caseData.statusCode === 'AWAITING_PAYMENT' && !isPaid && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-                  <strong>{c.paymentRequiredPrefix}</strong> SAR {quotedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })} {c.paymentRequiredSuffix}
-                  {" "}{c.receivedSoFar.replace("{amount}", totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+                  <strong>{c.paymentRequiredPrefix}</strong> {formatFoiAmount(quotedAmt, currency)} {c.paymentRequiredSuffix}
+                  {" "}{c.receivedSoFar.replace("{currency}", currency).replace("{amount}", totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
                   {" "}{c.recordPaymentsHint} <strong>{c.paymentsTabName}</strong>.
                 </div>
               )}
@@ -469,7 +471,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
                     <span className="text-sm text-blue-700">
-                      {c.computedAmount} <strong>SAR {computedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
+                      {c.computedAmount} <strong>{formatFoiAmount(computedCost, currency)}</strong>
                     </span>
                     {isAssessable && (
                       <label className="flex items-center gap-1.5 text-[11px] text-blue-600 cursor-pointer">
@@ -481,7 +483,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
                   {manualOverride && (
                     <div className="grid grid-cols-2 gap-3 p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
                       <div>
-                        <label className="block text-[10px] font-bold text-yellow-800 uppercase mb-1">{c.overrideAmountLabel} <span className="text-red-500">*</span></label>
+                        <label className="block text-[10px] font-bold text-yellow-800 uppercase mb-1">{c.overrideAmountLabel.replace("{currency}", currency)} <span className="text-red-500">*</span></label>
                         <input type="number" min="0" step="0.01" className="input w-full text-sm"
                           placeholder={String(computedCost)} value={manualAmount} onChange={e => setManualAmount(e.target.value)} />
                       </div>
@@ -511,7 +513,7 @@ export function AssessmentTab({ caseData, totalPaid, currentUser: _user, onChang
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted">
                   {c.finalAmount} <strong className={paymentExempt ? "text-amber-700" : "text-ink"}>
-                    {paymentExempt ? c.finalAmountExempt : `SAR ${effectiveCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+                    {paymentExempt ? c.finalAmountExempt.replace("{currency}", currency) : formatFoiAmount(effectiveCost, currency)}
                   </strong>
                 </span>
                 {quoteError && <span className="text-sm text-red-600">{quoteError}</span>}
