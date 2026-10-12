@@ -3591,8 +3591,10 @@ export type I18nStrings = {
     reportSubtitleMine: string;
     dashboardTitleAll: string;
     dashboardTitleMine: string;
-    dashboardSubtitleAll: string;
     dashboardSubtitleMine: string;
+    dashboardSubtitleOffice: string;
+    allStewardSources: string;
+    noOwnSourcesOffice: string;
     openReport: string;
     filterSource: string;
     filterSteward: string;

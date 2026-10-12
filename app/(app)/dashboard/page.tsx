@@ -14,11 +14,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const user = await getSession();
   if (!user) redirect("/login");
 
-  // Source statistics: the sources this user has a governance role on — or, for the Data
-  // Management Office side, every source, narrowed by the source / steward filters.
-  const sourceId  = searchParams.source ? Number(searchParams.source) : null;
+  // Source statistics are personal: the sources this user has a governance role on. The
+  // Data Management Office side starts there too, and can widen to every source
+  // (?source=all), one source, or a steward's sources with the filters.
+  const wantsAll  = searchParams.source === "all";
+  const sourceId  = searchParams.source && !wantsAll ? Number(searchParams.source) : null;
   const stewardId = searchParams.steward?.trim() || null;
-  const { scope, seesAll, allowed } = await resolveSourceScope(user, { sourceId, stewardId });
+  const { scope, seesAll, allowed, isOwn } = await resolveSourceScope(user, { sourceId, stewardId, all: wantsAll, ownByDefault: true });
   const pickable = seesAll && stewardId ? (await resolveSourceScope(user, { stewardId })).scope : allowed;
 
   const [recentAssets, recentSearches, sourceStats, topAssets, sources, stewards, announcements, canOpenGovernance, canManageGovernance] = await Promise.all([
@@ -51,6 +53,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         sourceId={sourceId}
         stewardId={seesAll ? stewardId : null}
         seesAllSources={seesAll}
+        showsOwnSources={isOwn && sourceId == null}
+        allSourcesChosen={seesAll && wantsAll && !stewardId}
         announcements={announcements}
         canOpenGovernance={canOpenGovernance}
         canManageGovernance={canManageGovernance}

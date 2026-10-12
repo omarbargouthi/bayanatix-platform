@@ -22,6 +22,10 @@ type Props = {
   sourceId:       number | null;
   stewardId:      string | null;
   seesAllSources: boolean;
+  /** The statistics are the user's own sources (the default view). */
+  showsOwnSources: boolean;
+  /** A user who sees all sources asked for all of them. */
+  allSourcesChosen: boolean;
   announcements:  GovAnnouncement[];
   canOpenGovernance:   boolean;
   canManageGovernance: boolean;
@@ -29,7 +33,7 @@ type Props = {
 
 export function DashboardClient({
   firstName, recentAssets, recentSearches,
-  sourceStats, topAssets, sources, stewards, sourceId, stewardId, seesAllSources,
+  sourceStats, topAssets, sources, stewards, sourceId, stewardId, seesAllSources, showsOwnSources, allSourcesChosen,
   announcements, canOpenGovernance, canManageGovernance,
 }: Props) {
   const { t } = useLang();
@@ -60,17 +64,17 @@ export function DashboardClient({
       <section>
         <div className="flex items-end justify-between gap-4 flex-wrap mb-4">
           <div>
-            <h2 className="text-xl font-bold">{seesAllSources ? t.sourceStats.dashboardTitleAll : t.sourceStats.dashboardTitleMine}</h2>
+            <h2 className="text-xl font-bold">{showsOwnSources ? t.sourceStats.dashboardTitleMine : t.sourceStats.dashboardTitleAll}</h2>
             <p className="text-sm text-ink-soft mt-0.5">
-              {seesAllSources ? t.sourceStats.dashboardSubtitleAll : t.sourceStats.dashboardSubtitleMine}{" "}
+              {seesAllSources ? t.sourceStats.dashboardSubtitleOffice : t.sourceStats.dashboardSubtitleMine}{" "}
               <Link href="/reports/sources" className="text-brand-purple font-semibold hover:underline">{t.sourceStats.openReport}</Link>
             </p>
           </div>
           {(seesAllSources || sources.length > 1) && (
-            <SourceStatsFilters sources={sources} stewards={stewards} sourceId={sourceId} stewardId={stewardId} />
+            <SourceStatsFilters sources={sources} stewards={stewards} sourceId={sourceId} stewardId={stewardId} ownByDefault allChosen={allSourcesChosen} />
           )}
         </div>
-        <SourceStatsView stats={sourceStats} top={topAssets} />
+        <SourceStatsView stats={sourceStats} top={topAssets} emptyText={seesAllSources && showsOwnSources ? t.sourceStats.noOwnSourcesOffice : undefined} />
       </section>
 
     </main>

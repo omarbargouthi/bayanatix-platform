@@ -19,8 +19,10 @@ const TIER_STYLE: Record<string, string> = {
 const TIERS = ["GOLD", "SILVER", "BRONZE"];
 
 /** The filter row: source, and — for those who see every source — steward. Filters live in the address (?source=&steward=). */
-export function SourceStatsFilters({ sources, stewards, sourceId, stewardId }: {
+export function SourceStatsFilters({ sources, stewards, sourceId, stewardId, ownByDefault = false, allChosen = false }: {
   sources: SourceLite[]; stewards: StewardLite[] | null; sourceId: number | null; stewardId: string | null;
+  /** Dashboard: with nothing chosen the page shows the user's own sources, and "all" is a choice (?source=all). */
+  ownByDefault?: boolean; allChosen?: boolean;
 }) {
   const s = useLang().t.sourceStats;
   const router = useRouter();
@@ -35,8 +37,10 @@ export function SourceStatsFilters({ sources, stewards, sourceId, stewardId }: {
   }
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <select aria-label={s.filterSource} className="field w-auto max-w-[260px]" value={sourceId ?? ""} onChange={(e) => set("source", e.target.value)}>
-        <option value="">{stewards ? s.allSources : s.allMySources}</option>
+      <select aria-label={s.filterSource} className="field w-auto max-w-[260px]" value={sourceId ?? (allChosen ? "all" : "")} onChange={(e) => set("source", e.target.value)}>
+        {/* The empty choice is "everything in view": the user's own sources, a chosen steward's, or all of them. */}
+        <option value="">{!stewards || (ownByDefault && !stewardId) ? s.allMySources : stewardId ? s.allStewardSources : s.allSources}</option>
+        {stewards && ownByDefault && !stewardId && <option value="all">{s.allSources}</option>}
         {sources.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
       </select>
       {stewards && (
@@ -118,7 +122,7 @@ function AssetList({ title, note, rows, emptyLabel, render }: {
   );
 }
 
-export function SourceStatsView({ stats, top }: { stats: SourceStats; top: TopAssets }) {
+export function SourceStatsView({ stats, top, emptyText }: { stats: SourceStats; top: TopAssets; emptyText?: string }) {
   const s = useLang().t.sourceStats;
   const pctOf = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
   const classified = stats.classification.filter((x) => x.code != null).reduce((n, x) => n + x.value, 0);
@@ -132,7 +136,7 @@ export function SourceStatsView({ stats, top }: { stats: SourceStats; top: TopAs
     </>
   );
 
-  if (stats.counts.sources === 0) return <div className="card p-8 text-center text-sm text-muted">{s.noSources}</div>;
+  if (stats.counts.sources === 0) return <div className="card p-8 text-center text-sm text-muted">{emptyText ?? s.noSources}</div>;
 
   return (
     <div className="space-y-5">
