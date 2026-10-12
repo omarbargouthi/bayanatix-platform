@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import type { GovDoc } from "@/lib/queries/gov-framework";
 import { RegulationForm, type RegulationDetailsData } from "./RegulationDetails";
 import { AttachmentList } from "./EvidenceAttachments";
+import { FormDialog, FormField } from "@/components/ui/FormDialog";
 import { useLang } from "@/lib/lang-context";
 
 type Props = {
@@ -270,20 +271,21 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">
-              {editDoc ? fw.editDocument : `${fw.addDocument} — ${sectionLabel}`}
-            </h2>
-            {error && <div className="text-red-600 text-sm mb-3">{error}</div>}
-            <div className="space-y-3">
+        <FormDialog
+          title={editDoc ? fw.editDocument : fw.addDocument.replace(/^\+\s*/, "")} subtitle={sectionLabel}
+          onClose={() => setShowModal(false)}
+          footer={<>
+            <button type="button" onClick={() => setShowModal(false)} className="btn btn-sm">{t.common.cancel}</button>
+            <button type="button" onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving ? (saveStep || t.common.saving) : t.common.save}</button>
+          </>}
+        >
               <Field label={fw.formTitle}>
                 <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} className="field" />
               </Field>
               <Field label={fw.formDesc}>
                 <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} className="field" />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <Field label={fw.formStatus}>
                   <select value={form.statusCode} onChange={(e) => setForm((p) => ({ ...p, statusCode: e.target.value }))} className="field">
                     <option value="DRAFT">{fw.statusDraft}</option>
@@ -310,7 +312,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
               </Field>
 
               {/* Files and links: live on a saved document, chosen up front on a new one. */}
-              <div className="border-t border-line pt-3">
+              <div className="border-t border-line-soft pt-4">
                 {editDoc ? (
                   <AttachmentList
                     base={`/api/governance/framework/${editDoc.docId}/attachments`} canEdit
@@ -319,7 +321,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                     onChange={(items) => setAttachmentCount(editDoc.docId, items.length)}
                   />
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <Field label={a.filesLabel}>
                       <input type="file" multiple onChange={(e) => setNewFiles(Array.from(e.target.files ?? []))}
                         className="block text-[12px] text-ink-soft file:me-2 file:px-2.5 file:py-1 file:rounded-md file:border file:border-line file:bg-white file:text-[12px] file:text-ink file:cursor-pointer" />
@@ -338,23 +340,11 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                   </div>
                 )}
               </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="btn btn-sm">{t.common.cancel}</button>
-              <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving ? (saveStep || t.common.saving) : t.common.save}</button>
-            </div>
-          </div>
-        </div>
+              {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
+        </FormDialog>
       )}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[12px] font-semibold text-ink-soft mb-1">{label}</label>
-      {children}
-    </div>
-  );
-}
+const Field = FormField;

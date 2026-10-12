@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { GovRegister } from "@/lib/queries/gov-registers";
 import { useLang } from "@/lib/lang-context";
+import { FormDialog, FormField } from "@/components/ui/FormDialog";
 
 function fmtDate(iso: string) {
   try {
@@ -32,6 +33,7 @@ export function RegistersClient({ initialRegisters, initialDeletedRegisters, isA
   // Delete confirmation modal state
   const [deleteTarget,  setDeleteTarget]  = useState<GovRegister | null>(null);
   const [deleting,      setDeleting]      = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
 
   async function create() {
     if (!name.trim()) return;
@@ -47,8 +49,13 @@ export function RegistersClient({ initialRegisters, initialDeletedRegisters, isA
 
   async function confirmDelete() {
     if (!deleteTarget) return;
-    setDeleting(true);
-    await fetch(`/api/governance/registers/${deleteTarget.registerId}`, { method: "DELETE" });
+    setDeleting(true); setDeleteError(null);
+    const res = await fetch(`/api/governance/registers/${deleteTarget.registerId}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) {
+      setDeleteError((await res?.json().catch(() => ({})))?.error ?? r.deleteFailed);
+      setDeleting(false);
+      return;
+    }
     setRegisters((p) => p.filter((reg) => reg.registerId !== deleteTarget.registerId));
     // Refresh archived list
     const archived = await fetch("/api/governance/registers/archived").then((r) => r.json());
@@ -93,9 +100,9 @@ export function RegistersClient({ initialRegisters, initialDeletedRegisters, isA
               <Link href={`/governance/registers/${reg.registerId}`} className="btn btn-primary btn-sm flex-1 text-center">
                 {r.open}
               </Link>
-              {!reg.isSystem && isAdmin && (
+              {isAdmin && (
                 <button
-                  onClick={() => setDeleteTarget(reg)}
+                  onClick={() => { setDeleteError(null); setDeleteTarget(reg); }}
                   className="btn btn-sm text-red-500 hover:border-red-300"
                 >
                   {t.common.delete}
@@ -114,17 +121,17 @@ export function RegistersClient({ initialRegisters, initialDeletedRegisters, isA
             className="flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-brand-deep mb-4"
           >
             <span className={`transition-transform ${showArchived ? "rotate-90" : ""}`}>▶</span>
-            Archived Registers ({deletedRegisters.length})
+            {r.archivedHeading.replace("{n}", String(deletedRegisters.length))}
           </button>
           {showArchived && (
             <div className="card overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-canvas-soft border-b border-line text-left">
-                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Name</th>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Archived By</th>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Archived At</th>
-                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Entries</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">{r.nameCol}</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">{r.archivedBy}</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">{r.archivedAt}</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">{r.tabEntries}</th>
                     <th className="px-4 py-2.5 w-32" />
                   </tr>
                 </thead>
@@ -144,13 +151,13 @@ export function RegistersClient({ initialRegisters, initialDeletedRegisters, isA
                             href={`/governance/registers/${reg.registerId}`}
                             className="text-[11px] text-brand-purple hover:text-brand-deep font-semibold"
                           >
-                            Audit View
+                            {r.auditView}
                           </Link>
                           <button
                             onClick={() => restore(reg)}
                             className="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold"
                           >
-                            Restore
+                            {r.restore}
                           </button>
                         </div>
                       </td>
@@ -163,61 +170,52 @@ export function RegistersClient({ initialRegisters, initialDeletedRegisters, isA
         </div>
       )}
 
-      {/* Create register modal */}
+      {/* Create register */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">{r.newRegisterModal}</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[12px] font-semibold text-ink-soft mb-1">{r.registerNameLabel}</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} className="field" placeholder="e.g. Risk Register" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold text-ink-soft mb-1">{t.common.description}</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className="field" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="btn btn-sm">{t.common.cancel}</button>
-              <button onClick={create} disabled={saving || !name.trim()} className="btn btn-primary btn-sm">
-                {saving ? r.creating : t.common.add}
-              </button>
-            </div>
-          </div>
-        </div>
+        <FormDialog
+          title={r.newRegisterModal} width="w-[520px]" onClose={() => setShowModal(false)}
+          footer={<>
+            <button type="button" onClick={() => setShowModal(false)} className="btn btn-sm">{t.common.cancel}</button>
+            <button type="button" onClick={create} disabled={saving || !name.trim()} className="btn btn-primary btn-sm">
+              {saving ? r.creating : t.common.add}
+            </button>
+          </>}
+        >
+          <FormField label={r.registerNameLabel.replace(/\s*\*\s*$/, "")} required>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="field" placeholder={r.registerNamePlaceholder} autoFocus />
+          </FormField>
+          <FormField label={t.common.description}>
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} className="field" />
+          </FormField>
+        </FormDialog>
       )}
 
-      {/* Delete (archive) confirmation modal */}
+      {/* Delete confirmation. The register is kept and can be restored (it is archived, not erased). */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !deleting && setDeleteTarget(null)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0 text-amber-500 text-xl">⚠</div>
-              <div>
-                <h2 className="text-base font-bold text-ink mb-1">Archive Register</h2>
-                <p className="text-sm text-ink-soft">
-                  <strong>&ldquo;{deleteTarget.name}&rdquo;</strong> will be archived and hidden from all users.
-                </p>
-              </div>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 mb-5">
-              <p className="font-semibold mb-1">What happens:</p>
-              <ul className="list-disc list-inside space-y-0.5 text-[12px]">
-                <li>The register and its {deleteTarget.entryCount} entries remain in the database</li>
-                <li>Regular users will no longer see this register</li>
-                <li>Admins can access it under &ldquo;Archived Registers&rdquo; for audit purposes</li>
-                <li>You can restore it at any time</li>
-              </ul>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="btn btn-sm">{t.common.cancel}</button>
-              <button onClick={confirmDelete} disabled={deleting} className="btn btn-sm bg-amber-500 text-white border-amber-500 hover:bg-amber-600">
-                {deleting ? "Archiving…" : "Archive Register"}
-              </button>
-            </div>
+        <FormDialog
+          title={r.archiveTitle} width="w-[520px]" onClose={() => { if (!deleting) setDeleteTarget(null); }}
+          footer={<>
+            <button type="button" onClick={() => setDeleteTarget(null)} disabled={deleting} className="btn btn-sm">{t.common.cancel}</button>
+            <button type="button" onClick={confirmDelete} disabled={deleting} className="btn btn-sm bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white hover:border-red-700">
+              {deleting ? r.archiving : r.archiveConfirm}
+            </button>
+          </>}
+        >
+          <p className="text-sm text-ink">{r.archiveIntro.replace("{name}", deleteTarget.name)}</p>
+          {deleteTarget.isSystem && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{r.archiveSystemNote}</p>
+          )}
+          <div className="bg-canvas-soft border border-line rounded-lg px-4 py-3 text-ink-soft">
+            <p className="font-semibold text-ink mb-1 text-[13px]">{r.archiveWhat}</p>
+            <ul className="list-disc list-inside space-y-0.5 text-[12px]">
+              <li>{r.archiveKept.replace("{n}", String(deleteTarget.entryCount))}</li>
+              <li>{r.archiveHidden}</li>
+              <li>{r.archiveAudit}</li>
+              <li>{r.archiveRestore}</li>
+            </ul>
           </div>
-        </div>
+          {deleteError && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{deleteError}</p>}
+        </FormDialog>
       )}
     </div>
   );

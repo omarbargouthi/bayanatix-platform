@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { GovRegister, RegisterColumn, RegisterEntry, RegisterEntryHistory, RegisterColumnLog } from "@/lib/queries/gov-registers";
 import { useLang } from "@/lib/lang-context";
+import { FormDialog, FormField } from "@/components/ui/FormDialog";
 
 type Props = {
   register:       GovRegister;
@@ -423,65 +424,53 @@ export function RegisterDetailClient({ register, initialColumns, initialEntries,
         </div>
       )}
 
-      {/* Entry Modal */}
+      {/* Entry dialog */}
       {entryModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setEntryModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">{editEntry ? r.editEntry : r.addEntryModal}</h2>
-            <div className="space-y-3">
-              {columns.map((col) => (
-                <div key={col.columnId}>
-                  <label className="block text-[12px] font-semibold text-ink-soft mb-1">
-                    {col.columnName}{col.isRequired && <span className="text-red-400 ml-0.5">*</span>}
-                    <span className="text-[10px] text-muted ml-1 font-normal">({col.dataType})</span>
-                  </label>
-                  <EntryField col={col} value={entryData[col.columnKey] ?? ""}
-                    onChange={(v) => setEntryData((p) => ({ ...p, [col.columnKey]: v }))}
-                    yesLabel={c.yes} noLabel={c.no} selectPlaceholder={r.selectPlaceholder} />
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setEntryModal(false)} className="btn btn-sm">{c.cancel}</button>
-              <button onClick={saveEntry} disabled={savingEntry} className="btn btn-primary btn-sm">{savingEntry ? c.saving : c.save}</button>
-            </div>
-          </div>
-        </div>
+        <FormDialog
+          title={editEntry ? r.editEntry : r.addEntryModal} subtitle={register.name} onClose={() => setEntryModal(false)}
+          footer={<>
+            <button type="button" onClick={() => setEntryModal(false)} className="btn btn-sm">{c.cancel}</button>
+            <button type="button" onClick={saveEntry} disabled={savingEntry} className="btn btn-primary btn-sm">{savingEntry ? c.saving : c.save}</button>
+          </>}
+        >
+          {columns.map((col) => (
+            <FormField key={col.columnId} required={col.isRequired}
+              label={<>{col.columnName} <span className="normal-case tracking-normal text-[10px]">({col.dataType})</span></>}>
+              <EntryField col={col} value={entryData[col.columnKey] ?? ""}
+                onChange={(v) => setEntryData((p) => ({ ...p, [col.columnKey]: v }))}
+                yesLabel={c.yes} noLabel={c.no} selectPlaceholder={r.selectPlaceholder} />
+            </FormField>
+          ))}
+        </FormDialog>
       )}
 
-      {/* Column Modal */}
+      {/* Column dialog */}
       {colModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setColModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">{editCol ? r.editColumnModal : r.addColumnModal}</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[12px] font-semibold text-ink-soft mb-1">{r.columnName} *</label>
-                <input value={colForm.columnName} onChange={(e) => setColForm((p) => ({ ...p, columnName: e.target.value }))} className="field" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold text-ink-soft mb-1">{r.formDataType}</label>
-                <select value={colForm.dataType} onChange={(e) => setColForm((p) => ({ ...p, dataType: e.target.value }))} className="field">
-                  {DATA_TYPES.map((tp) => <option key={tp}>{tp}</option>)}
-                </select>
-              </div>
-              {colForm.dataType === "SELECT" && (
-                <div>
-                  <label className="block text-[12px] font-semibold text-ink-soft mb-1">{r.formOptions}</label>
-                  <input value={colForm.optionsRaw} onChange={(e) => setColForm((p) => ({ ...p, optionsRaw: e.target.value }))} className="field" placeholder="Option A, Option B" />
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="req" checked={colForm.isRequired} onChange={(e) => setColForm((p) => ({ ...p, isRequired: e.target.checked }))} />
-                <label htmlFor="req" className="text-sm text-ink">{r.formRequired}</label>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setColModal(false)} className="btn btn-sm">{c.cancel}</button>
-              <button onClick={saveCol} disabled={savingCol || !colForm.columnName.trim()} className="btn btn-primary btn-sm">{savingCol ? c.saving : c.save}</button>
-            </div>
+        <FormDialog
+          title={editCol ? r.editColumnModal : r.addColumnModal} subtitle={register.name} width="w-[520px]" onClose={() => setColModal(false)}
+          footer={<>
+            <button type="button" onClick={() => setColModal(false)} className="btn btn-sm">{c.cancel}</button>
+            <button type="button" onClick={saveCol} disabled={savingCol || !colForm.columnName.trim()} className="btn btn-primary btn-sm">{savingCol ? c.saving : c.save}</button>
+          </>}
+        >
+          <FormField label={r.columnName} required>
+            <input value={colForm.columnName} onChange={(e) => setColForm((p) => ({ ...p, columnName: e.target.value }))} className="field" />
+          </FormField>
+          <FormField label={r.formDataType}>
+            <select value={colForm.dataType} onChange={(e) => setColForm((p) => ({ ...p, dataType: e.target.value }))} className="field">
+              {DATA_TYPES.map((tp) => <option key={tp}>{tp}</option>)}
+            </select>
+          </FormField>
+          {colForm.dataType === "SELECT" && (
+            <FormField label={r.formOptions}>
+              <input value={colForm.optionsRaw} onChange={(e) => setColForm((p) => ({ ...p, optionsRaw: e.target.value }))} className="field" placeholder="Option A, Option B" />
+            </FormField>
+          )}
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="req" className="accent-brand-purple w-4 h-4" checked={colForm.isRequired} onChange={(e) => setColForm((p) => ({ ...p, isRequired: e.target.checked }))} />
+            <label htmlFor="req" className="text-sm text-ink">{r.formRequired}</label>
           </div>
-        </div>
+        </FormDialog>
       )}
 
       {/* Column Delete Confirmation Modal */}

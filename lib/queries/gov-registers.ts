@@ -127,11 +127,13 @@ export async function updateRegister(registerId: number, name: string, descripti
   await sql`UPDATE bayanat.gov_registers SET name=${name}, description=${description} WHERE register_id=${registerId}`;
 }
 
+// Removes a register from use without erasing it: it is hidden, kept for audit, and can
+// be restored. Built-in registers can be removed the same way when they are not needed.
 export async function softDeleteRegister(registerId: number, deletedBy: string): Promise<void> {
   await sql`
     UPDATE bayanat.gov_registers
     SET deleted_at = NOW(), deleted_by = ${deletedBy}
-    WHERE register_id = ${registerId} AND is_system = FALSE
+    WHERE register_id = ${registerId}
   `;
 }
 

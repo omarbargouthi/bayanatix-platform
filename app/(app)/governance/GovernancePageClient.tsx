@@ -4,17 +4,20 @@ import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import type { ComplianceFramework } from "@/lib/queries/gov-compliance";
 import type { GovRegister } from "@/lib/queries/gov-registers";
+import type { FrameworkMaturity } from "@/lib/queries/maturity-overview";
+import { MaturityByDomain } from "@/components/governance/MaturityByDomain";
 
 type Props = {
   sectionCounts: Record<string, number>;
   registers:     GovRegister[];
   frameworks:    ComplianceFramework[];
+  maturity:      FrameworkMaturity[];
 };
 
 const FW_SECTION_CODES = ["POLICY","PROCESS","STRATEGY","ROADMAP","STANDARD","TRAINING","REGULATORY"] as const;
 type SectionCode = typeof FW_SECTION_CODES[number];
 
-export function GovernancePageClient({ sectionCounts, registers, frameworks }: Props) {
+export function GovernancePageClient({ sectionCounts, registers, frameworks, maturity }: Props) {
   const { t, isRtl } = useLang();
   const g = t.governance;
 
@@ -69,7 +72,7 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
           list scrolls internally past that height instead of growing the card,
           so the other areas don't end up with a tall gap between their
           description and their (short) list. */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-6 mb-10">
         {/* Governance Framework */}
         <div className="card p-6 flex flex-col h-[460px]">
           <div className="flex items-center gap-3 mb-3">
@@ -148,6 +151,9 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
           <Link href="/governance/compliance" className="btn btn-primary btn-sm text-center">{g.complianceOpen}</Link>
         </div>
       </div>
+
+      {/* Maturity of each domain, per maturity-mode regulation (NDI, NAII, …) */}
+      {maturity.length > 0 && <MaturityByDomain frameworks={maturity} />}
     </main>
   );
 }

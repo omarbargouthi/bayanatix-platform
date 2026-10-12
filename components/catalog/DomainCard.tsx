@@ -105,16 +105,16 @@ export function DomainCard({ d, labels }: { d: GovernanceDomain; labels?: { comp
 
 const STAR_POINTS = "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26";
 
-function Stars({ value, color = "#6058A0" }: { value: number; color?: string }) {
+export function Stars({ value, color = "#6058A0", size = 12 }: { value: number; color?: string; size?: number }) {
   return (
     <div className="flex items-center gap-0.5" style={{ color }}>
       {[1, 2, 3, 4, 5].map((i) => {
         // Fraction of this star that should be filled (0, partial, or 1) —
         // lets a 3.5 average render as three full stars and one half star.
         const fillFraction = Math.max(0, Math.min(1, value - (i - 1)));
-        const clipId = `star-clip-${i}-${Math.round(value * 100)}`;
+        const clipId = `star-clip-${i}-${Math.round(value * 100)}-${size}`;
         return (
-          <svg key={i} viewBox="0 0 24 24" width="12" height="12">
+          <svg key={i} viewBox="0 0 24 24" width={size} height={size}>
             <defs>
               <clipPath id={clipId}>
                 <rect x="0" y="0" width={24 * fillFraction} height="24" />

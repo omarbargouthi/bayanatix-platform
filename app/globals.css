@@ -58,4 +58,20 @@
            placeholder:text-muted
            focus:outline-none focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20;
   }
+
+  /* Text boxes, drop-downs and text areas. "field" and "input" are written on form
+     controls all over the application; both give the control its border, padding and
+     focus ring ("field" also makes it full width). "input-sm" is the compact size, on
+     its own or after "input". */
+  .field, .input, .input-sm {
+    @apply rounded-md border border-line bg-white text-ink
+           placeholder:text-muted
+           focus:outline-none focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20
+           disabled:bg-canvas-soft disabled:text-muted disabled:cursor-not-allowed;
+  }
+  .field, .input { @apply px-3 py-2 text-sm; }
+  .field { @apply w-full; }
+  .input-sm { @apply px-2.5 py-1.5 text-xs; }
+  /* The small uppercase caption above a form control (the regulation form's style). */
+  .form-label { @apply block text-[11px] uppercase tracking-wider text-muted mb-1.5; }
 }

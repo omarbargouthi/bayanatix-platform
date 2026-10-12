@@ -267,6 +267,24 @@ export type I18nStrings = {
     creating:           string;
     systemBadge:        string;
     deleteRegisterConfirm: string;
+    archiveTitle: string;
+    archiveIntro: string;
+    archiveWhat: string;
+    archiveKept: string;
+    archiveHidden: string;
+    archiveAudit: string;
+    archiveRestore: string;
+    archiveSystemNote: string;
+    archiveConfirm: string;
+    archiving: string;
+    archivedHeading: string;
+    archivedBy: string;
+    archivedAt: string;
+    auditView: string;
+    restore: string;
+    nameCol: string;
+    deleteFailed: string;
+    registerNamePlaceholder: string;
     columns:            string;
     entries:            string;
     open:               string;
@@ -326,6 +344,15 @@ export type I18nStrings = {
     compliance:     string;
     complianceDesc: string;
     complianceOpen: string;
+    maturity: {
+      title: string;
+      desc: string;
+      overall: string;
+      openAssessment: string;
+      standardsAssessed: string;
+      none: string;
+      noDomains: string;
+    };
     // framework section labels
     sectionLabels: {
       policy: string; process: string; strategy: string;
