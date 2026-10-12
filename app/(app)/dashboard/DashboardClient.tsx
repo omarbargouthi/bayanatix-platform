@@ -6,6 +6,11 @@ import { DomainCard } from "@/components/catalog/DomainCard";
 import { MaturityChart } from "@/components/catalog/MaturityChart";
 import { DashboardSearch } from "@/components/catalog/DashboardSearch";
 import { Tag } from "@/components/ui/Tag";
+import Link from "next/link";
+import { SourceStatsFilters, SourceStatsView } from "@/components/reports/SourceStatsView";
+import { GovAnnouncements } from "@/components/governance/GovAnnouncements";
+import type { SourceStats, TopAssets, SourceLite, StewardLite } from "@/lib/reports/source-stats";
+import type { GovAnnouncement } from "@/lib/queries/gov-announcements";
 import type {
   GovernanceDomain, ComplianceSummary, ComplianceSnapshot,
   TrendPoint, RecentAsset,
@@ -19,6 +24,18 @@ type Props = {
   trends:         TrendPoint[];
   recentAssets:   RecentAsset[];
   recentSearches: string[];
+  sourceStats:    SourceStats;
+  topAssets:      TopAssets;
+  /** The sources the filter offers. */
+  sources:        SourceLite[];
+  /** The stewards the filter offers; null when the user is held to their own sources. */
+  stewards:       StewardLite[] | null;
+  sourceId:       number | null;
+  stewardId:      string | null;
+  seesAllSources: boolean;
+  announcements:  GovAnnouncement[];
+  canOpenGovernance:   boolean;
+  canManageGovernance: boolean;
 };
 
 function Stat({ label, value }: { label: string; value: number | string }) {
@@ -32,6 +49,8 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 
 export function DashboardClient({
   firstName, domains, summary, snapshot, trends, recentAssets, recentSearches,
+  sourceStats, topAssets, sources, stewards, sourceId, stewardId, seesAllSources,
+  announcements, canOpenGovernance, canManageGovernance,
 }: Props) {
   const { t } = useLang();
 
@@ -52,6 +71,26 @@ export function DashboardClient({
           </h1>
           <DashboardSearch recentAssets={recentAssets} recentSearches={recentSearches} />
         </div>
+      </section>
+
+      {/* What the Governance Framework is announcing */}
+      <GovAnnouncements items={announcements} canOpen={canOpenGovernance} canManage={canManageGovernance} />
+
+      {/* Source systems: the user's own, or all of them for the Data Management Office */}
+      <section className="mb-8">
+        <div className="flex items-end justify-between gap-4 flex-wrap mb-4">
+          <div>
+            <h2 className="text-xl font-bold">{seesAllSources ? t.sourceStats.dashboardTitleAll : t.sourceStats.dashboardTitleMine}</h2>
+            <p className="text-sm text-ink-soft mt-0.5">
+              {seesAllSources ? t.sourceStats.dashboardSubtitleAll : t.sourceStats.dashboardSubtitleMine}{" "}
+              <Link href="/reports/sources" className="text-brand-purple font-semibold hover:underline">{t.sourceStats.openReport}</Link>
+            </p>
+          </div>
+          {(seesAllSources || sources.length > 1) && (
+            <SourceStatsFilters sources={sources} stewards={stewards} sourceId={sourceId} stewardId={stewardId} />
+          )}
+        </div>
+        <SourceStatsView stats={sourceStats} top={topAssets} />
       </section>
 
       {/* Metric cards */}

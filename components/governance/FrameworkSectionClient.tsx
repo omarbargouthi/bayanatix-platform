@@ -15,12 +15,12 @@ type Props = {
 
 type DocForm = {
   title: string; description: string; statusCode: string;
-  versionText: string; effectiveDate: string; expiryDate: string; ownerUserId: string; sourceUrl: string;
+  versionText: string; effectiveDate: string; expiryDate: string; ownerUserId: string; sourceUrl: string; announce: boolean;
 };
 
 const EMPTY_FORM: DocForm = {
   title: "", description: "", statusCode: "DRAFT",
-  versionText: "", effectiveDate: "", expiryDate: "", ownerUserId: "", sourceUrl: "",
+  versionText: "", effectiveDate: "", expiryDate: "", ownerUserId: "", sourceUrl: "", announce: false,
 };
 
 type SectionKey = "policy" | "process" | "strategy" | "roadmap" | "standard" | "training" | "regulatory";
@@ -88,6 +88,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
       expiryDate: doc.expiryDate?.slice(0, 10) ?? "",
       ownerUserId: doc.ownerUserId ?? "",
       sourceUrl: doc.sourceUrl ?? "",
+      announce: doc.announce,
     });
     setEditDoc(doc); setShowModal(true); setError("");
   }
@@ -105,6 +106,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
         statusCode: form.statusCode, versionText: form.versionText || null,
         effectiveDate: form.effectiveDate || null, expiryDate: form.expiryDate || null,
         ownerUserId: form.ownerUserId || null, sourceUrl: form.sourceUrl || null,
+        announce: form.announce,
       };
       const failed: string[] = [];
       if (editDoc) {
@@ -310,6 +312,14 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
               <Field label={fw.formSourceUrl}>
                 <input type="url" value={form.sourceUrl} onChange={(e) => setForm((p) => ({ ...p, sourceUrl: e.target.value }))} className="field" placeholder="https://..." />
               </Field>
+
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" className="accent-brand-purple w-4 h-4 mt-0.5" checked={form.announce} onChange={(e) => setForm((p) => ({ ...p, announce: e.target.checked }))} />
+                <span>
+                  <span className="block text-sm text-ink">{t.announcements.pinLabel}</span>
+                  <span className="block text-[11px] text-muted">{t.announcements.pinHint}</span>
+                </span>
+              </label>
 
               {/* Files and links: live on a saved document, chosen up front on a new one. */}
               <div className="border-t border-line-soft pt-4">

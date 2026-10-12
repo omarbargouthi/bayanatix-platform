@@ -3584,4 +3584,85 @@ export type I18nStrings = {
     excelCutRows: string;
     excelCutRowsCols: string;
   };
+  // Source Systems statistics (Reports › Source Systems, Dashboard).
+  sourceStats: {
+    reportTitle: string;
+    reportSubtitle: string;
+    reportSubtitleMine: string;
+    dashboardTitleAll: string;
+    dashboardTitleMine: string;
+    dashboardSubtitleAll: string;
+    dashboardSubtitleMine: string;
+    openReport: string;
+    filterSource: string;
+    filterSteward: string;
+    allSources: string;
+    allMySources: string;
+    allStewards: string;
+    noSources: string;
+    countSources: string;
+    countSchemas: string;
+    countObjects: string;
+    countColumns: string;
+    sourceTypes: string;
+    objectTypes: string;
+    tableTypes: string;
+    columnTypes: string;
+    classification: string;
+    classifiedPct: string;
+    certification: string;
+    certifiedPct: string;
+    certMetadata: string;
+    certData: string;
+    certNote: string;
+    ratings: string;
+    ratedObjects: string;
+    ratingsCount: string;
+    noRatings: string;
+    notSet: string;
+    notClassified: string;
+    nothingYet: string;
+    mostUsed: string;
+    mostUsedNote: string;
+    mostSearched: string;
+    mostSearchedNote: string;
+    highestRated: string;
+    lowestRated: string;
+    noActivity: string;
+    views: string;
+    searches: string;
+    users: string;
+    tiers: {
+      GOLD: string;
+      SILVER: string;
+      BRONZE: string;
+    };
+  };
+  // Governance announcements panel on the Dashboard.
+  announcements: {
+    title: string;
+    subtitle: string;
+    viewAll: string;
+    upcoming: string;
+    effectiveOn: string;
+    effectiveSince: string;
+    attachments: string;
+    emptyManage: string;
+    pinLabel: string;
+    pinHint: string;
+    kinds: {
+      ROADMAP: string;
+      TRAINING: string;
+      POLICY: string;
+      PROCESS: string;
+      STANDARD: string;
+      STRATEGY: string;
+      REGULATORY: string;
+    };
+    statuses: {
+      DRAFT: string;
+      REVIEW: string;
+      APPROVED: string;
+    };
+  };
 };

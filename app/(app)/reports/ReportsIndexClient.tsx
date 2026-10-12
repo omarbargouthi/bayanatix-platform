@@ -8,6 +8,7 @@ import type { I18nStrings } from "@/lib/i18n/strings";
 function buildTiles(t: I18nStrings) {
   const r = t.reports;
   return [
+    { name: t.sourceStats.reportTitle, description: t.sourceStats.reportSubtitle, href: "/reports/sources" },
     { name: r.mcm.title, description: r.mcm.subtitle, href: "/reports/mcm" },
     { name: r.dq.title, description: r.dq.subtitle, href: "/reports/dq" },
     { name: r.dc.title, description: r.dc.subtitle, href: "/reports/dc" },
