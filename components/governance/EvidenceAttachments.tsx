@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 // Loaded only when such a file is actually previewed: the renderers are large and browser-only.
 const previewLoading = () => <div className="h-full grid place-items-center text-sm text-muted">Loading…</div>;
 const PdfPreview = dynamic(() => import("./PdfPreview").then((m) => m.PdfPreview), { ssr: false, loading: previewLoading });
+const ExcelPreview = dynamic(() => import("./ExcelPreview").then((m) => m.ExcelPreview), { ssr: false, loading: previewLoading });
 const OfficePreview = dynamic(() => import("./OfficePreview").then((m) => m.OfficePreview), { ssr: false, loading: previewLoading });
 
 // A list of attached documents and links, used for the evidence of a compliance
@@ -16,8 +17,8 @@ const OfficePreview = dynamic(() => import("./OfficePreview").then((m) => m.Offi
 // Preview: the application never allows its own pages inside a frame (X-Frame-Options
 // DENY, frame-ancestors 'none' — next.config.mjs, lib/csp.ts), so a document is not
 // shown in an iframe. Images are shown with <img>, text files are fetched and shown as
-// text, a PDF is drawn page by page by pdf.js (PdfPreview), and Word and PowerPoint
-// files are drawn by OfficePreview.
+// text, a PDF is drawn page by page by pdf.js (PdfPreview), Word and PowerPoint files
+// are drawn by OfficePreview, and an Excel workbook is shown as tables by ExcelPreview.
 
 export type EvidenceItem = {
   evidenceId: number; kind: "FILE" | "LINK"; title: string; note: string | null;
@@ -27,6 +28,8 @@ export type EvidenceItem = {
 
 const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 const fmtSize = (n: number | null) => (n == null ? "" : n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 const isInternal = (url: string) => url.startsWith("/");
@@ -198,7 +201,7 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
               </ul>
             )}
             <div className="text-[10px] text-muted mt-1">
-              {isEdit ? "Up to 25 MB." : "Choose one or several, up to 25 MB each."} PDF, Word (.docx), PowerPoint (.pptx), images and text files are previewed here; other types (Excel, .doc, .ppt…) are downloaded.
+              {isEdit ? "Up to 25 MB." : "Choose one or several, up to 25 MB each."} PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), images and text files are previewed here; other types (.doc, .ppt, .xls…) are downloaded.
             </div>
           </div>
         ) : (
@@ -348,6 +351,8 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
                 <OfficePreview url={previewUrl} kind="docx" />
               ) : preview.mimeType === PPTX_TYPE ? (
                 <OfficePreview url={previewUrl} kind="pptx" />
+              ) : preview.mimeType === XLSX_TYPE ? (
+                <ExcelPreview url={previewUrl} />
               ) : preview.mimeType?.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <div className="h-full overflow-auto grid place-items-center p-4"><img src={previewUrl} alt={preview.title} className="max-w-full max-h-full" /></div>

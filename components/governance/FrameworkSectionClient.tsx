@@ -327,7 +327,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                           {newFiles.map((f) => <li key={f.name + f.size} className="break-all" dir="ltr">{f.name}</li>)}
                         </ul>
                       )}
-                      <div className="text-[10px] text-muted mt-1">Choose one or several, up to 25 MB each. PDF, Word (.docx), PowerPoint (.pptx), images and text files can be previewed in the page.</div>
+                      <div className="text-[10px] text-muted mt-1">Choose one or several, up to 25 MB each. PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), images and text files can be previewed in the page.</div>
                     </Field>
                     <Field label="Links">
                       <textarea value={newLinks} onChange={(e) => setNewLinks(e.target.value)} rows={2} dir="ltr" className="field font-mono text-[12px]"

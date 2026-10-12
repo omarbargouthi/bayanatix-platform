@@ -17,14 +17,15 @@ export const MAX_EVIDENCE_FILE_BYTES = 25 * 1024 * 1024;
 // HTML and SVG are deliberately absent: served inline they would execute as the app.
 export const INLINE_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "text/csv"]);
 
-// Word and PowerPoint (.docx, .pptx) are previewed too, but never displayed by the
-// browser itself: the preview fetches the bytes and draws them with script
-// (components/governance/DocxPreview.tsx, PptxPreview.tsx). The older binary formats
-// (.doc, .ppt) are not: they are downloaded.
+// Word, PowerPoint and Excel (.docx, .pptx, .xlsx) are previewed too, but never displayed
+// by the browser itself: the preview fetches the bytes and draws them with script
+// (components/governance/OfficePreview.tsx, ExcelPreview.tsx). The older binary formats
+// (.doc, .ppt, .xls) are not: they are downloaded.
 export const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+export const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export const canPreviewType = (mimeType: string | null | undefined): boolean =>
-  !!mimeType && (INLINE_TYPES.has(mimeType) || mimeType === DOCX_TYPE || mimeType === PPTX_TYPE);
+  !!mimeType && (INLINE_TYPES.has(mimeType) || mimeType === DOCX_TYPE || mimeType === PPTX_TYPE || mimeType === XLSX_TYPE);
 
 const TYPE_BY_EXTENSION: Record<string, string> = {
   pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
