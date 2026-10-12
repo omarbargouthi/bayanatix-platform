@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AssetRequest, RequestStatus } from "@/lib/types";
+import type { AccessRequestRow } from "@/lib/queries/access-requests";
 
 const TYPE_LABEL: Record<string, string> = {
   FIX_DATA_ISSUE:    "Fix Data Issue",
@@ -39,6 +40,26 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "CLOSED",      label: "Closed"        },
 ];
 
+// Access requests (a data source, schema, table or feature domain) live in their own
+// table with their own statuses; they are listed here next to the asset requests.
+type AccessItem = AccessRequestRow & { canDecide: boolean };
+type Item =
+  | { key: string; createdAt: string; asset: AssetRequest; access?: undefined }
+  | { key: string; createdAt: string; access: AccessItem; asset?: undefined };
+
+const ACCESS_TYPE_COLOR = "bg-emerald-50 text-emerald-700 border-emerald-200";
+// The page's status filter, in access-request terms (nothing is ever "in progress").
+const ACCESS_STATUS_FOR_FILTER: Record<string, string | null> = {
+  OPEN: "PENDING", IN_PROGRESS: null, RESOLVED: "APPROVED", CLOSED: "REJECTED",
+};
+const ACCESS_LEVEL_LABEL: Record<string, string> = { DATA_SOURCE: "Data Source", SCHEMA: "Schema", TABLE: "Table" };
+
+function accessTitle(a: AccessRequestRow): string {
+  return a.requestKind === "DOMAIN"
+    ? `Access to domain: ${(a.domainCode ?? "—").replace(/_/g, " ")}`
+    : `Access to ${(ACCESS_LEVEL_LABEL[a.resourceType ?? ""] ?? "asset").toLowerCase()}: ${a.resourceName ?? a.resourceId ?? "—"}`;
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -55,10 +76,12 @@ function RequestsPageContent() {
   const domainFilter  = searchParams.get("domain") ?? "";
 
   const [requests,  setRequests]  = useState<AssetRequest[]>([]);
+  const [access,    setAccess]    = useState<AccessItem[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [filter,    setFilter]    = useState("");
-  const [expanded,  setExpanded]  = useState<number | null>(null);
+  const [expanded,  setExpanded]  = useState<string | null>(null);
   const [updating,  setUpdating]  = useState<number | null>(null);
+  const [deciding,  setDeciding]  = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,8 +89,17 @@ function RequestsPageContent() {
     if (filter)       params.set("status", filter);
     if (domainFilter) params.set("domain", domainFilter);
     try {
-      const r = await fetch(`/api/requests?${params.toString()}`);
+      const [r, a] = await Promise.all([fetch(`/api/requests?${params.toString()}`), fetch("/api/access-requests")]);
       if (r.ok) setRequests(await r.json());
+      if (a.ok) {
+        // The caller's own access requests, plus the ones waiting on their approval
+        // (an administrator gets all of them).
+        const d: { mine: AccessRequestRow[]; pendingForMe: AccessRequestRow[]; all?: AccessRequestRow[] } = await a.json();
+        const decidable = new Set(d.pendingForMe.map((x) => x.requestId));
+        const byId = new Map<number, AccessRequestRow>();
+        for (const x of [...(d.all ?? []), ...d.mine, ...d.pendingForMe]) byId.set(x.requestId, x);
+        setAccess([...byId.values()].map((x) => ({ ...x, canDecide: decidable.has(x.requestId) })));
+      }
     } finally {
       setLoading(false);
     }
@@ -86,20 +118,46 @@ function RequestsPageContent() {
     load();
   }
 
+  async function decideAccess(id: number, decision: "APPROVED" | "REJECTED") {
+    setDeciding(id);
+    await fetch(`/api/access-requests/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+    setDeciding(null);
+    load();
+  }
+
+  // The governance-domain filter is about asset request targets, so it leaves access requests out.
+  const visibleAccess = domainFilter ? [] : access.filter((a) => !filter || a.statusCode === ACCESS_STATUS_FOR_FILTER[filter]);
+  const assetItems  = (rows: AssetRequest[]): Item[] => rows.map((r) => ({ key: `asset-${r.requestId}`, createdAt: r.createdAt, asset: r }));
+  const accessItems = (rows: AccessItem[]): Item[] => rows.map((a) => ({ key: `access-${a.requestId}`, createdAt: a.createdAt, access: a }));
+  const newestFirst = (items: Item[]) => items.sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
+  const isOpen = (r: AssetRequest) => r.statusCode === "OPEN" || r.statusCode === "IN_PROGRESS";
+
+  // An access request carries no priority of its own; it is listed as Medium, the default.
   const grouped = {
-    HIGH:   requests.filter((r) => r.priorityCode === "HIGH"   && (r.statusCode === "OPEN" || r.statusCode === "IN_PROGRESS")),
-    MEDIUM: requests.filter((r) => r.priorityCode === "MEDIUM" && (r.statusCode === "OPEN" || r.statusCode === "IN_PROGRESS")),
-    LOW:    requests.filter((r) => r.priorityCode === "LOW"    && (r.statusCode === "OPEN" || r.statusCode === "IN_PROGRESS")),
-    done:   requests.filter((r) => r.statusCode === "RESOLVED" || r.statusCode === "CLOSED"),
+    HIGH:   assetItems(requests.filter((r) => r.priorityCode === "HIGH" && isOpen(r))),
+    MEDIUM: newestFirst([
+      ...assetItems(requests.filter((r) => r.priorityCode === "MEDIUM" && isOpen(r))),
+      ...accessItems(visibleAccess.filter((a) => a.statusCode === "PENDING")),
+    ]),
+    LOW:    assetItems(requests.filter((r) => r.priorityCode === "LOW" && isOpen(r))),
+    done:   newestFirst([
+      ...assetItems(requests.filter((r) => r.statusCode === "RESOLVED" || r.statusCode === "CLOSED")),
+      ...accessItems(visibleAccess.filter((a) => a.statusCode !== "PENDING")),
+    ]),
   };
+  const total = requests.length + visibleAccess.length;
 
   return (
     <main className="px-8 py-7 pb-14 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-brand-deep">Asset Requests</h1>
-          <p className="text-sm text-muted mt-0.5">Track and manage requests raised against your data assets</p>
+          <h1 className="text-2xl font-extrabold text-brand-deep">Requests</h1>
+          <p className="text-sm text-muted mt-0.5">Requests raised against data assets, and your access requests, in one place</p>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -135,7 +193,7 @@ function RequestsPageContent() {
 
       {loading ? (
         <div className="py-20 text-center text-muted">Loading…</div>
-      ) : requests.length === 0 ? (
+      ) : total === 0 ? (
         <div className="py-20 text-center text-muted">
           <div className="text-5xl mb-4">✓</div>
           <p>{domainFilter ? `No open requests for domain ${domainFilter}.` : "No requests found."}</p>
@@ -153,12 +211,53 @@ function RequestsPageContent() {
                   <span className="text-[11px] text-muted">({rows.length})</span>
                 </div>
                 <div className="card overflow-hidden">
-                  {rows.map((req, idx) => (
-                    <div key={req.requestId} className={idx > 0 ? "border-t border-line-soft" : ""}>
+                  {rows.map((item, idx) => item.access ? (
+                    <div key={item.key} className={idx > 0 ? "border-t border-line-soft" : ""}>
+                      <button
+                        className="w-full text-left px-5 py-4 hover:bg-canvas-soft transition-colors flex items-start gap-3"
+                        onClick={() => setExpanded((e) => e === item.key ? null : item.key)}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${PRIORITY_DOT.MEDIUM}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${ACCESS_TYPE_COLOR}`}>Access</span>
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">PENDING APPROVAL</span>
+                          </div>
+                          <div className="text-sm font-semibold text-brand-deep">{accessTitle(item.access)}</div>
+                          <div className="text-[11px] text-muted mt-0.5 flex items-center gap-2">
+                            <span>{item.access.requesterName ?? item.access.requesterUserId}</span>
+                            <span>·</span>
+                            <span>{timeAgo(item.access.createdAt)}</span>
+                          </div>
+                        </div>
+                        <span className="text-muted shrink-0 mt-1">{expanded === item.key ? "▲" : "▼"}</span>
+                      </button>
+                      {expanded === item.key && (
+                        <div className="border-t border-line-soft px-5 py-4 bg-canvas-soft/50 space-y-3">
+                          <p className="text-[13px] text-ink leading-relaxed">
+                            {item.access.justificationText || <span className="text-muted italic">No justification given.</span>}
+                          </p>
+                          {item.access.canDecide ? (
+                            <div className="flex gap-2 pt-1">
+                              <button disabled={deciding === item.access.requestId} onClick={() => decideAccess(item.access.requestId, "APPROVED")} className="btn btn-primary btn-sm">
+                                {deciding === item.access.requestId ? "…" : "✓ Approve"}
+                              </button>
+                              <button disabled={deciding === item.access.requestId} onClick={() => decideAccess(item.access.requestId, "REJECTED")} className="btn btn-sm text-red-600">
+                                {deciding === item.access.requestId ? "…" : "✗ Reject"}
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted">Waiting for the approver.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (() => { const req = item.asset; return (
+                    <div key={item.key} className={idx > 0 ? "border-t border-line-soft" : ""}>
                       {/* Summary */}
                       <button
                         className="w-full text-left px-5 py-4 hover:bg-canvas-soft transition-colors flex items-start gap-3"
-                        onClick={() => setExpanded((e) => e === req.requestId ? null : req.requestId)}
+                        onClick={() => setExpanded((e) => e === item.key ? null : item.key)}
                       >
                         <span className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${PRIORITY_DOT[req.priorityCode]}`} />
                         <div className="flex-1 min-w-0">
@@ -183,11 +282,11 @@ function RequestsPageContent() {
                             <span>{req.targets.length} asset{req.targets.length !== 1 ? "s" : ""}</span>
                           </div>
                         </div>
-                        <span className="text-muted shrink-0 mt-1">{expanded === req.requestId ? "▲" : "▼"}</span>
+                        <span className="text-muted shrink-0 mt-1">{expanded === item.key ? "▲" : "▼"}</span>
                       </button>
 
                       {/* Expanded */}
-                      {expanded === req.requestId && (
+                      {expanded === item.key && (
                         <div className="border-t border-line-soft px-5 py-4 bg-canvas-soft/50 space-y-3">
                           {req.descriptionText && (
                             <p className="text-[13px] text-ink leading-relaxed">{req.descriptionText}</p>
@@ -229,7 +328,7 @@ function RequestsPageContent() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  ); })())}
                 </div>
               </div>
             );
@@ -244,9 +343,25 @@ function RequestsPageContent() {
                 <span className="text-[11px] text-muted">({grouped.done.length})</span>
               </div>
               <div className="card overflow-hidden">
-                {grouped.done.map((req, idx) => (
+                {grouped.done.map((item, idx) => item.access ? (
                   <div
-                    key={req.requestId}
+                    key={item.key}
+                    className={`flex items-center gap-3 px-5 py-3 ${idx > 0 ? "border-t border-line-soft" : ""}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${item.access.statusCode === "APPROVED" ? "bg-emerald-400" : "bg-gray-300"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-ink line-clamp-1">{accessTitle(item.access)}</p>
+                      <p className="text-[11px] text-muted">Access · {item.access.requesterName ?? item.access.requesterUserId} · {timeAgo(item.access.createdAt)}</p>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      item.access.statusCode === "APPROVED" ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-500"
+                    }`}>
+                      {item.access.statusCode}
+                    </span>
+                  </div>
+                ) : (() => { const req = item.asset; return (
+                  <div
+                    key={item.key}
                     className={`flex items-center gap-3 px-5 py-3 ${idx > 0 ? "border-t border-line-soft" : ""}`}
                   >
                     <span className={`w-2 h-2 rounded-full shrink-0 ${req.statusCode === "RESOLVED" ? "bg-emerald-400" : "bg-gray-300"}`} />
@@ -260,7 +375,7 @@ function RequestsPageContent() {
                       {req.statusCode}
                     </span>
                   </div>
-                ))}
+                ); })())}
               </div>
             </div>
           )}

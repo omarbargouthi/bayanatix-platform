@@ -8,7 +8,7 @@ import { DOMAIN_MANAGE_ROLE_NAME } from "@/lib/domain-roles";
 
 const ALL_DOMAINS: DomainCode[] = ["GOVERNANCE", "DATA_QUALITY", "DATA_PRIVACY", "SHARING", "FOI", "OPEN_DATA"];
 
-// GET — { mine, pendingForMe }. `mine` is the caller's own requests (any
+// GET — { mine, pendingForMe, all? }. `mine` is the caller's own requests (any
 // status). `pendingForMe` is every PENDING request the caller is the
 // authorized approver for (ADMIN sees all; otherwise domain managers see
 // their domain's requests, data source owners see requests under their source).
@@ -26,7 +26,10 @@ export async function GET() {
   const levels = await Promise.all(ALL_DOMAINS.map((d) => getDomainAccess(session, d)));
   const domainAccess = Object.fromEntries(ALL_DOMAINS.map((d, i) => [d, levels[i]]));
 
-  return NextResponse.json({ mine, pendingForMe, domainAccess });
+  // An administrator also gets every request, for the Requests list.
+  const all = session.role === "ADMIN" ? rows : undefined;
+
+  return NextResponse.json({ mine, pendingForMe, domainAccess, all });
 }
 
 async function notifyApprovers(

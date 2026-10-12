@@ -12,7 +12,7 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
       <Header
         crumbs={[
           { label: "Bayanis", href: "/dashboard" },
-          { label: "Asset Requests", href: "/requests" },
+          { label: "Requests", href: "/requests" },
           { label: `#${params.id}` },
         ]}
         user={user}

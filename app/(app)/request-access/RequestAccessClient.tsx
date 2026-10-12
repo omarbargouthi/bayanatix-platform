@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { NewRequestForm, type NewRequestResult } from "@/components/requests/NewRequestForm";
 import { useLang } from "@/lib/lang-context";
 import type { DomainCode } from "@/lib/can";
 import type { AccessRequestRow, CatalogResourceType } from "@/lib/queries/access-requests";
 
-type Tab = "new" | "mine" | "pending";
+type Tab = "new" | "pending";
 
 export function RequestAccessClient() {
   const { t } = useLang();
@@ -20,15 +21,14 @@ export function RequestAccessClient() {
     DATA_SOURCE: c.resourceLevelSource, SCHEMA: c.resourceLevelSchema, TABLE: c.resourceLevelTable,
   })[rt];
 
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("new");
-  const [mine, setMine] = useState<AccessRequestRow[]>([]);
   const [pendingForMe, setPendingForMe] = useState<AccessRequestRow[]>([]);
 
   const loadRequests = useCallback(async () => {
     const r = await fetch("/api/access-requests");
     if (!r.ok) return;
     const d: { mine: AccessRequestRow[]; pendingForMe: AccessRequestRow[] } = await r.json();
-    setMine(d.mine);
     setPendingForMe(d.pendingForMe);
   }, []);
 
@@ -36,8 +36,10 @@ export function RequestAccessClient() {
   // Notification links land on the right tab (?tab=pending | mine).
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("tab");
-    if (requested === "pending" || requested === "mine" || requested === "new") setTab(requested);
-  }, []);
+    if (requested === "pending" || requested === "new") setTab(requested);
+    // The old "my requests" tab is now the single Requests list.
+    if (requested === "mine") router.replace("/requests");
+  }, [router]);
 
   // ── New request (unified form) ──────────────────────────────────────────
   const [formKey, setFormKey] = useState(0);
@@ -58,14 +60,6 @@ export function RequestAccessClient() {
           .replace("{name}", row.resourceName ?? row.resourceId ?? "—");
   }
 
-  function StatusTag({ status }: { status: AccessRequestRow["statusCode"] }) {
-    const cls = status === "PENDING" ? "bg-amber-50 text-amber-700 border-amber-200"
-      : status === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : "bg-red-50 text-red-700 border-red-200";
-    const label = status === "PENDING" ? c.statusPending : status === "APPROVED" ? c.statusApproved : c.statusRejected;
-    return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}>{label}</span>;
-  }
-
   return (
     <div className="max-w-4xl">
       <p className="text-[13px] text-muted mb-5">{c.pageDesc}</p>
@@ -73,7 +67,6 @@ export function RequestAccessClient() {
       <div className="flex gap-1 border-b border-line mb-5">
         {([
           ["new", c.tabNewRequest],
-          ["mine", c.tabMyRequests],
           ["pending", c.tabPendingApproval],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -91,6 +84,9 @@ export function RequestAccessClient() {
             )}
           </button>
         ))}
+        <Link href="/requests" className="ms-auto self-center text-[13px] font-semibold text-brand-purple hover:underline">
+          {c.tabMyRequests} →
+        </Link>
       </div>
 
       {tab === "new" && (
@@ -114,24 +110,6 @@ export function RequestAccessClient() {
             }}
           />
         </div>
-      )}
-
-      {tab === "mine" && (
-        mine.length === 0 ? (
-          <p className="text-[13px] text-muted italic">{c.myRequestsEmpty}</p>
-        ) : (
-          <div className="space-y-2">
-            {mine.map((row) => (
-              <div key={row.requestId} className="card p-4 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-medium text-ink truncate">{describeRequest(row)}</div>
-                  <div className="text-[11px] text-muted mt-0.5">{new Date(row.createdAt).toLocaleDateString()}</div>
-                </div>
-                <StatusTag status={row.statusCode} />
-              </div>
-            ))}
-          </div>
-        )
       )}
 
       {tab === "pending" && (
