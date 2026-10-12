@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLang } from "@/lib/lang-context";
 
 // Shows a Word (.docx) or PowerPoint (.pptx) file inside the page.
 //
@@ -44,6 +45,7 @@ function tameLinks(root: HTMLElement) {
 }
 
 export function OfficePreview({ url, kind }: { url: string; kind: "docx" | "pptx" }) {
+  const a = useLang().t.attachments;
   const holder = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -84,9 +86,9 @@ export function OfficePreview({ url, kind }: { url: string; kind: "docx" | "pptx
   return (
     <div className="h-full flex flex-col">
       <div className="px-4 py-1.5 border-b border-line bg-white text-[12px] text-ink-soft shrink-0">
-        {state === "loading" ? "Loading…"
-          : state === "error" ? <span className="text-red-700">This {kind === "docx" ? "Word document" : "presentation"} could not be shown here. Download it to open it in its own application.</span>
-          : "Preview — fonts and layout may differ from the original. Download the file for the exact copy."}
+        {state === "loading" ? a.loading
+          : state === "error" ? <span className="text-red-700">{kind === "docx" ? a.wordFailed : a.pptFailed}</span>
+          : a.officeNote}
       </div>
       <div ref={holder} className={`flex-1 min-h-0 overflow-auto ${kind === "pptx" ? "px-4 py-3 [&_.pptx-preview-wrapper]:!bg-transparent [&_.pptx-preview-wrapper]:!h-auto [&_.pptx-preview-wrapper]:!overflow-visible" : ""}`} dir="ltr" />
     </div>

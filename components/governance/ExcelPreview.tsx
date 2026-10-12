@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLang } from "@/lib/lang-context";
 
 // Shows an Excel workbook (.xlsx) inside the page: one tab per sheet, the cells as a
 // plain table. The file is fetched as bytes and read by exceljs in the browser (loaded
@@ -46,6 +47,8 @@ function displayText(value: unknown, fallback: string): string {
 }
 
 export function ExcelPreview({ url }: { url: string }) {
+  const a = useLang().t.attachments;
+  const fill = (text: string, values: Record<string, number>) => text.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
   const [sheets, setSheets] = useState<Sheet[] | null>(null);
   const [active, setActive] = useState(0);
   const [error, setError] = useState(false);
@@ -87,9 +90,9 @@ export function ExcelPreview({ url }: { url: string }) {
     return () => { live = false; };
   }, [url]);
 
-  if (error) return <div className="h-full grid place-items-center text-center px-6 text-sm text-ink">This workbook could not be shown here. Download it to open it in Excel.</div>;
-  if (!sheets) return <div className="h-full grid place-items-center text-sm text-muted">Loading…</div>;
-  if (sheets.length === 0) return <div className="h-full grid place-items-center text-sm text-muted">This workbook has no sheets.</div>;
+  if (error) return <div className="h-full grid place-items-center text-center px-6 text-sm text-ink">{a.excelFailed}</div>;
+  if (!sheets) return <div className="h-full grid place-items-center text-sm text-muted">{a.loading}</div>;
+  if (sheets.length === 0) return <div className="h-full grid place-items-center text-sm text-muted">{a.excelNoSheets}</div>;
 
   const sheet = sheets[Math.min(active, sheets.length - 1)];
   const cut = sheet.totalRows > MAX_ROWS || sheet.totalCols > MAX_COLS;
@@ -97,12 +100,12 @@ export function ExcelPreview({ url }: { url: string }) {
   return (
     <div className="h-full flex flex-col">
       <div className="px-4 py-1.5 border-b border-line bg-white text-[12px] text-ink-soft shrink-0">
-        Values only — formulas show their last result; formatting, charts and merged cells are not drawn.
-        {cut && <span className="text-amber-700"> Showing the first {Math.min(sheet.totalRows, MAX_ROWS)} of {sheet.totalRows} rows{sheet.totalCols > MAX_COLS ? ` and ${MAX_COLS} of ${sheet.totalCols} columns` : ""}; download to see the rest.</span>}
+        {a.excelNote}
+        {cut && <span className="text-amber-700">{fill(sheet.totalCols > MAX_COLS ? a.excelCutRowsCols : a.excelCutRows, { shown: Math.min(sheet.totalRows, MAX_ROWS), total: sheet.totalRows, cols: MAX_COLS, totalCols: sheet.totalCols })}</span>}
       </div>
       <div className="flex-1 min-h-0 overflow-auto bg-white" dir="ltr">
         {sheet.rows.length === 0 ? (
-          <div className="h-full grid place-items-center text-sm text-muted">This sheet is empty.</div>
+          <div className="h-full grid place-items-center text-sm text-muted">{a.excelEmptySheet}</div>
         ) : (
           <table className="border-collapse text-[12px] text-ink">
             <thead>

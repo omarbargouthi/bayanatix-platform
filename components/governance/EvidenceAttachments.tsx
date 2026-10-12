@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { useLang } from "@/lib/lang-context";
 
 // Loaded only when such a file is actually previewed: the renderers are large and browser-only.
-const previewLoading = () => <div className="h-full grid place-items-center text-sm text-muted">Loading…</div>;
+function PreviewLoading() {
+  const { t } = useLang();
+  return <div className="h-full grid place-items-center text-sm text-muted">{t.attachments.loading}</div>;
+}
+const previewLoading = () => <PreviewLoading />;
 const PdfPreview = dynamic(() => import("./PdfPreview").then((m) => m.PdfPreview), { ssr: false, loading: previewLoading });
 const ExcelPreview = dynamic(() => import("./ExcelPreview").then((m) => m.ExcelPreview), { ssr: false, loading: previewLoading });
 const OfficePreview = dynamic(() => import("./OfficePreview").then((m) => m.OfficePreview), { ssr: false, loading: previewLoading });
@@ -56,11 +61,12 @@ export function EvidenceAttachments({ fwId, reqId, canEdit, onChange }: {
   const report = useRef(onChange);
   report.current = onChange;
   const relay = useCallback((items: EvidenceItem[]) => report.current?.(items.map((i) => i.title)), []);
+  const a = useLang().t.attachments;
   return (
     <AttachmentList
       base={`/api/governance/compliance/${fwId}/evidence/${reqId}`} canEdit={canEdit} onChange={relay}
-      heading="Evidence provided" removeFrom="this requirement's evidence"
-      emptyHint="Add a document or a link to a page that shows this requirement is met."
+      heading={a.evidenceHeading} removeFrom={a.evidenceRemoveFrom}
+      emptyHint={a.evidenceEmptyHint}
     />
   );
 }
@@ -75,6 +81,8 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
   removeFrom: string;
   emptyHint: string;
 }) {
+  const a = useLang().t.attachments;
+  const fill = (text: string, values: Record<string, string | number>) => text.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
   const [items, setItems] = useState<EvidenceItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -93,7 +101,7 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
   useEffect(() => {
     let live = true;
     fetch(base).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => { if (live) apply(d.items); })
-      .catch(() => { if (live) { setItems([]); setError("The list could not be loaded."); } });
+      .catch(() => { if (live) { setItems([]); setError(a.listLoadFailed); } });
     return () => { live = false; };
   }, [base, apply]);
 
@@ -102,8 +110,8 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
     setPreviewText(null); setPreview(i);
     if (i.canPreview && i.mimeType?.startsWith("text/")) {
       fetch(url).then((r) => (r.ok ? r.text() : Promise.reject()))
-        .then((t) => setPreviewText(t.length > 300_000 ? t.slice(0, 300_000) + "\n\n… (the rest is not shown; download the document to see all of it)" : t))
-        .catch(() => setPreviewText("The document could not be loaded."));
+        .then((t) => setPreviewText(t.length > 300_000 ? t.slice(0, 300_000) + "\n\n" + a.textTruncated : t))
+        .catch(() => setPreviewText(a.docLoadFailed));
     }
   }
 
@@ -123,10 +131,10 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
     try {
       const r = await fetch(url, init);
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) return (d.error as string | undefined) ?? "That did not work. Try again.";
+      if (!r.ok) return (d.error as string | undefined) ?? a.genericErr;
       return method === "DELETE" ? true : (d.item as EvidenceItem);
     } catch {
-      return "The server could not be reached.";
+      return a.serverUnreachable;
     }
   }
 
@@ -135,8 +143,8 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
   async function saveNew() {
     if (!items || !adding) return;
     const links = linesOf(form.url);
-    if (adding === "FILE" && files.length === 0) { setError("Choose one or more documents to upload."); return; }
-    if (adding === "LINK" && links.length === 0) { setError("Enter at least one link."); return; }
+    if (adding === "FILE" && files.length === 0) { setError(a.chooseDocsErr); return; }
+    if (adding === "LINK" && links.length === 0) { setError(a.enterLinkErr); return; }
     const many = (adding === "FILE" ? files.length : links.length) > 1;
     const title = many ? "" : form.title;
     setBusy(true); setError(null);
@@ -144,7 +152,7 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
     const failed: { name: string; why: string }[] = [];
     const total = adding === "FILE" ? files.length : links.length;
     for (let n = 0; n < total; n++) {
-      if (many) setProgress(`${adding === "FILE" ? "Uploading" : "Adding"} ${n + 1} of ${total}…`);
+      if (many) setProgress(fill(adding === "FILE" ? a.uploadingN : a.addingN, { n: n + 1, total }));
       const result = adding === "FILE"
         ? await send(base, "POST", { file: files[n], title, note: form.note })
         : await send(base, "POST", { title, note: form.note, url: links[n] });
@@ -156,11 +164,11 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
     if (failed.length === 0) { close(); return; }
     if (adding === "FILE") setFiles(files.filter((f) => failed.some((x) => x.name === f.name)));
     else setForm((x) => ({ ...x, url: failed.map((f) => f.name).join("\n") }));
-    setError(failed.length === 1 && !many ? failed[0].why : `${failed.length} of ${total} could not be added: ${failed.map((f) => `${f.name} (${f.why})`).join("; ")}`);
+    setError(failed.length === 1 && !many ? failed[0].why : fill(a.failedSummary, { failed: failed.length, total, list: failed.map((f) => `${f.name} (${f.why})`).join("; ") }));
   }
   async function saveEdit(i: EvidenceItem) {
     if (!items) return;
-    if (!form.title.trim()) { setError("The title cannot be empty."); return; }
+    if (!form.title.trim()) { setError(a.titleEmptyErr); return; }
     setBusy(true); setError(null);
     const result = await send(`${base}/${i.evidenceId}`, "PATCH", { file: files[0], title: form.title, note: form.note, ...(i.kind === "LINK" ? { url: form.url } : {}) });
     setBusy(false);
@@ -168,7 +176,7 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
     if (result !== true) { apply(items.map((x) => (x.evidenceId === i.evidenceId ? result : x))); close(); }
   }
   async function remove(i: EvidenceItem) {
-    if (!items || !confirm(`Remove “${i.title}” from ${removeFrom}?${i.kind === "FILE" ? " The stored document is deleted." : ""}`)) return;
+    if (!items || !confirm(fill(a.removeConfirm, { title: i.title, from: removeFrom }) + (i.kind === "FILE" ? a.removeFileNote : ""))) return;
     setBusy(true); setError(null);
     const result = await send(`${base}/${i.evidenceId}`, "DELETE");
     setBusy(false);
@@ -188,7 +196,7 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
       <div className="space-y-2.5">
         {kind === "FILE" ? (
           <div>
-            <label className={label}>{isEdit ? "Replace the document (optional)" : "Documents"}</label>
+            <label className={label}>{isEdit ? a.replaceLabel : a.documentsLabel}</label>
             <input type="file" multiple={!isEdit} className={filePicker}
               onChange={(e) => {
                 const picked = Array.from(e.target.files ?? []);
@@ -201,34 +209,34 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
               </ul>
             )}
             <div className="text-[10px] text-muted mt-1">
-              {isEdit ? "Up to 25 MB." : "Choose one or several, up to 25 MB each."} PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), images and text files are previewed here; other types (.doc, .ppt, .xls…) are downloaded.
+              {isEdit ? a.sizeOne : a.sizeMany} {a.previewTypesHint}
             </div>
           </div>
         ) : (
           <div>
-            <label className={label}>{isEdit ? "Link" : "Links"}</label>
+            <label className={label}>{isEdit ? a.linkLabel : a.linksLabel}</label>
             {isEdit ? (
               <input className={`${input} font-mono`} dir="ltr" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
             ) : (
               <textarea className={`${input} font-mono resize-y`} dir="ltr" rows={3} value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })}
                 placeholder={"/catalog/12/tables/34\nhttps://intranet.example.com/policy"} />
             )}
-            <div className="text-[10px] text-muted mt-1">{isEdit ? "The" : "One per line: the"} address of a page in Bayanis, or any http(s) address such as an intranet page.</div>
+            <div className="text-[10px] text-muted mt-1">{isEdit ? a.linkHintOne : a.linkHintMany}</div>
           </div>
         )}
         <div className={many ? "" : "grid grid-cols-2 gap-2.5"}>
           {!many && (
             <div>
-              <label className={label}>Title</label>
-              <input className={input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={kind === "FILE" ? "Defaults to the file name" : "Defaults to the link"} />
+              <label className={label}>{a.titleLabel}</label>
+              <input className={input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={kind === "FILE" ? a.titleFilePlaceholder : a.titleLinkPlaceholder} />
             </div>
           )}
           <div>
-            <label className={label}>Note (optional){many ? " — applied to all of them" : ""}</label>
-            <input className={input} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="What this shows, which section or page" />
+            <label className={label}>{a.noteLabel}{many ? a.noteAllSuffix : ""}</label>
+            <input className={input} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder={a.notePlaceholder} />
           </div>
         </div>
-        {many && <div className="text-[10px] text-muted">Each one is titled by its {kind === "FILE" ? "file name" : "address"}; titles can be edited afterwards.</div>}
+        {many && <div className="text-[10px] text-muted">{kind === "FILE" ? a.titledByFile : a.titledByLink}</div>}
       </div>
     );
   };
@@ -243,8 +251,8 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
         </label>
         {canEdit && !adding && (
           <div className="flex items-center gap-3">
-            <button onClick={() => open("FILE")} disabled={busy} className={link}>+ Add documents</button>
-            <button onClick={() => open("LINK")} disabled={busy} className={link}>+ Add links</button>
+            <button onClick={() => open("FILE")} disabled={busy} className={link}>{a.addDocuments}</button>
+            <button onClick={() => open("LINK")} disabled={busy} className={link}>{a.addLinks}</button>
           </div>
         )}
       </div>
@@ -252,9 +260,9 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
       {error && !adding && editingId == null && <div className="mb-2 text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-1.5">{error}</div>}
 
       {items == null ? (
-        <div className="text-[12px] text-muted">Loading…</div>
+        <div className="text-[12px] text-muted">{a.loading}</div>
       ) : items.length === 0 && !adding ? (
-        <div className="text-[12px] text-muted italic">Nothing attached yet.{canEdit ? ` ${emptyHint}` : ""}</div>
+        <div className="text-[12px] text-muted italic">{a.nothingAttached}{canEdit ? ` ${emptyHint}` : ""}</div>
       ) : items.length === 0 ? null : (
         <div className="rounded-md border border-line bg-white divide-y divide-line-soft">
           {items.map((i) => (
@@ -264,8 +272,8 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
                   {fields(i.kind, true)}
                   {error && <div className="mt-2 text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-1.5">{error}</div>}
                   <div className="flex justify-end gap-2 mt-2.5">
-                    <button onClick={close} disabled={busy} className="btn btn-sm">Cancel</button>
-                    <button onClick={() => saveEdit(i)} disabled={busy} className="btn btn-primary btn-sm">{busy ? "Saving…" : "Save"}</button>
+                    <button onClick={close} disabled={busy} className="btn btn-sm">{a.cancel}</button>
+                    <button onClick={() => saveEdit(i)} disabled={busy} className="btn btn-primary btn-sm">{busy ? a.saving : a.save}</button>
                   </div>
                 </div>
               ) : (
@@ -280,24 +288,24 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
                     <div className="text-[11px] text-muted break-all" dir="ltr">
                       {i.kind === "FILE"
                         ? <>{i.fileName !== i.title && <>{i.fileName} · </>}{fmtSize(i.fileSize)}</>
-                        : <>{isInternal(i.linkUrl ?? "") ? "Bayanis page" : "External link"} · {i.linkUrl}</>}
+                        : <>{isInternal(i.linkUrl ?? "") ? a.bayanisPage : a.externalLink} · {i.linkUrl}</>}
                     </div>
                     {i.note && <div className="text-[12px] text-ink-soft mt-0.5">{i.note}</div>}
                     <div className="text-[10px] text-muted mt-0.5">
-                      Added{i.addedBy ? ` by ${i.addedBy}` : ""} on {i.addedAt.slice(0, 10)}{i.updatedAt ? ` · edited ${i.updatedAt.slice(0, 10)}${i.updatedBy ? ` by ${i.updatedBy}` : ""}` : ""}
+                      {i.addedBy ? fill(a.addedByOn, { user: i.addedBy, date: i.addedAt.slice(0, 10) }) : fill(a.addedOn, { date: i.addedAt.slice(0, 10) })}{i.updatedAt ? fill(i.updatedBy ? a.editedByOn : a.editedOn, { date: i.updatedAt.slice(0, 10), user: i.updatedBy ?? "" }) : ""}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 pt-0.5">
                     {i.kind === "FILE" ? (
                       <>
-                        <button onClick={() => showPreview(i)} className={link}>Preview</button>
-                        <a href={`${base}/${i.evidenceId}?download=1`} className={link}>Download</a>
+                        <button onClick={() => showPreview(i)} className={link}>{a.preview}</button>
+                        <a href={`${base}/${i.evidenceId}?download=1`} className={link}>{a.download}</a>
                       </>
                     ) : (
-                      <a href={i.linkUrl ?? "#"} target="_blank" rel="noopener noreferrer" className={link}>Open</a>
+                      <a href={i.linkUrl ?? "#"} target="_blank" rel="noopener noreferrer" className={link}>{a.open}</a>
                     )}
-                    {canEdit && <button onClick={() => edit(i)} disabled={busy} className={link}>Edit</button>}
-                    {canEdit && <button onClick={() => remove(i)} disabled={busy} className="text-[11px] text-red-600 font-medium hover:underline disabled:opacity-40">Remove</button>}
+                    {canEdit && <button onClick={() => edit(i)} disabled={busy} className={link}>{a.edit}</button>}
+                    {canEdit && <button onClick={() => remove(i)} disabled={busy} className="text-[11px] text-red-600 font-medium hover:underline disabled:opacity-40">{a.remove}</button>}
                   </div>
                 </div>
               )}
@@ -308,14 +316,14 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
 
       {adding && (
         <div className="mt-2 rounded-lg border border-brand-purple/30 bg-brand-purple/[0.03] px-3.5 py-3">
-          <div className="text-[12px] font-semibold text-ink mb-2">{adding === "FILE" ? "Add documents" : "Add links"}</div>
+          <div className="text-[12px] font-semibold text-ink mb-2">{adding === "FILE" ? a.addDocumentsTitle : a.addLinksTitle}</div>
           {fields(adding, false)}
           {error && <div className="mt-2 text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-1.5">{error}</div>}
           <div className="flex justify-end items-center gap-2 mt-2.5">
             {progress && <span className="text-[11px] text-muted me-auto">{progress}</span>}
-            <button onClick={close} disabled={busy} className="btn btn-sm">Cancel</button>
+            <button onClick={close} disabled={busy} className="btn btn-sm">{a.cancel}</button>
             <button onClick={saveNew} disabled={busy} className="btn btn-primary btn-sm">
-              {busy ? "Saving…" : adding === "FILE" ? (files.length > 1 ? `Upload ${files.length} documents` : "Upload") : (linesOf(form.url).length > 1 ? `Add ${linesOf(form.url).length} links` : "Add link")}
+              {busy ? a.saving : adding === "FILE" ? (files.length > 1 ? fill(a.uploadN, { n: files.length }) : a.upload) : (linesOf(form.url).length > 1 ? fill(a.addLinksN, { n: linesOf(form.url).length }) : a.addLink)}
             </button>
           </div>
         </div>
@@ -331,18 +339,18 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 {preview.mimeType === "application/pdf" && (
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-brand-purple font-medium hover:underline">Open in a new tab</a>
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-brand-purple font-medium hover:underline">{a.openNewTab}</a>
                 )}
-                <a href={`${previewUrl}?download=1`} className="btn btn-sm">Download</a>
-                <button onClick={() => setPreview(null)} aria-label="Close" className="text-muted hover:text-ink text-xl leading-none">&times;</button>
+                <a href={`${previewUrl}?download=1`} className="btn btn-sm">{a.download}</a>
+                <button onClick={() => setPreview(null)} aria-label={a.close} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
               </div>
             </div>
             <div className="flex-1 min-h-0 bg-canvas-soft">
               {!preview.canPreview ? (
                 <div className="h-full grid place-items-center text-center px-6">
                   <div>
-                    <div className="text-sm text-ink">This type of document cannot be shown in the browser.</div>
-                    <div className="text-[12px] text-muted mt-1">Download it to open it in its own application.</div>
+                    <div className="text-sm text-ink">{a.cannotPreview}</div>
+                    <div className="text-[12px] text-muted mt-1">{a.cannotPreviewHint}</div>
                   </div>
                 </div>
               ) : preview.mimeType === "application/pdf" ? (
@@ -357,7 +365,7 @@ export function AttachmentList({ base, canEdit, onChange, heading, removeFrom, e
                 // eslint-disable-next-line @next/next/no-img-element
                 <div className="h-full overflow-auto grid place-items-center p-4"><img src={previewUrl} alt={preview.title} className="max-w-full max-h-full" /></div>
               ) : (
-                <pre className="h-full overflow-auto bg-white p-4 text-[12px] font-mono text-ink whitespace-pre-wrap break-words" dir="auto">{previewText ?? "Loading…"}</pre>
+                <pre className="h-full overflow-auto bg-white p-4 text-[12px] font-mono text-ink whitespace-pre-wrap break-words" dir="auto">{previewText ?? a.loading}</pre>
               )}
             </div>
           </div>

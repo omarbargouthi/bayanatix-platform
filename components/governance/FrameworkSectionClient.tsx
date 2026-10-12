@@ -28,6 +28,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
   const { t } = useLang();
   const g  = t.governance;
   const fw = g.fw;
+  const a  = t.attachments;
 
   const sectionKey = sectionCode.toLowerCase() as SectionKey;
   const sectionLabel = g.sectionLabels[sectionKey] ?? sectionCode;
@@ -109,33 +110,33 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
         const r = await fetch(`/api/governance/framework/${editDoc.docId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         });
-        if (!r.ok) { setError((await r.json().catch(() => ({}))).error ?? "The document could not be saved."); return; }
+        if (!r.ok) { setError((await r.json().catch(() => ({}))).error ?? a.docSaveFailed); return; }
       } else {
         const r = await fetch("/api/governance/framework", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         });
         const created = await r.json().catch(() => ({}));
-        if (!r.ok || !created.docId) { setError(created.error ?? "The document could not be saved."); return; }
+        if (!r.ok || !created.docId) { setError(created.error ?? a.docSaveFailed); return; }
         // The document exists now; attach what was chosen, one item after the other.
         const base = `/api/governance/framework/${created.docId}/attachments`;
         const links = newLinks.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
         const total = newFiles.length + links.length;
         let n = 0;
         for (const file of newFiles) {
-          setSaveStep(`Attaching ${++n} of ${total}…`);
+          setSaveStep(a.attachingN.replace("{n}", String(++n)).replace("{total}", String(total)));
           const fd = new FormData(); fd.append("file", file);
           const up = await fetch(base, { method: "POST", body: fd }).catch(() => null);
-          if (!up?.ok) failed.push(`${file.name} (${(await up?.json().catch(() => ({})))?.error ?? "not uploaded"})`);
+          if (!up?.ok) failed.push(`${file.name} (${(await up?.json().catch(() => ({})))?.error ?? a.notUploaded})`);
         }
         for (const url of links) {
-          setSaveStep(`Attaching ${++n} of ${total}…`);
+          setSaveStep(a.attachingN.replace("{n}", String(++n)).replace("{total}", String(total)));
           const up = await fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) }).catch(() => null);
-          if (!up?.ok) failed.push(`${url} (${(await up?.json().catch(() => ({})))?.error ?? "not added"})`);
+          if (!up?.ok) failed.push(`${url} (${(await up?.json().catch(() => ({})))?.error ?? a.notAdded})`);
         }
       }
       await reloadDocs();
       setShowModal(false);
-      if (failed.length > 0) alert(`The document was saved, but ${failed.length} attachment${failed.length === 1 ? "" : "s"} could not be added:\n\n${failed.join("\n")}\n\nOpen the document to add them again.`);
+      if (failed.length > 0) alert(a.attachFailed.replace("{n}", String(failed.length)).replace("{list}", failed.join("\n")));
     } finally { setSaving(false); setSaveStep(""); }
   }
 
@@ -219,7 +220,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                     <td className="px-4 py-3 text-muted truncate max-w-[140px]">{doc.ownerName ?? "—"}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => setExpandedId(expandedId === doc.docId ? null : doc.docId)}
-                        className="text-brand-purple hover:underline text-[12px]" title="Show the files and links of this document">
+                        className="text-brand-purple hover:underline text-[12px]" title={a.showFilesTooltip}>
                         {doc.attachmentCount} {fw.colFiles.toLowerCase()}
                       </button>
                     </td>
@@ -249,8 +250,8 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                         )}
                         <AttachmentList
                           base={`/api/governance/framework/${doc.docId}/attachments`} canEdit
-                          heading="Files and links" removeFrom="this document"
-                          emptyHint="Add the document itself, supporting files, or links to where it is published."
+                          heading={a.filesAndLinks} removeFrom={a.docRemoveFrom}
+                          emptyHint={a.docEmptyHint}
                           onChange={(items) => setAttachmentCount(doc.docId, items.length)}
                         />
                       </td>
@@ -313,13 +314,13 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                 {editDoc ? (
                   <AttachmentList
                     base={`/api/governance/framework/${editDoc.docId}/attachments`} canEdit
-                    heading="Files and links" removeFrom="this document"
-                    emptyHint="Add the document itself, supporting files, or links to where it is published."
+                    heading={a.filesAndLinks} removeFrom={a.docRemoveFrom}
+                    emptyHint={a.docEmptyHint}
                     onChange={(items) => setAttachmentCount(editDoc.docId, items.length)}
                   />
                 ) : (
                   <div className="space-y-3">
-                    <Field label="Files">
+                    <Field label={a.filesLabel}>
                       <input type="file" multiple onChange={(e) => setNewFiles(Array.from(e.target.files ?? []))}
                         className="block text-[12px] text-ink-soft file:me-2 file:px-2.5 file:py-1 file:rounded-md file:border file:border-line file:bg-white file:text-[12px] file:text-ink file:cursor-pointer" />
                       {newFiles.length > 1 && (
@@ -327,12 +328,12 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                           {newFiles.map((f) => <li key={f.name + f.size} className="break-all" dir="ltr">{f.name}</li>)}
                         </ul>
                       )}
-                      <div className="text-[10px] text-muted mt-1">Choose one or several, up to 25 MB each. PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), images and text files can be previewed in the page.</div>
+                      <div className="text-[10px] text-muted mt-1">{a.newFilesHint}</div>
                     </Field>
-                    <Field label="Links">
+                    <Field label={a.linksLabel}>
                       <textarea value={newLinks} onChange={(e) => setNewLinks(e.target.value)} rows={2} dir="ltr" className="field font-mono text-[12px]"
                         placeholder={"/catalog/12/tables/34\nhttps://intranet.example.com/policy"} />
-                      <div className="text-[10px] text-muted mt-1">One per line: a page in Bayanis, or any http(s) address. Titles and notes can be edited after saving.</div>
+                      <div className="text-[10px] text-muted mt-1">{a.newLinksHint}</div>
                     </Field>
                   </div>
                 )}

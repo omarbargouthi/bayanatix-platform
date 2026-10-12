@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLang } from "@/lib/lang-context";
 
 // Shows a PDF inside the page by drawing its pages on canvases with pdf.js.
 //
@@ -23,16 +24,19 @@ type PdfPage = {
 };
 
 export function PdfPreview({ url }: { url: string }) {
+  const a = useLang().t.attachments;
+  const pageLabel = useRef(a.pageN);
+  pageLabel.current = a.pageN;
   const holder = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState<PdfDoc | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [zoom, setZoom] = useState(1);
 
   // Load the document once per address.
   useEffect(() => {
     let live = true;
     let loaded: PdfDoc | null = null;
-    setDoc(null); setError(null);
+    setDoc(null); setError(false);
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
@@ -44,7 +48,7 @@ export function PdfPreview({ url }: { url: string }) {
         loaded = (await pdfjs.getDocument({ data, isEvalSupported: false }).promise) as unknown as PdfDoc;
         if (live) setDoc(loaded); else void loaded.destroy();
       } catch {
-        if (live) setError("This PDF could not be shown here. Download it to open it in a PDF reader.");
+        if (live) setError(true);
       }
     })();
     return () => { live = false; void loaded?.destroy(); };
@@ -73,7 +77,9 @@ export function PdfPreview({ url }: { url: string }) {
         canvas.style.width = `${Math.floor(viewport.width / density)}px`;
         canvas.style.height = `${Math.floor(viewport.height / density)}px`;
         canvas.className = "block mx-auto my-3 bg-white shadow border border-line";
-        canvas.setAttribute("aria-label", `Page ${n}`);
+        // pdf.js places each glyph itself; a canvas that inherits right-to-left (Arabic UI) misplaces them.
+        canvas.dir = "ltr";
+        canvas.setAttribute("aria-label", pageLabel.current.replace("{n}", String(n)));
         el.appendChild(canvas);
         const ctx = canvas.getContext("2d");
         if (!ctx) continue;
@@ -87,21 +93,21 @@ export function PdfPreview({ url }: { url: string }) {
 
   const step = (dir: -1 | 1) => setZoom((z) => ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, ZOOMS.indexOf(z) + dir))]);
 
-  if (error) return <div className="h-full grid place-items-center text-center px-6 text-sm text-ink">{error}</div>;
+  if (error) return <div className="h-full grid place-items-center text-center px-6 text-sm text-ink">{a.pdfFailed}</div>;
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between gap-3 px-4 py-1.5 border-b border-line bg-white text-[12px] text-ink-soft shrink-0">
         <span>
-          {doc ? `${doc.numPages} page${doc.numPages === 1 ? "" : "s"}` : "Loading…"}
-          {doc && doc.numPages > MAX_PAGES && <span className="text-amber-700"> · showing the first {MAX_PAGES}; download to see the rest</span>}
+          {doc ? (doc.numPages === 1 ? a.pdfPageOne : a.pdfPages.replace("{n}", String(doc.numPages))) : a.loading}
+          {doc && doc.numPages > MAX_PAGES && <span className="text-amber-700">{a.pdfFirstN.replace("{n}", String(MAX_PAGES))}</span>}
         </span>
         <span className="flex items-center gap-1.5">
-          <button onClick={() => step(-1)} disabled={!doc || zoom === ZOOMS[0]} aria-label="Zoom out" className="w-6 h-6 grid place-items-center rounded border border-line hover:border-brand-purple disabled:opacity-40">−</button>
+          <button onClick={() => step(-1)} disabled={!doc || zoom === ZOOMS[0]} aria-label={a.zoomOut} className="w-6 h-6 grid place-items-center rounded border border-line hover:border-brand-purple disabled:opacity-40">−</button>
           <span className="w-11 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-          <button onClick={() => step(1)} disabled={!doc || zoom === ZOOMS[ZOOMS.length - 1]} aria-label="Zoom in" className="w-6 h-6 grid place-items-center rounded border border-line hover:border-brand-purple disabled:opacity-40">+</button>
+          <button onClick={() => step(1)} disabled={!doc || zoom === ZOOMS[ZOOMS.length - 1]} aria-label={a.zoomIn} className="w-6 h-6 grid place-items-center rounded border border-line hover:border-brand-purple disabled:opacity-40">+</button>
         </span>
       </div>
-      <div ref={holder} className="flex-1 min-h-0 overflow-auto px-4" />
+      <div ref={holder} dir="ltr" className="flex-1 min-h-0 overflow-auto px-4" />
     </div>
   );
 }
