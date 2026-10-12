@@ -28,16 +28,6 @@ export type GovDoc = {
   requirementCount: number | null;
 };
 
-export type GovAttachment = {
-  attachmentId:  number;
-  docId:         number;
-  fileName:      string;
-  fileSizeBytes: number | null;
-  fileMimeType:  string | null;
-  uploadedAt:    string;
-  uploadedBy:    string | null;
-};
-
 export async function listGovDocs(sectionCode?: string): Promise<GovDoc[]> {
   return sql<GovDoc[]>`
     SELECT
@@ -180,44 +170,6 @@ export async function deleteGovDoc(docId: number): Promise<void> {
     await sql`DELETE FROM bayanat.compliance_config_items WHERE framework_id = ${regulation.frameworkId}`;
     await sql`DELETE FROM bayanat.gov_compliance_frameworks WHERE framework_id = ${regulation.frameworkId}`;
   }
-}
-
-export async function listAttachments(docId: number): Promise<GovAttachment[]> {
-  return sql<GovAttachment[]>`
-    SELECT attachment_id AS "attachmentId", doc_id AS "docId",
-           file_name AS "fileName", file_size_bytes AS "fileSizeBytes",
-           file_mime_type AS "fileMimeType",
-           uploaded_at::text AS "uploadedAt", uploaded_by AS "uploadedBy"
-    FROM bayanat.gov_framework_attachments
-    WHERE doc_id = ${docId}
-    ORDER BY uploaded_at DESC
-  `;
-}
-
-export async function addAttachment(data: {
-  docId: number; fileName: string; fileSizeBytes?: number;
-  fileMimeType?: string; fileData?: Buffer; uploadedBy: string;
-}): Promise<number> {
-  const rows = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.gov_framework_attachments
-      (doc_id, file_name, file_size_bytes, file_mime_type, file_data, uploaded_by)
-    VALUES (${data.docId}, ${data.fileName}, ${data.fileSizeBytes ?? null},
-            ${data.fileMimeType ?? null}, ${data.fileData ?? null}, ${data.uploadedBy})
-    RETURNING attachment_id AS id
-  `;
-  return rows[0].id;
-}
-
-export async function deleteAttachment(attachmentId: number): Promise<void> {
-  await sql`DELETE FROM bayanat.gov_framework_attachments WHERE attachment_id = ${attachmentId}`;
-}
-
-export async function getAttachmentData(attachmentId: number): Promise<{ fileName: string; fileMimeType: string | null; fileData: Buffer | null } | null> {
-  const rows = await sql<{ fileName: string; fileMimeType: string | null; fileData: Buffer | null }[]>`
-    SELECT file_name AS "fileName", file_mime_type AS "fileMimeType", file_data AS "fileData"
-    FROM bayanat.gov_framework_attachments WHERE attachment_id = ${attachmentId}
-  `;
-  return rows[0] ?? null;
 }
 
 export async function getSectionCounts(): Promise<Record<string, number>> {

@@ -7,7 +7,7 @@ export type EvidenceItem = {
   evidenceId: number; reqId: number; kind: EvidenceKind; title: string; note: string | null;
   fileName: string | null; mimeType: string | null; fileSize: number | null; linkUrl: string | null;
   addedBy: string | null; addedAt: string; updatedBy: string | null; updatedAt: string | null;
-  /** Whether the document can be shown in the browser (see PREVIEWABLE_TYPES). */
+  /** Whether the document can be previewed in the page (see canPreviewType). */
   canPreview: boolean;
 };
 
@@ -15,7 +15,16 @@ export const MAX_EVIDENCE_FILE_BYTES = 25 * 1024 * 1024;
 
 // Types the browser can show on its own and that cannot run script in our origin.
 // HTML and SVG are deliberately absent: served inline they would execute as the app.
-export const PREVIEWABLE_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "text/csv"]);
+export const INLINE_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "text/csv"]);
+
+// Word and PowerPoint (.docx, .pptx) are previewed too, but never displayed by the
+// browser itself: the preview fetches the bytes and draws them with script
+// (components/governance/DocxPreview.tsx, PptxPreview.tsx). The older binary formats
+// (.doc, .ppt) are not: they are downloaded.
+export const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+export const canPreviewType = (mimeType: string | null | undefined): boolean =>
+  !!mimeType && (INLINE_TYPES.has(mimeType) || mimeType === DOCX_TYPE || mimeType === PPTX_TYPE);
 
 const TYPE_BY_EXTENSION: Record<string, string> = {
   pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
@@ -66,7 +75,7 @@ const COLUMNS = sql`
   added_by_user_id AS "addedBy", added_at::text AS "addedAt", updated_by_user_id AS "updatedBy", updated_at::text AS "updatedAt"
 `;
 type Row = Omit<EvidenceItem, "canPreview">;
-const shape = (r: Row): EvidenceItem => ({ ...r, canPreview: r.kind === "FILE" && PREVIEWABLE_TYPES.has(r.mimeType ?? "") });
+const shape = (r: Row): EvidenceItem => ({ ...r, canPreview: r.kind === "FILE" && canPreviewType(r.mimeType) });
 
 export async function listEvidenceItems(reqId: number): Promise<EvidenceItem[]> {
   const rows = await sql<Row[]>`SELECT ${COLUMNS} FROM bayanat.gov_compliance_evidence_items WHERE req_id = ${reqId} ORDER BY evidence_id`;

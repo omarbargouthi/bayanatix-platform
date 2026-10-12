@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { canAccessDomain, canManageDomain } from "@/lib/can";
-import { getGovDoc, updateGovDoc, deleteGovDoc, listAttachments, RegulationInUseError } from "@/lib/queries/gov-framework";
+import { getGovDoc, updateGovDoc, deleteGovDoc, RegulationInUseError } from "@/lib/queries/gov-framework";
+import { listGovAttachments } from "@/lib/queries/gov-framework-attachments";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -9,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!(await canAccessDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const doc = await getGovDoc(Number(params.id));
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const attachments = await listAttachments(doc.docId);
+  const attachments = await listGovAttachments(doc.docId);
   return NextResponse.json({ doc, attachments });
 }
 
