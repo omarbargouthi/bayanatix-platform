@@ -1,27 +1,16 @@
 "use client";
 
 import { useLang } from "@/lib/lang-context";
-import { HalfDonut } from "@/components/ui/HalfDonut";
-import { DomainCard } from "@/components/catalog/DomainCard";
-import { MaturityChart } from "@/components/catalog/MaturityChart";
 import { DashboardSearch } from "@/components/catalog/DashboardSearch";
-import { Tag } from "@/components/ui/Tag";
 import Link from "next/link";
 import { SourceStatsFilters, SourceStatsView } from "@/components/reports/SourceStatsView";
 import { GovAnnouncements } from "@/components/governance/GovAnnouncements";
 import type { SourceStats, TopAssets, SourceLite, StewardLite } from "@/lib/reports/source-stats";
 import type { GovAnnouncement } from "@/lib/queries/gov-announcements";
-import type {
-  GovernanceDomain, ComplianceSummary, ComplianceSnapshot,
-  TrendPoint, RecentAsset,
-} from "@/lib/types";
+import type { RecentAsset } from "@/lib/types";
 
 type Props = {
   firstName:      string;
-  domains:        GovernanceDomain[];
-  summary:        ComplianceSummary;
-  snapshot:       ComplianceSnapshot | null;
-  trends:         TrendPoint[];
   recentAssets:   RecentAsset[];
   recentSearches: string[];
   sourceStats:    SourceStats;
@@ -38,17 +27,8 @@ type Props = {
   canManageGovernance: boolean;
 };
 
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div>
-      <div className="text-base font-bold text-ink">{value}</div>
-      <div className="text-[12px] text-muted">{label}</div>
-    </div>
-  );
-}
-
 export function DashboardClient({
-  firstName, domains, summary, snapshot, trends, recentAssets, recentSearches,
+  firstName, recentAssets, recentSearches,
   sourceStats, topAssets, sources, stewards, sourceId, stewardId, seesAllSources,
   announcements, canOpenGovernance, canManageGovernance,
 }: Props) {
@@ -77,7 +57,7 @@ export function DashboardClient({
       <GovAnnouncements items={announcements} canOpen={canOpenGovernance} canManage={canManageGovernance} />
 
       {/* Source systems: the user's own, or all of them for the Data Management Office */}
-      <section className="mb-8">
+      <section>
         <div className="flex items-end justify-between gap-4 flex-wrap mb-4">
           <div>
             <h2 className="text-xl font-bold">{seesAllSources ? t.sourceStats.dashboardTitleAll : t.sourceStats.dashboardTitleMine}</h2>
@@ -91,71 +71,6 @@ export function DashboardClient({
           )}
         </div>
         <SourceStatsView stats={sourceStats} top={topAssets} />
-      </section>
-
-      {/* Metric cards */}
-      <section className="grid grid-cols-2 gap-5 mb-6">
-
-        {/* Overall Compliance */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-bold">{t.dashboard.overallCompliance}</h3>
-            {snapshot && <Tag variant="purple">{snapshot.periodLabel}</Tag>}
-          </div>
-          <div className="flex items-center gap-5">
-            <div className="shrink-0">
-              <HalfDonut
-                value={snapshot?.current ?? summary.overallPct}
-                previousValue={snapshot?.previous}
-                prevLabel={snapshot?.prevLabel ?? t.dashboard.lastPeriod}
-                size={195}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-3 flex-1">
-              <Stat label={t.dashboard.stats.specsTracked}    value={summary.specsTracked} />
-              <Stat label={t.dashboard.stats.domainsActive}   value={`${summary.domainsActive} / 14`} />
-              <Stat label={t.dashboard.stats.controlsPassing} value={summary.controlsPassing} />
-              <Stat label={t.dashboard.stats.openFindings}    value={summary.openFindings} />
-            </div>
-          </div>
-        </div>
-
-        {/* Overall Maturity */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-base font-bold">{t.dashboard.overallMaturity}</h3>
-              {summary.overallMaturityPct > 0 && (
-                <span className="text-sm font-bold text-brand-purple">
-                  {summary.overallMaturityScore.toFixed(2)} / 5 · {summary.overallMaturityPct}%
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3 text-[11px] text-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-brand-purple inline-block" /> NDI
-              </span>
-            </div>
-          </div>
-          <MaturityChart data={trends} noDataLabel={t.dashboard.noTrendData} />
-        </div>
-      </section>
-
-      {/* Domain grid */}
-      <section>
-        <h2 className="text-xl font-bold mb-4">{t.dashboard.ndomoDomains}</h2>
-        <div className="grid grid-cols-3 gap-5">
-          {domains.map((d) => (
-            <DomainCard
-              key={d.domainCode}
-              d={d}
-              labels={{
-                compliance: t.dashboard.domainCard.compliance,
-                maturity:   t.dashboard.domainCard.maturity,
-              }}
-            />
-          ))}
-        </div>
       </section>
 
     </main>

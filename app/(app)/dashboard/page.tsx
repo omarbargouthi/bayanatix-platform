@@ -1,12 +1,6 @@
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
-import { getDomains, getComplianceSummary } from "@/lib/queries/domains";
-import {
-  getComplianceSnapshot,
-  getMaturityTrends,
-  getRecentAssets,
-  getRecentSearches,
-} from "@/lib/queries/dashboard";
+import { getRecentAssets, getRecentSearches } from "@/lib/queries/dashboard";
 import { DashboardClient } from "./DashboardClient";
 import { redirect } from "next/navigation";
 import { getServerT } from "@/lib/i18n/server";
@@ -27,11 +21,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const { scope, seesAll, allowed } = await resolveSourceScope(user, { sourceId, stewardId });
   const pickable = seesAll && stewardId ? (await resolveSourceScope(user, { stewardId })).scope : allowed;
 
-  const [domains, summary, snapshot, trends, recentAssets, recentSearches, sourceStats, topAssets, sources, stewards, announcements, canOpenGovernance, canManageGovernance] = await Promise.all([
-    getDomains(),
-    getComplianceSummary(),
-    getComplianceSnapshot(),
-    getMaturityTrends(new Date().getFullYear()),
+  const [recentAssets, recentSearches, sourceStats, topAssets, sources, stewards, announcements, canOpenGovernance, canManageGovernance] = await Promise.all([
     getRecentAssets(user.userId, 10),
     getRecentSearches(user.userId, 5),
     getSourceStats(scope),
@@ -52,10 +42,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       <Header crumbs={[{ label: "Bayanis", href: "/dashboard" }, { label: t.nav.dashboard }]} user={user} hideSearch />
       <DashboardClient
         firstName={firstName}
-        domains={domains}
-        summary={summary}
-        snapshot={snapshot}
-        trends={trends}
         recentAssets={recentAssets}
         recentSearches={recentSearches}
         sourceStats={sourceStats}
