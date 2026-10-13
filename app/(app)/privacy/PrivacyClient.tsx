@@ -7,8 +7,9 @@ import { DataCategoriesTab } from "@/components/retention/DataCategoriesTab";
 import { LegalHoldsTab } from "@/components/retention/LegalHoldsTab";
 import { RetentionOverviewTab } from "@/components/retention/RetentionOverviewTab";
 import { DataSubjectRequestsTab } from "@/components/retention/DataSubjectRequestsTab";
+import { DpiaRegisterTab } from "@/components/privacy/DpiaRegisterTab";
 
-type Tab = "overview" | "categories" | "holds" | "dsr";
+type Tab = "overview" | "categories" | "holds" | "dsr" | "dpia";
 
 export function PrivacyClient({ userRole }: { userRole: string }) {
   const { t } = useLang();
@@ -16,7 +17,7 @@ export function PrivacyClient({ userRole }: { userRole: string }) {
   const searchParams = useSearchParams();
   // Data subject requests: admins, data protection officers and stewards (owners act on their tables).
   const canSeeDsr = userRole === "ADMIN" || userRole === "OFFICER" || userRole === "STEWARD";
-  const [tab, setTab] = useState<Tab>(searchParams.get("tab") === "dsr" && canSeeDsr ? "dsr" : "overview");
+  const [tab, setTab] = useState<Tab>(searchParams.get("tab") === "dsr" && canSeeDsr ? "dsr" : searchParams.get("tab") === "dpia" ? "dpia" : "overview");
   const dsrId = Number(searchParams.get("dsr")) || null;
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
@@ -24,6 +25,7 @@ export function PrivacyClient({ userRole }: { userRole: string }) {
     { id: "categories",  label: r.tabCategories,  icon: "🗂️" },
     { id: "holds",       label: r.tabLegalHolds,  icon: "⚖️" },
     ...(canSeeDsr ? [{ id: "dsr" as Tab, label: t.dsr.tab, icon: "🧾" }] : []),
+    { id: "dpia",        label: t.dpia.tab,       icon: "🛡️" },
   ];
 
   return (
@@ -58,6 +60,7 @@ export function PrivacyClient({ userRole }: { userRole: string }) {
       {tab === "categories" && <DataCategoriesTab userRole={userRole} />}
       {tab === "holds"      && <LegalHoldsTab />}
       {tab === "dsr"        && <DataSubjectRequestsTab userRole={userRole} initialId={dsrId} />}
+      {tab === "dpia"       && <DpiaRegisterTab />}
     </main>
   );
 }

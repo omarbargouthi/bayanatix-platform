@@ -140,6 +140,23 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldConfig[] = [
     ],
   },
   {
+    categoryCode: "DPIA_TEMPLATES", table: "bayanat.dpia_templates", idExpr: "template_id::text",
+    keyPrefix: "dpia_templates",
+    fields: [
+      { keySuffix: "name", textColumn: "template_name_text" },
+      { keySuffix: "regulation", textColumn: "regulation_text" },
+      { keySuffix: "description", textColumn: "description_text" },
+    ],
+  },
+  {
+    categoryCode: "DPIA_TEMPLATES", table: "bayanat.dpia_template_questions", idExpr: "question_id::text",
+    keyPrefix: "dpia_template_questions",
+    fields: [
+      { keySuffix: "text", textColumn: "question_text" },
+      { keySuffix: "help", textColumn: "help_text" },
+    ],
+  },
+  {
     categoryCode: "REPORT_KPIS", table: "bayanat.report_kpi_definitions", idExpr: "kpi_code",
     keyPrefix: "report_kpis",
     fields: [{ keySuffix: "name", textColumn: "name_en", secondaryColumn: "name_ar" }],

@@ -14,6 +14,7 @@ import { ColumnsTable } from "@/components/catalog/ColumnsTable";
 import { TablePageActions } from "@/components/catalog/TablePageActions";
 import { ProfilingPanel } from "@/components/catalog/ProfilingPanel";
 import { ActivityTab } from "@/components/catalog/ActivityTab";
+import { AssetDpias } from "@/components/privacy/AssetDpias";
 import { LineageTab } from "@/components/catalog/LineageTab";
 import { TableDqTab } from "@/components/catalog/TableDqTab";
 import { getDqRules, getTableDqDimensions } from "@/lib/queries/dq";
@@ -202,6 +203,8 @@ export default async function TablePage({
             />
 
             <RelatedAssetsPanel assetTypeCode="DATA_ENTITIES" assetId={entity.entityId} />
+
+            <AssetDpias assetTypeCode="DATA_ENTITIES" assetId={entity.entityId} assetName={entity.entityName} canCreate={false} hideWhenEmpty className="mb-6" />
 
             <ColumnsTable attributes={entity.attributes} canEdit={canEdit} />
 

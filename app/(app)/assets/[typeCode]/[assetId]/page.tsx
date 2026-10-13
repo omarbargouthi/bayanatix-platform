@@ -6,6 +6,8 @@ import {
 } from "@/lib/queries/custom-assets";
 import { AssetActivityPanel } from "@/components/custom-assets/AssetActivityPanel";
 import { AssetDetailClient } from "./AssetDetailClient";
+import { AssetDpias } from "@/components/privacy/AssetDpias";
+import { canCreateDpia } from "@/lib/privacy/dpia";
 import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +62,8 @@ export default async function AssetDetailPage({ params }: { params: { typeCode: 
         relationshipTypes={relationshipTypes}
         canWrite={canWrite}
       />
-      <div className="px-6 max-w-4xl mx-auto pb-10">
+      <div className="px-6 max-w-4xl mx-auto pb-10 space-y-4">
+        <AssetDpias assetTypeCode={assetTypeCode} assetId={assetId} assetName={instance.assetNameText} canCreate={canCreateDpia(user.role)} />
         <div className="card p-6">
           <h3 className="font-bold text-sm mb-4">Activity</h3>
           <AssetActivityPanel assetTypeCode={assetTypeCode} assetId={assetId} />

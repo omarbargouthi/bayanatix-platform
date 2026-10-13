@@ -85,7 +85,7 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
 
   ROPA_LITE: {
     code: "ROPA_LITE", name: "Processing Activities (RoPA-lite)",
-    description: "Activity type linked to a Role, PI-flagged Columns, and a Data Source — a lightweight Records-of-Processing view feeding the \"PI Access by Role\" report.",
+    description: "Activity type linked to a Role, PI-flagged Columns, a Data Source and the Customers it is shared with — a lightweight Records-of-Processing view feeding the \"PI Access by Role\" report and impact assessments.",
     types: [{
       typeCode: "ACTIVITY", typeNameText: "Activity", nameArText: "نشاط",
       descriptionText: "A data-processing activity performed by a role.", iconCode: "activity", colorHex: "#d97706",
@@ -93,6 +93,11 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
         { attr_code: "PURPOSE", attr_name_text: "Purpose", name_ar_text: "الغرض", data_type_code: "TEXT", is_required_indicator: true },
         { attr_code: "LEGAL_BASIS", attr_name_text: "Legal Basis", name_ar_text: "الأساس القانوني", data_type_code: "ENUM", enum_values_json: ["CONSENT", "CONTRACT", "LEGAL_OBLIGATION", "LEGITIMATE_INTEREST"], is_required_indicator: true },
         { attr_code: "FREQUENCY", attr_name_text: "Frequency", name_ar_text: "التكرار", data_type_code: "TEXT" },
+        // Read by impact assessments (lib/privacy/dpia-facts.ts); db/186 adds them where the template was already installed.
+        { attr_code: "DATA_SUBJECTS", attr_name_text: "Data Subject Categories", name_ar_text: "فئات أصحاب البيانات", data_type_code: "TEXT" },
+        { attr_code: "CROSS_BORDER", attr_name_text: "Transferred Outside the Country", name_ar_text: "نقل إلى خارج الدولة", data_type_code: "BOOLEAN" },
+        { attr_code: "TRANSFER_COUNTRIES", attr_name_text: "Destination Countries", name_ar_text: "دول الوجهة", data_type_code: "TEXT" },
+        { attr_code: "RETENTION_PERIOD", attr_name_text: "Retention Period", name_ar_text: "مدة الاحتفاظ", data_type_code: "TEXT" },
       ],
     }],
     relationshipTypes: [
@@ -110,6 +115,11 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
         relCode: "WITHIN_SOURCE", relNameText: "Within Source", nameArText: "ضمن مصدر",
         inverseNameText: "Hosts activity", inverseNameArText: "يستضيف نشاط",
         fromEndpoints: ["CUSTOM:ACTIVITY"], toEndpoints: ["DATA_SOURCES"], cardinalityCode: "N:1", attributesSchema: null,
+      },
+      {
+        relCode: "SHARED_WITH", relNameText: "Shared With", nameArText: "يُشارك مع",
+        inverseNameText: "Receives data from", inverseNameArText: "يتلقى بيانات من",
+        fromEndpoints: ["CUSTOM:ACTIVITY"], toEndpoints: ["CUSTOM:CUSTOMER"], cardinalityCode: "M:N", attributesSchema: null,
       },
     ],
   },
