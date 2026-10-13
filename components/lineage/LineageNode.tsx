@@ -45,6 +45,10 @@ const ENGINE_GLYPH: Record<string, { mono: string; color: string }> = {
   POSTGRES: { mono: "PG",  color: "bg-sky-700" },
   POWERBI:  { mono: "BI",  color: "bg-amber-600" },
   FABRIC:   { mono: "FB",  color: "bg-purple-700" },
+  // What Azure Data Factory / Synapse definitions point at (lib/lineage/azure).
+  ADLS:     { mono: "DL",  color: "bg-cyan-700" },
+  BLOB:     { mono: "BL",  color: "bg-cyan-600" },
+  SPARK:    { mono: "SP",  color: "bg-orange-600" },
 };
 
 export function EngineGlyph({ engineCode, label }: { engineCode: string | null; label?: string }) {

@@ -1,0 +1,131 @@
+{
+  "name": "PL_Load_FinOps",
+  "properties": {
+    "description": "Lands FinOps payments in the lake, loads them and the FX rates to staging, then rebuilds the customer dimension.",
+    "activities": [
+      {
+        "name": "Land Payments",
+        "type": "Copy",
+        "inputs": [
+          {
+            "referenceName": "DS_FinOps_Payments",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "DS_Lake_Payments",
+            "type": "DatasetReference"
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "SqlServerSource"
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      },
+      {
+        "name": "Load Payments",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "Land Payments",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "inputs": [
+          {
+            "referenceName": "DS_Lake_Payments",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "DS_Stg_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "TableName": "stg_payments"
+            }
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "ParquetSource"
+          },
+          "sink": {
+            "type": "PostgreSqlSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "columnMappings": "PAYMENT_ID: payment_id, INVOICE_ID: invoice_id, PAYMENT_DATE: payment_date, PAYMENT_AMOUNT: payment_amount"
+          }
+        }
+      },
+      {
+        "name": "Load FX Rates",
+        "type": "Copy",
+        "inputs": [
+          {
+            "referenceName": "DS_FinOps_FxRates",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "DS_Stg_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "TableName": "stg_fx_rates"
+            }
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "SqlServerSource"
+          },
+          "sink": {
+            "type": "PostgreSqlSink"
+          }
+        }
+      },
+      {
+        "name": "Build Customer Dimension",
+        "type": "ExecuteDataFlow",
+        "dependsOn": [
+          {
+            "activity": "Load Payments",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "dataflow": {
+            "referenceName": "DF_Build_Dim_Customer",
+            "type": "DataFlowReference"
+          },
+          "compute": {
+            "coreCount": 8,
+            "computeType": "General"
+          }
+        }
+      },
+      {
+        "name": "Refresh Aging",
+        "type": "SqlServerStoredProcedure",
+        "linkedServiceName": {
+          "referenceName": "LS_Analytics_DW",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "storedProcedureName": "dw.refresh_ar_aging"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "DS_Dim_Customer",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_Analytics_DW",
+      "type": "LinkedServiceReference"
+    },
+    "type": "PostgreSqlTable",
+    "typeProperties": {
+      "schema": "dw",
+      "table": "dim_customer"
+    }
+  }
+}

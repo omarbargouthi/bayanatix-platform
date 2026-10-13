@@ -1,0 +1,18 @@
+{
+  "name": "LS_ERP_Oracle",
+  "properties": {
+    "type": "Oracle",
+    "description": "ERP production (Oracle)",
+    "typeProperties": {
+      "connectionString": "Host=oradb01.corp.local;Port=1521;Sid=ERPPRD;User Id=adf_reader;",
+      "password": {
+        "type": "AzureKeyVaultSecret",
+        "store": {
+          "referenceName": "LS_KeyVault",
+          "type": "LinkedServiceReference"
+        },
+        "secretName": "erp-reader"
+      }
+    }
+  }
+}

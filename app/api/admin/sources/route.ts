@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { connectionName, dbTypeCode, portNumber, databaseName, serviceName, defaultSchema, usernameText, passwordText, sslEnabled } = body;
   const hostAddress = typeof body.hostAddress === "string" ? cleanSourcePath(body.hostAddress) : body.hostAddress;
-  const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL", "JSON", "PBIX_FOLDER", "REST_API", "SOAP_API"];
+  const VALID = ["POSTGRES", "MYSQL", "MSSQL", "ORACLE", "CSV", "EXCEL", "JSON", "PBIX_FOLDER", "REST_API", "SOAP_API", "ADF", "SYNAPSE"];
   if (!VALID.includes(dbTypeCode)) return NextResponse.json({ error: `dbTypeCode must be one of ${VALID.join(", ")}` }, { status: 400 });
   // File sources (CSV/EXCEL/JSON/PBIX_FOLDER) store their path in hostAddress and have no real port,
   // username, or database — those fields stay null for them. Spec sources (REST_API/
@@ -26,12 +26,16 @@ export async function POST(req: Request) {
   // fetched from a URL behind auth.
   const isFileType = dbTypeCode === "CSV" || dbTypeCode === "EXCEL" || dbTypeCode === "JSON" || dbTypeCode === "PBIX_FOLDER";
   const isSpecType = dbTypeCode === "REST_API" || dbTypeCode === "SOAP_API";
-  const noPortNeeded = isFileType || isSpecType;
+  // Azure Data Factory / Synapse: hostAddress is the repository folder or the live
+  // service; for the live service databaseName carries the tenant ID and the
+  // username / password the service principal's client ID and secret.
+  const isPipelineType = dbTypeCode === "ADF" || dbTypeCode === "SYNAPSE";
+  const noPortNeeded = isFileType || isSpecType || isPipelineType;
   if (!connectionName || !hostAddress || (!noPortNeeded && !portNumber))
     return NextResponse.json({ error: noPortNeeded ? "connectionName and hostAddress (path/URL) are required" : "connectionName, dbTypeCode, hostAddress, portNumber are required" }, { status: 400 });
   const id = await createConnection({
     connectionName, dbTypeCode, hostAddress, portNumber: noPortNeeded ? 0 : Number(portNumber),
-    databaseName: noPortNeeded ? null : (databaseName || null),
+    databaseName: isPipelineType ? (databaseName || null) : noPortNeeded ? null : (databaseName || null),
     serviceName: noPortNeeded ? null : (serviceName || null),
     defaultSchema: noPortNeeded ? null : (defaultSchema || null),
     usernameText: isFileType ? null : (usernameText || null),

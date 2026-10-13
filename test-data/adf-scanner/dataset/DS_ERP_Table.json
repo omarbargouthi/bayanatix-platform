@@ -1,0 +1,22 @@
+{
+  "name": "DS_ERP_Table",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_ERP_Oracle",
+      "type": "LinkedServiceReference"
+    },
+    "type": "OracleTable",
+    "parameters": {
+      "TableName": {
+        "type": "string"
+      }
+    },
+    "typeProperties": {
+      "schema": "ERP",
+      "table": {
+        "value": "@dataset().TableName",
+        "type": "Expression"
+      }
+    }
+  }
+}

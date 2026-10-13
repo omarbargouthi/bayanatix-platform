@@ -1240,6 +1240,10 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
         ? { ok: true, message: `Found ${files.length} ${cfg.dbTypeCode} file(s)` }
         : { ok: false, message: `No ${extLabel} files found at that path` };
     }
+    if (cfg.dbTypeCode === "ADF" || cfg.dbTypeCode === "SYNAPSE") {
+      const { testAzureConnection } = await import("./lineage/azure/ingest");
+      return await testAzureConnection(connectionId);
+    }
     if (cfg.dbTypeCode === "PBIX_FOLDER") {
       const { listPbixFiles } = await import("./lineage/pbix-folder-scan");
       const { files } = listPbixFiles(cfg.hostAddress ?? "");
@@ -1761,6 +1765,13 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!cfgRow) throw new Error("Connection not found");
+  // Azure Data Factory / Synapse are crawled for lineage, not for tables — their own
+  // scanner, with the same job, log and status plumbing as below.
+  if (cfgRow.dbTypeCode === "ADF" || cfgRow.dbTypeCode === "SYNAPSE") {
+    const { scanAzureConnection } = await import("./lineage/azure/ingest");
+    await scanAzureConnection(connectionId, triggeredByUserId);
+    return;
+  }
   cfgRow.passwordText = openSecret(cfgRow.passwordText);
 
   // Load crawl config (schema/table filters, profiling settings, governance defaults)

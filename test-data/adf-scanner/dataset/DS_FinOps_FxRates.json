@@ -1,0 +1,14 @@
+{
+  "name": "DS_FinOps_FxRates",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_FinOps_Sql",
+      "type": "LinkedServiceReference"
+    },
+    "type": "SqlServerTable",
+    "typeProperties": {
+      "schema": "dbo",
+      "table": "FX_RATES"
+    }
+  }
+}

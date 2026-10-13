@@ -1,0 +1,165 @@
+{
+  "name": "PL_Load_ERP_Staging",
+  "properties": {
+    "description": "Nightly load of ERP customers and invoices into the warehouse staging area.",
+    "activities": [
+      {
+        "name": "Copy Customers",
+        "type": "Copy",
+        "inputs": [
+          {
+            "referenceName": "DS_ERP_Customers",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "DS_Stg_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "TableName": "stg_customers"
+            }
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "OracleSource"
+          },
+          "sink": {
+            "type": "PostgreSqlSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "CUSTOMER_ID"
+                },
+                "sink": {
+                  "name": "customer_id"
+                }
+              },
+              {
+                "source": {
+                  "name": "CUSTOMER_NAME"
+                },
+                "sink": {
+                  "name": "customer_name"
+                }
+              },
+              {
+                "source": {
+                  "name": "COUNTRY_CODE"
+                },
+                "sink": {
+                  "name": "country_code"
+                }
+              },
+              {
+                "source": {
+                  "name": "CREDIT_LIMIT"
+                },
+                "sink": {
+                  "name": "credit_limit"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "Copy Open Invoices",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "Copy Customers",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "inputs": [
+          {
+            "referenceName": "DS_ERP_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "TableName": "INVOICES"
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "DS_Stg_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "TableName": "stg_invoices"
+            }
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "OracleSource",
+            "oracleReaderQuery": "SELECT INVOICE_ID, CUSTOMER_ID, INVOICE_DATE, CURRENCY_CODE, INVOICE_AMOUNT, STATUS FROM ERP.INVOICES WHERE STATUS <> 'CANCELLED'"
+          },
+          "sink": {
+            "type": "PostgreSqlSink",
+            "preCopyScript": "TRUNCATE TABLE stg.stg_invoices"
+          }
+        }
+      },
+      {
+        "name": "For Each Reference Table",
+        "type": "ForEach",
+        "typeProperties": {
+          "items": {
+            "value": "@pipeline().parameters.ReferenceTables",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Copy Reference Table",
+              "type": "Copy",
+              "inputs": [
+                {
+                  "referenceName": "DS_ERP_Table",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "TableName": {
+                      "value": "@item().source",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "DS_Stg_Table",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "TableName": {
+                      "value": "@item().target",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "typeProperties": {
+                "source": {
+                  "type": "OracleSource"
+                },
+                "sink": {
+                  "type": "PostgreSqlSink"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "ReferenceTables": {
+        "type": "array"
+      }
+    }
+  }
+}

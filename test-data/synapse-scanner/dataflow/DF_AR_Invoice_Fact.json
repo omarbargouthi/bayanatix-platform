@@ -1,0 +1,96 @@
+{
+  "name": "DF_AR_Invoice_Fact",
+  "properties": {
+    "type": "MappingDataFlow",
+    "description": "Builds the AR invoice fact: invoices converted to USD, with payments netted off.",
+    "typeProperties": {
+      "sources": [
+        {
+          "name": "Invoices",
+          "dataset": {
+            "referenceName": "DS_DW_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "SchemaName": "stg",
+              "TableName": "stg_invoices"
+            }
+          }
+        },
+        {
+          "name": "FxRates",
+          "dataset": {
+            "referenceName": "DS_DW_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "SchemaName": "stg",
+              "TableName": "stg_fx_rates"
+            }
+          }
+        },
+        {
+          "name": "Payments",
+          "dataset": {
+            "referenceName": "DS_DW_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "SchemaName": "stg",
+              "TableName": "stg_payments"
+            }
+          }
+        },
+        {
+          "name": "Customers",
+          "dataset": {
+            "referenceName": "DS_DW_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "SchemaName": "dw",
+              "TableName": "dim_customer"
+            }
+          }
+        }
+      ],
+      "sinks": [
+        {
+          "name": "FactInvoice",
+          "dataset": {
+            "referenceName": "DS_DW_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "SchemaName": "dw",
+              "TableName": "fact_ar_invoice"
+            }
+          }
+        },
+        {
+          "name": "LakeCopy",
+          "linkedService": {
+            "referenceName": "LS_DataLake",
+            "type": "LinkedServiceReference"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "name": "PaidPerInvoice"
+        },
+        {
+          "name": "WithRate"
+        },
+        {
+          "name": "WithPaid"
+        },
+        {
+          "name": "WithCustomer"
+        },
+        {
+          "name": "Amounts"
+        },
+        {
+          "name": "OpenOnly"
+        }
+      ],
+      "script": "source(output(invoice_id as integer, customer_id as integer, invoice_date as date, currency_code as string, invoice_amount as decimal(18,2), status as string),\n     allowSchemaDrift: false, format: 'table') ~> Invoices\nsource(output(rate_date as date, currency_code as string, usd_rate as decimal(18,6)),\n     allowSchemaDrift: false, format: 'table') ~> FxRates\nsource(output(payment_id as integer, invoice_id as integer, payment_date as date, payment_amount as decimal(18,2)),\n     allowSchemaDrift: false, format: 'table') ~> Payments\nsource(output(customer_key as long, customer_id as integer, customer_name as string, country_code as string),\n     allowSchemaDrift: false, format: 'table') ~> Customers\n// payments summed per invoice\nPayments aggregate(groupBy(invoice_id),\n     paid_amount = sum(payment_amount)) ~> PaidPerInvoice\nInvoices, FxRates join(Invoices@currency_code == FxRates@currency_code && invoice_date == rate_date,\n     joinType:'left', broadcast: 'auto') ~> WithRate\nWithRate, PaidPerInvoice lookup(Invoices@invoice_id == PaidPerInvoice@invoice_id,\n     multiple: false, pickup: 'any', broadcast: 'auto') ~> WithPaid\nWithPaid, Customers join(Invoices@customer_id == Customers@customer_id,\n     joinType:'inner', broadcast: 'auto') ~> WithCustomer\nWithCustomer derive(invoice_amount_usd = round(invoice_amount * usd_rate, 2),\n          paid_amount_usd = round(iifNull(paid_amount, 0) * usd_rate, 2),\n          open_amount_usd = round((invoice_amount - iifNull(paid_amount, 0)) * usd_rate, 2)) ~> Amounts\nAmounts filter(status != 'CANCELLED') ~> OpenOnly\nOpenOnly sink(allowSchemaDrift: false, validateSchema: false, format: 'table',\n     mapColumn(invoice_id, customer_key, invoice_date, invoice_amount_usd, paid_amount_usd, open_amount_usd, status)) ~> FactInvoice\nOpenOnly sink(allowSchemaDrift: true, format: 'delta', fileSystem: 'curated', folderPath: 'finance/fact_ar_invoice',\n     mergeSchema: false, autoCompact: true) ~> LakeCopy"
+    }
+  }
+}

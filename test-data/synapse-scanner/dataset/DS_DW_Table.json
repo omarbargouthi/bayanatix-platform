@@ -1,0 +1,28 @@
+{
+  "name": "DS_DW_Table",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_Analytics_DW",
+      "type": "LinkedServiceReference"
+    },
+    "type": "PostgreSqlTable",
+    "parameters": {
+      "SchemaName": {
+        "type": "string"
+      },
+      "TableName": {
+        "type": "string"
+      }
+    },
+    "typeProperties": {
+      "schema": {
+        "value": "@dataset().SchemaName",
+        "type": "Expression"
+      },
+      "table": {
+        "value": "@dataset().TableName",
+        "type": "Expression"
+      }
+    }
+  }
+}

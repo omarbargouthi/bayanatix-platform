@@ -1,0 +1,82 @@
+{
+  "name": "NB_AR_Aging",
+  "properties": {
+    "description": "Ages the open AR invoices and publishes the result to the gold layer and the warehouse.",
+    "nbformat": 4,
+    "nbformat_minor": 2,
+    "bigDataPool": {
+      "referenceName": "sparkpool01",
+      "type": "BigDataPoolReference"
+    },
+    "metadata": {
+      "language_info": {
+        "name": "python"
+      },
+      "kernelspec": {
+        "name": "synapse_pyspark",
+        "display_name": "Synapse PySpark"
+      }
+    },
+    "cells": [
+      {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+          "# AR aging\n",
+          "Reads the curated invoice fact and the customer dimension, writes the aging table."
+        ]
+      },
+      {
+        "cell_type": "code",
+        "metadata": {},
+        "source": [
+          "from pyspark.sql import functions as F\n",
+          "\n",
+          "fact = (spark.read\n",
+          "        .format(\"delta\")\n",
+          "        .load(\"abfss://curated@contosolake.dfs.core.windows.net/finance/fact_ar_invoice\"))\n",
+          "customers = spark.read.table(\"silver.dim_customer\")\n",
+          "fact.createOrReplaceTempView(\"fact_open\")\n",
+          "customers.createOrReplaceTempView(\"cust\")"
+        ],
+        "outputs": [],
+        "execution_count": null
+      },
+      {
+        "cell_type": "code",
+        "metadata": {},
+        "source": [
+          "%%sql\n",
+          "CREATE OR REPLACE TABLE gold.ar_aging AS\n",
+          "SELECT c.customer_name,\n",
+          "       CASE WHEN datediff(current_date(), f.invoice_date) <= 30 THEN '0-30'\n",
+          "            WHEN datediff(current_date(), f.invoice_date) <= 60 THEN '31-60'\n",
+          "            ELSE '60+' END AS aging_bucket,\n",
+          "       SUM(f.open_amount_usd) AS open_amount_usd\n",
+          "FROM fact_open f\n",
+          "JOIN cust c ON c.customer_key = f.customer_key\n",
+          "LEFT JOIN silver.credit_holds h ON h.customer_key = f.customer_key\n",
+          "GROUP BY 1, 2"
+        ],
+        "outputs": [],
+        "execution_count": null
+      },
+      {
+        "cell_type": "code",
+        "metadata": {},
+        "source": [
+          "aging = spark.table(\"gold.ar_aging\")\n",
+          "(aging.write\n",
+          "      .mode(\"overwrite\")\n",
+          "      .parquet(\"abfss://curated@contosolake.dfs.core.windows.net/finance/ar_aging\"))\n",
+          "\n",
+          "# the run date decides the snapshot folder — a path built at run time\n",
+          "snapshot = f\"abfss://curated@contosolake.dfs.core.windows.net/finance/ar_aging_snapshots/{run_date}\"\n",
+          "aging.write.mode(\"overwrite\").save(snapshot)"
+        ],
+        "outputs": [],
+        "execution_count": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "LS_Analytics_DW",
+  "properties": {
+    "type": "PostgreSql",
+    "description": "Analytics warehouse (Postgres)",
+    "typeProperties": {
+      "connectionString": "Server=pgdw01.corp.local;Database=analytics;Port=5432;UID=adf_loader;"
+    }
+  }
+}

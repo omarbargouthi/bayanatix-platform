@@ -1,0 +1,15 @@
+{
+  "name": "DS_ERP_Customers",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_ERP_Oracle",
+      "type": "LinkedServiceReference"
+    },
+    "type": "OracleTable",
+    "typeProperties": {
+      "schema": "ERP",
+      "table": "CUSTOMERS"
+    },
+    "schema": []
+  }
+}

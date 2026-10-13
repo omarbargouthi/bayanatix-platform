@@ -1,0 +1,10 @@
+{
+  "name": "LS_DataLake",
+  "properties": {
+    "type": "AzureBlobFS",
+    "description": "Data lake (ADLS Gen2)",
+    "typeProperties": {
+      "url": "https://contosolake.dfs.core.windows.net"
+    }
+  }
+}

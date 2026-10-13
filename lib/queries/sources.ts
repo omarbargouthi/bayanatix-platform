@@ -218,6 +218,58 @@ export async function deleteConnection(connectionId: number): Promise<void> {
     )
   `;
   await sql`DELETE FROM bayanat.data_sources WHERE connection_id = ${connectionId}`;
+  // An Azure Data Factory / Synapse connection owns lineage, not tables: its pipelines,
+  // data flows and notebooks (lineage processes) and the links they produced go with it.
+  await sql`
+    DELETE FROM bayanat.data_lineage WHERE provenance_code = 'SCANNED' AND process_id IN (
+      SELECT process_id FROM bayanat.lineage_processes
+      WHERE connection_id = ${connectionId} AND (starts_with(process_type_code, 'ADF_') OR starts_with(process_type_code, 'SYNAPSE_'))
+    )
+  `;
+  await sql`
+    DELETE FROM bayanat.lineage_processes
+    WHERE connection_id = ${connectionId} AND parent_process_id IS NOT NULL
+      AND (starts_with(process_type_code, 'ADF_') OR starts_with(process_type_code, 'SYNAPSE_'))
+  `;
+  await sql`
+    DELETE FROM bayanat.lineage_processes
+    WHERE connection_id = ${connectionId} AND (starts_with(process_type_code, 'ADF_') OR starts_with(process_type_code, 'SYNAPSE_'))
+  `;
+  // …and so do the placeholder tables and files its crawl added for objects it could not
+  // find in the catalog, once no lineage link uses them any more.
+  const placeholders = await sql<{ entityId: number; schemaId: number }[]>`
+    SELECT e.entity_id AS "entityId", e.schema_id AS "schemaId"
+    FROM bayanat.data_entities e
+    WHERE e.description_text LIKE 'Auto-created by the lineage scanner%'
+      AND e.entity_id IN (
+        SELECT q.placeholder_entity_id FROM bayanat.lineage_stitch_queue q
+        JOIN bayanat.lineage_scan_runs r ON r.scan_run_id = q.scan_run_id
+        WHERE r.connection_id = ${connectionId} AND q.status_code = 'OPEN')
+      AND NOT EXISTS (
+        SELECT 1 FROM bayanat.data_lineage l
+        WHERE l.lineage_scope_code = 'ENTITY_LEVEL' AND (l.source_asset_id = e.entity_id OR l.target_asset_id = e.entity_id))
+      AND NOT EXISTS (
+        SELECT 1 FROM bayanat.data_lineage l
+        JOIN bayanat.data_attributes a ON a.attribute_id IN (l.source_asset_id, l.target_asset_id)
+        WHERE l.lineage_scope_code = 'ATTRIBUTE_LEVEL' AND a.entity_id = e.entity_id)
+  `;
+  for (const p of placeholders) {
+    try {
+      await sql.begin(async (tx) => {
+        await tx`DELETE FROM bayanat.lineage_stitch_queue WHERE placeholder_entity_id = ${p.entityId}`;
+        await tx`DELETE FROM bayanat.data_entities WHERE entity_id = ${p.entityId}`;
+        await tx`
+          DELETE FROM bayanat.data_schemas s WHERE s.schema_id = ${p.schemaId}
+            AND NOT EXISTS (SELECT 1 FROM bayanat.data_entities e WHERE e.schema_id = s.schema_id)
+        `;
+        await tx`
+          DELETE FROM bayanat.data_sources ds
+          WHERE ds.connection_id IS NULL AND ds.description_text LIKE 'Auto-created%'
+            AND NOT EXISTS (SELECT 1 FROM bayanat.data_schemas s WHERE s.data_source_id = ds.data_source_id)
+        `;
+      });
+    } catch { /* something else refers to it now — it stays for Stitching Review */ }
+  }
   await sql`DELETE FROM bayanat.connection_registry WHERE connection_id = ${connectionId}`;
 }
 

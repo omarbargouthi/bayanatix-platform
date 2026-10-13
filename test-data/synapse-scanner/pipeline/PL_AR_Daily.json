@@ -1,0 +1,37 @@
+{
+  "name": "PL_AR_Daily",
+  "properties": {
+    "description": "Daily AR build: the invoice fact data flow, then the aging notebook.",
+    "activities": [
+      {
+        "name": "Build Invoice Fact",
+        "type": "ExecuteDataFlow",
+        "typeProperties": {
+          "dataflow": {
+            "referenceName": "DF_AR_Invoice_Fact",
+            "type": "DataFlowReference"
+          }
+        }
+      },
+      {
+        "name": "Age Invoices",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Build Invoice Fact",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "NB_AR_Aging",
+            "type": "NotebookReference"
+          },
+          "snapshot": true
+        }
+      }
+    ]
+  }
+}

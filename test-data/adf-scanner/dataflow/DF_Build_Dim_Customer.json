@@ -1,0 +1,74 @@
+{
+  "name": "DF_Build_Dim_Customer",
+  "properties": {
+    "type": "MappingDataFlow",
+    "description": "Customer dimension from staged customers.",
+    "typeProperties": {
+      "sources": [
+        {
+          "name": "StagedCustomers",
+          "dataset": {
+            "referenceName": "DS_Stg_Table",
+            "type": "DatasetReference",
+            "parameters": {
+              "TableName": "stg_customers"
+            }
+          }
+        }
+      ],
+      "sinks": [
+        {
+          "name": "DimCustomer",
+          "dataset": {
+            "referenceName": "DS_Dim_Customer",
+            "type": "DatasetReference"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "name": "CleanNames"
+        },
+        {
+          "name": "AddKey"
+        },
+        {
+          "name": "PickColumns"
+        }
+      ],
+      "scriptLines": [
+        "source(output(",
+        "          customer_id as integer,",
+        "          customer_name as string,",
+        "          country_code as string,",
+        "          credit_limit as decimal(18,2)",
+        "     ),",
+        "     allowSchemaDrift: false,",
+        "     validateSchema: false,",
+        "     isolationLevel: 'READ_COMMITTED',",
+        "     format: 'table') ~> StagedCustomers",
+        "StagedCustomers derive(customer_name = initCap(trim(customer_name)),",
+        "          country_code = upper(country_code)) ~> CleanNames",
+        "CleanNames keyGenerate(output(customer_key as long),",
+        "     startAt: 1L,",
+        "     stepValue: 1L) ~> AddKey",
+        "AddKey select(mapColumn(",
+        "          customer_key,",
+        "          customer_id,",
+        "          customer_name,",
+        "          country_code",
+        "     ),",
+        "     skipDuplicateMapInputs: true,",
+        "     skipDuplicateMapOutputs: true) ~> PickColumns",
+        "PickColumns sink(allowSchemaDrift: false,",
+        "     validateSchema: false,",
+        "     deletable:false,",
+        "     insertable:true,",
+        "     updateable:false,",
+        "     upsertable:false,",
+        "     truncate:true,",
+        "     format: 'table') ~> DimCustomer"
+      ]
+    }
+  }
+}

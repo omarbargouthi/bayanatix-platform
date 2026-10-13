@@ -1,0 +1,13 @@
+{
+  "name": "DS_FinOps_Payments",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_FinOps_Sql",
+      "type": "LinkedServiceReference"
+    },
+    "type": "SqlServerTable",
+    "typeProperties": {
+      "tableName": "[dbo].[PAYMENTS]"
+    }
+  }
+}

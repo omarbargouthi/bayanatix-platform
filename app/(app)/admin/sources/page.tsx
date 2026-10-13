@@ -45,13 +45,15 @@ const DB_TYPES = [
   { value: "EXCEL",    label: "Excel Workbook(s)",    port: 0 },
   { value: "JSON",     label: "JSON File(s)",         port: 0 },
   { value: "PBIX_FOLDER", label: "Power BI Desktop Folder (.pbix)", port: 0 },
+  { value: "ADF",      label: "Azure Data Factory", port: 0 },
+  { value: "SYNAPSE",  label: "Azure Synapse Analytics", port: 0 },
   { value: "REST_API", label: "REST API (OpenAPI/Swagger)", port: 0 },
   { value: "SOAP_API", label: "SOAP Web Service (WSDL)",    port: 0 },
 ];
 
 const DB_ICON: Record<string, string> = {
   POSTGRES: "🐘", MYSQL: "🐬", MSSQL: "🪟", ORACLE: "🔶", CSV: "📄", EXCEL: "📊", JSON: "🗂️", PBIX_FOLDER: "📊",
-  REST_API: "🌐", SOAP_API: "🧼",
+  REST_API: "🌐", SOAP_API: "🧼", ADF: "🏭", SYNAPSE: "⚡",
 };
 
 // CSV/EXCEL/JSON/PBIX_FOLDER are flat-file sources: no network host/port/credentials,
@@ -65,6 +67,14 @@ const isFileType = (dbTypeCode: string) => FILE_TYPES.includes(dbTypeCode);
 // when fetching a URL-based spec that's published behind auth.
 const SPEC_TYPES = ["REST_API", "SOAP_API"];
 const isSpecType = (dbTypeCode: string) => SPEC_TYPES.includes(dbTypeCode);
+
+// ADF/SYNAPSE are crawled for lineage rather than for tables: the address is the Git
+// repository folder of the factory / workspace, or the live service (factory resource ID,
+// workspace endpoint) read with a service principal — tenant ID in databaseName, client
+// ID in usernameText, client secret in passwordText. Their three crawl counters are
+// processes, tables linked and column links.
+const PIPELINE_TYPES = ["ADF", "SYNAPSE"];
+const isPipelineType = (dbTypeCode: string) => PIPELINE_TYPES.includes(dbTypeCode);
 
 // Database types the crawler can actually connect to (ORACLE has no working driver yet).
 const LINEAGE_APPLICABLE_TYPES = ["POSTGRES", "MYSQL", "MSSQL"];
@@ -316,7 +326,8 @@ export default function DataSourcesPage() {
 
   function setDbType(type: string) {
     const found = DB_TYPES.find(t => t.value === type);
-    setForm(f => ({ ...f, dbTypeCode: type, portNumber: found?.port ?? f.portNumber }));
+    // The form starts on a database host ("localhost"), which is not a folder or an Azure address.
+    setForm(f => ({ ...f, dbTypeCode: type, portNumber: found?.port ?? f.portNumber, hostAddress: isPipelineType(type) && f.hostAddress === "localhost" ? "" : f.hostAddress }));
   }
 
   async function handleSave() {
@@ -485,13 +496,13 @@ export default function DataSourcesPage() {
                 <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[c.connectionStatus] ?? "bg-gray-300"}`} title={`Connection: ${c.connectionStatus}`} />
               </div>
               <div className="mt-1 pl-6 flex items-center gap-2">
-                <span className="text-[10px] text-muted truncate">{(isFileType(c.dbTypeCode) || isSpecType(c.dbTypeCode)) ? c.hostAddress : `${c.hostAddress}/${c.databaseName || "—"}`}</span>
+                <span className="text-[10px] text-muted truncate">{(isFileType(c.dbTypeCode) || isSpecType(c.dbTypeCode) || isPipelineType(c.dbTypeCode)) ? c.hostAddress : `${c.hostAddress}/${c.databaseName || "—"}`}</span>
                 {c.crawlStatus !== "IDLE" && (
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CRAWL_DOT[c.crawlStatus] ?? "bg-gray-300"}`} title={`Crawl: ${c.crawlStatus}`} />
                 )}
               </div>
               {c.crawledTableCount > 0 && (
-                <div className="pl-6 mt-0.5 text-[10px] text-muted">{c.crawledTableCount} tables · {c.crawledColumnCount} cols</div>
+                <div className="pl-6 mt-0.5 text-[10px] text-muted">{isPipelineType(c.dbTypeCode) ? `${c.crawledSchemaCount} processes · ${c.crawledTableCount} tables linked` : `${c.crawledTableCount} tables · ${c.crawledColumnCount} cols`}</div>
               )}
             </button>
           ))}
@@ -546,6 +557,39 @@ export default function DataSourcesPage() {
                         : <>A single file is crawled as one table{form.dbTypeCode === "EXCEL" ? " per sheet" : ""}. A directory is crawled as one schema — every {form.dbTypeCode === "CSV" ? ".csv file" : ".xlsx/.xls workbook"} inside becomes its own table{form.dbTypeCode === "EXCEL" ? "(s)" : ""}. Server-side path — must be reachable by the app process.</>}
                     </p>
                   </div>
+                ) : isPipelineType(form.dbTypeCode) ? (
+                  <>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-ink mb-1">{form.dbTypeCode === "ADF" ? "Repository Folder, or Factory Resource ID *" : "Repository Folder, or Workspace Endpoint *"}</label>
+                    <input className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.hostAddress} onChange={e => setForm(f => ({ ...f, hostAddress: e.target.value }))}
+                      placeholder={form.dbTypeCode === "ADF" ? "C:\\repos\\my-factory   or   /subscriptions/…/providers/Microsoft.DataFactory/factories/my-factory" : "C:\\repos\\my-workspace   or   https://my-workspace.dev.azuresynapse.net"} />
+                    <p className="text-[11px] text-muted mt-1">
+                      {form.dbTypeCode === "ADF"
+                        ? <>A folder holding the factory&apos;s definitions — the Git repository it is integrated with (pipeline, dataset, linkedService, dataflow folders) or an exported ARM template — or the factory&apos;s resource ID to read it from Azure. Pipelines&apos; Copy activities and mapping data flows are traced into Data Lineage; the data itself is never read.</>
+                        : <>A folder holding the workspace&apos;s definitions — the Git repository it is integrated with (pipeline, dataset, linkedService, dataflow, notebook folders) or an exported template — or the workspace&apos;s development endpoint to read it from Azure. Copy activities, mapping data flows and notebooks are traced into Data Lineage; the data itself is never read.</>}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-ink mb-1">Tenant ID <span className="text-muted font-normal">(live service only)</span></label>
+                    <input autoComplete="off" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.databaseName} onChange={e => setForm(f => ({ ...f, databaseName: e.target.value }))} placeholder="00000000-0000-0000-0000-000000000000" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1">Client ID <span className="text-muted font-normal">(live service only)</span></label>
+                    <input autoComplete="off" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple font-mono" value={form.usernameText} onChange={e => setForm(f => ({ ...f, usernameText: e.target.value }))} placeholder="service principal application ID" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1">Client Secret {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
+                    <div className="relative">
+                      <input type={showPwd ? "text" : "password"} autoComplete="new-password" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} />
+                      <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
+                    </div>
+                  </div>
+                  <p className="col-span-2 text-[11px] text-muted -mt-2">
+                    {form.dbTypeCode === "ADF"
+                      ? "The service principal needs the Reader role on the data factory."
+                      : "The service principal needs the Synapse Artifact User role (or Reader of artifacts) in the workspace."}
+                  </p>
+                  </>
                 ) : isSpecType(form.dbTypeCode) ? (
                   <>
                   <div className="col-span-2">
@@ -951,13 +995,19 @@ export default function DataSourcesPage() {
                           <span className="text-xs text-green-600">{selected.lastDiscoveryTimestamp ? new Date(selected.lastDiscoveryTimestamp).toLocaleString() : ""}</span>
                         </div>
                         <div className="flex gap-6 text-sm text-green-800">
+                          {isPipelineType(selected.dbTypeCode) ? (<>
+                            <span><strong>{selected.crawledSchemaCount}</strong> process{selected.crawledSchemaCount !== 1 ? "es" : ""}</span>
+                            <span><strong>{selected.crawledTableCount}</strong> table{selected.crawledTableCount !== 1 ? "s" : ""} linked</span>
+                            <span><strong>{selected.crawledColumnCount}</strong> column link{selected.crawledColumnCount !== 1 ? "s" : ""}</span>
+                          </>) : (<>
                           <span><strong>{selected.crawledSchemaCount}</strong> schema{selected.crawledSchemaCount !== 1 ? "s" : ""}</span>
                           <span><strong>{selected.crawledTableCount}</strong> table{selected.crawledTableCount !== 1 ? "s" : ""}</span>
                           <span><strong>{selected.crawledColumnCount}</strong> column{selected.crawledColumnCount !== 1 ? "s" : ""}</span>
+                          </>)}
                         </div>
                       </div>
-                      <a href="/catalog" className="inline-flex items-center gap-1 text-sm text-brand-purple font-medium hover:underline">
-                        View in Data Catalog →
+                      <a href={isPipelineType(selected.dbTypeCode) ? "/lineage" : "/catalog"} className="inline-flex items-center gap-1 text-sm text-brand-purple font-medium hover:underline">
+                        {isPipelineType(selected.dbTypeCode) ? "View in Data Lineage →" : "View in Data Catalog →"}
                       </a>
                     </div>
                   )}
@@ -1037,6 +1087,12 @@ export default function DataSourcesPage() {
                     {(isFileType(selected.dbTypeCode) ? [
                       ["Type", DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
                       ["Path", selected.hostAddress],
+                      ["Added", new Date(selected.createdAtTimestamp).toLocaleDateString()],
+                    ] : isPipelineType(selected.dbTypeCode) ? [
+                      ["Type", DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
+                      ["Folder / Service", selected.hostAddress],
+                      ["Tenant ID", selected.databaseName || "— (folder)"],
+                      ["Client ID", selected.usernameText || "— (folder)"],
                       ["Added", new Date(selected.createdAtTimestamp).toLocaleDateString()],
                     ] : isSpecType(selected.dbTypeCode) ? [
                       ["Type", DB_TYPES.find(t => t.value === selected.dbTypeCode)?.label ?? selected.dbTypeCode],
