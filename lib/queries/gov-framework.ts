@@ -16,6 +16,14 @@ export type GovDoc = {
   sourceUrl:     string | null;
   /** Pinned to the Dashboard's announcements panel (db/178). */
   announce:      boolean;
+  /** Roadmaps: the domain the roadmap is for (metadata, data quality, …). */
+  domain:        string | null;
+  // Roadmaps: the milestones and deliverables behind the execution status (db/182) —
+  // all but the cancelled ones, those completed, in progress, and delayed or overdue.
+  execTotal:     number;
+  execCompleted: number;
+  execStarted:   number;
+  execLate:      number;
   createdAt:     string;
   updatedAt:     string;
   createdBy:     string | null;
@@ -45,6 +53,12 @@ export async function listGovDocs(sectionCode?: string): Promise<GovDoc[]> {
       u.full_name       AS "ownerName",
       d.source_url      AS "sourceUrl",
       d.announce_indicator AS "announce",
+      d.domain_text     AS "domain",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id AND i.status_code <> 'CANCELLED') AS "execTotal",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id AND i.status_code = 'COMPLETED') AS "execCompleted",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id AND i.status_code = 'IN_PROGRESS') AS "execStarted",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id
+         AND (i.status_code = 'DELAYED' OR (i.due_date < current_date AND i.status_code NOT IN ('COMPLETED', 'CANCELLED')))) AS "execLate",
       d.created_at::text AS "createdAt",
       d.updated_at::text AS "updatedAt",
       d.created_by      AS "createdBy",
@@ -81,6 +95,12 @@ export async function getGovDoc(docId: number): Promise<GovDoc | null> {
       u.full_name       AS "ownerName",
       d.source_url      AS "sourceUrl",
       d.announce_indicator AS "announce",
+      d.domain_text     AS "domain",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id AND i.status_code <> 'CANCELLED') AS "execTotal",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id AND i.status_code = 'COMPLETED') AS "execCompleted",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id AND i.status_code = 'IN_PROGRESS') AS "execStarted",
+      (SELECT count(*)::int FROM bayanat.gov_roadmap_items i WHERE i.doc_id = d.doc_id
+         AND (i.status_code = 'DELAYED' OR (i.due_date < current_date AND i.status_code NOT IN ('COMPLETED', 'CANCELLED')))) AS "execLate",
       d.created_at::text AS "createdAt",
       d.updated_at::text AS "updatedAt",
       d.created_by      AS "createdBy",
@@ -102,16 +122,16 @@ export async function getGovDoc(docId: number): Promise<GovDoc | null> {
 export async function createGovDoc(data: {
   sectionCode: string; title: string; description?: string;
   statusCode?: string; versionText?: string; effectiveDate?: string;
-  expiryDate?: string; ownerUserId?: string; sourceUrl?: string; announce?: boolean; createdBy: string;
+  expiryDate?: string; ownerUserId?: string; sourceUrl?: string; announce?: boolean; domain?: string | null; createdBy: string;
 }): Promise<number> {
   const rows = await sql<{ docId: number }[]>`
     INSERT INTO bayanat.gov_framework_docs
-      (section_code, title, description, status_code, version_text, effective_date, expiry_date, owner_user_id, source_url, announce_indicator, created_by)
+      (section_code, title, description, status_code, version_text, effective_date, expiry_date, owner_user_id, source_url, announce_indicator, domain_text, created_by)
     VALUES (
       ${data.sectionCode}, ${data.title}, ${data.description ?? null},
       ${data.statusCode ?? 'DRAFT'}, ${data.versionText ?? null},
       ${data.effectiveDate ?? null}, ${data.expiryDate ?? null},
-      ${data.ownerUserId ?? null}, ${data.sourceUrl ?? null}, ${data.announce === true}, ${data.createdBy}
+      ${data.ownerUserId ?? null}, ${data.sourceUrl ?? null}, ${data.announce === true}, ${data.domain ?? null}, ${data.createdBy}
     )
     RETURNING doc_id AS "docId"
   `;
@@ -137,7 +157,7 @@ export async function createGovDoc(data: {
 export async function updateGovDoc(docId: number, data: {
   title?: string; description?: string; statusCode?: string;
   versionText?: string; effectiveDate?: string; expiryDate?: string;
-  ownerUserId?: string; sourceUrl?: string; announce?: boolean;
+  ownerUserId?: string; sourceUrl?: string; announce?: boolean; domain?: string | null;
 }): Promise<void> {
   await sql`
     UPDATE bayanat.gov_framework_docs SET
@@ -150,6 +170,7 @@ export async function updateGovDoc(docId: number, data: {
       owner_user_id  = COALESCE(${data.ownerUserId ?? null}, owner_user_id),
       source_url     = ${data.sourceUrl !== undefined ? data.sourceUrl : sql`source_url`},
       announce_indicator = ${typeof data.announce === "boolean" ? data.announce : sql`announce_indicator`},
+      domain_text    = ${data.domain !== undefined ? data.domain : sql`domain_text`},
       updated_at     = NOW()
     WHERE doc_id = ${docId}
   `;
@@ -186,4 +207,21 @@ export async function getSectionCounts(): Promise<Record<string, number>> {
     GROUP BY d.section_code
   `;
   return Object.fromEntries(rows.map((r) => [r.sectionCode, r.cnt]));
+}
+
+/** The sections switched off for the organization (db/182). They are left out of the
+ *  framework pages and of the Dashboard's announcements; their documents are kept. */
+export async function getHiddenSections(): Promise<string[]> {
+  const rows = await sql<{ code: string }[]>`
+    SELECT section_code AS code FROM bayanat.gov_framework_section_settings WHERE hidden_indicator
+  `;
+  return rows.map((r) => r.code);
+}
+
+export async function setSectionHidden(sectionCode: string, hidden: boolean, userId: string): Promise<void> {
+  await sql`
+    INSERT INTO bayanat.gov_framework_section_settings (section_code, hidden_indicator, updated_by)
+    VALUES (${sectionCode}, ${hidden}, ${userId})
+    ON CONFLICT (section_code) DO UPDATE SET hidden_indicator = EXCLUDED.hidden_indicator, updated_by = EXCLUDED.updated_by, updated_at = now()
+  `;
 }

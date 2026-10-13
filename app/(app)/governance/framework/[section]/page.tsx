@@ -1,35 +1,31 @@
 import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { getSession } from "@/lib/auth";
-import { listGovDocs } from "@/lib/queries/gov-framework";
+import { canManageDomain } from "@/lib/can";
+import { listGovDocs, getHiddenSections } from "@/lib/queries/gov-framework";
+import { listCommEvents } from "@/lib/queries/gov-comm-events";
 import { FrameworkSectionClient } from "@/components/governance/FrameworkSectionClient";
+import { CommunicationPlanClient } from "@/components/governance/CommunicationPlanClient";
+import { fwSectionFromSlug, fwSectionKey } from "@/lib/gov-framework-sections";
 import { getServerT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
-
-const VALID_SECTIONS = new Set(["policy","process","strategy","roadmap","standard","training","regulatory"]);
-
-// English labels for breadcrumbs (server-side only)
-const SECTION_EN_LABEL: Record<string, string> = {
-  policy:     "Policies",
-  process:    "Processes",
-  strategy:   "Strategy",
-  roadmap:    "Roadmap",
-  standard:   "Standards & Guidelines",
-  training:   "Training Material",
-  regulatory: "Regulatory",
-};
 
 export default async function FrameworkSectionPage({ params }: { params: { section: string } }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const key = params.section.toLowerCase();
-  if (!VALID_SECTIONS.has(key)) notFound();
+  const sectionCode = fwSectionFromSlug(params.section);
+  if (!sectionCode) notFound();
 
-  const sectionCode = key.toUpperCase();
-  const docs = await listGovDocs(sectionCode);
-  const t = await getServerT(user);
+  const [docs, hiddenSections, canManage, t] = await Promise.all([
+    listGovDocs(sectionCode), getHiddenSections(), canManageDomain(user, "GOVERNANCE"), getServerT(user),
+  ]);
+  // A hidden section exists only for those who manage the framework (who can show it again).
+  const isHidden = hiddenSections.includes(sectionCode);
+  if (isHidden && !canManage) notFound();
+
+  const events = sectionCode === "COMMUNICATION" ? await listCommEvents() : null;
 
   return (
     <>
@@ -38,15 +34,22 @@ export default async function FrameworkSectionPage({ params }: { params: { secti
           { label: "Bayanis",             href: "/dashboard" },
           { label: t.governance.pageTitle,     href: "/governance" },
           { label: t.governance.framework,href: "/governance/framework" },
-          { label: SECTION_EN_LABEL[key] },
+          { label: t.governance.sectionLabels[fwSectionKey(sectionCode)] },
         ]}
         user={user}
       />
       <main className="px-8 py-7 pb-14">
+        {isHidden && (
+          <p className="mb-4 text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{t.governance.fw.sectionHiddenBanner}</p>
+        )}
         <FrameworkSectionClient
           sectionCode={sectionCode}
           initialDocs={docs}
           userId={user.userId}
+          canManage={canManage}
+          // The Communication Plan leads with its schedule; the plan documents follow.
+          top={events && <CommunicationPlanClient initialEvents={events} canManage={canManage} />}
+          docsHeading={events ? t.commPlan.plansTitle : undefined}
         />
       </main>
     </>

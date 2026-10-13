@@ -347,12 +347,12 @@ export type I18nStrings = {
     // framework section labels
     sectionLabels: {
       policy: string; process: string; strategy: string;
-      roadmap: string; standard: string; training: string; regulatory: string;
+      roadmap: string; standard: string; training: string; regulatory: string; operatingModel: string; communication: string;
     };
     // framework section descriptions
     sectionDescs: {
       policy: string; process: string; strategy: string;
-      roadmap: string; standard: string; training: string; regulatory: string;
+      roadmap: string; standard: string; training: string; regulatory: string; operatingModel: string; communication: string;
     };
     // framework document management
     fw: {
@@ -361,6 +361,17 @@ export type I18nStrings = {
       noDocuments:    string;
       uploading:      string;
       titleRequired:  string;
+      formDomain: string;
+      domainHint: string;
+      domainOptions: string;
+      colDomain: string;
+      colExecution: string;
+      hideSection: string;
+      showSection: string;
+      hiddenBadge: string;
+      hiddenNote: string;
+      sectionHiddenBanner: string;
+      upcomingEvents: string;
       openArrow:      string;
       docs:           string;
       colTitle:       string;
@@ -3671,6 +3682,8 @@ export type I18nStrings = {
     subtitle: string;
     viewAll: string;
     upcoming: string;
+    dueOn: string;
+    completedOn: string;
     effectiveOn: string;
     effectiveSince: string;
     attachments: string;
@@ -3685,11 +3698,114 @@ export type I18nStrings = {
       STANDARD: string;
       STRATEGY: string;
       REGULATORY: string;
+      OPERATING_MODEL: string;
+      COMMUNICATION: string;
     };
     statuses: {
       DRAFT: string;
       REVIEW: string;
       APPROVED: string;
+    };
+  };
+  // Governance Framework › Communication Plan: the schedule of events.
+  commPlan: {
+    scheduleTitle: string;
+    scheduleDesc: string;
+    plansTitle: string;
+    addEvent: string;
+    newEvent: string;
+    editEvent: string;
+    upcoming: string;
+    past: string;
+    noEvents: string;
+    noUpcoming: string;
+    onDashboard: string;
+    fTitle: string;
+    fType: string;
+    fStatus: string;
+    fDate: string;
+    fEndDate: string;
+    endDateHint: string;
+    fTime: string;
+    fLocation: string;
+    locationHint: string;
+    fAudience: string;
+    audiencePlaceholder: string;
+    fChannel: string;
+    channelPlaceholder: string;
+    fDescription: string;
+    announceLabel: string;
+    announceHint: string;
+    titleRequired: string;
+    dateRequired: string;
+    saveFailed: string;
+    deleteConfirm: string;
+    types: {
+      TRAINING: string;
+      AWARENESS: string;
+      POLICY_UPDATE: string;
+      PROCEDURE_UPDATE: string;
+      STRATEGY_UPDATE: string;
+      ROADMAP_UPDATE: string;
+      KEY_EVENT: string;
+      ANNOUNCEMENT: string;
+    };
+    statuses: {
+      PLANNED: string;
+      DONE: string;
+      CANCELLED: string;
+    };
+  };
+  // Governance Framework › Roadmap: execution — milestones and deliverables.
+  roadmapExec: {
+    title: string;
+    progress: string;
+    noItems: string;
+    addMilestone: string;
+    addDeliverable: string;
+    otherDeliverables: string;
+    overdue: string;
+    onDashboard: string;
+    due: string;
+    completed: string;
+    fTitle: string;
+    fMilestone: string;
+    noMilestone: string;
+    fStatus: string;
+    fOwner: string;
+    fDue: string;
+    fCompleted: string;
+    completedHint: string;
+    fDescription: string;
+    announceLabel: string;
+    announceHint: string;
+    titleRequired: string;
+    saveFailed: string;
+    deleteConfirm: string;
+    types: {
+      MILESTONE: string;
+      DELIVERABLE: string;
+    };
+    dialogTitles: {
+      NEW_MILESTONE: string;
+      EDIT_MILESTONE: string;
+      NEW_DELIVERABLE: string;
+      EDIT_DELIVERABLE: string;
+    };
+    statuses: {
+      NOT_STARTED: string;
+      IN_PROGRESS: string;
+      COMPLETED: string;
+      DELAYED: string;
+      ON_HOLD: string;
+      CANCELLED: string;
+    };
+    execStatuses: {
+      NOT_TRACKED: string;
+      NOT_STARTED: string;
+      IN_PROGRESS: string;
+      DELAYED: string;
+      COMPLETED: string;
     };
   };
 };

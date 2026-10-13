@@ -1,45 +1,45 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { FW_SECTION_CODES, FW_SECTION_ICONS, fwSectionKey, fwSectionSlug } from "@/lib/gov-framework-sections";
 
-const SECTION_ICONS: Record<string, string> = {
-  POLICY: "📋", PROCESS: "⚙️", STRATEGY: "🎯",
-  ROADMAP: "🗺️", STANDARD: "📐", TRAINING: "🎓", REGULATORY: "⚖️",
+type Props = {
+  counts: Record<string, number>;
+  /** Sections hidden from everyone who does not manage Data Governance. */
+  hiddenSections: string[];
+  canManage: boolean;
+  /** Events scheduled in the Communication Plan that are still to come. */
+  upcomingEvents: number;
 };
 
-const SECTION_CODES = ["POLICY","PROCESS","STRATEGY","ROADMAP","STANDARD","TRAINING","REGULATORY"] as const;
-type SectionCode = typeof SECTION_CODES[number];
-
-type Props = { counts: Record<string, number> };
-
-export function FrameworkPageClient({ counts }: Props) {
+export function FrameworkPageClient({ counts, hiddenSections, canManage, upcomingEvents }: Props) {
   const { t, isRtl } = useLang();
   const g = t.governance;
 
-  const labelMap: Record<SectionCode, string> = {
-    POLICY:     g.sectionLabels.policy,
-    PROCESS:    g.sectionLabels.process,
-    STRATEGY:   g.sectionLabels.strategy,
-    ROADMAP:    g.sectionLabels.roadmap,
-    STANDARD:   g.sectionLabels.standard,
-    TRAINING:   g.sectionLabels.training,
-    REGULATORY: g.sectionLabels.regulatory,
-  };
-  const descMap: Record<SectionCode, string> = {
-    POLICY:     g.sectionDescs.policy,
-    PROCESS:    g.sectionDescs.process,
-    STRATEGY:   g.sectionDescs.strategy,
-    ROADMAP:    g.sectionDescs.roadmap,
-    STANDARD:   g.sectionDescs.standard,
-    TRAINING:   g.sectionDescs.training,
-    REGULATORY: g.sectionDescs.regulatory,
-  };
+  const [hidden, setHidden] = useState(new Set(hiddenSections));
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  async function toggle(code: string) {
+    const hide = !hidden.has(code);
+    setBusy(code);
+    try {
+      const r = await fetch("/api/governance/framework/sections", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sectionCode: code, hidden: hide }),
+      });
+      if (!r.ok) return;
+      setHidden((p) => { const next = new Set(p); if (hide) next.add(code); else next.delete(code); return next; });
+    } finally { setBusy(null); }
+  }
+
+  // Those who manage the framework still see a hidden section (dimmed) so they can bring it back.
+  const sections = FW_SECTION_CODES.filter((code) => canManage || !hidden.has(code));
+  const shown = FW_SECTION_CODES.filter((code) => !hidden.has(code));
+  const total = shown.reduce((sum, code) => sum + (counts[code] ?? 0), 0);
   const totalSub = isRtl
-    ? `${total} ${g.fw.docs} عبر ${SECTION_CODES.length} أقسام`
-    : `${total} ${total !== 1 ? "documents" : "document"} across ${SECTION_CODES.length} sections`;
+    ? `${total} ${g.fw.docs} عبر ${shown.length} أقسام`
+    : `${total} ${total !== 1 ? "documents" : "document"} across ${shown.length} sections`;
 
   return (
     <main className="px-8 py-7 pb-14">
@@ -51,26 +51,43 @@ export function FrameworkPageClient({ counts }: Props) {
       </div>
 
       <div className="grid grid-cols-3 gap-5">
-        {SECTION_CODES.map((code) => {
+        {sections.map((code) => {
           const count = counts[code] ?? 0;
+          const key = fwSectionKey(code);
+          const isHidden = hidden.has(code);
           return (
-            <Link key={code} href={`/governance/framework/${code.toLowerCase()}`}
-              className="card p-5 hover:border-brand-light hover:shadow-sm transition-all flex flex-col group">
+            <div key={code} className={`card p-5 hover:border-brand-light hover:shadow-sm transition-all flex flex-col group relative ${isHidden ? "opacity-60 border-dashed" : ""}`}>
               <div className="flex items-start justify-between mb-3">
-                <span className="text-2xl">{SECTION_ICONS[code]}</span>
-                <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-purple/10 text-brand-purple rounded-full">
-                  {count} {g.fw.docs}
-                </span>
+                <span className="text-2xl">{FW_SECTION_ICONS[code]}</span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {isHidden && <span className="text-[11px] font-semibold px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full">{g.fw.hiddenBadge}</span>}
+                  {code === "COMMUNICATION" && upcomingEvents > 0 && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full">{upcomingEvents} {g.fw.upcomingEvents}</span>
+                  )}
+                  <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-purple/10 text-brand-purple rounded-full">
+                    {count} {g.fw.docs}
+                  </span>
+                </div>
               </div>
-              <h3 className="font-bold text-brand-deep group-hover:text-brand-purple transition-colors mb-1">{labelMap[code]}</h3>
-              <p className="text-[12px] text-muted flex-1">{descMap[code]}</p>
-              <div className="mt-4 text-[12px] text-brand-purple font-semibold group-hover:underline">
-                {g.fw.openArrow}
+              <h3 className="font-bold text-brand-deep group-hover:text-brand-purple transition-colors mb-1">
+                {/* The whole card opens the section; the Hide / Show button sits above this link. */}
+                <Link href={`/governance/framework/${fwSectionSlug(code)}`} className="after:absolute after:inset-0">{g.sectionLabels[key]}</Link>
+              </h3>
+              <p className="text-[12px] text-muted flex-1">{g.sectionDescs[key]}</p>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-[12px] text-brand-purple font-semibold group-hover:underline">{g.fw.openArrow}</span>
+                {canManage && (
+                  <button type="button" onClick={() => toggle(code)} disabled={busy === code}
+                    className="relative z-10 text-[11px] text-ink-soft hover:text-brand-purple border border-line rounded-md px-2 py-0.5 bg-white">
+                    {isHidden ? g.fw.showSection : g.fw.hideSection}
+                  </button>
+                )}
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>
+      {canManage && <p className="text-[11px] text-muted mt-4">{g.fw.hiddenNote}</p>}
     </main>
   );
 }

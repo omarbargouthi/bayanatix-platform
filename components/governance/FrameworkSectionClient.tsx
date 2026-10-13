@@ -1,37 +1,43 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type { GovDoc } from "@/lib/queries/gov-framework";
 import { RegulationForm, type RegulationDetailsData } from "./RegulationDetails";
 import { AttachmentList } from "./EvidenceAttachments";
 import { FormDialog, FormField } from "@/components/ui/FormDialog";
+import { RoadmapExecution, ExecutionBadge, type ExecutionCounts } from "./RoadmapExecution";
+import { fwSectionKey } from "@/lib/gov-framework-sections";
 import { useLang } from "@/lib/lang-context";
 
 type Props = {
   sectionCode:  string;
   initialDocs:  GovDoc[];
   userId:       string;
+  /** The viewer manages Data Governance: may add, edit and delete. */
+  canManage:    boolean;
+  /** Shown between the page heading and the documents (the Communication Plan's schedule). */
+  top?:         ReactNode;
+  /** A heading for the documents table, when something is shown above it. */
+  docsHeading?: string;
 };
 
 type DocForm = {
   title: string; description: string; statusCode: string;
-  versionText: string; effectiveDate: string; expiryDate: string; ownerUserId: string; sourceUrl: string; announce: boolean;
+  versionText: string; effectiveDate: string; expiryDate: string; ownerUserId: string; sourceUrl: string; announce: boolean; domain: string;
 };
 
 const EMPTY_FORM: DocForm = {
   title: "", description: "", statusCode: "DRAFT",
-  versionText: "", effectiveDate: "", expiryDate: "", ownerUserId: "", sourceUrl: "", announce: false,
+  versionText: "", effectiveDate: "", expiryDate: "", ownerUserId: "", sourceUrl: "", announce: false, domain: "",
 };
 
-type SectionKey = "policy" | "process" | "strategy" | "roadmap" | "standard" | "training" | "regulatory";
-
-export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
+export function FrameworkSectionClient({ sectionCode, initialDocs, canManage, top, docsHeading }: Props) {
   const { t } = useLang();
   const g  = t.governance;
   const fw = g.fw;
   const a  = t.attachments;
 
-  const sectionKey = sectionCode.toLowerCase() as SectionKey;
+  const sectionKey = fwSectionKey(sectionCode);
   const sectionLabel = g.sectionLabels[sectionKey] ?? sectionCode;
   const sectionDescription = g.sectionDescs[sectionKey] ?? "";
 
@@ -63,6 +69,10 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
   // edited with the same full form as on the Compliance page. (Status, owner and expiry —
   // the document side of an entry — keep the plain document dialog, under "Document".)
   const isRegistry = sectionCode === "REGULATORY";
+  // A roadmap is for a domain and has an execution side: milestones and deliverables.
+  const isRoadmap = sectionCode === "ROADMAP";
+  const setExecution = (docId: number, c: ExecutionCounts) =>
+    setDocs((p) => p.map((d) => (d.docId === docId ? { ...d, execTotal: c.total, execCompleted: c.completed, execStarted: c.started, execLate: c.late } : d)));
   const [regulationForm, setRegulationForm] = useState<{ details?: RegulationDetailsData } | null>(null);
 
   async function reloadDocs() {
@@ -89,6 +99,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
       ownerUserId: doc.ownerUserId ?? "",
       sourceUrl: doc.sourceUrl ?? "",
       announce: doc.announce,
+      domain: doc.domain ?? "",
     });
     setEditDoc(doc); setShowModal(true); setError("");
   }
@@ -107,6 +118,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
         effectiveDate: form.effectiveDate || null, expiryDate: form.expiryDate || null,
         ownerUserId: form.ownerUserId || null, sourceUrl: form.sourceUrl || null,
         announce: form.announce,
+        ...(isRoadmap ? { domain: form.domain.trim() || null } : {}),
       };
       const failed: string[] = [];
       if (editDoc) {
@@ -157,10 +169,13 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
           <h1 className="text-2xl font-bold text-brand-deep">{sectionLabel}</h1>
           <p className="text-sm text-ink-soft mt-0.5">{sectionDescription}</p>
         </div>
-        <button onClick={openNew} className="btn btn-primary">{isRegistry ? "+ New Regulation" : fw.addDocument}</button>
+        {canManage && <button onClick={openNew} className="btn btn-primary">{isRegistry ? "+ New Regulation" : fw.addDocument}</button>}
       </div>
 
-      <div className="card overflow-hidden mt-5">
+      {top}
+      {docsHeading && <h2 className="font-bold text-brand-deep mt-7">{docsHeading}</h2>}
+
+      <div className={`card overflow-hidden ${docsHeading ? "mt-3" : "mt-5"}`}>
         {docs.length === 0 ? (
           <div className="py-16 text-center">
             <div className="text-4xl mb-3">📄</div>
@@ -172,7 +187,9 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
               <tr className="bg-canvas-soft border-b border-line text-left">
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colTitle}</th>
                 {isRegistry && <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">Countries in scope</th>}
+                {isRoadmap && <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colDomain}</th>}
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colStatus}</th>
+                {isRoadmap && <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colExecution}</th>}
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colVersion}</th>
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colEffective}</th>
                 <th className="px-4 py-3 font-semibold text-ink-soft text-xs uppercase tracking-wide">{fw.colOwner}</th>
@@ -213,11 +230,19 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                         {doc.regionName && <div className="text-[11px] text-muted">{doc.regionName}</div>}
                       </td>
                     )}
+                    {isRoadmap && <td className="px-4 py-3 text-ink-soft text-[13px]" dir="auto">{doc.domain ?? "—"}</td>}
                     <td className="px-4 py-3">
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[doc.statusCode] ?? "bg-gray-100 text-gray-600"}`}>
                         {STATUS_LABEL[doc.statusCode] ?? doc.statusCode}
                       </span>
                     </td>
+                    {isRoadmap && (
+                      <td className="px-4 py-3">
+                        <button onClick={() => setExpandedId(expandedId === doc.docId ? null : doc.docId)} className="text-start">
+                          <ExecutionBadge compact counts={{ total: doc.execTotal, completed: doc.execCompleted, started: doc.execStarted, late: doc.execLate }} />
+                        </button>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-muted">{doc.versionText ?? "—"}</td>
                     <td className="px-4 py-3 text-muted">{doc.effectiveDate?.slice(0, 10) ?? "—"}</td>
                     <td className="px-4 py-3 text-muted truncate max-w-[140px]">{doc.ownerName ?? "—"}</td>
@@ -228,7 +253,7 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 justify-end">
+                      {canManage && <div className="flex items-center gap-2 justify-end">
                         {isRegistry && doc.frameworkId != null ? (
                           <>
                             <button onClick={() => openRegulation(doc.frameworkId!)} className="text-[11px] text-ink-soft hover:text-brand-purple">{t.common.edit}</button>
@@ -238,12 +263,12 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                           <button onClick={() => openEdit(doc)} className="text-[11px] text-ink-soft hover:text-brand-purple">{t.common.edit}</button>
                         )}
                         <button onClick={() => deleteDoc(doc.docId)} className="text-[11px] text-ink-soft hover:text-red-500">{t.common.delete}</button>
-                      </div>
+                      </div>}
                     </td>
                   </tr>
                   {expandedId === doc.docId && (
                     <tr key={`${doc.docId}-exp`} className="bg-canvas-soft border-b border-line-soft">
-                      <td colSpan={isRegistry ? 8 : 7} className="px-6 py-3 text-sm text-ink-soft space-y-2.5">
+                      <td colSpan={isRegistry ? 8 : isRoadmap ? 9 : 7} className="px-6 py-3 text-sm text-ink-soft space-y-2.5">
                         {doc.description && <p>{doc.description}</p>}
                         {doc.sourceUrl && (
                           <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer"
@@ -251,8 +276,9 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
                             🔗 {doc.sourceUrl}
                           </a>
                         )}
+                        {isRoadmap && <RoadmapExecution docId={doc.docId} canManage={canManage} onChange={(c) => setExecution(doc.docId, c)} />}
                         <AttachmentList
-                          base={`/api/governance/framework/${doc.docId}/attachments`} canEdit
+                          base={`/api/governance/framework/${doc.docId}/attachments`} canEdit={canManage}
                           heading={a.filesAndLinks} removeFrom={a.docRemoveFrom}
                           emptyHint={a.docEmptyHint}
                           onChange={(items) => setAttachmentCount(doc.docId, items.length)}
@@ -284,6 +310,14 @@ export function FrameworkSectionClient({ sectionCode, initialDocs }: Props) {
               <Field label={fw.formTitle}>
                 <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} className="field" />
               </Field>
+              {isRoadmap && (
+                <Field label={fw.formDomain} hint={fw.domainHint}>
+                  <input value={form.domain} onChange={(e) => setForm((p) => ({ ...p, domain: e.target.value }))} className="field" list="roadmap-domains" />
+                  <datalist id="roadmap-domains">
+                    {fw.domainOptions.split(/[,،]/).map((d) => d.trim()).filter(Boolean).map((d) => <option key={d} value={d} />)}
+                  </datalist>
+                </Field>
+              )}
               <Field label={fw.formDesc}>
                 <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} className="field" />
               </Field>

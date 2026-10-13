@@ -4,31 +4,23 @@ import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import type { ComplianceFramework } from "@/lib/queries/gov-compliance";
 import type { GovRegister } from "@/lib/queries/gov-registers";
+import { FW_SECTION_CODES, fwSectionKey, fwSectionSlug } from "@/lib/gov-framework-sections";
 
 type Props = {
   sectionCounts: Record<string, number>;
+  /** Framework sections switched off for the organization. */
+  hiddenSections: string[];
   registers:     GovRegister[];
   frameworks:    ComplianceFramework[];
 };
 
-const FW_SECTION_CODES = ["POLICY","PROCESS","STRATEGY","ROADMAP","STANDARD","TRAINING","REGULATORY"] as const;
-type SectionCode = typeof FW_SECTION_CODES[number];
-
-export function GovernancePageClient({ sectionCounts, registers, frameworks }: Props) {
+export function GovernancePageClient({ sectionCounts, hiddenSections, registers, frameworks }: Props) {
   const { t, isRtl } = useLang();
   const g = t.governance;
 
-  const sectionLabelMap: Record<SectionCode, string> = {
-    POLICY:     g.sectionLabels.policy,
-    PROCESS:    g.sectionLabels.process,
-    STRATEGY:   g.sectionLabels.strategy,
-    ROADMAP:    g.sectionLabels.roadmap,
-    STANDARD:   g.sectionLabels.standard,
-    TRAINING:   g.sectionLabels.training,
-    REGULATORY: g.sectionLabels.regulatory,
-  };
+  const fwSections = FW_SECTION_CODES.filter((code) => !hiddenSections.includes(code));
 
-  const totalFwDocs  = Object.values(sectionCounts).reduce((a, b) => a + b, 0);
+  const totalFwDocs  = fwSections.reduce((sum, code) => sum + (sectionCounts[code] ?? 0), 0);
   const totalEntries = registers.reduce((a, r) => a + r.entryCount, 0);
   const primaryFw    = frameworks[0] ?? null;
   const compliantPct = primaryFw
@@ -37,8 +29,8 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
 
   // Pluralisable sub-lines
   const fwSub     = isRtl
-    ? `${FW_SECTION_CODES.length} أقسام · ${totalFwDocs} ${g.fw.docs}`
-    : `${FW_SECTION_CODES.length} sections · ${totalFwDocs} ${g.fw.docs}`;
+    ? `${fwSections.length} أقسام · ${totalFwDocs} ${g.fw.docs}`
+    : `${fwSections.length} sections · ${totalFwDocs} ${g.fw.docs}`;
   const regSub    = isRtl
     ? `${registers.length} ${t.registers.pageTitle} · ${totalEntries} ${t.registers.entries}`
     : `${registers.length} register${registers.length !== 1 ? "s" : ""} · ${totalEntries} ${t.registers.entries}`;
@@ -81,10 +73,10 @@ export function GovernancePageClient({ sectionCounts, registers, frameworks }: P
           </div>
           <p className="text-sm text-ink-soft mb-4">{g.frameworkDesc}</p>
           <div className="space-y-1.5 mb-5 flex-1 overflow-y-auto">
-            {FW_SECTION_CODES.map((code) => (
-              <Link key={code} href={`/governance/framework/${code.toLowerCase()}`}
+            {fwSections.map((code) => (
+              <Link key={code} href={`/governance/framework/${fwSectionSlug(code)}`}
                 className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-canvas transition-colors group">
-                <span className="text-sm font-medium text-ink group-hover:text-brand-purple">{sectionLabelMap[code]}</span>
+                <span className="text-sm font-medium text-ink group-hover:text-brand-purple">{g.sectionLabels[fwSectionKey(code)]}</span>
                 <span className="text-[11px] text-muted bg-canvas-soft px-2 py-0.5 rounded-full">{sectionCounts[code] ?? 0}</span>
               </Link>
             ))}
