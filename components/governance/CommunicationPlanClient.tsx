@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { CommEvent } from "@/lib/queries/gov-comm-events";
-import { COMM_EVENT_TYPES, COMM_EVENT_STATUSES } from "@/lib/gov-framework-sections";
+import type { GovDoc } from "@/lib/queries/gov-framework";
+import { COMM_EVENT_TYPES, COMM_EVENT_STATUSES, FW_SECTION_CODES, fwSectionKey, fwSectionSlug } from "@/lib/gov-framework-sections";
 import { FormDialog, FormField } from "@/components/ui/FormDialog";
 import { fmtGovDate } from "./GovAnnouncements";
 import { useLang } from "@/lib/lang-context";
@@ -13,11 +15,11 @@ import { useLang } from "@/lib/lang-context";
 
 type EventForm = {
   title: string; description: string; typeCode: string; eventDate: string; endDate: string; timeText: string;
-  location: string; audience: string; channel: string; statusCode: string; announce: boolean;
+  location: string; audience: string; channel: string; statusCode: string; announce: boolean; relatedDocId: string;
 };
 const EMPTY: EventForm = {
   title: "", description: "", typeCode: "TRAINING", eventDate: "", endDate: "", timeText: "",
-  location: "", audience: "", channel: "", statusCode: "PLANNED", announce: true,
+  location: "", audience: "", channel: "", statusCode: "PLANNED", announce: true, relatedDocId: "",
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -28,7 +30,11 @@ const STATUS_STYLE: Record<string, string> = {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function CommunicationPlanClient({ initialEvents, canManage }: { initialEvents: CommEvent[]; canManage: boolean }) {
+export function CommunicationPlanClient({ initialEvents, canManage, hiddenSections }: {
+  initialEvents: CommEvent[]; canManage: boolean;
+  /** Sections switched off: their documents are not offered as (or linked to as) the related document. */
+  hiddenSections: string[];
+}) {
   const { t, lang } = useLang();
   const c = t.commPlan;
   const types = c.types as Record<string, string>;
@@ -40,6 +46,14 @@ export function CommunicationPlanClient({ initialEvents, canManage }: { initialE
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showPast, setShowPast] = useState(false);
+  // The framework documents an event can be about; loaded when the form is first opened.
+  const [docs, setDocs] = useState<GovDoc[] | null>(null);
+  const sectionLabels = t.governance.sectionLabels;
+  async function loadDocs() {
+    if (docs) return;
+    const r = await fetch("/api/governance/framework");
+    setDocs(r.ok ? ((await r.json()).docs as GovDoc[]).filter((d) => !hiddenSections.includes(d.sectionCode)) : []);
+  }
 
   // Upcoming: still planned and not over yet. Everything else is the record of what happened.
   const now = today();
@@ -51,14 +65,14 @@ export function CommunicationPlanClient({ initialEvents, canManage }: { initialE
     const r = await fetch("/api/governance/framework/events");
     if (r.ok) setEvents((await r.json()).events);
   }
-  function openNew() { setForm(EMPTY); setEditId(null); setError(""); }
+  function openNew() { setForm(EMPTY); setEditId(null); setError(""); loadDocs(); }
   function openEdit(e: CommEvent) {
     setForm({
       title: e.title, description: e.description ?? "", typeCode: e.typeCode, eventDate: e.eventDate, endDate: e.endDate ?? "",
       timeText: e.timeText ?? "", location: e.location ?? "", audience: e.audience ?? "", channel: e.channel ?? "",
-      statusCode: e.statusCode, announce: e.announce,
+      statusCode: e.statusCode, announce: e.announce, relatedDocId: e.relatedDocId ? String(e.relatedDocId) : "",
     });
-    setEditId(e.eventId); setError("");
+    setEditId(e.eventId); setError(""); loadDocs();
   }
   async function save() {
     if (!form) return;
@@ -103,6 +117,10 @@ export function CommunicationPlanClient({ initialEvents, canManage }: { initialE
             : e.location}</span>}
           {e.audience && <span dir="auto">{c.fAudience}: {e.audience}</span>}
           {e.channel && <span dir="auto">{c.fChannel}: {e.channel}</span>}
+          {e.relatedDocId && e.relatedDocSection && !hiddenSections.includes(e.relatedDocSection) && (
+            <span dir="auto">{c.fRelatedDoc}: <Link href={`/governance/framework/${fwSectionSlug(e.relatedDocSection)}`} className="text-brand-purple hover:underline">{e.relatedDocTitle}</Link>
+              {" "}({sectionLabels[fwSectionKey(e.relatedDocSection)]})</span>
+          )}
         </div>
       </div>
       {canManage && (
@@ -185,6 +203,19 @@ export function CommunicationPlanClient({ initialEvents, canManage }: { initialE
               <input value={form.channel} onChange={(e) => set("channel", e.target.value)} className="field" placeholder={c.channelPlaceholder} />
             </FormField>
           </div>
+          <FormField label={c.fRelatedDoc} hint={c.relatedDocHint}>
+            <select value={form.relatedDocId} onChange={(e) => set("relatedDocId", e.target.value)} className="field" disabled={!docs}>
+              <option value="">{docs ? c.noRelatedDoc : t.common.loading}</option>
+              {FW_SECTION_CODES.map((code) => {
+                const inSection = (docs ?? []).filter((d) => d.sectionCode === code);
+                return inSection.length === 0 ? null : (
+                  <optgroup key={code} label={sectionLabels[fwSectionKey(code)]}>
+                    {inSection.map((d) => <option key={d.docId} value={d.docId}>{d.title}{d.versionText ? ` · ${d.versionText}` : ""}</option>)}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </FormField>
           <FormField label={c.fDescription}>
             <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="field" />
           </FormField>

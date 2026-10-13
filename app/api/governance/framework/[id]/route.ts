@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!(await canAccessDomain(session, "GOVERNANCE"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const doc = await getGovDoc(Number(params.id));
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const attachments = await listGovAttachments(doc.docId);
+  const attachments = await listGovAttachments({ docId: doc.docId, itemId: null });
   return NextResponse.json({ doc, attachments });
 }
 

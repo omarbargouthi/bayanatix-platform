@@ -9,13 +9,15 @@ export type CommEvent = {
   eventDate: string; endDate: string | null; timeText: string | null;
   location: string | null; audience: string | null; channel: string | null;
   statusCode: string; announce: boolean;
+  /** The framework document the event is about (db/184): the policy being updated, the training material… */
+  relatedDocId: number | null; relatedDocTitle: string | null; relatedDocSection: string | null;
 };
 
 export type CommEventInput = {
   title?: string; description?: string | null; typeCode?: string;
   eventDate?: string; endDate?: string | null; timeText?: string | null;
   location?: string | null; audience?: string | null; channel?: string | null;
-  statusCode?: string; announce?: boolean;
+  statusCode?: string; announce?: boolean; relatedDocId?: number | string | null;
 };
 
 export class CommEventError extends Error {}
@@ -36,16 +38,22 @@ function clean(data: CommEventInput) {
     location: text(data.location), audience: text(data.audience), channel: text(data.channel),
     statusCode: (COMM_EVENT_STATUSES as readonly string[]).includes(data.statusCode ?? "") ? data.statusCode! : "PLANNED",
     announce: data.announce !== false,
+    relatedDocId: data.relatedDocId != null && data.relatedDocId !== "" && Number.isInteger(Number(data.relatedDocId)) ? Number(data.relatedDocId) : null,
   };
 }
 
+/** The related document's id as stored: nothing when the document does not exist (any more). */
+const related = (docId: number | null) => sql`(SELECT doc_id FROM bayanat.gov_framework_docs WHERE doc_id = ${docId})`;
+
 export async function listCommEvents(): Promise<CommEvent[]> {
   return sql<CommEvent[]>`
-    SELECT event_id AS "eventId", title, description, event_type_code AS "typeCode",
+    SELECT event_id AS "eventId", e.title, e.description, event_type_code AS "typeCode",
            event_date::text AS "eventDate", end_date::text AS "endDate", time_text AS "timeText",
            location_text AS location, audience_text AS audience, channel_text AS channel,
-           status_code AS "statusCode", announce_indicator AS announce
-    FROM   bayanat.gov_comm_events
+           e.status_code AS "statusCode", e.announce_indicator AS announce,
+           d.doc_id AS "relatedDocId", d.title AS "relatedDocTitle", d.section_code AS "relatedDocSection"
+    FROM   bayanat.gov_comm_events e
+    LEFT   JOIN bayanat.gov_framework_docs d ON d.doc_id = e.related_doc_id
     ORDER  BY event_date, event_id
   `;
 }
@@ -54,8 +62,8 @@ export async function createCommEvent(data: CommEventInput, userId: string): Pro
   const e = clean(data);
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.gov_comm_events
-      (title, description, event_type_code, event_date, end_date, time_text, location_text, audience_text, channel_text, status_code, announce_indicator, created_by)
-    VALUES (${e.title}, ${e.description}, ${e.typeCode}, ${e.eventDate}, ${e.endDate}, ${e.timeText}, ${e.location}, ${e.audience}, ${e.channel}, ${e.statusCode}, ${e.announce}, ${userId})
+      (title, description, event_type_code, event_date, end_date, time_text, location_text, audience_text, channel_text, status_code, announce_indicator, related_doc_id, created_by)
+    VALUES (${e.title}, ${e.description}, ${e.typeCode}, ${e.eventDate}, ${e.endDate}, ${e.timeText}, ${e.location}, ${e.audience}, ${e.channel}, ${e.statusCode}, ${e.announce}, ${related(e.relatedDocId)}, ${userId})
     RETURNING event_id AS id
   `;
   return row.id;
@@ -69,7 +77,7 @@ export async function updateCommEvent(eventId: number, data: CommEventInput): Pr
       title = ${e.title}, description = ${e.description}, event_type_code = ${e.typeCode},
       event_date = ${e.eventDate}, end_date = ${e.endDate}, time_text = ${e.timeText},
       location_text = ${e.location}, audience_text = ${e.audience}, channel_text = ${e.channel},
-      status_code = ${e.statusCode}, announce_indicator = ${e.announce}, updated_at = now()
+      status_code = ${e.statusCode}, announce_indicator = ${e.announce}, related_doc_id = ${related(e.relatedDocId)}, updated_at = now()
     WHERE event_id = ${eventId}
     RETURNING event_id
   `;

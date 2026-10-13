@@ -3734,6 +3734,9 @@ export type I18nStrings = {
     fChannel: string;
     channelPlaceholder: string;
     fDescription: string;
+    fRelatedDoc: string;
+    relatedDocHint: string;
+    noRelatedDoc: string;
     announceLabel: string;
     announceHint: string;
     titleRequired: string;
@@ -3777,6 +3780,9 @@ export type I18nStrings = {
     fCompleted: string;
     completedHint: string;
     fDescription: string;
+    filesToggle: string;
+    attachRemoveFrom: string;
+    attachEmptyHint: string;
     announceLabel: string;
     announceHint: string;
     titleRequired: string;

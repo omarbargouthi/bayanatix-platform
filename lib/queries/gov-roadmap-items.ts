@@ -10,6 +10,8 @@ export type RoadmapItem = {
   title: string; description: string | null; statusCode: string;
   dueDate: string | null; completedDate: string | null; owner: string | null;
   announce: boolean;
+  /** Files and links attached to the item (db/184). */
+  attachmentCount: number;
 };
 
 export type RoadmapItemInput = {
@@ -61,7 +63,8 @@ export async function listRoadmapItems(docId: number): Promise<RoadmapItem[]> {
     SELECT i.item_id AS "itemId", i.doc_id AS "docId", i.parent_item_id AS "parentItemId", i.item_type_code AS "typeCode",
            i.title, i.description, i.status_code AS "statusCode",
            i.due_date::text AS "dueDate", i.completed_date::text AS "completedDate", i.owner_text AS owner,
-           i.announce_indicator AS announce
+           i.announce_indicator AS announce,
+           (SELECT count(*)::int FROM bayanat.gov_framework_attachments a WHERE a.item_id = i.item_id) AS "attachmentCount"
     FROM   bayanat.gov_roadmap_items i
     LEFT   JOIN bayanat.gov_roadmap_items p ON p.item_id = i.parent_item_id
     WHERE  i.doc_id = ${docId}

@@ -40,7 +40,7 @@ export type GovAnnouncement = {
   endDate:     string | null;
   timeText:    string | null;
   location:    string | null;
-  /** ITEM: the roadmap it belongs to. */
+  /** ITEM: the roadmap it belongs to; EVENT: the document it is about. */
   context:     string | null;
   /** Lies ahead: not yet in effect, not yet held, not yet due. */
   isUpcoming:  boolean;
@@ -60,7 +60,7 @@ export async function getGovAnnouncements(limit = 8): Promise<GovAnnouncement[]>
         d.effective_date::text AS date, NULL AS "endDate", NULL AS "timeText", NULL AS location, NULL AS context,
         coalesce(d.effective_date > current_date, false) AS "isUpcoming",
         d.announce_indicator AS "isPinned",
-        (SELECT count(*)::int FROM bayanat.gov_framework_attachments a WHERE a.doc_id = d.doc_id) AS "attachmentCount"
+        (SELECT count(*)::int FROM bayanat.gov_framework_attachments a WHERE a.doc_id = d.doc_id AND a.item_id IS NULL) AS "attachmentCount"
       FROM bayanat.gov_framework_docs d
       LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
       WHERE d.status_code <> 'ARCHIVED'
@@ -77,7 +77,10 @@ export async function getGovAnnouncements(limit = 8): Promise<GovAnnouncement[]>
       SELECT
         'event-' || e.event_id AS key, 'EVENT' AS kind, 'COMMUNICATION' AS "sectionCode", e.event_type_code AS "typeCode",
         e.title, e.description, e.status_code AS "statusCode", NULL AS "versionText",
-        e.event_date::text AS date, e.end_date::text AS "endDate", e.time_text AS "timeText", e.location_text AS location, NULL AS context,
+        e.event_date::text AS date, e.end_date::text AS "endDate", e.time_text AS "timeText", e.location_text AS location,
+        -- The document the event is about, unless its section is hidden.
+        (SELECT rd.title FROM bayanat.gov_framework_docs rd
+          WHERE rd.doc_id = e.related_doc_id AND rd.section_code <> ALL(${hidden}::text[])) AS context,
         true AS "isUpcoming", true AS "isPinned", 0 AS "attachmentCount"
       FROM bayanat.gov_comm_events e
       WHERE e.status_code = 'PLANNED' AND e.announce_indicator
@@ -91,7 +94,8 @@ export async function getGovAnnouncements(limit = 8): Promise<GovAnnouncement[]>
         (CASE WHEN i.status_code = 'COMPLETED' THEN coalesce(i.completed_date, i.due_date) ELSE i.due_date END)::text AS date,
         NULL AS "endDate", NULL AS "timeText", NULL AS location,
         d.title || coalesce(' · ' || nullif(d.domain_text, ''), '') AS context,
-        (i.status_code <> 'COMPLETED' AND i.due_date >= current_date) AS "isUpcoming", true AS "isPinned", 0 AS "attachmentCount"
+        (i.status_code <> 'COMPLETED' AND i.due_date >= current_date) AS "isUpcoming", true AS "isPinned",
+        (SELECT count(*)::int FROM bayanat.gov_framework_attachments a WHERE a.item_id = i.item_id) AS "attachmentCount"
       FROM bayanat.gov_roadmap_items i
       JOIN bayanat.gov_framework_docs d ON d.doc_id = i.doc_id
       WHERE i.announce_indicator AND d.status_code <> 'ARCHIVED' AND i.status_code <> 'CANCELLED'

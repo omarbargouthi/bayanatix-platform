@@ -69,7 +69,7 @@ export async function listGovDocs(sectionCode?: string): Promise<GovDoc[]> {
       (SELECT count(*)::int FROM bayanat.gov_compliance_requirements r WHERE r.framework_id = d.framework_id) AS "requirementCount"
     FROM bayanat.gov_framework_docs d
     LEFT JOIN bayanat.users u ON u.user_id = d.owner_user_id
-    LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id
+    LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id AND a.item_id IS NULL
     LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
     -- A regulation marked "not applicable to the organization" (configuration) is not
     -- shown in the registry either; ticking it again brings its entry back.
@@ -111,7 +111,7 @@ export async function getGovDoc(docId: number): Promise<GovDoc | null> {
       (SELECT count(*)::int FROM bayanat.gov_compliance_requirements r WHERE r.framework_id = d.framework_id) AS "requirementCount"
     FROM bayanat.gov_framework_docs d
     LEFT JOIN bayanat.users u ON u.user_id = d.owner_user_id
-    LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id
+    LEFT JOIN bayanat.gov_framework_attachments a ON a.doc_id = d.doc_id AND a.item_id IS NULL
     LEFT JOIN bayanat.gov_compliance_frameworks f ON f.framework_id = d.framework_id
     WHERE d.doc_id = ${docId}
     GROUP BY d.doc_id, u.full_name, f.framework_id

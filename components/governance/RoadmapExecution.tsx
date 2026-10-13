@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { RoadmapItem } from "@/lib/queries/gov-roadmap-items";
 import { ROADMAP_ITEM_STATUSES, roadmapExecution, type RoadmapExecutionStatus } from "@/lib/gov-framework-sections";
 import { FormDialog, FormField } from "@/components/ui/FormDialog";
+import { AttachmentList } from "./EvidenceAttachments";
 import { fmtGovDate } from "./GovAnnouncements";
 import { useLang } from "@/lib/lang-context";
 
@@ -84,6 +85,10 @@ export function RoadmapExecution({ docId, canManage, onChange }: {
   const [editId, setEditId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // The item whose files and links are open.
+  const [openFiles, setOpenFiles] = useState<number | null>(null);
+  const setAttachmentCount = (itemId: number, count: number) =>
+    setItems((p) => p && (p.some((y) => y.itemId === itemId && y.attachmentCount !== count) ? p.map((y) => (y.itemId === itemId ? { ...y, attachmentCount: count } : y)) : p));
 
   async function load() {
     const r = await fetch(base);
@@ -150,7 +155,21 @@ export function RoadmapExecution({ docId, canManage, onChange }: {
             ? <span>{x.completed.replace("{date}", fmtGovDate(i.completedDate, lang))}</span>
             : i.dueDate && <span>{x.due.replace("{date}", fmtGovDate(i.dueDate, lang))}</span>}
           {i.owner && <span dir="auto">{x.fOwner}: {i.owner}</span>}
+          {(canManage || i.attachmentCount > 0) && (
+            <button onClick={() => setOpenFiles(openFiles === i.itemId ? null : i.itemId)} className="text-brand-purple hover:underline">
+              {openFiles === i.itemId ? "▾" : "▸"} {x.filesToggle.replace("{n}", String(i.attachmentCount))}
+            </button>
+          )}
         </div>
+        {openFiles === i.itemId && (
+          <div className="mt-2 rounded-md border border-line-soft bg-canvas-soft px-3 py-2.5">
+            <AttachmentList
+              base={`${base}/${i.itemId}/attachments`} canEdit={canManage}
+              heading={t.attachments.filesAndLinks} removeFrom={x.attachRemoveFrom} emptyHint={x.attachEmptyHint}
+              onChange={(list) => setAttachmentCount(i.itemId, list.length)}
+            />
+          </div>
+        )}
       </div>
       {canManage && (
         <div className="flex items-center gap-2 shrink-0">

@@ -48,7 +48,7 @@ export default async function FrameworkSectionPage({ params }: { params: { secti
           userId={user.userId}
           canManage={canManage}
           // The Communication Plan leads with its schedule; the plan documents follow.
-          top={events && <CommunicationPlanClient initialEvents={events} canManage={canManage} />}
+          top={events && <CommunicationPlanClient initialEvents={events} canManage={canManage} hiddenSections={hiddenSections} />}
           docsHeading={events ? t.commPlan.plansTitle : undefined}
         />
       </main>
