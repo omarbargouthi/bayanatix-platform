@@ -16,7 +16,7 @@ export default async function AdminLayout({
     <>
       {/* Suspense required — AdminHeader uses useSearchParams() to track the
           active User Management sub-tab */}
-      <Suspense fallback={<div className="sticky top-0 z-20 h-[60px] bg-white border-b border-line" />}>
+      <Suspense fallback={<div className="sticky top-0 z-30 h-[60px] bg-white border-b border-line" />}>
         <AdminHeader user={user} />
       </Suspense>
       {children}

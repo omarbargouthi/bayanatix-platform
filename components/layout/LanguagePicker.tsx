@@ -46,13 +46,13 @@ export function LanguagePicker({ collapsed = false, dropUp = false, triggerClass
         {!collapsed && <span>{active?.languageNameText ?? lang}</span>}
       </button>
       {open && (
-        <div className={`absolute right-0 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"} w-40 bg-white border border-line rounded-md shadow-md py-1 z-50`}>
+        <div className={`absolute end-0 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"} w-40 bg-white border border-line rounded-md shadow-md py-1 z-50`}>
           {languages.map((l) => (
             <button
               key={l.languageCode}
               type="button"
               onClick={() => { setLang(l.languageCode); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-canvas transition-colors ${l.languageCode === lang ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
+              className={`w-full text-start px-3 py-1.5 text-sm hover:bg-canvas transition-colors ${l.languageCode === lang ? "text-brand-purple font-semibold" : "text-ink-soft"}`}
             >
               {l.languageNameText}
             </button>

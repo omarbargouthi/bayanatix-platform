@@ -188,7 +188,8 @@ export function Header({ crumbs, user, contextTypes, collaborationHref, hideSear
 
   return (
     <>
-    <header className="sticky top-0 z-20 h-[60px] bg-white border-b border-line flex items-center gap-3 px-5">
+    {/* z-30: above page sections that form their own layer (the dashboard banner is z-20), so the header's menus stay on top. */}
+    <header className="sticky top-0 z-30 h-[60px] bg-white border-b border-line flex items-center gap-3 px-5">
       {/* Hamburger */}
       <button
         onClick={toggle}
