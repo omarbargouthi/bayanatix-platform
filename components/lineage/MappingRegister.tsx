@@ -136,6 +136,7 @@ export function MappingRegister({ canManage, initialQuery = "" }: { canManage: b
             <button onClick={() => setManaging(true)} className="btn btn-sm">{t.lineageProcesses.manage}</button>
             <a href={`/api/lineage/register?${query()}&format=xlsx`} className="btn btn-sm">⭳ {t.lineageTools.exportExcel}</a>
             {canManage && <LineageImportButton onImported={() => setReload((n) => n + 1)} />}
+            {canManage && <Link href="/lineage/stitching" className="btn btn-sm">{lr.stitchingReview}</Link>}
             {canManage && <button onClick={() => setAdding(true)} className="btn btn-primary btn-sm">+ {lr.addMapping}</button>}
           </div>
         </div>

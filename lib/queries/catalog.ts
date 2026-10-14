@@ -67,10 +67,6 @@ export async function getCatalogStats(dataSourceIds?: number[]): Promise<Catalog
     select
       (select count(*)::int from bayanat.data_sources ds
         where true ${whereDs})                                       as sources,
-      coalesce((select sum(coalesce(e.row_count_estimate,0))::bigint
-                from bayanat.data_entities e
-                join bayanat.data_schemas s on s.schema_id = e.schema_id
-                where true ${whereS}), 0)::bigint                     as records,
       (select count(*)::int from bayanat.data_entities e
         join bayanat.data_schemas s on s.schema_id = e.schema_id
         where e.lifecycle_status_code = 'ACTIVE' ${whereS})           as tables,
@@ -80,7 +76,6 @@ export async function getCatalogStats(dataSourceIds?: number[]): Promise<Catalog
   const r = rows[0];
   return {
     sources: Number(r.sources ?? 0),
-    records: Number(r.records ?? 0),
     tables: Number(r.tables ?? 0),
     schemas: Number(r.schemas ?? 0),
   };

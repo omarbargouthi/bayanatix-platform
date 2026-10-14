@@ -343,13 +343,6 @@ function LineageGraphInner({
           ))}
         </div>
 
-        <a
-          href={`/api/lineage/export?assetType=${focus.assetType}&assetId=${focus.assetId}&scope=${scope}&up=${upDepth}&down=${downDepth}`}
-          className="btn btn-sm text-xs"
-        >
-          ⭳ {t.lineageTools.exportExcel}
-        </a>
-
         {systemCount > 1 && view === "graph" && (
           <button
             onClick={() => setGroupBySystem((v) => !v)}

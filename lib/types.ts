@@ -189,7 +189,6 @@ export type ComplianceSummary = {
 
 export type CatalogStats = {
   sources: number;
-  records: number;
   tables: number;
   schemas: number;
 };

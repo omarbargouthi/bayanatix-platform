@@ -2797,6 +2797,7 @@ export const en: I18nStrings = {
   lineageRegister: {
     tabGraph:           "Lineage graph",
     tabRegister:        "Mapping asset",
+    stitchingReview:    "Stitching review",
     title:              "Mapping asset",
     desc:               "Every data mapping in the catalog, scanned and manual. Search it, update manual mappings (with approval), and raise a review request against any mapping that doesn't look right.",
     searchPh:           "Search tables, columns, systems, logic…",

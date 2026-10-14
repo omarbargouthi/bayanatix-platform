@@ -14,7 +14,7 @@ import type { DataSource, DataSchema } from "@/lib/types";
 import { CdeDqConfigModal } from "./CdeDqConfigModal";
 
 type CatalogStats = {
-  tables: number; schemas: number; sources: number; records: number;
+  tables: number; schemas: number; sources: number;
 };
 type GlossaryRoot = {
   glossaryId: number; termName: string; termCount: number;
@@ -360,16 +360,16 @@ export function CatalogPageClient({
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-2.5 px-5 py-3.5 border-b border-line-soft">
+          <div className="grid grid-cols-3 gap-2.5 px-5 py-3.5 border-b border-line-soft">
             {/* stats.* already comes back scoped to the source filter from
                 GET /api/catalog/stats — only the client-only name search
                 (server doesn't know about it) needs a client-side re-tally. */}
             <Big label={c.sources} value={q === "" ? stats.sources : filteredSources.length} />
-            <Big label={c.records} value={stats.records} />
             <Big label={c.tables}  value={q === "" ? stats.tables : filteredSources.reduce((sum, s) => sum + tableCount(s), 0)} />
             <Big label={c.schemas} value={q === "" ? stats.schemas : filteredSources.reduce((sum, s) => sum + s.schemas.length, 0)} />
           </div>
-          <div className="px-2 py-2">
+          {/* The lists keep a set height and scroll inside, so a long catalog doesn't stretch the page. */}
+          <div className="px-2 py-2 max-h-[480px] overflow-y-auto nice-scroll">
             <AssetTree sources={filteredSources} canEdit={canEdit} />
           </div>
         </div>
@@ -385,7 +385,7 @@ export function CatalogPageClient({
             <Big label={c.linkedTerms}  value={glossaryStats.linkedTerms} />
             <Big label={c.linkedAssets} value={glossaryStats.linkedAssets} />
           </div>
-          <div className="py-2">
+          <div className="py-2 max-h-[480px] overflow-y-auto nice-scroll">
             {glossaries.map((g) => (
               <Link key={g.glossaryId} href={`/glossary?domain=${g.glossaryId}`} className="flex items-center gap-2.5 px-5 py-2.5 hover:bg-canvas transition-colors">
                 <span className="w-8 h-8 grid place-items-center rounded-md bg-brand-purple/10 text-brand-purple">

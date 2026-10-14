@@ -2934,6 +2934,7 @@ export type I18nStrings = {
   lineageRegister: {
     tabGraph:           string;
     tabRegister:        string;
+    stitchingReview:    string;
     title:              string;
     desc:               string;
     searchPh:           string;

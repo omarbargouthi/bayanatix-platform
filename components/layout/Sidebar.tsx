@@ -23,6 +23,11 @@ type Item = {
   badge?: number;
 };
 
+type Child = Item & { exact?: boolean };
+
+// Which menu groups the user has expanded, remembered in this browser only.
+const OPEN_GROUPS_KEY = "bayanatix_nav_open";
+
 // ── Static item definitions (labels overridden at runtime via i18n) ───────────
 const NAV_TOP_DEF = [
   { href: "/dashboard",  key: "dashboard"    as const, Icon: IconDashboard },
@@ -67,6 +72,22 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [hasCustomerLogo, setHasCustomerLogo] = useState(false);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(OPEN_GROUPS_KEY) ?? "[]");
+      if (Array.isArray(saved)) setOpenGroups((g) => Array.from(new Set([...g, ...saved])));
+    } catch {}
+  }, []);
+
+  function toggleGroup(href: string) {
+    setOpenGroups((g) => {
+      const next = g.includes(href) ? g.filter((h) => h !== href) : [...g, href];
+      try { localStorage.setItem(OPEN_GROUPS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     fetch("/api/admin/branding")
@@ -103,24 +124,30 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
   // Data Catalog sub-menu: each opens its own view (assets overview, glossaries,
   // lineage graph + mapping register). Lineage used to sit under Administration,
   // which hid it — and its Excel import — from stewards.
-  const CATALOG_CHILDREN: Item[] = [
+  const CATALOG_CHILDREN: Child[] = [
     { href: "/catalog",  label: t.nav.catalogAssets,     Icon: IconDB },
     { href: "/glossary", label: t.nav.catalogGlossaries, Icon: IconGlossary },
     { href: "/lineage",  label: t.nav.lineage,           Icon: IconLineage },
   ];
-  const catalogChildActive = CATALOG_CHILDREN.some((c) => isActive(c.href));
 
   // Data Privacy sub-menu. Data Retention lives at /privacy itself, so it is active only
   // there, not on the pages below it. Data subject requests are for admins, data
   // protection officers and stewards (the same rule as the page).
   const seesDsr = user.role === "ADMIN" || user.role === "OFFICER" || user.role === "STEWARD";
-  const PRIVACY_CHILDREN: (Item & { exact?: boolean })[] = [
+  const PRIVACY_CHILDREN: Child[] = [
     { href: "/privacy",          label: t.nav.privacyRetention, Icon: IconHistory, exact: true },
     ...(seesDsr ? [{ href: "/privacy/requests", label: t.nav.privacyRequests, Icon: IconCollaborate }] : []),
     { href: "/privacy/dpia",     label: t.nav.privacyDpia,      Icon: IconShield },
   ];
-  const privacyActive = (c: { href: string; exact?: boolean }) => (c.exact ? pathname === c.href : isActive(c.href));
-  const privacyChildActive = PRIVACY_CHILDREN.some(privacyActive);
+  const childActive = (c: Child) => (c.exact ? pathname === c.href : isActive(c.href));
+
+  // Menu items with sub-pages expand and collapse. A group holding the current page
+  // opens by itself, so the page's own entry is always visible.
+  const GROUPS: Record<string, Child[]> = { "/catalog": CATALOG_CHILDREN, "/privacy": PRIVACY_CHILDREN };
+  const activeGroup = Object.keys(GROUPS).find((g) => GROUPS[g].some(childActive));
+  useEffect(() => {
+    if (activeGroup) setOpenGroups((g) => (g.includes(activeGroup) ? g : [...g, activeGroup]));
+  }, [activeGroup]);
 
   const borderSide = isRtl ? "border-l border-line" : "border-r border-line";
 
@@ -214,24 +241,23 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
             </div>
         }
 
-        {NAV_DOMAINS.map((it) => it.href === "/catalog" ? (
+        {NAV_DOMAINS.map((it) => GROUPS[it.href] ? (
           <div key={it.href}>
-            <NavLink item={it} active={collapsed && catalogChildActive} collapsed={collapsed} isRtl={isRtl} />
-            {!collapsed && (
-              <div className={`mt-0.5 flex flex-col gap-0.5 ${isRtl ? "mr-4 border-r pr-1.5" : "ml-4 border-l pl-1.5"} border-line`}>
-                {CATALOG_CHILDREN.map((c) => (
-                  <NavLink key={c.href} item={c} active={isActive(c.href)} collapsed={false} isRtl={isRtl} small />
-                ))}
-              </div>
+            {collapsed ? (
+              <NavLink item={it} active={activeGroup === it.href} collapsed isRtl={isRtl} />
+            ) : (
+              <GroupToggle
+                item={it}
+                open={openGroups.includes(it.href)}
+                holdsActive={activeGroup === it.href}
+                isRtl={isRtl}
+                onToggle={() => toggleGroup(it.href)}
+              />
             )}
-          </div>
-        ) : it.href === "/privacy" ? (
-          <div key={it.href}>
-            <NavLink item={it} active={collapsed && privacyChildActive} collapsed={collapsed} isRtl={isRtl} />
-            {!collapsed && (
+            {!collapsed && openGroups.includes(it.href) && (
               <div className={`mt-0.5 flex flex-col gap-0.5 ${isRtl ? "mr-4 border-r pr-1.5" : "ml-4 border-l pl-1.5"} border-line`}>
-                {PRIVACY_CHILDREN.map((c) => (
-                  <NavLink key={c.href} item={c} active={privacyActive(c)} collapsed={false} isRtl={isRtl} small />
+                {GROUPS[it.href].map((c) => (
+                  <NavLink key={c.href} item={c} active={childActive(c)} collapsed={false} isRtl={isRtl} small />
                 ))}
               </div>
             )}
@@ -292,6 +318,35 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
         {!collapsed && <EnvironmentBadge className="mx-3 mt-2" />}
       </div>
     </aside>
+  );
+}
+
+/** The heading of a menu group: opens and closes its sub-pages. */
+function GroupToggle({ item, open, holdsActive, isRtl, onToggle }: {
+  item: Item; open: boolean; holdsActive: boolean; isRtl?: boolean; onToggle: () => void;
+}) {
+  const { Icon } = item;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={[
+        "w-full flex items-center gap-2.5 py-1.5 px-3 rounded-md text-sm font-medium transition-colors text-start",
+        holdsActive && !open ? "text-brand-deep bg-brand-purple/5" : "text-ink-soft hover:bg-canvas hover:text-brand-deep",
+      ].join(" ")}
+    >
+      <Icon className={["w-[15px] h-[15px] shrink-0", holdsActive ? "text-brand-purple" : ""].join(" ")} />
+      <span className="flex-1 text-[13px]">{item.label}</span>
+      <svg
+        viewBox="0 0 24 24"
+        className="w-3.5 h-3.5 shrink-0 text-muted transition-transform"
+        style={{ transform: open ? "none" : `rotate(${isRtl ? 90 : -90}deg)` }}
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+      >
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </button>
   );
 }
 
