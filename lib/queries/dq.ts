@@ -201,13 +201,11 @@ export async function getDqRules(filters?: {
 // dq_rules-driven approach getCdeDataQuality() already uses for the Data
 // Catalog page's CDE rollup, just scoped to one table instead of a whole
 // source and without that feature's configurable per-dimension weights.
-// CONFORMITY exists as a dimension but has no tile here (matches the
-// long-standing 6-tile layout) — a dimension with no rules assigned shows
-// score:null so the UI can render "No rules assigned" rather than a fake number.
+// One tile per dimension — a dimension with no rules assigned shows score:null so
+// the UI can render "No rules assigned" rather than a fake number.
 
-// Labels are resolved by the caller (page.tsx, via getServerT()) from
-// dimensionCode — kept out of this data-layer module so they can be
-// translated without this file needing i18n access.
+// Labels are resolved by the caller from dimensionCode, through the dimension list
+// (lib/dq-dimension-label.tsx), so they read the same as on every other screen.
 const TABLE_DQ_DIMENSION_CODES = ["COMP", "VALIDITY", "UNIQUENESS", "FRESHNESS", "CONSISTENCY", "ACCURACY"];
 
 // ruleCount = total active rules assigned to this dimension (whether or not

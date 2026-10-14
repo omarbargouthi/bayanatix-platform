@@ -6,7 +6,7 @@ import type { ContextPackage } from "./context";
 import type { DqRuleDraft } from "./dq-suggester";
 import { runSuggestionPrompt } from "./suggestion-service";
 
-const VALID_DIMENSIONS = new Set(["COMP", "ACCURACY", "CONSISTENCY", "VALIDITY", "FRESHNESS", "CONFORMITY", "UNIQUENESS"]);
+const VALID_DIMENSIONS = new Set(["COMP", "ACCURACY", "CONSISTENCY", "VALIDITY", "FRESHNESS", "UNIQUENESS"]);
 
 type LlmRuleIdea = { rule_name: string; dimension: string; sql: string; rationale: string };
 
