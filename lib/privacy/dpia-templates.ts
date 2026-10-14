@@ -1,7 +1,10 @@
 // Editing the impact assessment questionnaires (db/186, db/190). Admins and data
-// protection officers only. English is the base text; the Arabic is saved beside it in
-// bayanat.translations (category DPIA_TEMPLATES), and a changed English text marks the
-// existing Arabic stale until it is updated.
+// protection officers only. The texts are written in English, the base language; other
+// languages are translated in Languages & Translations (category DPIA_TEMPLATES), where a
+// changed English text marks the existing translations stale.
+//
+// Which questionnaires are used, and the default, is a configuration chosen by an
+// administrator (setQuestionnaireUse, Configuration › Privacy & Retention).
 //
 // Edits apply to assessments that are not yet decided; decided versions are snapshots.
 // A question an assessment has answered is retired rather than deleted, so the answer
@@ -25,33 +28,17 @@ const qKey = (id: number, field: "text" | "help") => `dpia_template_questions.${
 type Ok = { ok: true };
 const forbidden = () => fail("FORBIDDEN", "Only an admin or a data protection officer can edit the questionnaires.");
 
-/** The Arabic stored for a key, with whether the English changed since. */
-const arCol = (keySql: string, alias: string) => `
-  (SELECT jsonb_build_object('text', tr.translated_text, 'stale', tr.status_code = 'STALE')
-   FROM bayanat.translation_keys tk JOIN bayanat.translations tr ON tr.key_id = tk.key_id AND tr.language_code = 'ar'
-   WHERE tk.key_code = ${keySql} AND btrim(coalesce(tr.translated_text, '')) <> '') AS "${alias}"`;
-
 /**
- * Saves a translatable text. English goes to its column (by the caller) and to the key's
- * base text; the Arabic is saved only when the editor sent it (undefined = untouched).
+ * Keeps a text's translation key in step with its English (the caller saves the column):
+ * a new key for the Workbench, a changed base text that marks translations stale, or no
+ * key once the text is cleared.
  */
-async function saveText(keyCode: string, english: string | null, arabic: unknown): Promise<void> {
+async function saveText(keyCode: string, english: string | null): Promise<void> {
   if (!english) {
     await sql`DELETE FROM bayanat.translation_keys WHERE key_code = ${keyCode}`;
     return;
   }
   await upsertKey({ keysCreated: 0, keysUpdatedStale: 0, secondarySeeded: 0 }, CATEGORY, keyCode, english, "en", "ar", null);
-  if (arabic === undefined) return;
-  const ar = text(arabic, 20000);
-  if (!ar) {
-    await sql`DELETE FROM bayanat.translations WHERE language_code = 'ar' AND key_id = (SELECT key_id FROM bayanat.translation_keys WHERE key_code = ${keyCode})`;
-    return;
-  }
-  await sql`
-    INSERT INTO bayanat.translations (key_id, language_code, translated_text, status_code, translated_at)
-    SELECT key_id, 'ar', ${ar}, 'HUMAN_EDITED', now() FROM bayanat.translation_keys WHERE key_code = ${keyCode}
-    ON CONFLICT (key_id, language_code) DO UPDATE SET translated_text = EXCLUDED.translated_text, status_code = 'HUMAN_EDITED', translated_at = now()
-  `;
 }
 
 /** Copies the translations of one key to another (copying a questionnaire). */
@@ -79,10 +66,7 @@ const templateCols = () => sql.unsafe(`
   (SELECT count(*)::int FROM bayanat.dpia_template_questions q WHERE q.template_id = t.template_id AND q.stage_code = 'ASSESSMENT' AND NOT q.is_retired_indicator) AS "assessmentCount",
   (SELECT count(*)::int FROM bayanat.dpias d WHERE d.template_id = t.template_id) AS "dpiaCount",
   (SELECT count(*)::int FROM bayanat.dpias d WHERE d.template_id = t.template_id AND d.status_code IN ('SCREENING', 'ASSESSMENT', 'IN_REVIEW')) AS "openDpiaCount",
-  t.updated_at::text AS "updatedAt", coalesce(u.full_name, t.updated_by_user_id) AS "updatedBy",
-  ${arCol("'dpia_templates.' || t.template_id || '.name'", "nameAr")},
-  ${arCol("'dpia_templates.' || t.template_id || '.regulation'", "regulationAr")},
-  ${arCol("'dpia_templates.' || t.template_id || '.description'", "descriptionAr")}
+  t.updated_at::text AS "updatedAt", coalesce(u.full_name, t.updated_by_user_id) AS "updatedBy"
 `);
 
 export async function listTemplatesForAdmin(): Promise<TemplateAdmin[]> {
@@ -102,9 +86,7 @@ export async function getTemplateForAdmin(templateId: number): Promise<{ templat
            q.question_text AS text, q.help_text AS help, q.reference_text AS reference, q.auto_code AS "autoCode",
            q.is_required_indicator AS required, q.is_retired_indicator AS retired,
            (SELECT count(*)::int FROM bayanat.dpia_answers a WHERE a.question_id = q.question_id
-              AND (a.answer_code IS NOT NULL OR btrim(coalesce(a.answer_text, '')) <> '')) AS "answeredCount",
-           ${sql.unsafe(arCol("'dpia_template_questions.' || q.question_id || '.text'", "textAr"))},
-           ${sql.unsafe(arCol("'dpia_template_questions.' || q.question_id || '.help'", "helpAr"))}
+              AND (a.answer_code IS NOT NULL OR btrim(coalesce(a.answer_text, '')) <> '')) AS "answeredCount"
     FROM bayanat.dpia_template_questions q WHERE q.template_id = ${templateId}
     ORDER BY q.sort_order_int, q.question_id
   `;
@@ -113,7 +95,7 @@ export async function getTemplateForAdmin(templateId: number): Promise<{ templat
 
 // ── Questionnaires ───────────────────────────────────────────────────────────
 /** A new questionnaire, empty or as a copy of another one (questions and translations included). */
-export async function createTemplate(input: { name?: unknown; nameAr?: unknown; copyFromId?: unknown }, session: SessionUser): Promise<{ templateId: number } | DpiaError> {
+export async function createTemplate(input: { name?: unknown; copyFromId?: unknown }, session: SessionUser): Promise<{ templateId: number } | DpiaError> {
   if (!isDpiaReviewer(session.role)) return forbidden();
   const name = text(input.name, 150);
   if (!name) return fail("NAME_REQUIRED", "A name is required.");
@@ -130,10 +112,10 @@ export async function createTemplate(input: { name?: unknown; nameAr?: unknown; 
     RETURNING template_id AS "templateId"
   `;
   const id = row.templateId;
-  await saveText(tplKey(id, "name"), name, input.nameAr === undefined ? undefined : input.nameAr);
+  await saveText(tplKey(id, "name"), name);
   if (fromId && src) {
-    if (src.regulation) { await saveText(tplKey(id, "regulation"), src.regulation, undefined); await copyTranslations(tplKey(fromId, "regulation"), tplKey(id, "regulation")); }
-    if (src.description) { await saveText(tplKey(id, "description"), src.description, undefined); await copyTranslations(tplKey(fromId, "description"), tplKey(id, "description")); }
+    if (src.regulation) { await saveText(tplKey(id, "regulation"), src.regulation); await copyTranslations(tplKey(fromId, "regulation"), tplKey(id, "regulation")); }
+    if (src.description) { await saveText(tplKey(id, "description"), src.description); await copyTranslations(tplKey(fromId, "description"), tplKey(id, "description")); }
     const qs = await sql<{ questionId: number; code: string; stage: string; section: string; text: string; help: string | null; reference: string | null; autoCode: string | null; required: boolean; sort: number }[]>`
       SELECT question_id AS "questionId", question_code AS code, stage_code AS stage, section_code AS section, question_text AS text, help_text AS help,
              reference_text AS reference, auto_code AS "autoCode", is_required_indicator AS required, sort_order_int AS sort
@@ -145,19 +127,16 @@ export async function createTemplate(input: { name?: unknown; nameAr?: unknown; 
         VALUES (${id}, ${q.code}, ${q.stage}, ${q.section}, ${q.text}, ${q.help}, ${q.reference}, ${q.autoCode}, ${q.required}, ${q.sort})
         RETURNING question_id AS "questionId"
       `;
-      await saveText(qKey(n.questionId, "text"), q.text, undefined);
+      await saveText(qKey(n.questionId, "text"), q.text);
       await copyTranslations(qKey(q.questionId, "text"), qKey(n.questionId, "text"));
-      if (q.help) { await saveText(qKey(n.questionId, "help"), q.help, undefined); await copyTranslations(qKey(q.questionId, "help"), qKey(n.questionId, "help")); }
+      if (q.help) { await saveText(qKey(n.questionId, "help"), q.help); await copyTranslations(qKey(q.questionId, "help"), qKey(n.questionId, "help")); }
     }
   }
   await logCreate(AUDIT_TYPE, id, session.userId, [{ field: "name", newVal: name }, { field: "copied_from", newVal: fromId ? String(fromId) : null }]);
   return { templateId: id };
 }
 
-type TemplateInput = {
-  name?: unknown; nameAr?: unknown; regulation?: unknown; regulationAr?: unknown; description?: unknown; descriptionAr?: unknown;
-  threshold?: unknown; isActive?: unknown; isDefault?: unknown;
-};
+type TemplateInput = { name?: unknown; regulation?: unknown; description?: unknown; threshold?: unknown };
 
 export async function updateTemplate(templateId: number, input: TemplateInput, session: SessionUser): Promise<Ok | DpiaError> {
   if (!isDpiaReviewer(session.role)) return forbidden();
@@ -170,30 +149,47 @@ export async function updateTemplate(templateId: number, input: TemplateInput, s
   const threshold = input.threshold === undefined ? cur.threshold : Math.floor(Number(input.threshold));
   if (!Number.isFinite(threshold) || threshold < 1) return fail("THRESHOLD_INVALID", "The threshold must be at least 1.");
   if (cur.screeningCount > 0 && threshold > cur.screeningCount) return fail("THRESHOLD_TOO_HIGH", "The threshold cannot be higher than the number of screening questions.");
-  const isDefault = input.isDefault === undefined ? cur.isDefault : input.isDefault === true;
-  const isActive = isDefault ? true : input.isActive === undefined ? cur.isActive : input.isActive === true;
-  if (cur.isDefault && !isDefault) return fail("DEFAULT_REQUIRED", "Make another questionnaire the default instead.");
-  if (isActive && !cur.isActive && cur.screeningCount === 0) return fail("NO_SCREENING_QUESTIONS", "Add at least one screening question before offering this questionnaire.");
-
-  if (isDefault && !cur.isDefault) await sql`UPDATE bayanat.dpia_templates SET is_default_indicator = false WHERE template_id <> ${templateId}`;
   await sql`
     UPDATE bayanat.dpia_templates SET template_name_text = ${name}, regulation_text = ${regulation}, description_text = ${description},
-      screening_threshold_int = ${threshold}, is_active_indicator = ${isActive}, is_default_indicator = ${isDefault},
-      updated_at = now(), updated_by_user_id = ${session.userId}
+      screening_threshold_int = ${threshold}, updated_at = now(), updated_by_user_id = ${session.userId}
     WHERE template_id = ${templateId}
   `;
-  await saveText(tplKey(templateId, "name"), name, input.nameAr);
-  await saveText(tplKey(templateId, "regulation"), regulation, input.regulationAr);
-  await saveText(tplKey(templateId, "description"), description, input.descriptionAr);
+  await saveText(tplKey(templateId, "name"), name);
+  await saveText(tplKey(templateId, "regulation"), regulation);
+  await saveText(tplKey(templateId, "description"), description);
   await logUpdate(AUDIT_TYPE, templateId, session.userId, [
     { field: "name", oldVal: cur.name, newVal: name },
     { field: "regulation", oldVal: cur.regulation, newVal: regulation },
     { field: "description", oldVal: cur.description, newVal: description },
     { field: "threshold", oldVal: String(cur.threshold), newVal: String(threshold) },
-    { field: "active", oldVal: String(cur.isActive), newVal: String(isActive) },
-    { field: "default", oldVal: String(cur.isDefault), newVal: String(isDefault) },
-    ...(input.nameAr !== undefined ? [{ field: "name.ar", oldVal: cur.nameAr?.text ?? null, newVal: text(input.nameAr) }] : []),
   ]);
+  return { ok: true };
+}
+
+/**
+ * The configuration: which questionnaires (that is, which regulations) new assessments
+ * are offered, and the one preselected. Administrators only. Assessments already started
+ * keep their questionnaire whatever is chosen here.
+ */
+export async function setQuestionnaireUse(input: { activeIds?: unknown; defaultId?: unknown }, session: SessionUser): Promise<Ok | DpiaError> {
+  if (session.role !== "ADMIN") return fail("FORBIDDEN", "Only an administrator can choose the questionnaires in use.");
+  const all = await listTemplatesForAdmin();
+  const active = [...new Set((Array.isArray(input.activeIds) ? input.activeIds : []).map(Number))].filter((id) => all.some((t) => t.templateId === id));
+  const defaultId = Number(input.defaultId);
+  if (active.length === 0) return fail("NONE_IN_USE", "Choose at least one questionnaire.");
+  if (!active.includes(defaultId)) return fail("DEFAULT_NOT_IN_USE", "The default must be one of the questionnaires in use.");
+  const empty = all.find((t) => active.includes(t.templateId) && t.screeningCount === 0);
+  if (empty) return fail("NO_SCREENING_QUESTIONS", `“${empty.name}” has no screening question yet, so it cannot be used.`);
+  await sql`
+    UPDATE bayanat.dpia_templates SET is_active_indicator = (template_id = ANY(${active})), is_default_indicator = (template_id = ${defaultId})
+  `;
+  for (const t of all) {
+    const nowActive = active.includes(t.templateId), nowDefault = t.templateId === defaultId;
+    await logUpdate(AUDIT_TYPE, t.templateId, session.userId, [
+      { field: "in_use", oldVal: String(t.isActive), newVal: String(nowActive) },
+      { field: "default", oldVal: String(t.isDefault), newVal: String(nowDefault) },
+    ]);
+  }
   return { ok: true };
 }
 
@@ -202,8 +198,8 @@ export async function deleteTemplate(templateId: number, session: SessionUser): 
   if (!isDpiaReviewer(session.role)) return forbidden();
   const cur = (await getTemplateForAdmin(templateId))?.template;
   if (!cur) return fail("NOT_FOUND", "Not found");
-  if (cur.isDefault) return fail("DEFAULT_REQUIRED", "Make another questionnaire the default instead.");
-  if (cur.dpiaCount > 0) return fail("TEMPLATE_IN_USE", "Assessments use this questionnaire. Take it out of use instead of deleting it.");
+  if (cur.isActive) return fail("TEMPLATE_ACTIVE", "This questionnaire is in use. Take it out of use in Configuration first.");
+  if (cur.dpiaCount > 0) return fail("TEMPLATE_IN_USE", "Assessments use this questionnaire, so it stays; it can be taken out of use in Configuration.");
   const qs = await sql<{ id: number }[]>`SELECT question_id AS id FROM bayanat.dpia_template_questions WHERE template_id = ${templateId}`;
   const keys = [tplKey(templateId, "name"), tplKey(templateId, "regulation"), tplKey(templateId, "description"),
     ...qs.flatMap((q) => [qKey(q.id, "text"), qKey(q.id, "help")])];
@@ -214,10 +210,7 @@ export async function deleteTemplate(templateId: number, session: SessionUser): 
 }
 
 // ── Questions ────────────────────────────────────────────────────────────────
-type QuestionInput = {
-  stage?: unknown; section?: unknown; text?: unknown; textAr?: unknown; help?: unknown; helpAr?: unknown;
-  reference?: unknown; autoCode?: unknown; required?: unknown;
-};
+type QuestionInput = { stage?: unknown; section?: unknown; text?: unknown; help?: unknown; reference?: unknown; autoCode?: unknown; required?: unknown };
 type Clean = { stage: "SCREENING" | "ASSESSMENT"; section: string; text: string; help: string | null; reference: string | null; autoCode: string | null; required: boolean };
 
 function clean(input: QuestionInput, cur?: QuestionAdmin): Clean | DpiaError {
@@ -262,8 +255,8 @@ export async function addQuestion(templateId: number, input: QuestionInput, sess
             (SELECT coalesce(max(sort_order_int), 0) + 1 FROM bayanat.dpia_template_questions WHERE template_id = ${templateId}))
     RETURNING question_id AS "questionId"
   `;
-  await saveText(qKey(row.questionId, "text"), c.text, input.textAr);
-  await saveText(qKey(row.questionId, "help"), c.help, input.helpAr);
+  await saveText(qKey(row.questionId, "text"), c.text);
+  await saveText(qKey(row.questionId, "help"), c.help);
   await touch(templateId, session.userId);
   await logUpdate(AUDIT_TYPE, templateId, session.userId, [{ field: `question.${code}`, oldVal: null, newVal: c.text }]);
   return { questionId: row.questionId };
@@ -289,8 +282,8 @@ export async function updateQuestion(questionId: number, input: QuestionInput, s
       reference_text = ${c.reference}, auto_code = ${c.autoCode}, is_required_indicator = ${c.required}
     WHERE question_id = ${questionId}
   `;
-  await saveText(qKey(questionId, "text"), c.text, input.textAr);
-  await saveText(qKey(questionId, "help"), c.help, input.helpAr);
+  await saveText(qKey(questionId, "text"), c.text);
+  await saveText(qKey(questionId, "help"), c.help);
   await touch(cur.templateId, session.userId);
   await logUpdate(AUDIT_TYPE, cur.templateId, session.userId, [
     { field: `question.${cur.code}.text`, oldVal: cur.text, newVal: c.text },
@@ -299,7 +292,6 @@ export async function updateQuestion(questionId: number, input: QuestionInput, s
     { field: `question.${cur.code}.reference`, oldVal: cur.reference, newVal: c.reference },
     { field: `question.${cur.code}.catalog_link`, oldVal: cur.autoCode, newVal: c.autoCode },
     { field: `question.${cur.code}.required`, oldVal: String(cur.required), newVal: String(c.required) },
-    ...(input.textAr !== undefined ? [{ field: `question.${cur.code}.text.ar`, oldVal: cur.textAr?.text ?? null, newVal: text(input.textAr) }] : []),
   ]);
   return { ok: true };
 }

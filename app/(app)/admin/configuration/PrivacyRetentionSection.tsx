@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DpiaQuestionnairesConfig } from "./DpiaQuestionnairesConfig";
 
 type Settings = {
   auditLogDays: number | null; dataAccessLogDays: number | null; jobLogDays: number | null;
@@ -176,6 +177,8 @@ export function PrivacyRetentionSection() {
           </div>
         )}
       </section>
+
+      <DpiaQuestionnairesConfig />
     </div>
   );
 }

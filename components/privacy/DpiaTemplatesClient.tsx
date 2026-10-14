@@ -1,14 +1,15 @@
 "use client";
 
-// Editing the impact assessment questionnaires: their names, screening threshold and
-// whether they are offered, and their screening and assessment questions, each in
-// English with its Arabic beside it. Admins and data protection officers only.
+// Editing the impact assessment questionnaires: their names, screening threshold, and
+// their screening and assessment questions. Admins and data protection officers only.
+// Texts are written in English; other languages are translated in Languages &
+// Translations, and which questionnaires are used is chosen in Configuration.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import {
-  DPIA_ASSESSMENT_AUTO, DPIA_ASSESSMENT_SECTIONS, DPIA_SCREENING_AUTO, type ArText, type QuestionAdmin, type TemplateAdmin,
+  DPIA_ASSESSMENT_AUTO, DPIA_ASSESSMENT_SECTIONS, DPIA_SCREENING_AUTO, type QuestionAdmin, type TemplateAdmin,
 } from "@/lib/privacy/dpia-types";
 import { Dialog, ErrorNote, day, fill } from "./dpia-ui";
 
@@ -28,7 +29,7 @@ function autoLabel(t: I18nStrings, stage: string, code: string | null): string |
   return stage === "SCREENING" ? (t.dpiaTemplates.autoFlags as Record<string, string>)[code] ?? code : (t.dpia.facts.blocks as Record<string, string>)[code] ?? code;
 }
 
-export function DpiaTemplatesClient() {
+export function DpiaTemplatesClient({ isAdmin }: { isAdmin: boolean }) {
   const { t } = useLang();
   const w = t.dpiaTemplates;
   const [templates, setTemplates] = useState<TemplateAdmin[] | null>(null);
@@ -49,6 +50,10 @@ export function DpiaTemplatesClient() {
         <div>
           <h1 className="text-lg font-bold text-brand-deep">{w.title}</h1>
           <p className="text-[13px] text-muted mt-1 max-w-4xl">{w.desc} {w.editNote}</p>
+          <p className="text-[12px] text-muted mt-2 max-w-4xl">
+            {w.translationsNote}
+            {isAdmin && <> <Link href="/admin/languages?tab=Workbench&category=DPIA_TEMPLATES" className="text-brand-purple hover:underline">{w.translationsLink}</Link></>}
+          </p>
         </div>
         <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm shrink-0">{w.newTemplate}</button>
       </div>
@@ -68,7 +73,7 @@ export function DpiaTemplatesClient() {
             </button>
           ))}
         </div>
-        {selected != null && <TemplateEditor key={selected} templateId={selected} onListChanged={loadList} />}
+        {selected != null && <TemplateEditor key={selected} templateId={selected} isAdmin={isAdmin} onListChanged={loadList} />}
       </div>
 
       {creating && templates && <NewTemplateDialog templates={templates} onClose={() => setCreating(false)}
@@ -78,7 +83,7 @@ export function DpiaTemplatesClient() {
 }
 
 // ── One questionnaire ────────────────────────────────────────────────────────
-function TemplateEditor({ templateId, onListChanged }: { templateId: number; onListChanged: () => void }) {
+function TemplateEditor({ templateId, isAdmin, onListChanged }: { templateId: number; isAdmin: boolean; onListChanged: () => void }) {
   const { t } = useLang();
   const w = t.dpiaTemplates;
   const [data, setData] = useState<Detail | null>(null);
@@ -122,7 +127,7 @@ function TemplateEditor({ templateId, onListChanged }: { templateId: number; onL
           <span>{message.text}</span><button onClick={() => setMessage(null)} className="opacity-60 hover:opacity-100">×</button>
         </div>
       )}
-      <DetailsCard template={template} save={(body) => run(`/api/privacy/dpia/templates/${templateId}`, "PATCH", body, w.saved)}
+      <DetailsCard template={template} isAdmin={isAdmin} save={(body) => run(`/api/privacy/dpia/templates/${templateId}`, "PATCH", body, w.saved)}
         remove={async () => {
           if (!window.confirm(w.deleteConfirm)) return;
           const r = await send(`/api/privacy/dpia/templates/${templateId}`, "DELETE");
@@ -182,58 +187,43 @@ function TemplateEditor({ templateId, onListChanged }: { templateId: number; onL
   );
 }
 
-/** An English field with its Arabic beside it. */
-function Bilingual({ label, en, ar, onEn, onAr, multiline, stale }: {
-  label: string; en: string; ar: string; onEn: (v: string) => void; onAr: (v: string) => void; multiline?: boolean; stale?: boolean;
-}) {
-  const { t } = useLang();
-  const w = t.dpiaTemplates;
+/** A text in English, the base language. */
+function TextField({ label, value, onChange, multiline }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean }) {
   const Field = multiline ? "textarea" : "input";
   return (
     <div>
       <label className="field-label">{label}</label>
-      <div className="grid md:grid-cols-2 gap-2">
-        <div>
-          <Field className="input-field w-full" rows={multiline ? 3 : undefined} value={en} onChange={(e) => onEn(e.target.value)} dir="ltr" lang="en" />
-          <div className="text-[10px] text-muted mt-0.5">{w.inEnglish}</div>
-        </div>
-        <div>
-          <Field className={`input-field w-full ${stale ? "border-amber-400" : ""}`} rows={multiline ? 3 : undefined} value={ar} onChange={(e) => onAr(e.target.value)} dir="rtl" lang="ar" />
-          <div className={`text-[10px] mt-0.5 ${stale ? "text-amber-700 font-semibold" : "text-muted"}`}>{stale ? w.arStale : w.inArabic}</div>
-        </div>
-      </div>
+      <Field className="input-field w-full" rows={multiline ? 3 : undefined} value={value} onChange={(e) => onChange(e.target.value)} dir="ltr" lang="en" />
     </div>
   );
 }
 
-const arValue = (a: ArText) => a?.text ?? "";
-
-function DetailsCard({ template, save, remove }: { template: TemplateAdmin; save: (body: object) => Promise<boolean>; remove: () => void }) {
+function DetailsCard({ template, isAdmin, save, remove }: { template: TemplateAdmin; isAdmin: boolean; save: (body: object) => Promise<boolean>; remove: () => void }) {
   const { t } = useLang();
   const w = t.dpiaTemplates;
-  const initial = {
-    name: template.name, nameAr: arValue(template.nameAr), regulation: template.regulation ?? "", regulationAr: arValue(template.regulationAr),
-    description: template.description ?? "", descriptionAr: arValue(template.descriptionAr),
-    threshold: String(template.threshold), isActive: template.isActive, isDefault: template.isDefault,
-  };
-  const [f, setF] = useState(initial);
+  const [f, setF] = useState({ name: template.name, regulation: template.regulation ?? "", description: template.description ?? "", threshold: String(template.threshold) });
   const [busy, setBusy] = useState(false);
-  const set = (k: keyof typeof f) => (v: string | boolean) => setF((x) => ({ ...x, [k]: v }));
+  const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
 
   async function submit() {
     setBusy(true);
-    // Arabic is sent only where it was touched, so an untouched stale translation stays marked stale.
-    const body: Record<string, unknown> = { name: f.name, regulation: f.regulation, description: f.description, threshold: Number(f.threshold), isActive: f.isActive, isDefault: f.isDefault };
-    for (const k of ["nameAr", "regulationAr", "descriptionAr"] as const) if (f[k] !== initial[k]) body[k] = f[k];
-    await save(body);
+    await save({ name: f.name, regulation: f.regulation, description: f.description, threshold: Number(f.threshold) });
     setBusy(false);
   }
 
   return (
     <div className="card p-5 space-y-3">
-      <Bilingual label={w.fName} en={f.name} ar={f.nameAr} onEn={set("name")} onAr={set("nameAr")} stale={template.nameAr?.stale} />
-      <Bilingual label={w.fRegulation} en={f.regulation} ar={f.regulationAr} onEn={set("regulation")} onAr={set("regulationAr")} stale={template.regulationAr?.stale} />
-      <Bilingual label={w.fDescription} en={f.description} ar={f.descriptionAr} onEn={set("description")} onAr={set("descriptionAr")} multiline stale={template.descriptionAr?.stale} />
+      <div className="flex items-center gap-2 flex-wrap text-[12px]">
+        <span className={`font-semibold rounded-full px-2 py-0.5 ${template.isActive ? "text-emerald-700 bg-emerald-50" : "text-muted bg-canvas-soft"}`}>{template.isActive ? w.statusInUse : w.badgeInactive}</span>
+        {template.isDefault && <span className="text-[10px] font-bold uppercase tracking-wider text-brand-purple bg-brand-purple/10 rounded px-1.5 py-0.5">{w.badgeDefault}</span>}
+        <span className="text-muted">
+          {w.useNote}
+          {isAdmin && <> <Link href="/admin/configuration" className="text-brand-purple hover:underline">{w.useLink}</Link></>}
+        </span>
+      </div>
+      <TextField label={w.fName} value={f.name} onChange={set("name")} />
+      <TextField label={w.fRegulation} value={f.regulation} onChange={set("regulation")} />
+      <TextField label={w.fDescription} value={f.description} onChange={set("description")} multiline />
       <div className="grid md:grid-cols-[200px_1fr] gap-4 items-start">
         <div>
           <label className="field-label">{w.fThreshold}</label>
@@ -241,21 +231,13 @@ function DetailsCard({ template, save, remove }: { template: TemplateAdmin; save
         </div>
         <p className="text-[12px] text-muted md:pt-6">{w.thresholdHint}</p>
       </div>
-      <div className="flex flex-wrap gap-5">
-        <label className="flex items-center gap-2 text-[13px]">
-          <input type="checkbox" checked={f.isActive || f.isDefault} disabled={f.isDefault} onChange={(e) => set("isActive")(e.target.checked)} />{w.fActive}
-        </label>
-        <label className="flex items-center gap-2 text-[13px]">
-          <input type="checkbox" checked={f.isDefault} disabled={template.isDefault} onChange={(e) => set("isDefault")(e.target.checked)} />{w.fDefault}
-        </label>
-      </div>
       <div className="flex items-center justify-between gap-3 flex-wrap pt-1 border-t border-line-soft">
         <div className="text-[11px] text-muted pt-2">
           {template.dpiaCount ? fill(w.usedBy, { n: template.dpiaCount, open: template.openDpiaCount }) : w.notUsed}
           {template.updatedAt && <> · {fill(w.updated, { user: template.updatedBy ?? "—", date: day(template.updatedAt) })}</>}
         </div>
         <div className="flex gap-2 pt-2">
-          {template.dpiaCount === 0 && !template.isDefault && <button onClick={remove} className="btn btn-sm text-red-600">{w.deleteTemplate}</button>}
+          {template.dpiaCount === 0 && !template.isActive && <button onClick={remove} className="btn btn-sm text-red-600">{w.deleteTemplate}</button>}
           <button onClick={submit} disabled={busy || !f.name.trim()} className="btn btn-primary btn-sm">{busy ? t.common.saving : t.common.save}</button>
         </div>
       </div>
@@ -281,10 +263,7 @@ function QuestionList({ items, onEdit, onMove, onRemove, onRestore }: { items: Q
             <span className="text-[12px] text-muted w-5 shrink-0 pt-0.5">{i + 1}.</span>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] text-ink" dir="ltr" lang="en">{q.text}</div>
-              <div className={`text-[13px] mt-0.5 ${q.textAr ? (q.textAr.stale ? "text-amber-800" : "text-ink-soft") : "text-muted italic"}`} dir="rtl" lang="ar">
-                {q.textAr ? q.textAr.text : w.arMissing}
-              </div>
-              {q.textAr?.stale && <div className="text-[11px] text-amber-700 font-semibold">{w.arStale}</div>}
+              {q.help && <div className="text-[12px] text-muted mt-0.5" dir="ltr" lang="en">{q.help}</div>}
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {q.required && <span className="text-[10px] font-bold uppercase tracking-wider text-brand-purple bg-brand-purple/10 rounded px-1.5 py-0.5">{w.required}</span>}
                 {auto && <span className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{fill(q.stage === "SCREENING" ? w.catalogSuggests : w.catalogShows, { what: auto })}</span>}
@@ -314,7 +293,7 @@ function QuestionDialog({ question, stage: initialStage, onClose, onSave }: {
   const w = t.dpiaTemplates;
   const initial = {
     stage: initialStage, section: question?.stage === "ASSESSMENT" ? question.section : "DESCRIPTION",
-    text: question?.text ?? "", textAr: arValue(question?.textAr ?? null), help: question?.help ?? "", helpAr: arValue(question?.helpAr ?? null),
+    text: question?.text ?? "", help: question?.help ?? "",
     reference: question?.reference ?? "", autoCode: question?.autoCode ?? "", required: question?.required ?? false,
   };
   const [f, setF] = useState(initial);
@@ -328,8 +307,6 @@ function QuestionDialog({ question, stage: initialStage, onClose, onSave }: {
     const body: Record<string, unknown> = {
       stage: f.stage, section: f.section, text: f.text, help: f.help, reference: f.reference, autoCode: f.autoCode || null, required: f.required,
     };
-    if (!question || f.textAr !== initial.textAr) body.textAr = f.textAr;
-    if (!question || f.helpAr !== initial.helpAr) body.helpAr = f.helpAr;
     setError(await onSave(body));
     setBusy(false);
   }
@@ -358,8 +335,8 @@ function QuestionDialog({ question, stage: initialStage, onClose, onSave }: {
           </div>
         )}
       </div>
-      <Bilingual label={w.fText} en={f.text} ar={f.textAr} onEn={(v) => setF({ ...f, text: v })} onAr={(v) => setF({ ...f, textAr: v })} multiline stale={question?.textAr?.stale} />
-      <Bilingual label={w.fHelp} en={f.help} ar={f.helpAr} onEn={(v) => setF({ ...f, help: v })} onAr={(v) => setF({ ...f, helpAr: v })} multiline stale={question?.helpAr?.stale} />
+      <TextField label={w.fText} value={f.text} onChange={(v) => setF({ ...f, text: v })} multiline />
+      <TextField label={w.fHelp} value={f.help} onChange={(v) => setF({ ...f, help: v })} multiline />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="field-label">{w.fReference}</label>
@@ -388,13 +365,12 @@ function NewTemplateDialog({ templates, onClose, onCreated }: { templates: Templ
   const { t } = useLang();
   const w = t.dpiaTemplates;
   const [name, setName] = useState("");
-  const [nameAr, setNameAr] = useState("");
   const [from, setFrom] = useState(String(templates.find((x) => x.isDefault)?.templateId ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit() {
     setBusy(true); setError(null);
-    const r = await send("/api/privacy/dpia/templates", "POST", { name, nameAr, copyFromId: from ? Number(from) : null });
+    const r = await send("/api/privacy/dpia/templates", "POST", { name, copyFromId: from ? Number(from) : null });
     setBusy(false);
     if (r.ok) onCreated(Number(r.res.templateId)); else setError(errorText(t, r.res));
   }
@@ -403,7 +379,7 @@ function NewTemplateDialog({ templates, onClose, onCreated }: { templates: Templ
       <button onClick={onClose} className="btn btn-sm">{t.common.cancel}</button>
       <button onClick={submit} disabled={busy || !name.trim()} className="btn btn-primary btn-sm">{w.create}</button>
     </>}>
-      <Bilingual label={w.fName} en={name} ar={nameAr} onEn={setName} onAr={setNameAr} />
+      <TextField label={w.fName} value={name} onChange={setName} />
       <div>
         <label className="field-label">{w.startFrom}</label>
         <select className="input-field w-full" value={from} onChange={(e) => setFrom(e.target.value)}>

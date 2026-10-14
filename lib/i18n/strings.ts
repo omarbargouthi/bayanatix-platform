@@ -4218,14 +4218,8 @@ export type I18nStrings = {
     fName: string;
     fRegulation: string;
     fDescription: string;
-    inEnglish: string;
-    inArabic: string;
-    arStale: string;
-    arMissing: string;
     fThreshold: string;
     thresholdHint: string;
-    fActive: string;
-    fDefault: string;
     badgeDefault: string;
     badgeInactive: string;
     counts: string;
@@ -4280,11 +4274,15 @@ export type I18nStrings = {
     retiredTitle: string;
     restore: string;
     stageLockedNote: string;
+    translationsNote: string;
+    translationsLink: string;
+    useNote: string;
+    useLink: string;
+    statusInUse: string;
     errors: {
       NAME_REQUIRED: string;
       THRESHOLD_INVALID: string;
       THRESHOLD_TOO_HIGH: string;
-      DEFAULT_REQUIRED: string;
       NO_SCREENING_QUESTIONS: string;
       TEMPLATE_IN_USE: string;
       STAGE_INVALID: string;
@@ -4292,6 +4290,9 @@ export type I18nStrings = {
       TEXT_REQUIRED: string;
       AUTO_INVALID: string;
       STAGE_LOCKED: string;
+      TEMPLATE_ACTIVE: string;
+      NONE_IN_USE: string;
+      DEFAULT_NOT_IN_USE: string;
     };
   };
 };

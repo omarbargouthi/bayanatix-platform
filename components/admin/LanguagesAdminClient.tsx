@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { LANGUAGE_REGISTRY } from "@/lib/lang-config";
 import { useLang } from "@/lib/lang-context";
 import { BackgroundJobsPanel } from "@/components/shared/BackgroundJobsPanel";
@@ -15,8 +16,10 @@ const TABS = ["Languages", "Categories", "Workbench", "Import / Export"] as cons
 type Tab = (typeof TABS)[number];
 
 export function LanguagesAdminClient() {
-  const [tab, setTab] = useState<Tab>("Languages");
-  const [workbenchCategory, setWorkbenchCategory] = useState<string | null>(null);
+  // ?tab=Workbench&category=CODE opens the Workbench on one category (e.g. from the questionnaire editor).
+  const params = useSearchParams();
+  const [tab, setTab] = useState<Tab>((TABS as readonly string[]).includes(params.get("tab") ?? "") ? (params.get("tab") as Tab) : "Languages");
+  const [workbenchCategory, setWorkbenchCategory] = useState<string | null>(params.get("category"));
   const [workbenchLang, setWorkbenchLang] = useState<string | null>(null);
 
   return (

@@ -166,16 +166,16 @@ export const DPIA_SCREENING_AUTO: DpiaFlagCode[] = ["SENSITIVE_PI", "LARGE_SCALE
 /** Assessment: the block of catalog facts shown under the question. */
 export const DPIA_ASSESSMENT_AUTO = ["SUBJECT", "LEGAL_BASIS", "PERSONAL_DATA", "ACCESS", "SCALE", "FLOWS", "RECIPIENTS", "RETENTION"] as const;
 
-/** An Arabic text as stored: stale when the English changed after it was written. */
-export type ArText = { text: string; stale: boolean } | null;
 export type TemplateAdmin = {
-  templateId: number; code: string; name: string; nameAr: ArText; regulation: string | null; regulationAr: ArText;
-  description: string | null; descriptionAr: ArText; threshold: number; isActive: boolean; isDefault: boolean;
+  templateId: number; code: string; name: string; regulation: string | null;
+  description: string | null; threshold: number;
+  /** Chosen in Configuration: offered for new assessments, and preselected. */
+  isActive: boolean; isDefault: boolean;
   screeningCount: number; assessmentCount: number; dpiaCount: number; openDpiaCount: number;
   updatedAt: string | null; updatedBy: string | null;
 };
 export type QuestionAdmin = {
   questionId: number; code: string; stage: "SCREENING" | "ASSESSMENT"; section: string;
-  text: string; textAr: ArText; help: string | null; helpAr: ArText; reference: string | null;
+  text: string; help: string | null; reference: string | null;
   autoCode: string | null; required: boolean; retired: boolean; answeredCount: number;
 };

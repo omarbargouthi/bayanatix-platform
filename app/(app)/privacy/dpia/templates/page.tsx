@@ -25,7 +25,7 @@ export default async function DpiaTemplatesPage() {
         ]}
         user={user}
       />
-      <DpiaTemplatesClient />
+      <DpiaTemplatesClient isAdmin={user.role === "ADMIN"} />
     </>
   );
 }
