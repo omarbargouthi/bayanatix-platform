@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
 import { SourceSystemSelect } from "./SourceSystemSelect";
 
 type DescRow = {
@@ -35,6 +36,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 export function EnrichmentReviewClient({ canEdit, fixedTab }: { canEdit: boolean; fixedTab?: "descriptions" | "dq" }) {
   const { t } = useLang();
+  const dimLabel = useDqDimensionLabel();
   const e = t.enrichment;
 
   const [internalTab, setInternalTab] = useState<"descriptions" | "dq">("descriptions");
@@ -235,7 +237,7 @@ export function EnrichmentReviewClient({ canEdit, fixedTab }: { canEdit: boolean
                     {r.provenance === "LLM" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">AI</span>}
                     {r.sourceName && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-canvas-soft text-muted">{r.sourceName}</span>}
                   </div>
-                  <p className="text-[12px] text-ink-soft mt-1">{r.ruleName} · {r.dimensionCode} · {r.ruleTemplateCode ?? "CUSTOM_SQL"}</p>
+                  <p className="text-[12px] text-ink-soft mt-1">{r.ruleName} · {dimLabel(r.dimensionCode)} · {r.ruleTemplateCode ?? "CUSTOM_SQL"}</p>
                 </div>
                 {canEdit && r.status === "PENDING" && (
                   <div className="flex items-center gap-2 shrink-0">

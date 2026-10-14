@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { EntityProfileData, AttributeProfile } from "@/lib/queries/catalog";
 import type { DataAttribute } from "@/lib/types";
 import { useLang } from "@/lib/lang-context";
+import { HelpTip } from "@/components/ui/HelpTip";
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -121,7 +122,7 @@ export function ProfilingPanel({
             <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
           </svg>
           <div>
-            <h3 className="font-bold text-sm">{g.dataProfile}</h3>
+            <h3 className="font-bold text-sm flex items-center gap-1.5">{g.dataProfile} <HelpTip text={g.profileHow} href="/help/data-catalog#table-indicators" align="start" /></h3>
             <div className="text-[11px] text-muted mt-0.5">{g.lastRun} {fmtDate(profile.profiledAt)}</div>
           </div>
         </div>

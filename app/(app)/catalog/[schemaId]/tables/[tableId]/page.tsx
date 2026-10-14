@@ -28,6 +28,8 @@ import { RelatedAssetsPanel } from "@/components/custom-assets/RelatedAssetsPane
 import { SetChatContext } from "@/components/chat/SetChatContext";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
 import { SampleDataTab } from "@/components/catalog/SampleDataTab";
+import { HelpTip } from "@/components/ui/HelpTip";
+import { DqDimensionName } from "@/lib/dq-dimension-label";
 import { ViewAnatomyTab } from "@/components/lineage/ViewAnatomyPanel";
 import { isViewType } from "@/lib/object-types";
 import { getServerT } from "@/lib/i18n/server";
@@ -176,14 +178,14 @@ export default async function TablePage({
                 </div>
 
                 <div className="mt-6 flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-sm">{t.catalog.tabDataQuality}</h4>
+                  <h4 className="font-bold text-sm flex items-center gap-1.5">{t.catalog.tabDataQuality} <HelpTip text={t.catalog.dqDimensionsHow} href="/help/data-catalog#table-indicators" align="start" /></h4>
                   <a href="?tab=Data+Quality" className="text-[11px] text-brand-purple hover:underline">
                     {t.catalog.rulesManageLink.replace("{n}", String(schemaTabDqRules.length))}
                   </a>
                 </div>
                 <div className="grid grid-cols-3 gap-3.5">
                   {(tableDq?.dimensions ?? []).map((d) => (
-                    <DqItem key={d.dimensionCode} label={DQ_DIMENSION_LABEL(t)[d.dimensionCode] ?? d.dimensionCode} value={d.score} ruleCount={d.ruleCount} t={t} />
+                    <DqItem key={d.dimensionCode} label={<DqDimensionName code={d.dimensionCode} />} value={d.score} ruleCount={d.ruleCount} t={t} />
                   ))}
                 </div>
               </div>
@@ -254,18 +256,7 @@ export default async function TablePage({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function DQ_DIMENSION_LABEL(t: I18nStrings): Record<string, string> {
-  return {
-    COMP: t.catalog.completeness,
-    VALIDITY: t.catalog.validity,
-    UNIQUENESS: t.catalog.uniqueness,
-    FRESHNESS: t.catalog.freshness,
-    CONSISTENCY: t.catalog.consistency,
-    ACCURACY: t.catalog.accuracy,
-  };
-}
-
-function DqItem({ label, value, ruleCount, t }: { label: string; value: number | null; ruleCount: number; t: I18nStrings }) {
+function DqItem({ label, value, ruleCount, t }: { label: React.ReactNode; value: number | null; ruleCount: number; t: I18nStrings }) {
   return (
     <div className="bg-canvas-soft rounded-md px-3.5 py-2.5">
       <div className="text-base font-bold text-ink">{value != null ? `${value.toFixed(1)}%` : "—"}</div>

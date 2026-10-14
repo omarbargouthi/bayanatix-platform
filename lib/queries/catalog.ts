@@ -1138,7 +1138,8 @@ export async function getCdeMetadataQuality(dataSourceIds?: number[]): Promise<C
 // rules for yet is left out rather than silently dragging the score to 0. Dimensions/weights are
 // admin-editable via getCdeDataQualityConfig/updateCdeDataQualityConfig (see the config panel on
 // the Data Catalog page), so this can be retuned without a code change.
-// "Timeliness" (as requested for this card) maps to the shared FRESHNESS dq_dimensions code.
+// A dimension's name is always the one in bayanat.dq_dimensions (Configuration › DQ Dimensions),
+// never a label of this card's own, so every screen calls it the same.
 
 export type CdeDqDimensionConfig = {
   dimensionCode: string; label: string; weight: number; isEnabled: boolean;
@@ -1150,10 +1151,11 @@ export type CdeDataQuality = {
 
 export async function getCdeDataQualityConfig(): Promise<CdeDqDimensionConfig[]> {
   const rows = await sql<{ dimensionCode: string; label: string; weight: number; isEnabled: boolean }[]>`
-    SELECT dimension_code AS "dimensionCode", display_label_text AS label,
-           weight::float8 AS weight, is_enabled AS "isEnabled"
-    FROM bayanat.dq_cde_dimension_config
-    ORDER BY dimension_code
+    SELECT c.dimension_code AS "dimensionCode", COALESCE(d.dimension_name_text, c.display_label_text) AS label,
+           c.weight::float8 AS weight, c.is_enabled AS "isEnabled"
+    FROM bayanat.dq_cde_dimension_config c
+    LEFT JOIN bayanat.dq_dimensions d ON d.dimension_code = c.dimension_code
+    ORDER BY c.dimension_code
   `;
   return rows.map((r) => ({ ...r, weight: Number(r.weight), isEnabled: Boolean(r.isEnabled) }));
 }

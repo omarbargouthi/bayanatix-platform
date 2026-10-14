@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { DataEntity } from "@/lib/types";
@@ -217,6 +218,7 @@ export function SchemaTableList({
 }) {
   const router = useRouter();
   const { t } = useLang();
+  const dimLabel = useDqDimensionLabel();
   const c = t.catalog;
   const [search,        setSearch]        = useState("");
   const [filterType,    setFilterType]    = useState("");
@@ -519,8 +521,8 @@ export function SchemaTableList({
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         {([
                           { label: c.trustScore,   value: trust != null ? `${trust}%` : "—" },
-                          { label: c.completeness, value: "—" },
-                          { label: c.validity,     value: "—" },
+                          { label: dimLabel("COMP", c.completeness), value: "—" },
+                          { label: dimLabel("VALIDITY", c.validity), value: "—" },
                         ] as { label: string; value: string }[]).map(({ label, value }) => (
                           <div key={label} className="bg-white border border-line rounded-lg px-3 py-2.5">
                             <div className="text-sm font-bold text-ink">{value}</div>

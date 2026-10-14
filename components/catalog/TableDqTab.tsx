@@ -6,6 +6,8 @@ import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
 import { DqRuleSuggestPanel } from "./DqRuleSuggestPanel";
 import { useLang } from "@/lib/lang-context";
+import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
+import { HelpTip } from "@/components/ui/HelpTip";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
 
@@ -45,9 +47,10 @@ function Badge({ text, className }: { text: string; className: string }) {
 
 /** Chart 1 — horizontal bar: rule count per DQ dimension */
 function ChartRulesPerDimension({ rules }: { rules: DqRule[] }) {
+  const dimLabel = useDqDimensionLabel();
   const byDim: Record<string, number> = {};
   for (const r of rules) {
-    const key = r.dimensionName ?? r.dimensionCode ?? "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
     byDim[key] = (byDim[key] ?? 0) + 1;
   }
   const entries = Object.entries(byDim).sort((a, b) => b[1] - a[1]);
@@ -143,10 +146,11 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
 
 /** Chart 3 — pie chart: aggregated DQ score % per dimension */
 function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
+  const dimLabel = useDqDimensionLabel();
   const scoredByDim: Record<string, number[]> = {};
   for (const r of rules) {
     if (r.lastScore == null || r.lastStatusCode === "ERROR") continue;
-    const key = r.dimensionName ?? r.dimensionCode ?? "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
     if (!scoredByDim[key]) scoredByDim[key] = [];
     scoredByDim[key].push(Number(r.lastScore));
   }
@@ -222,10 +226,11 @@ function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
 
 /** Chart 4 — stacked horizontal bars: PASSED/FAILED/WARNING per dimension (threshold results only) */
 function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
+  const dimLabel = useDqDimensionLabel();
   // Only count successfully-executed rules (threshold outcomes)
   const byDim: Record<string, { PASSED: number; FAILED: number; WARNING: number; NONE: number }> = {};
   for (const r of rules) {
-    const key = r.dimensionName ?? r.dimensionCode ?? "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
     if (!byDim[key]) byDim[key] = { PASSED: 0, FAILED: 0, WARNING: 0, NONE: 0 };
     const s = r.lastStatusCode;
     if (s === "PASSED" || s === "FAILED" || s === "WARNING") byDim[key][s]++;
@@ -318,7 +323,7 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
 
   return (
     <div className="card p-5 flex flex-col items-center text-center">
-      <div className="text-[11px] text-muted uppercase tracking-wider font-semibold mb-3">{c.dqScore}</div>
+      <div className="text-[11px] text-muted uppercase tracking-wider font-semibold mb-3 flex items-center gap-1.5">{c.dqScore} <HelpTip text={c.dqScoreHow} href="/help/data-catalog#table-indicators" align="start" /></div>
       <div className="relative">
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
           <circle cx={size/2} cy={size/2} r={rOuter} fill="none" stroke="#E2E8F0" strokeWidth="10" />
@@ -802,6 +807,7 @@ function MiniGauge({ value, size = 36 }: { value: number; size?: number }) {
 export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number; entityName: string; canEdit: boolean }) {
   const { t, lookupLabel } = useLang();
   const c = t.catalog;
+  const dimLabel = useDqDimensionLabel();
   const [rules, setRules] = useState<DqRule[]>([]);
   const [latestResults, setLatestResults] = useState<Record<number, DqResult>>({});
   const [loading, setLoading] = useState(true);
@@ -883,7 +889,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   // Group threshold-result rules by dimension
   const byDimension: Record<string, DqRule[]> = {};
   for (const r of thresholdRules) {
-    const key = r.dimensionName ?? r.dimensionCode ?? "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
     if (!byDimension[key]) byDimension[key] = [];
     byDimension[key].push(r);
   }
@@ -902,7 +908,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-ink">DQ Rules — {entityName}</h3>
+              <h3 className="font-bold text-ink flex items-center gap-1.5">DQ Rules — {entityName} <HelpTip text={c.dqRuleCountsHow} href="/help/data-catalog#table-indicators" align="start" /></h3>
               <p className="text-[11px] text-muted mt-0.5">
                 {rules.length} rule{rules.length !== 1 ? "s" : ""} across {Object.keys(byDimension).length} dimension{Object.keys(byDimension).length !== 1 ? "s" : ""}
                 {errorRules.length > 0 && <span className="text-amber-600 ml-1">· {errorRules.length} execution error{errorRules.length !== 1 ? "s" : ""}</span>}

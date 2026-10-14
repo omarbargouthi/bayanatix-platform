@@ -50,12 +50,40 @@ The **score** in the circle is the average of the three.
 
 ### Data Quality (CDEs)
 How well the CDE columns pass their data quality rules.
-- Each **dimension** (such as Completeness, Validity, Timeliness) scores the average latest result of the active rules on CDE columns in that dimension.
+- Each **dimension** (such as Completeness, Validity, Freshness) scores the average latest result of the active rules on CDE columns in that dimension.
 - The **score** is the weighted average of the enabled dimensions that have at least one scored rule. Weights are set with **Configure** (people who can edit metadata).
 - A dimension without rules is left out rather than counted as 0, so it does not pull the score down. "No rules yet" means no rule on a CDE has run in that dimension.
 
 ### Sources, Tables, Schemas
 The number of data sources, active tables and schemas in the catalog (or in the sources selected in the filter).`,
+      },
+      {
+        id: "table-indicators",
+        title: "Indicators on a table's page",
+        body: `### Table Health (Schema tab)
+- **Overall quality score** (the circle): the average of the table's dimension scores shown under Data Quality. Each dimension scores the average latest result of the **active** rules on the table and its columns. Dimensions without a scored rule are left out.
+- **CDEs:** columns of this table whose classification term is Confidential, Secret or Top Secret.
+- **Metadata completion:** columns with a description ÷ all columns × 100.
+- **Column type classification:** columns marked business or technical ÷ all columns × 100. Columns confirmed by a steward or accepted automatically count; suggestions still waiting for review do not.
+
+### Data Quality (Schema tab)
+One tile per dimension: Completeness, Validity, Uniqueness, Freshness, Consistency and Accuracy. A tile's score is the average latest result of the active rules in that dimension, on the table and its columns. "Not run yet" means the dimension has rules that have not run; "No rules" means it has none.
+
+### Data Quality tab
+- **DQ score:** the average latest score of all the table's rules, table-level and column-level, that ran without an error, whether or not they are switched on. The arrow compares with the rules' previous run. Green from 90%, amber from 70%, red below.
+- **Passing, Warnings, Failing:** rules by their latest result, judged against each rule's thresholds (see [Data Quality](/help/data-quality)). Rules whose last run ended in an error are counted separately.
+- **Charts:** rules per dimension, rules by severity, average score per dimension, and the latest results per dimension.
+
+> The DQ score on this tab averages every rule, while the overall quality score on the Schema tab averages the dimensions and counts only active rules, so the two can differ.
+
+### Data profile
+Taken during the crawl from the rows set in the source's profiling options (PostgreSQL and file sources).
+- **Total rows**, with the change since the previous profile, and **Sampled** when not every row was read.
+- **Null %:** empty values among the rows read.
+- **Unique %:** distinct values ÷ rows read × 100.
+- **Distinct, Min, Max, Top values:** from the same rows. They are not kept for personal-data columns.
+
+Dimension names are the ones set in Configuration › DQ Dimensions, and are the same on every screen.`,
       },
       {
         id: "how",

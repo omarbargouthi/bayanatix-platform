@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLang } from "@/lib/lang-context";
+import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
 
 type Suggestion = {
   suggestionId: number;
@@ -44,6 +45,7 @@ export function DqRuleSuggestPanel({
   onSaved: () => void;
 }) {
   const { t } = useLang();
+  const dimLabel = useDqDimensionLabel();
   const e = t.enrichment;
 
   const [loading, setLoading] = useState(true);
@@ -170,7 +172,7 @@ export function DqRuleSuggestPanel({
                       {s.provenance === "LLM" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">AI</span>}
                       {isDuplicate && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{e.duplicateLabel}</span>}
                     </div>
-                    <div className="text-[11px] text-muted mt-0.5">{s.dimensionCode} · {s.ruleTemplateCode ?? "CUSTOM_SQL"}</div>
+                    <div className="text-[11px] text-muted mt-0.5">{dimLabel(s.dimensionCode)} · {s.ruleTemplateCode ?? "CUSTOM_SQL"}</div>
                     {Object.keys(threshold).length > 0 && (
                       <div className="text-[11px] text-ink-soft mt-1 font-mono">
                         {String(threshold.metric ?? "")} {String(threshold.operator ?? "")} {JSON.stringify(threshold.value)}

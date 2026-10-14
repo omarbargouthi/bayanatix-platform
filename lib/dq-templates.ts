@@ -65,7 +65,7 @@ export const DQ_TEMPLATES = [
   },
   {
     code: "FRESHNESS_CHECK",
-    label: "Freshness / Timeliness",
+    label: "Freshness",
     description: "Checks that a date column has recent values within configured hours.",
     dimension: "FRESHNESS",
     assetType: "column",

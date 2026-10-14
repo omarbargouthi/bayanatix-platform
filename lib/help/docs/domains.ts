@@ -57,7 +57,7 @@ Submitted evidence can go through a compliance review (confirmed by a steward or
       {
         id: "what",
         title: "What it is",
-        body: `A data quality **rule** checks a table or column, for example "national ID is never empty" or "order date is not in the future". Rules belong to a **dimension**: completeness, validity, uniqueness, consistency, accuracy, conformity or freshness (timeliness). They run on demand or on a schedule, and every run is kept with its result and examples of failing values.
+        body: `A data quality **rule** checks a table or column, for example "national ID is never empty" or "order date is not in the future". Rules belong to a **dimension**: Completeness, Validity, Uniqueness, Consistency, Accuracy, Conformity or Freshness. The names are set in Configuration › DQ Dimensions and are the same on every screen. They run on demand or on a schedule, and every run is kept with its result and examples of failing values.
 
 Rule templates: not null, completeness rate, pattern (regular expression), allowed values, range, unique, row count threshold, freshness, referential check, and custom SQL.`,
       },

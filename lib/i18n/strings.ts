@@ -502,6 +502,14 @@ export type I18nStrings = {
     classificationHow: string;
     metadataQualityHow: string;
     dataQualityHow: string;
+    tableHealthHow: string;
+    cdeCountHow: string;
+    metadataCompletionHow: string;
+    columnTypeHow: string;
+    dqDimensionsHow: string;
+    dqScoreHow: string;
+    dqRuleCountsHow: string;
+    profileHow: string;
     dataClassification: string;
     columnsClassifiedLabel: string;
     metadataQuality:  string;
@@ -510,7 +518,6 @@ export type I18nStrings = {
     completeness:     string;
     accuracy:         string;
     consistency:      string;
-    timeliness:       string;
     validity:         string;
     uniqueness:       string;
     noCdesYet:        string;

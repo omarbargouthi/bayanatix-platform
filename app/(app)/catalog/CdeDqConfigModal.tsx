@@ -3,6 +3,7 @@
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
+import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
 
 type DimensionRow = { dimensionCode: string; label: string; weight: number; isEnabled: boolean };
 
@@ -13,6 +14,7 @@ export function CdeDqConfigModal({
   onClose: () => void;
 }) {
   const { t } = useLang();
+  const dimLabel = useDqDimensionLabel();
   const c = t.catalog;
   const router = useRouter();
   const [rows, setRows] = useState<DimensionRow[]>(dimensions.map((d) => ({ ...d })));
@@ -71,7 +73,7 @@ export function CdeDqConfigModal({
                   checked={r.isEnabled}
                   onChange={(e) => updateRow(r.dimensionCode, { isEnabled: e.target.checked })}
                 />
-                <span className="text-sm text-ink">{r.label}</span>
+                <span className="text-sm text-ink">{dimLabel(r.dimensionCode, r.label)}</span>
                 <input
                   type="number"
                   min={0}

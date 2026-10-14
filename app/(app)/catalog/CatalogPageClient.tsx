@@ -13,6 +13,7 @@ import { useLang } from "@/lib/lang-context";
 import type { DataSource, DataSchema } from "@/lib/types";
 import { CdeDqConfigModal } from "./CdeDqConfigModal";
 import { HelpTip } from "@/components/ui/HelpTip";
+import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
 
 const INDICATORS_HELP = "/help/data-catalog#indicators";
 
@@ -56,6 +57,7 @@ export function CatalogPageClient({
 }) {
   const { t } = useLang();
   const c = t.catalog;
+  const dimLabel = useDqDimensionLabel();
   const [dqConfigOpen, setDqConfigOpen] = useState(false);
   const [showNewTerm, setShowNewTerm] = useState(false);
 
@@ -303,7 +305,7 @@ export function CatalogPageClient({
               )}
               <div className="flex-1 space-y-1.5">
                 {cdeDataQuality.dimensions.map((d) => (
-                  <Mini key={d.dimensionCode} label={d.label} value={d.score != null ? `${Math.round(d.score)}%` : c.noRulesYet} />
+                  <Mini key={d.dimensionCode} label={dimLabel(d.dimensionCode, d.label)} value={d.score != null ? `${Math.round(d.score)}%` : c.noRulesYet} />
                 ))}
               </div>
             </div>
