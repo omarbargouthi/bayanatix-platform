@@ -9,12 +9,12 @@ import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import { DPIA_STATUSES, type DpiaSuggestion, type DpiaSummary, type DpiaTemplate } from "@/lib/privacy/dpia-types";
-import { AssetPicker, Dialog, ErrorNote, LevelBadge, StatusBadge, assetTypeLabel, day, errorText, fill, reasonText, type CustomTypeOption } from "./dpia-ui";
+import { AssetPicker, Dialog, ErrorNote, LevelBadge, StatusBadge, assetTypeLabel, day, errorText, fill, reasonText, stamp, type CustomTypeOption } from "./dpia-ui";
 
 type Options = { templates: DpiaTemplate[]; users: { userId: string; name: string; role: string }[]; customTypes: CustomTypeOption[]; canCreate: boolean };
 
 export function DpiaRegisterTab() {
-  const { t, lang } = useLang();
+  const { t, lang, isRtl } = useLang();
   const d = t.dpia;
   const [items, setItems] = useState<DpiaSummary[] | null>(null);
   const [canCreate, setCanCreate] = useState(false);
@@ -104,7 +104,7 @@ export function DpiaRegisterTab() {
                   <div className="text-[11px] text-muted">{pickTranslation(r.templateName, r.templateNameTranslations, lang)}</div>
                 </td>
                 <td className="px-4 py-2.5 text-[13px]">
-                  {r.subject ? <><div className="text-ink" dir="auto">{r.subject.name}</div><div className="text-[11px] text-muted">{assetTypeLabel(t, r.subject.typeCode, r.subject.typeName)}</div></> : <span className="text-muted">—</span>}
+                  {r.subject ? <><div className="text-ink" dir="auto">{r.subject.name}</div><div className="text-[11px] text-muted">{assetTypeLabel(t, r.subject.typeCode, r.subject.typeName, lang, r.subject.typeNameTranslations)}</div></> : <span className="text-muted">—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-[13px] text-ink-soft" dir="auto">{r.ownerName ?? "—"}</td>
                 <td className="px-4 py-2.5">
@@ -112,10 +112,10 @@ export function DpiaRegisterTab() {
                   {r.changesPending && <div className="text-[11px] font-semibold text-amber-700 mt-1">{t.dpiaWatch.changedBadge}</div>}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap">
-                  {r.inherentLevel ? <span className="inline-flex items-center gap-1"><LevelBadge level={r.inherentLevel} /><span className="text-muted text-[11px]">→</span><LevelBadge level={r.residualLevel} /></span> : <span className="text-muted text-[12px]">—</span>}
+                  {r.inherentLevel ? <span className="inline-flex items-center gap-1"><LevelBadge level={r.inherentLevel} /><span className="text-muted text-[11px]">{isRtl ? "←" : "→"}</span><LevelBadge level={r.residualLevel} /></span> : <span className="text-muted text-[12px]">—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-[12px] text-ink-soft whitespace-nowrap">
-                  {r.measuresTotal === 0 ? "—" : `${r.measuresTotal - r.measuresOpen} / ${r.measuresTotal}`}
+                  {r.measuresTotal === 0 ? "—" : <bdi dir="ltr">{`${r.measuresTotal - r.measuresOpen} / ${r.measuresTotal}`}</bdi>}
                   {r.measuresOverdue > 0 && <span className="ms-1.5 text-[11px] font-semibold text-red-700">{fill(d.overdueN, { n: r.measuresOverdue })}</span>}
                 </td>
                 <td className="px-4 py-2.5 text-[12px] text-ink-soft whitespace-nowrap">{day(r.decidedAt)}{r.versionNo > 0 && <div className="text-[11px] text-muted">{fill(d.versionN, { n: r.versionNo })}</div>}</td>
@@ -135,7 +135,7 @@ export function DpiaRegisterTab() {
 
 /** What the daily check suggests screening: start one, or (an officer) dismiss it with a reason. */
 function SuggestionsCard({ suggestions, lastChecked, isReviewer, reload }: { suggestions: DpiaSuggestion[]; lastChecked: string | null; isReviewer: boolean; reload: () => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const w = t.dpiaWatch;
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -164,7 +164,7 @@ function SuggestionsCard({ suggestions, lastChecked, isReviewer, reload }: { sug
     <div key={s.suggestionId} className={`py-2.5 flex items-start justify-between gap-3 ${s.status === "DISMISSED" ? "opacity-70" : ""}`}>
       <div className="min-w-0">
         {s.href ? <Link href={s.href} className="text-[13px] font-semibold text-brand-purple hover:underline" dir="auto">{s.assetName}</Link> : <span className="text-[13px] font-semibold text-ink" dir="auto">{s.assetName}</span>}
-        <span className="text-[11px] text-muted ms-2">{assetTypeLabel(t, s.assetTypeCode, s.assetTypeName)}{s.sublabel ? ` · ${s.sublabel}` : ""}</span>
+        <span className="text-[11px] text-muted ms-2">{assetTypeLabel(t, s.assetTypeCode, s.assetTypeName, lang, s.assetTypeNameTranslations)}{s.sublabel ? ` · ${s.sublabel}` : ""}</span>
         <div className="flex flex-wrap gap-1.5 mt-1">
           {s.reasons.map((r) => <span key={r.code} className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5" dir="auto">{reasonText(t, r)}</span>)}
         </div>
@@ -188,7 +188,7 @@ function SuggestionsCard({ suggestions, lastChecked, isReviewer, reload }: { sug
           <p className="text-[12px] text-muted mt-0.5 max-w-3xl">{w.suggestionsDesc}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="text-[11px] text-muted">{lastChecked ? fill(w.lastChecked, { date: lastChecked.replace("T", " ").slice(0, 16) }) : w.neverChecked}</span>
+          <span className="text-[11px] text-muted">{lastChecked ? fill(w.lastChecked, { date: stamp(lastChecked) }) : w.neverChecked}</span>
           {isReviewer && <button onClick={check} disabled={checking} className="btn btn-sm">{checking ? w.checking : w.checkNow}</button>}
         </div>
       </div>

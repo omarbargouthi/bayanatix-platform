@@ -1,15 +1,27 @@
 // How an impact assessment's catalog facts and findings are worded, in the reader's
 // language. Used by the screens and by the PDF export.
 import type { I18nStrings } from "../i18n/strings";
+import { pickTranslation } from "../i18n-admin/translated-column";
 import type { DpiaChange, DpiaFacts, DpiaFlag, DpiaSuggestionReason } from "./dpia-types";
 
 export const fill = (tpl: string, v: Record<string, string | number>) => tpl.replace(/\{(\w+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
-export const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : "—");
+// Dates and times are isolated as left-to-right runs, or an ISO date inside an Arabic sentence reads backwards.
+export const day = (iso: string | null | undefined) => (iso ? `\u2066${iso.slice(0, 10)}\u2069` : "—");
+export const stamp = (iso: string | null | undefined) => (iso ? `\u2066${iso.replace("T", " ").slice(0, 16)}\u2069` : "—");
 
-/** Catalog types are named in the user's language; a custom type keeps the name its admin gave it. */
-export const assetTypeLabel = (t: I18nStrings, typeCode: string, typeName: string) => (t.dpia.assetTypes as Record<string, string>)[typeCode] ?? typeName;
+/** Catalog types are named in the user's language; a custom type by its own translations, else the name its admin gave it. */
+export const assetTypeLabel = (t: I18nStrings, typeCode: string, typeName: string, lang?: string, translations?: Record<string, string> | null) =>
+  (t.dpia.assetTypes as Record<string, string>)[typeCode] ?? (lang ? pickTranslation(typeName, translations ?? null, lang) : typeName);
 
-export const flagText = (t: I18nStrings, f: DpiaFlag) => fill((t.dpia.flags as Record<string, string>)[f.code] ?? f.code, { n: f.n.toLocaleString() }) + (f.detail ? ` (${f.detail})` : "");
+/** The two categories the catalog facts make up themselves, rather than read from pi_category_types. */
+const categoryName = (t: I18nStrings, code: string, name: string) =>
+  code === "UNCATEGORISED" ? t.dpia.facts.uncategorised : code === "SENSITIVE" && name === "SENSITIVE" ? t.dpia.facts.sensitiveClass : name;
+
+export const flagText = (t: I18nStrings, f: DpiaFlag) => {
+  // The sensitive-data finding lists category names, or the class itself for a column classified sensitive without one.
+  const detail = f.code === "SENSITIVE_PI" && f.detail ? f.detail.split(", ").map((x) => (x === "SENSITIVE" ? t.dpia.facts.sensitiveClass : x)).join(", ") : f.detail;
+  return fill((t.dpia.flags as Record<string, string>)[f.code] ?? f.code, { n: f.n.toLocaleString() }) + (detail ? ` (${detail})` : "");
+};
 
 /** One thing the catalog says now that it did not say at the screening, submission or decision. */
 export function changeText(t: I18nStrings, c: DpiaChange): string {
@@ -50,7 +62,7 @@ export function factLines(t: I18nStrings, facts: DpiaFacts | null, block: FactBl
   }
   if (block === "PERSONAL_DATA" && facts.personalData.columnCount > 0) {
     out.push(fill(f.piSummary, { n: facts.personalData.columnCount, tables: facts.scope.tables.filter((x) => x.piColumns > 0).length }));
-    for (const c of facts.personalData.categories) out.push(`${c.name}: ${c.count}${c.sensitive ? ` — ${f.sensitive}` : ""}`);
+    for (const c of facts.personalData.categories) out.push(`${categoryName(t, c.code, c.name)}: ${c.count}${c.sensitive ? ` — ${f.sensitive}` : ""}`);
     const cols = facts.personalData.columns.slice(0, 15);
     for (const c of cols) out.push(`${c.source} › ${c.table}.${c.column}${c.term ? ` — ${c.term}` : ""}`);
     more(cols.length, facts.personalData.columnCount);

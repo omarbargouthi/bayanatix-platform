@@ -9,7 +9,7 @@ import type { I18nStrings } from "@/lib/i18n/strings";
 import type { DpiaStatus, RiskLevel } from "@/lib/privacy/dpia-types";
 import { assetTypeLabel } from "@/lib/privacy/dpia-text";
 
-export { fill, day, assetTypeLabel, flagText, factLines, changeText, reasonText, FACT_BLOCKS, type FactBlock } from "@/lib/privacy/dpia-text";
+export { fill, day, stamp, assetTypeLabel, flagText, factLines, changeText, reasonText, FACT_BLOCKS, type FactBlock } from "@/lib/privacy/dpia-text";
 
 const STATUS_STYLE: Record<DpiaStatus, string> = {
   SCREENING: "bg-sky-50 text-sky-700 border-sky-200", ASSESSMENT: "bg-violet-50 text-violet-700 border-violet-200",
@@ -38,14 +38,14 @@ export function FactLines({ lines }: { lines: string[] }) {
   return <ul className="space-y-0.5 text-[12px] text-ink-soft">{lines.map((l, i) => <li key={i} dir="auto" className="break-words">{l}</li>)}</ul>;
 }
 
-export type CustomTypeOption = { typeCode: string; name: string };
+export type CustomTypeOption = { typeCode: string; name: string; nameTranslations?: Record<string, string> | null };
 type Hit = { typeCode: string; id: number; name: string; sublabel: string | null };
 
 /** Pick any asset: choose the kind, then search by name. */
 export function AssetPicker({ customTypes, onPick, defaultType }: { customTypes: CustomTypeOption[]; onPick: (h: Hit) => void; defaultType?: string }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const d = t.dpia;
-  const kinds = [...customTypes.map((c) => ({ code: `CUSTOM:${c.typeCode}`, label: c.name })), ...["DATA_SOURCES", "DATA_SCHEMAS", "DATA_ENTITIES", "DATA_ATTRIBUTES"].map((c) => ({ code: c, label: assetTypeLabel(t, c, c) }))];
+  const kinds = [...customTypes.map((c) => ({ code: `CUSTOM:${c.typeCode}`, label: assetTypeLabel(t, `CUSTOM:${c.typeCode}`, c.name, lang, c.nameTranslations) })), ...["DATA_SOURCES", "DATA_SCHEMAS", "DATA_ENTITIES", "DATA_ATTRIBUTES"].map((c) => ({ code: c, label: assetTypeLabel(t, c, c) }))];
   const [kind, setKind] = useState(defaultType ?? kinds[0]?.code ?? "DATA_ENTITIES");
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);

@@ -16,8 +16,7 @@ export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   if (p.get("options")) {
     const [templates, users, types] = await Promise.all([listDpiaTemplates(), dpiaUserOptions(), getCustomAssetTypes()]);
-    const lang = session.preferredLanguageCode ?? "en";
-    const customTypes = types.map((x) => ({ typeCode: x.typeCode, name: (lang !== "en" && x.nameTranslations?.[lang]) || x.typeNameText }));
+    const customTypes = types.map((x) => ({ typeCode: x.typeCode, name: x.typeNameText, nameTranslations: x.nameTranslations }));
     return NextResponse.json({ templates, users, customTypes, canCreate: canCreateDpia(session.role) });
   }
   const assetType = p.get("assetType"), assetId = Number(p.get("assetId"));

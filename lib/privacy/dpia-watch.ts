@@ -181,7 +181,7 @@ async function described(rows: SuggestionRow[]): Promise<DpiaSuggestion[]> {
     const a = assets.find((x) => x.typeCode === r.assetTypeCode && x.id === Number(r.assetId));
     // The asset was deleted since the last check; the next check resolves the suggestion.
     if (!a) return [];
-    return [{ ...r, suggestionId: Number(r.suggestionId), assetId: Number(r.assetId), dpiaId: r.dpiaId == null ? null : Number(r.dpiaId), assetName: a.name, assetTypeName: a.typeName, sublabel: a.sublabel, href: a.href }];
+    return [{ ...r, suggestionId: Number(r.suggestionId), assetId: Number(r.assetId), dpiaId: r.dpiaId == null ? null : Number(r.dpiaId), assetName: a.name, assetTypeName: a.typeName, assetTypeNameTranslations: a.typeNameTranslations ?? null, sublabel: a.sublabel, href: a.href }];
   });
 }
 

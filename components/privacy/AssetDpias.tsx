@@ -45,7 +45,7 @@ export function AssetDpias({ assetTypeCode, assetId, assetName, canCreate, hideW
             <div className="min-w-0">
               <Link href={`/privacy/dpia/${r.dpiaId}`} className="text-[13px] font-semibold text-brand-purple hover:underline">{r.referenceCode}</Link>
               <span className="text-[13px] text-ink ms-2" dir="auto">{r.title}</span>
-              <div className="text-[11px] text-muted">{r.decidedAt ? `${d.colDecided} ${day(r.decidedAt)}` : `${d.updated} ${day(r.updatedAt)}`}{r.nextReviewDate ? ` · ${d.colNextReview} ${r.nextReviewDate}` : ""}</div>
+              <div className="text-[11px] text-muted">{r.decidedAt ? `${d.colDecided} ${day(r.decidedAt)}` : `${d.updated} ${day(r.updatedAt)}`}{r.nextReviewDate ? ` · ${d.colNextReview} ${day(r.nextReviewDate)}` : ""}</div>
             </div>
             <div className="flex items-center gap-2 shrink-0"><LevelBadge level={r.residualLevel} /><StatusBadge status={r.statusCode} /></div>
           </div>

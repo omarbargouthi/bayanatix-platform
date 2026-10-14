@@ -92,7 +92,7 @@ async function withSubjects(rows: SummaryRow[]): Promise<DpiaSummary[]> {
     const s = described.find((a) => a.typeCode === subjectType && a.id === Number(subjectId));
     return {
       ...r, inherentLevel: levelOf(inherentScore), residualLevel: levelOf(residualScore),
-      subject: s ? { typeCode: s.typeCode, id: s.id, name: s.name, typeName: s.typeName } : null,
+      subject: s ? { typeCode: s.typeCode, id: s.id, name: s.name, typeName: s.typeName, typeNameTranslations: s.typeNameTranslations ?? null } : null,
     };
   });
 }

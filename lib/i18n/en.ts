@@ -3797,6 +3797,8 @@ export const en: I18nStrings = {
       none: "The catalog has nothing on this.",
       more: "… and {n} more",
       sensitive: "sensitive",
+      uncategorised: "No category",
+      sensitiveClass: "Classified sensitive",
       piSummary: "{n} personal data column(s) in {tables} table(s)",
       sharingBasis: "Sharing agreement “{title}”: {basis}",
       accessBasis: "Stated on access grants: {basis}",

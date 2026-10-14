@@ -3797,6 +3797,8 @@ export const ar: I18nStrings = {
       none: "لا توجد معلومات في الفهرس عن هذا.",
       more: "… و{n} أخرى",
       sensitive: "حساسة",
+      uncategorised: "بلا فئة",
+      sensitiveClass: "مصنّفة حساسة",
       piSummary: "{n} عمود بيانات شخصية في {tables} جدول",
       sharingBasis: "اتفاقية المشاركة «{title}»: {basis}",
       accessBasis: "مذكور في أذونات الوصول: {basis}",

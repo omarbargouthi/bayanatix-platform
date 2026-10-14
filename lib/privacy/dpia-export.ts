@@ -29,7 +29,7 @@ export function buildDpiaHtml(dpia: DpiaDetail, t: I18nStrings, lang: string, fr
   const summary = `<table class="kv">
     ${row(d.colStatus, esc(d.statuses[dpia.statusCode]) + (frozenVersion ? ` — ${esc(fill(d.versionN, { n: frozenVersion }))}` : ""))}
     ${row(d.fTemplate, esc(tr(dpia.template.name, dpia.template.nameTranslations)) + `<div class="muted">${esc(tr(dpia.template.regulation, dpia.template.regulationTranslations))}</div>`)}
-    ${row(d.colSubject, dpia.subject ? `${esc(dpia.subject.name)} <span class="muted">(${esc(assetTypeLabel(t, dpia.subject.typeCode, dpia.subject.typeName))})</span>` : "—")}
+    ${row(d.colSubject, dpia.subject ? `${esc(dpia.subject.name)} <span class="muted">(${esc(assetTypeLabel(t, dpia.subject.typeCode, dpia.subject.typeName, lang, dpia.subject.typeNameTranslations))})</span>` : "—")}
     ${row(d.colOwner, esc(dpia.ownerName ?? "—"))}
     ${row(d.colRisk, `${esc(d.inherent)} ${level(overallInherent(dpia.risks))} &nbsp; ${esc(d.residual)} ${level(overallResidual(dpia.risks))}`)}
     ${row(d.colDecided, `${esc(dpia.decidedBy ?? "—")} · ${esc(day(dpia.decidedAt))}`)}
@@ -37,7 +37,7 @@ export function buildDpiaHtml(dpia: DpiaDetail, t: I18nStrings, lang: string, fr
   </table>${dpia.description ? `<p>${para(dpia.description, "")}</p>` : ""}`;
 
   const scope = `<table><thead><tr><th>${esc(d.exportAsset)}</th><th>${esc(d.exportKind)}</th></tr></thead><tbody>
-    ${dpia.assets.map((a) => `<tr><td>${esc(a.name)}${a.isSubject ? ` <span class="muted">(${esc(d.subjectTag)})</span>` : ""}</td><td>${esc(assetTypeLabel(t, a.typeCode, a.typeName))}${a.sublabel ? ` · ${esc(a.sublabel)}` : ""}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">${esc(d.noAssets)}</td></tr>`}
+    ${dpia.assets.map((a) => `<tr><td>${esc(a.name)}${a.isSubject ? ` <span class="muted">(${esc(d.subjectTag)})</span>` : ""}</td><td>${esc(assetTypeLabel(t, a.typeCode, a.typeName, lang, a.typeNameTranslations))}${a.sublabel ? ` · ${esc(a.sublabel)}` : ""}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">${esc(d.noAssets)}</td></tr>`}
   </tbody></table>`;
 
   const facts = dpia.facts;

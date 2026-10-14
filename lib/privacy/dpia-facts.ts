@@ -3,6 +3,7 @@
 // Read once per refresh and stored on the assessment, so an approved version keeps
 // the facts it was approved on.
 import { sql } from "../db";
+import { translatedColumnSql } from "../i18n-admin/translated-column";
 import type { DpiaAsset, DpiaFacts, DpiaFlag } from "./dpia-types";
 
 /** A table this large, holding personal data, counts as large-scale processing. */
@@ -309,14 +310,15 @@ export async function describeAssets(refs: (AssetRef & { isSubject: boolean })[]
     FROM bayanat.data_attributes a JOIN bayanat.data_entities e ON e.entity_id = a.entity_id WHERE a.attribute_id = ANY(${ids("DATA_ATTRIBUTES")}) ORDER BY 2`);
   const customIds = refs.filter((r) => isCustom(r.typeCode)).map((r) => r.id);
   if (customIds.length) {
-    const rows = await sql<{ id: number; name: string; typeCode: string; typeName: string }[]>`
-      SELECT ca.custom_asset_id AS id, ca.asset_name_text AS name, t.type_code AS "typeCode", t.type_name_text AS "typeName"
+    const rows = await sql<{ id: number; name: string; typeCode: string; typeName: string; typeNameTranslations: Record<string, string> | null }[]>`
+      SELECT ca.custom_asset_id AS id, ca.asset_name_text AS name, t.type_code AS "typeCode", t.type_name_text AS "typeName",
+             ${sql.unsafe(translatedColumnSql("'custom_asset_types.' || t.type_id || '.name'", "typeNameTranslations"))}
       FROM bayanat.custom_assets ca JOIN bayanat.custom_asset_types t ON t.type_id = ca.type_id
       WHERE ca.custom_asset_id = ANY(${customIds}) ORDER BY 2`;
     for (const r of rows) {
       const typeCode = `CUSTOM:${r.typeCode}`;
       if (!refs.some((x) => x.typeCode === typeCode && x.id === Number(r.id))) continue;
-      out.push({ typeCode, id: Number(r.id), name: r.name, typeName: r.typeName, sublabel: null, href: `/assets/${r.typeCode.toLowerCase()}/${r.id}`, isSubject: subject(typeCode, Number(r.id)) });
+      out.push({ typeCode, id: Number(r.id), name: r.name, typeName: r.typeName, typeNameTranslations: r.typeNameTranslations, sublabel: null, href: `/assets/${r.typeCode.toLowerCase()}/${r.id}`, isSubject: subject(typeCode, Number(r.id)) });
     }
   }
   return out.sort((a, b) => Number(b.isSubject) - Number(a.isSubject));

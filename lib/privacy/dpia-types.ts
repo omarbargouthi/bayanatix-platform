@@ -53,7 +53,7 @@ export type DpiaTemplate = {
   threshold: number; isDefault: boolean;
 };
 
-export type DpiaAsset = { typeCode: string; id: number; name: string; typeName: string; sublabel: string | null; href: string | null; isSubject: boolean };
+export type DpiaAsset = { typeCode: string; id: number; name: string; typeName: string; typeNameTranslations?: Record<string, string> | null; sublabel: string | null; href: string | null; isSubject: boolean };
 
 // ── What the catalog says about the linked assets ───────────────────────────
 export type DpiaFlagCode =
@@ -105,7 +105,7 @@ export const SUGGESTED_RISKS: Partial<Record<DpiaFlagCode, { likelihood: number;
 export type DpiaSummary = {
   dpiaId: number; referenceCode: string; title: string; templateName: string; templateNameTranslations: Record<string, string> | null;
   statusCode: DpiaStatus; screeningOutcome: "REQUIRED" | "NOT_REQUIRED" | null;
-  subject: { typeCode: string; id: number; name: string; typeName: string } | null;
+  subject: { typeCode: string; id: number; name: string; typeName: string; typeNameTranslations?: Record<string, string> | null } | null;
   ownerUserId: string | null; ownerName: string | null; createdByUserId: string | null;
   inherentLevel: RiskLevel | null; residualLevel: RiskLevel | null;
   measuresTotal: number; measuresOpen: number; measuresOverdue: number;
@@ -147,7 +147,7 @@ export type DpiaSuggestionReasonCode = "SENSITIVE_PI" | "LARGE_SCALE" | "EXTERNA
 export type DpiaSuggestionReason = { code: DpiaSuggestionReasonCode; n: number; detail: string | null };
 /** An asset the catalog says should be screened, which no assessment covers yet. */
 export type DpiaSuggestion = {
-  suggestionId: number; assetTypeCode: string; assetId: number; assetName: string; assetTypeName: string; sublabel: string | null; href: string | null;
+  suggestionId: number; assetTypeCode: string; assetId: number; assetName: string; assetTypeName: string; assetTypeNameTranslations?: Record<string, string> | null; sublabel: string | null; href: string | null;
   reasons: DpiaSuggestionReason[]; status: "OPEN" | "DISMISSED" | "STARTED" | "RESOLVED"; dpiaId: number | null;
   firstSeenAt: string; dismissedBy: string | null; dismissedAt: string | null; dismissNote: string | null;
 };

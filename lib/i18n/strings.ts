@@ -3938,6 +3938,8 @@ export type I18nStrings = {
       none: string;
       more: string;
       sensitive: string;
+      uncategorised: string;
+      sensitiveClass: string;
       piSummary: string;
       sharingBasis: string;
       accessBasis: string;

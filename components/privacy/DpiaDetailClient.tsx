@@ -13,7 +13,7 @@ import {
   type DpiaDetail, type DpiaPermissions, type DpiaQuestion,
 } from "@/lib/privacy/dpia-types";
 import {
-  AssetPicker, Dialog, ErrorNote, FACT_BLOCKS, FactLines, LevelBadge, StatusBadge, assetTypeLabel, changeText, day, errorText, factLines, fill, flagText,
+  AssetPicker, Dialog, ErrorNote, FACT_BLOCKS, FactLines, LevelBadge, StatusBadge, assetTypeLabel, changeText, day, errorText, factLines, fill, flagText, stamp,
   type CustomTypeOption, type FactBlock,
 } from "./dpia-ui";
 import { DpiaRisksTab } from "./DpiaRisksTab";
@@ -82,8 +82,8 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
             {dpia.description && <div className="text-[13px] text-ink-soft mt-0.5" dir="auto">{dpia.description}</div>}
             <div className="text-[12px] text-muted mt-1.5" dir="auto">
               {pickTranslation(tpl.name, tpl.nameTranslations, lang)} · {d.colOwner}: {dpia.ownerName ?? "—"}
-              {dpia.subject && <> · {assetTypeLabel(t, dpia.subject.typeCode, dpia.subject.typeName)}: {dpia.subject.name}</>}
-              {dpia.nextReviewDate && <> · {d.colNextReview}: {dpia.nextReviewDate}</>}
+              {dpia.subject && <> · {assetTypeLabel(t, dpia.subject.typeCode, dpia.subject.typeName, lang, dpia.subject.typeNameTranslations)}: {dpia.subject.name}</>}
+              {dpia.nextReviewDate && <> · {d.colNextReview}: {day(dpia.nextReviewDate)}</>}
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -165,7 +165,7 @@ type TabProps = { dpia: DpiaDetail; permissions: DpiaPermissions | null; act: Ac
 
 // ── Overview: what it is about, and what the catalog says about it ───────────
 function OverviewTab({ dpia, permissions, options, act }: TabProps & { options: Options }) {
-  const { t } = useLang();
+  const { t , lang } = useLang();
   const d = t.dpia;
   const facts = dpia.facts;
   const canEdit = !!permissions?.canEdit;
@@ -180,7 +180,7 @@ function OverviewTab({ dpia, permissions, options, act }: TabProps & { options: 
             <div key={`${a.typeCode}:${a.id}`} className="flex items-center justify-between gap-3 py-2">
               <div className="min-w-0">
                 {a.href ? <Link href={a.href} className="text-[13px] font-medium text-brand-purple hover:underline" dir="auto">{a.name}</Link> : <span className="text-[13px] font-medium text-ink" dir="auto">{a.name}</span>}
-                <span className="text-[11px] text-muted ms-2">{assetTypeLabel(t, a.typeCode, a.typeName)}{a.sublabel ? ` · ${a.sublabel}` : ""}</span>
+                <span className="text-[11px] text-muted ms-2">{assetTypeLabel(t, a.typeCode, a.typeName, lang, a.typeNameTranslations)}{a.sublabel ? ` · ${a.sublabel}` : ""}</span>
                 {a.isSubject && <span className="ms-2 text-[10px] font-bold uppercase tracking-wider text-brand-purple bg-brand-purple/10 rounded px-1.5 py-0.5">{d.subjectTag}</span>}
               </div>
               {canEdit && (
@@ -199,7 +199,7 @@ function OverviewTab({ dpia, permissions, options, act }: TabProps & { options: 
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-[15px] font-bold text-brand-deep">{d.findingsTitle}</h3>
-            <p className="text-[12px] text-muted mt-0.5">{facts ? fill(d.factsAsOf, { date: (dpia.factsAt ?? facts.generatedAt).replace("T", " ").slice(0, 16) }) : d.facts.none}</p>
+            <p className="text-[12px] text-muted mt-0.5">{facts ? fill(d.factsAsOf, { date: stamp(dpia.factsAt ?? facts.generatedAt) }) : d.facts.none}</p>
           </div>
           {canEdit && <button onClick={() => act({ action: "REFRESH" }, d.refreshed)} className="btn btn-sm shrink-0">{d.refresh}</button>}
         </div>
@@ -513,7 +513,7 @@ function HistoryTab({ dpia, dpiaId, current, onView }: { dpia: DpiaDetail; dpiaI
           {dpia.events.map((e) => (
             <li key={e.eventId} className="text-[13px]">
               <div className="text-ink">{(d.events as Record<string, string>)[e.code] ?? e.code}</div>
-              <div className="text-[11px] text-muted" dir="auto">{e.user ?? "—"} · {e.at.replace("T", " ").slice(0, 16)}</div>
+              <div className="text-[11px] text-muted" dir="auto">{e.user ?? "—"} · {stamp(e.at)}</div>
               {e.note && <div className="text-[12px] text-ink-soft bg-canvas-soft rounded px-2 py-1 mt-0.5 whitespace-pre-wrap" dir="auto">{e.note}</div>}
             </li>
           ))}
