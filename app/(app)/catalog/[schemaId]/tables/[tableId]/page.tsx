@@ -72,8 +72,10 @@ export default async function TablePage({
 
   const canEdit = await canEditMetadata(user);
 
+  // Counted as on the Data Catalog page (getCdeCoverage): active business columns only.
   const cdeCount = entity.attributes.filter(
-    (a) => a.classTermClassCode && CDE_CLASSIFICATION_CODES.includes(a.classTermClassCode)
+    (a) => a.columnType === "BUSINESS" && a.lifecycleStatus === "ACTIVE"
+      && a.classTermClassCode && CDE_CLASSIFICATION_CODES.includes(a.classTermClassCode)
   ).length;
   const totalCols = entity.attributes.length;
   const withDescription = entity.attributes.filter((a) => a.description && a.description.trim() !== "").length;

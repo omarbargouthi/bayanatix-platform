@@ -61,8 +61,8 @@ The number of data sources, active tables and schemas in the catalog (or in the 
         id: "table-indicators",
         title: "Indicators on a table's page",
         body: `### Table Health (Schema tab)
-- **Overall quality score** (the circle): the average of the table's dimension scores shown under Data Quality. Each dimension scores the average latest result of the **active** rules on the table and its columns. Dimensions without a scored rule are left out.
-- **CDEs:** columns of this table whose classification term is Confidential, Secret or Top Secret.
+- **Overall quality score** (the circle): the average of the table's dimension scores shown under Data Quality. Each dimension scores the average latest result of the **active** rules on the table and its columns. Dimensions without a scored rule, and runs that ended in an error, are left out.
+- **CDEs:** business columns of this table whose classification term is Confidential, Secret or Top Secret. Technical and deprecated columns are not counted, as on the Data Catalog page.
 - **Metadata completion:** columns with a description ÷ all columns × 100.
 - **Column type classification:** columns marked business or technical ÷ all columns × 100. Columns confirmed by a steward or accepted automatically count; suggestions still waiting for review do not.
 
@@ -70,11 +70,9 @@ The number of data sources, active tables and schemas in the catalog (or in the 
 One tile per dimension: Completeness, Validity, Uniqueness, Freshness, Consistency and Accuracy. A tile's score is the average latest result of the active rules in that dimension, on the table and its columns. "Not run yet" means the dimension has rules that have not run; "No rules" means it has none.
 
 ### Data Quality tab
-- **DQ score:** the average latest score of all the table's rules, table-level and column-level, that ran without an error, whether or not they are switched on. The arrow compares with the rules' previous run. Green from 90%, amber from 70%, red below.
+- **DQ score:** the same as the overall quality score on the Schema tab: the average of the dimension scores, each from the latest results of the active rules in it. Runs that ended in an error are left out. The arrow compares with the rules' previous run. Green from 90%, amber from 70%, red below. Pass, Warn and Fail under it count the active rules.
 - **Passing, Warnings, Failing:** rules by their latest result, judged against each rule's thresholds (see [Data Quality](/help/data-quality)). Rules whose last run ended in an error are counted separately.
-- **Charts:** rules per dimension, rules by severity, average score per dimension, and the latest results per dimension.
-
-> The DQ score on this tab averages every rule, while the overall quality score on the Schema tab averages the dimensions and counts only active rules, so the two can differ.
+- **Charts:** rules per dimension, rules by severity, average score per dimension (active rules), and the latest results per dimension.
 
 ### Data profile
 Taken during the crawl from the rows set in the source's profiling options (PostgreSQL and file sources).

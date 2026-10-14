@@ -7,6 +7,7 @@ import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
 import { DqRuleSuggestPanel } from "./DqRuleSuggestPanel";
 import { useLang } from "@/lib/lang-context";
 import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
+import { tableDqScore } from "@/lib/dq-table-score";
 import { HelpTip } from "@/components/ui/HelpTip";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
@@ -147,17 +148,11 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
 /** Chart 3 — pie chart: aggregated DQ score % per dimension */
 function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
   const dimLabel = useDqDimensionLabel();
-  const scoredByDim: Record<string, number[]> = {};
-  for (const r of rules) {
-    if (r.lastScore == null || r.lastStatusCode === "ERROR") continue;
-    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
-    if (!scoredByDim[key]) scoredByDim[key] = [];
-    scoredByDim[key].push(Number(r.lastScore));
-  }
-
-  const entries = Object.entries(scoredByDim).map(([dim, scores], i) => ({
-    dim,
-    score: scores.reduce((a, b) => a + b, 0) / scores.length,
+  // Same calculation as the DQ score card and the Schema tab: active rules only.
+  const { overall, byDimension } = tableDqScore(rules, (r) => r.lastScore);
+  const entries = [...byDimension].map(([code, score], i) => ({
+    dim: dimLabel(code),
+    score,
     color: DIM_COLORS[i % DIM_COLORS.length],
   }));
 
@@ -192,7 +187,7 @@ function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
     return { ...e, d, labelPos, angle };
   });
 
-  const overallAvg = entries.reduce((s, e) => s + e.score, 0) / entries.length;
+  const overallAvg = overall ?? 0;
 
   return (
     <div className="flex items-center gap-4">
@@ -293,10 +288,17 @@ function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
 function OverallScoreCard({ rules }: { rules: DqRule[] }) {
   const { t } = useLang();
   const c = t.catalog;
-  const scoredRules = rules.filter((r) => r.lastScore != null && r.lastStatusCode !== "ERROR");
-  const prevScoredRules = rules.filter((r) => r.previousScore != null && r.lastStatusCode !== "ERROR");
+  // The same score as the Schema tab's overall quality score: the average of the
+  // dimension scores, each from the latest results of the active rules in it.
+  const current = tableDqScore(rules, (r) => r.lastScore).overall;
+  // Like for like: a rule that has run only once counts at its latest score, so the
+  // arrow shows the change of the rules that ran again, not a different set of rules.
+  const previous = rules.some((r) => r.isActive && r.previousScore != null)
+    ? tableDqScore(rules, (r) => r.previousScore ?? r.lastScore).overall
+    : null;
+  const activeRules = rules.filter((r) => r.isActive);
 
-  if (scoredRules.length === 0) {
+  if (current == null) {
     return (
       <div className="card p-5 flex flex-col items-center justify-center text-center min-h-[160px]">
         <div className="text-3xl font-extrabold text-muted mb-1">—</div>
@@ -306,10 +308,6 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
     );
   }
 
-  const current  = scoredRules.reduce((s, r) => s + Number(r.lastScore!), 0) / scoredRules.length;
-  const previous = prevScoredRules.length > 0
-    ? prevScoredRules.reduce((s, r) => s + Number(r.previousScore!), 0) / prevScoredRules.length
-    : null;
   const delta = previous != null ? current - previous : null;
 
   const scoreColor = current >= 90 ? "text-emerald-600" : current >= 70 ? "text-amber-600" : "text-red-600";
@@ -351,15 +349,15 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
 
       <div className="mt-3 grid grid-cols-3 gap-2 w-full text-center">
         <div className="bg-emerald-50 rounded-md py-1.5">
-          <div className="text-sm font-bold text-emerald-600">{scoredRules.filter((r) => r.lastStatusCode === "PASSED").length}</div>
+          <div className="text-sm font-bold text-emerald-600">{activeRules.filter((r) => r.lastStatusCode === "PASSED").length}</div>
           <div className="text-[9px] text-muted uppercase">Pass</div>
         </div>
         <div className="bg-amber-50 rounded-md py-1.5">
-          <div className="text-sm font-bold text-amber-600">{scoredRules.filter((r) => r.lastStatusCode === "WARNING").length}</div>
+          <div className="text-sm font-bold text-amber-600">{activeRules.filter((r) => r.lastStatusCode === "WARNING").length}</div>
           <div className="text-[9px] text-muted uppercase">Warn</div>
         </div>
         <div className="bg-red-50 rounded-md py-1.5">
-          <div className="text-sm font-bold text-red-600">{scoredRules.filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "ERROR").length}</div>
+          <div className="text-sm font-bold text-red-600">{activeRules.filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "ERROR").length}</div>
           <div className="text-[9px] text-muted uppercase">Fail</div>
         </div>
       </div>
@@ -1003,7 +1001,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
             <h4 className="font-bold text-sm text-ink">{dim}</h4>
             <span className="text-xs text-muted">{dimRules.length} rule{dimRules.length !== 1 ? "s" : ""}</span>
             {(() => {
-              const scored = dimRules.filter((r) => r.lastScore != null && r.lastStatusCode !== "ERROR");
+              const scored = dimRules.filter((r) => r.isActive && r.lastScore != null && r.lastStatusCode !== "ERROR");
               if (scored.length === 0) return null;
               const avg = scored.reduce((s, r) => s + Number(r.lastScore!), 0) / scored.length;
               return (

@@ -218,7 +218,7 @@ export type TableDqResult = { overallScore: number | null; dimensions: TableDqDi
 export async function getTableDqDimensions(entityId: number): Promise<TableDqResult> {
   const scoreRows = await sql<{ dimensionCode: string; avgScore: number | null; ruleCount: number }[]>`
     SELECT r.dimension_code AS "dimensionCode",
-           AVG(r.last_score)::float8 AS "avgScore",
+           AVG(r.last_score) FILTER (WHERE r.last_status_code IS DISTINCT FROM 'ERROR')::float8 AS "avgScore",
            COUNT(*)::int AS "ruleCount"
     FROM bayanat.dq_rules r
     LEFT JOIN bayanat.data_attributes a ON r.asset_type_code = 'DATA_ATTRIBUTES' AND a.attribute_id = r.asset_id
