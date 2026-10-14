@@ -3,6 +3,7 @@ import {
   getDpia, getDpiaVersion, dpiaPermissions, updateDpia, deleteDpia, changeDpiaAsset, refreshDpia, saveDpiaAnswers,
   decideScreening, submitDpia, returnDpia, decideDpia, reopenDpia,
 } from "@/lib/privacy/dpia";
+import { acknowledgeDpiaChanges } from "@/lib/privacy/dpia-watch";
 import { respond, viewer } from "@/lib/privacy/dpia-http";
 
 type Ctx = { params: { id: string } };
@@ -23,7 +24,7 @@ export async function GET(req: Request, { params }: Ctx) {
   return NextResponse.json({ dpia: d, frozenVersion: null, permissions: dpiaPermissions(v.session, d) });
 }
 
-// PATCH { action, ... } — UPDATE | ADD_ASSET | REMOVE_ASSET | SET_SUBJECT | REFRESH | ANSWERS | SCREEN | SUBMIT | RETURN | DECIDE | REOPEN
+// PATCH { action, ... } — UPDATE | ADD_ASSET | REMOVE_ASSET | SET_SUBJECT | REFRESH | ANSWERS | SCREEN | SUBMIT | RETURN | DECIDE | REOPEN | ACK_CHANGES
 export async function PATCH(req: Request, { params }: Ctx) {
   const id = Number(params.id);
   const v = await viewer(id);
@@ -42,6 +43,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     case "RETURN": return respond(await returnDpia(id, b.note, s));
     case "DECIDE": return respond(await decideDpia(id, b, s));
     case "REOPEN": return respond(await reopenDpia(id, b.note, s));
+    case "ACK_CHANGES": return respond(await acknowledgeDpiaChanges(id, b.note, s));
     default: return NextResponse.json({ error: "Unknown action", code: "UNKNOWN_ACTION" }, { status: 400 });
   }
 }

@@ -7,8 +7,8 @@ import { createNotification } from "../queries/notifications";
 import type { SessionUser } from "../types";
 import { buildDpiaFacts, describeAssets, type AssetRef } from "./dpia-facts";
 import {
-  isClosed, overallResidual, screeningRecommendation, CONSULTATION_CODES, MEASURE_STATUSES,
-  type ConsultationCode, type DpiaDetail, type DpiaEvent, type DpiaFacts, type DpiaMeasure, type DpiaPermissions, type DpiaQuestion,
+  isClosed, overallResidual, screeningRecommendation, CONSULTATION_CODES, DPIA_WATCHED, MEASURE_STATUSES,
+  type ConsultationCode, type DpiaChange, type DpiaDetail, type DpiaEvent, type DpiaFacts, type DpiaMeasure, type DpiaPermissions, type DpiaQuestion,
   type DpiaRisk, type DpiaStatus, type DpiaSummary, type DpiaTemplate, type DpiaVersionInfo, type MeasureStatus, type RiskLevel,
 } from "./dpia-types";
 
@@ -25,7 +25,9 @@ const levelOf = (s: number | null): RiskLevel | null => (s == null ? null : s >=
 /** Admins, data protection officers and stewards see the whole register. */
 export const seesAllDpias = (role: string) => role === "ADMIN" || role === "OFFICER" || role === "STEWARD";
 export const canCreateDpia = (role: string) => role === "ADMIN" || role === "OFFICER" || role === "STEWARD";
-const isReviewer = (role: string) => role === "ADMIN" || role === "OFFICER";
+/** Data protection officers and admins decide assessments and settle what the daily check raises. */
+export const isDpiaReviewer = (role: string) => role === "ADMIN" || role === "OFFICER";
+const isReviewer = isDpiaReviewer;
 
 export function dpiaPermissions(session: SessionUser, d: Pick<DpiaSummary, "statusCode" | "ownerUserId" | "createdByUserId" | "versionNo">): DpiaPermissions {
   const mine = d.ownerUserId === session.userId || d.createdByUserId === session.userId;
@@ -38,6 +40,7 @@ export function dpiaPermissions(session: SessionUser, d: Pick<DpiaSummary, "stat
     canReopen: author && isClosed(d.statusCode),
     isAuthor: author,
     userId: session.userId,
+    canAcknowledgeChanges: isReviewer(session.role) && DPIA_WATCHED.includes(d.statusCode),
   };
 }
 
@@ -71,7 +74,8 @@ const summaryCols = () => sql.unsafe(`
   d.decided_at::text AS "decidedAt", du.full_name AS "decidedBy", d.next_review_date::text AS "nextReviewDate",
   (d.status_code IN ('APPROVED', 'APPROVED_WITH_CONDITIONS') AND d.next_review_date IS NOT NULL AND d.next_review_date <= CURRENT_DATE) AS "reviewDue",
   d.version_no AS "versionNo", d.created_at::text AS "createdAt", d.updated_at::text AS "updatedAt",
-  sa.asset_type_code AS "subjectType", sa.asset_id AS "subjectId"
+  sa.asset_type_code AS "subjectType", sa.asset_id AS "subjectId",
+  (d.changes_json IS NOT NULL AND d.status_code IN ('NOT_REQUIRED', 'IN_REVIEW', 'APPROVED', 'APPROVED_WITH_CONDITIONS')) AS "changesPending"
 `);
 const SUMMARY_FROM = sql`
   FROM bayanat.dpias d
@@ -141,11 +145,13 @@ export async function getDpia(dpiaId: number): Promise<DpiaDetail | null> {
     description: string | null; templateId: number; screeningNote: string | null; screeningBy: string | null; screeningAt: string | null;
     submittedBy: string | null; submittedAt: string | null; dpoOpinion: string | null; conditions: string | null;
     consultationCode: ConsultationCode; consultationNote: string | null; facts: DpiaFacts | null; factsAt: string | null;
+    changes: DpiaChange[] | null; changesAt: string | null;
   }[]>`
     SELECT d.description_text AS description, d.template_id AS "templateId", d.screening_note_text AS "screeningNote", su.full_name AS "screeningBy",
            d.screening_at::text AS "screeningAt", sb.full_name AS "submittedBy", d.submitted_at::text AS "submittedAt",
            d.dpo_opinion_text AS "dpoOpinion", d.conditions_text AS conditions, d.consultation_code AS "consultationCode",
-           d.consultation_note_text AS "consultationNote", d.facts_json AS facts, d.facts_at::text AS "factsAt"
+           d.consultation_note_text AS "consultationNote", d.facts_json AS facts, d.facts_at::text AS "factsAt",
+           d.changes_json AS changes, d.changes_detected_at::text AS "changesAt"
     FROM bayanat.dpias d
     LEFT JOIN bayanat.users su ON su.user_id = d.screening_by_user_id
     LEFT JOIN bayanat.users sb ON sb.user_id = d.submitted_by_user_id
@@ -191,6 +197,7 @@ export async function getDpia(dpiaId: number): Promise<DpiaDetail | null> {
     assets: await describeAssets(assetRows.map((a) => ({ ...a, id: Number(a.id) }))),
     questions: [...questions], risks: [...risks], measures: [...measures], facts: extra.facts, factsAt: extra.factsAt,
     events: [...events], versions: [...versions],
+    changes: summary.changesPending ? extra.changes : null, changesAt: summary.changesPending ? extra.changesAt : null,
   };
 }
 
@@ -201,7 +208,7 @@ export async function getDpiaVersion(dpiaId: number, versionNo: number): Promise
 }
 
 // ── Writes ───────────────────────────────────────────────────────────────────
-async function logEvent(dpiaId: number, code: string, userId: string, note: string | null = null): Promise<void> {
+export async function logEvent(dpiaId: number, code: string, userId: string, note: string | null = null): Promise<void> {
   await sql`INSERT INTO bayanat.dpia_events (dpia_id, event_code, note_text, user_id) VALUES (${dpiaId}, ${code}, ${note}, ${userId})`;
   await sql`UPDATE bayanat.dpias SET updated_at = now() WHERE dpia_id = ${dpiaId}`;
 }
@@ -231,7 +238,11 @@ export async function refreshDpiaFacts(dpiaId: number): Promise<void> {
   const refs = assets.map((a) => ({ typeCode: a.typeCode, id: Number(a.id) }));
   const subject = assets.find((a) => a.isSubject);
   const facts = await buildDpiaFacts(refs, subject ? { typeCode: subject.typeCode, id: Number(subject.id) } : null);
-  await sql`UPDATE bayanat.dpias SET facts_json = ${sql.json(facts as never)}, facts_at = now() WHERE dpia_id = ${dpiaId}`;
+  // Fresh facts are the new point of comparison, so changes found against the old ones no longer apply.
+  await sql`
+    UPDATE bayanat.dpias SET facts_json = ${sql.json(facts as never)}, facts_at = now(), baseline_facts_json = NULL, changes_json = NULL, changes_detected_at = NULL
+    WHERE dpia_id = ${dpiaId}
+  `;
 }
 
 export async function createDpia(
@@ -261,6 +272,10 @@ export async function createDpia(
   }
   await refreshDpiaFacts(row.dpiaId);
   await logEvent(row.dpiaId, "CREATED", session.userId);
+  if (subjectType) {
+    await sql`UPDATE bayanat.dpia_suggestions SET status_code = 'STARTED', dpia_id = ${row.dpiaId}
+              WHERE asset_type_code = ${subjectType} AND asset_id = ${subjectId} AND status_code IN ('OPEN', 'DISMISSED', 'RESOLVED')`;
+  }
   return { dpiaId: row.dpiaId };
 }
 
@@ -536,6 +551,7 @@ export async function returnDpia(dpiaId: number, note: unknown, session: Session
   const reason = text(note);
   if (!reason) return fail("REASON_REQUIRED", "Say what needs to change.");
   await sql`UPDATE bayanat.dpias SET status_code = 'ASSESSMENT' WHERE dpia_id = ${dpiaId}`;
+  await refreshDpiaFacts(dpiaId);
   await logEvent(dpiaId, "RETURNED", session.userId, reason);
   await notifyAuthors(dpiaId, h, session.userId, `Impact assessment returned for changes — ${h.referenceCode}`, reason, "WARNING");
   return { ok: true };

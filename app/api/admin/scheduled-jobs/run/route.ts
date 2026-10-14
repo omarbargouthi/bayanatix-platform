@@ -4,6 +4,7 @@ import { isScheduleDue } from "@/lib/scheduler-utils";
 import { getAllReportCodes, captureSnapshot } from "@/lib/queries/reports";
 import { captureMaturityTrendSnapshot } from "@/lib/queries/dashboard";
 import { captureComplianceTrendSnapshot } from "@/lib/queries/gov-compliance";
+import { runDpiaWatch } from "@/lib/privacy/dpia-watch";
 
 // Hit by scripts/scheduler.mjs's poll tick (Authorization: Bearer CRON_SECRET,
 // same convention as /api/admin/sources/scheduled-crawl and
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
       const maturity = await captureMaturityTrendSnapshot();
       const compliance = await captureComplianceTrendSnapshot();
       results[area.areaCode] = { maturity, compliance };
+    } else if (area.areaCode === "DPIA_WATCH") {
+      // Impact assessments: suggestions, changes since decisions, review and measure reminders.
+      results[area.areaCode] = await runDpiaWatch();
     }
     await markScheduledJobRan(area.areaCode);
   }

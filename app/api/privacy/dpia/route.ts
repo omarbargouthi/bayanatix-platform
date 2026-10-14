@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getCustomAssetTypes } from "@/lib/queries/custom-assets";
-import { listDpias, listDpiasForAsset, listDpiaTemplates, dpiaUserOptions, createDpia, canCreateDpia } from "@/lib/privacy/dpia";
+import { listDpias, listDpiasForAsset, listDpiaTemplates, dpiaUserOptions, createDpia, canCreateDpia, isDpiaReviewer, seesAllDpias } from "@/lib/privacy/dpia";
+import { listDpiaSuggestions, dpiaSuggestionFor, lastDpiaWatchRun } from "@/lib/privacy/dpia-watch";
 
 // Impact assessments. Admins, data protection officers and stewards see the whole
 // register; anyone else sees the assessments they own, started or hold a measure in.
 
 // GET — the register. ?options=1 → questionnaires and people for the forms.
-// ?assetType=&assetId= → the assessments one asset is part of.
+// ?assetType=&assetId= → the assessments one asset is part of, and the open suggestion to assess it.
+// The register also carries the suggestions from the daily check for those who see the whole register.
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,8 +21,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ templates, users, customTypes, canCreate: canCreateDpia(session.role) });
   }
   const assetType = p.get("assetType"), assetId = Number(p.get("assetId"));
-  if (assetType && Number.isFinite(assetId)) return NextResponse.json(await listDpiasForAsset(session, assetType, assetId));
-  return NextResponse.json({ items: await listDpias(session), canCreate: canCreateDpia(session.role) });
+  const all = seesAllDpias(session.role);
+  if (assetType && Number.isFinite(assetId)) {
+    const [items, suggestion] = await Promise.all([listDpiasForAsset(session, assetType, assetId), all ? dpiaSuggestionFor(assetType, assetId) : null]);
+    return NextResponse.json({ items, suggestion });
+  }
+  const [items, suggestions, lastChecked] = await Promise.all([listDpias(session), all ? listDpiaSuggestions() : [], lastDpiaWatchRun()]);
+  return NextResponse.json({ items, suggestions, lastChecked, canCreate: canCreateDpia(session.role), isReviewer: isDpiaReviewer(session.role) });
 }
 
 // POST { title, description?, templateId, ownerUserId?, subjectType?, subjectId? }

@@ -1,12 +1,12 @@
 "use client";
 
 // The impact assessments an asset is part of, shown on the asset's own page, with a
-// shortcut to start one about it.
+// shortcut to start one about it, and the daily check's suggestion when there is one.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
-import type { DpiaSummary } from "@/lib/privacy/dpia-types";
-import { LevelBadge, StatusBadge, day } from "./dpia-ui";
+import type { DpiaSuggestion, DpiaSummary } from "@/lib/privacy/dpia-types";
+import { LevelBadge, StatusBadge, day, reasonText } from "./dpia-ui";
 import { NewDpiaDialog } from "./DpiaRegisterTab";
 
 export function AssetDpias({ assetTypeCode, assetId, assetName, canCreate, hideWhenEmpty, className }: {
@@ -17,20 +17,28 @@ export function AssetDpias({ assetTypeCode, assetId, assetName, canCreate, hideW
   const { t } = useLang();
   const d = t.dpia;
   const [items, setItems] = useState<DpiaSummary[] | null>(null);
+  const [suggestion, setSuggestion] = useState<DpiaSuggestion | null>(null);
   const [creating, setCreating] = useState(false);
   useEffect(() => {
     fetch(`/api/privacy/dpia?assetType=${encodeURIComponent(assetTypeCode)}&assetId=${assetId}`)
-      .then((r) => (r.ok ? r.json() : [])).then(setItems).catch(() => setItems([]));
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((res) => { setItems(res.items ?? []); setSuggestion(res.suggestion ?? null); })
+      .catch(() => setItems([]));
   }, [assetTypeCode, assetId]);
 
-  if (hideWhenEmpty && !items?.length) return null;
+  if (hideWhenEmpty && !items?.length && !suggestion) return null;
   return (
     <div className={`card p-5 ${className ?? ""}`}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-bold text-sm">{d.assetCardTitle}</h3>
         {canCreate && <button onClick={() => setCreating(true)} className="btn btn-sm">{d.startOne}</button>}
       </div>
-      {items?.length === 0 && <p className="text-[13px] text-muted mt-2">{d.assetCardEmpty}</p>}
+      {suggestion && (
+        <div className="text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-2" dir="auto">
+          {t.dpiaWatch.assetSuggested} {suggestion.reasons.map((r) => reasonText(t, r)).join(" · ")}
+        </div>
+      )}
+      {items?.length === 0 && !suggestion && <p className="text-[13px] text-muted mt-2">{d.assetCardEmpty}</p>}
       <div className="mt-2 divide-y divide-line-soft">
         {items?.map((r) => (
           <div key={r.dpiaId} className="py-2 flex items-center justify-between gap-3">

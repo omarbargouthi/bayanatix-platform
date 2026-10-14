@@ -22,7 +22,7 @@ type Resolved = { sourceIds: number[]; entityIds: number[]; attributeIds: number
  * tables. A custom asset brings what it is linked to; when it points at specific
  * tables or columns, a source it also names is context, not the whole source.
  */
-async function resolveScope(assets: AssetRef[]): Promise<Resolved> {
+export async function resolveScope(assets: AssetRef[]): Promise<Resolved> {
   const sources: number[] = [], schemas: number[] = [], entities: number[] = [], attributes: number[] = [];
   const take = (r: AssetRef, into: { sources: number[]; schemas: number[]; entities: number[]; attributes: number[] }) => {
     if (r.typeCode === "DATA_SOURCES") into.sources.push(r.id);

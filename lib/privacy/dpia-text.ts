@@ -1,7 +1,7 @@
 // How an impact assessment's catalog facts and findings are worded, in the reader's
 // language. Used by the screens and by the PDF export.
 import type { I18nStrings } from "../i18n/strings";
-import type { DpiaFacts, DpiaFlag } from "./dpia-types";
+import type { DpiaChange, DpiaFacts, DpiaFlag, DpiaSuggestionReason } from "./dpia-types";
 
 export const fill = (tpl: string, v: Record<string, string | number>) => tpl.replace(/\{(\w+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
 export const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : "—");
@@ -10,6 +10,21 @@ export const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) :
 export const assetTypeLabel = (t: I18nStrings, typeCode: string, typeName: string) => (t.dpia.assetTypes as Record<string, string>)[typeCode] ?? typeName;
 
 export const flagText = (t: I18nStrings, f: DpiaFlag) => fill((t.dpia.flags as Record<string, string>)[f.code] ?? f.code, { n: f.n.toLocaleString() }) + (f.detail ? ` (${f.detail})` : "");
+
+/** One thing the catalog says now that it did not say at the screening, submission or decision. */
+export function changeText(t: I18nStrings, c: DpiaChange): string {
+  const head = fill((t.dpiaWatch.changes as Record<string, string>)[c.code] ?? c.code, { n: c.n.toLocaleString(), finding: c.flag ? flagText(t, c.flag) : "" });
+  // Sensitive categories are named; a column classified sensitive without a category has no name to add.
+  const items = c.code === "NEW_SENSITIVE" ? c.items.filter((i) => i !== "SENSITIVE") : c.items;
+  if (!items.length) return head;
+  const more = c.code !== "NEW_SENSITIVE" && c.n > items.length ? ` ${fill(t.dpia.facts.more, { n: c.n - items.length })}` : "";
+  return `${head}: ${items.join(", ")}${more}`;
+}
+
+/** Why the catalog suggests screening an asset. */
+export const reasonText = (t: I18nStrings, r: DpiaSuggestionReason) =>
+  fill((t.dpiaWatch.reasons as Record<string, string>)[r.code] ?? r.code, { n: r.n.toLocaleString(), detail: r.detail ?? "" }) +
+  (r.code === "SENSITIVE_PI" && r.detail ? ` (${r.detail})` : "");
 
 export type FactBlock = "SUBJECT" | "LEGAL_BASIS" | "PERSONAL_DATA" | "ACCESS" | "SCALE" | "FLOWS" | "RECIPIENTS" | "RETENTION";
 export const FACT_BLOCKS: FactBlock[] = ["SUBJECT", "PERSONAL_DATA", "SCALE", "FLOWS", "RECIPIENTS", "ACCESS", "RETENTION"];

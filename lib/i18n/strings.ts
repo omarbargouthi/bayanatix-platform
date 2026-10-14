@@ -4103,6 +4103,8 @@ export type I18nStrings = {
       MEASURE_IN_PROGRESS: string;
       MEASURE_DONE: string;
       MEASURE_CANCELLED: string;
+      CHANGES_DETECTED: string;
+      CHANGES_ACKNOWLEDGED: string;
     };
     assetCardTitle: string;
     assetCardEmpty: string;
@@ -4142,6 +4144,58 @@ export type I18nStrings = {
       OPINION_REQUIRED: string;
       CONDITIONS_REQUIRED: string;
       HIGH_RESIDUAL: string;
+      NO_CHANGES: string;
+      SUGGESTION_NOT_FOUND: string;
     };
+  };
+  dpiaWatch: {
+    suggestionsTitle: string;
+    suggestionsDesc: string;
+    lastChecked: string;
+    neverChecked: string;
+    checkNow: string;
+    checking: string;
+    checkedResult: string;
+    noSuggestions: string;
+    showDismissed: string;
+    hideDismissed: string;
+    start: string;
+    dismiss: string;
+    restore: string;
+    dismissTitle: string;
+    dismissHint: string;
+    dismissedBy: string;
+    since: string;
+    reasons: {
+      SENSITIVE_PI: string;
+      LARGE_SCALE: string;
+      EXTERNAL_SHARING: string;
+      CROSS_BORDER: string;
+      PROCESSES_PI: string;
+    };
+    kpiChanged: string;
+    filterChanged: string;
+    changedBadge: string;
+    bannerTitle: {
+      NOT_REQUIRED: string;
+      IN_REVIEW: string;
+      DECIDED: string;
+    };
+    bannerHint: string;
+    bannerHintReview: string;
+    ackButton: string;
+    ackTitle: string;
+    ackHint: string;
+    acknowledged: string;
+    changes: {
+      NEW_PI_COLUMNS: string;
+      NEW_SENSITIVE: string;
+      NEW_FINDING: string;
+      NEW_SHARING: string;
+      NEW_SYSTEMS: string;
+      SUBJECT_CHANGED: string;
+      ASSET_REMOVED: string;
+    };
+    assetSuggested: string;
   };
 };

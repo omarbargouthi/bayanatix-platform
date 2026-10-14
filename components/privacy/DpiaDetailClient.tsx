@@ -13,7 +13,7 @@ import {
   type DpiaDetail, type DpiaPermissions, type DpiaQuestion,
 } from "@/lib/privacy/dpia-types";
 import {
-  AssetPicker, Dialog, ErrorNote, FACT_BLOCKS, FactLines, LevelBadge, StatusBadge, assetTypeLabel, day, errorText, factLines, fill, flagText,
+  AssetPicker, Dialog, ErrorNote, FACT_BLOCKS, FactLines, LevelBadge, StatusBadge, assetTypeLabel, changeText, day, errorText, factLines, fill, flagText,
   type CustomTypeOption, type FactBlock,
 } from "./dpia-ui";
 import { DpiaRisksTab } from "./DpiaRisksTab";
@@ -35,7 +35,7 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
   const [tab, setTab] = useState<Tab>(TABS.includes(params.get("tab") as Tab) ? (params.get("tab") as Tab) : "overview");
   const [version, setVersion] = useState<number | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  const [dialog, setDialog] = useState<"edit" | "reopen" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "reopen" | "ack" | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/privacy/dpia/${dpiaId}${version ? `?version=${version}` : ""}`);
@@ -116,6 +116,24 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
           <span>{message.text}</span><button onClick={() => setMessage(null)} className="opacity-60 hover:opacity-100">×</button>
         </div>
       )}
+      {!frozenVersion && dpia.changes && dpia.changes.length > 0 && (
+        <div className="rounded-md px-4 py-3 border text-amber-900 bg-amber-50 border-amber-200">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-[13px] font-semibold">{t.dpiaWatch.bannerTitle[dpia.statusCode === "NOT_REQUIRED" || dpia.statusCode === "IN_REVIEW" ? dpia.statusCode : "DECIDED"]}</div>
+              <div className="text-[12px] mt-0.5">{fill(dpia.statusCode === "IN_REVIEW" ? t.dpiaWatch.bannerHintReview : t.dpiaWatch.bannerHint, { date: day(dpia.changesAt) })}</div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {p?.canReopen && <button onClick={() => setDialog("reopen")} className="btn btn-sm">{d.reopen}</button>}
+              {p?.canReview && tab !== "review" && <button onClick={() => setTab("review")} className="btn btn-sm">{d.tabs.review}</button>}
+              {p?.canAcknowledgeChanges && <button onClick={() => setDialog("ack")} className="btn btn-sm">{t.dpiaWatch.ackButton}</button>}
+            </div>
+          </div>
+          <ul className="mt-2 list-disc ps-5 text-[13px] space-y-0.5">
+            {dpia.changes.map((c, i) => <li key={i} dir="auto">{changeText(t, c)}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-line overflow-x-auto">
         {TABS.map((id) => (
@@ -136,6 +154,8 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
       {dialog === "edit" && <EditDialog dpia={dpia} users={options.users} onClose={() => setDialog(null)} act={act} />}
       {dialog === "reopen" && <ReasonDialog title={d.reopen} hint={d.reopenHint} confirm={d.reopen} onClose={() => setDialog(null)}
         onConfirm={(note) => act({ action: "REOPEN", note }, d.reopened)} />}
+      {dialog === "ack" && <ReasonDialog title={t.dpiaWatch.ackTitle} hint={t.dpiaWatch.ackHint} confirm={t.dpiaWatch.ackButton} onClose={() => setDialog(null)}
+        onConfirm={(note) => act({ action: "ACK_CHANGES", note }, t.dpiaWatch.acknowledged)} />}
     </main>
   );
 }

@@ -111,6 +111,8 @@ export type DpiaSummary = {
   measuresTotal: number; measuresOpen: number; measuresOverdue: number;
   decidedAt: string | null; decidedBy: string | null; nextReviewDate: string | null; reviewDue: boolean;
   versionNo: number; createdAt: string; updatedAt: string;
+  /** The catalog changed since the screening, submission or decision (lib/privacy/dpia-watch.ts). */
+  changesPending: boolean;
 };
 
 export type DpiaEvent = { eventId: number; code: string; note: string | null; user: string | null; at: string };
@@ -125,9 +127,30 @@ export type DpiaDetail = DpiaSummary & {
   assets: DpiaAsset[]; questions: DpiaQuestion[]; risks: DpiaRisk[]; measures: DpiaMeasure[];
   facts: DpiaFacts | null; factsAt: string | null;
   events: DpiaEvent[]; versions: DpiaVersionInfo[];
+  changes: DpiaChange[] | null; changesAt: string | null;
 };
 
-export type DpiaPermissions = { canEdit: boolean; canReview: boolean; canOverrideScreening: boolean; canDelete: boolean; canReopen: boolean; isAuthor: boolean; userId: string };
+export type DpiaPermissions = {
+  canEdit: boolean; canReview: boolean; canOverrideScreening: boolean; canDelete: boolean; canReopen: boolean; isAuthor: boolean; userId: string;
+  /** May record that the catalog changes found since the decision are not material. */
+  canAcknowledgeChanges: boolean;
+};
+
+// ── Keeping assessments current (lib/privacy/dpia-watch.ts) ─────────────────
+/** Statuses whose facts are compared with the catalog: an outcome was recorded, or a review is under way. */
+export const DPIA_WATCHED: DpiaStatus[] = ["NOT_REQUIRED", "IN_REVIEW", "APPROVED", "APPROVED_WITH_CONDITIONS"];
+export type DpiaChangeCode = "NEW_PI_COLUMNS" | "NEW_SENSITIVE" | "NEW_FINDING" | "NEW_SHARING" | "NEW_SYSTEMS" | "SUBJECT_CHANGED" | "ASSET_REMOVED";
+/** One thing the catalog says now that it did not say when the assessment was screened, submitted or decided. */
+export type DpiaChange = { code: DpiaChangeCode; n: number; items: string[]; flag?: DpiaFlag };
+
+export type DpiaSuggestionReasonCode = "SENSITIVE_PI" | "LARGE_SCALE" | "EXTERNAL_SHARING" | "CROSS_BORDER" | "PROCESSES_PI";
+export type DpiaSuggestionReason = { code: DpiaSuggestionReasonCode; n: number; detail: string | null };
+/** An asset the catalog says should be screened, which no assessment covers yet. */
+export type DpiaSuggestion = {
+  suggestionId: number; assetTypeCode: string; assetId: number; assetName: string; assetTypeName: string; sublabel: string | null; href: string | null;
+  reasons: DpiaSuggestionReason[]; status: "OPEN" | "DISMISSED" | "STARTED" | "RESOLVED"; dpiaId: number | null;
+  firstSeenAt: string; dismissedBy: string | null; dismissedAt: string | null; dismissNote: string | null;
+};
 
 /** What the screening answers add up to under the template's rule. */
 export function screeningRecommendation(questions: DpiaQuestion[], threshold: number): { yes: number; answered: number; total: number; required: boolean } {

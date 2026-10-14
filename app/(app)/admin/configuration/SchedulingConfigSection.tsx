@@ -9,7 +9,7 @@ type ScheduledJobArea = {
   lastRunAt:    string | null;
 };
 
-// Deliberately only the two AREA-level jobs (Reports, Regulation) -- crawl and
+// Deliberately only the AREA-level jobs (Reports, Regulation, Impact assessments) -- crawl and
 // DQ rule scheduling are per-row (one connection, one rule) and stay managed
 // from their own pages (Admin > Sources / the DQ rule editor), unchanged.
 const AREA_META: Record<string, { label: string; description: string }> = {
@@ -20,6 +20,10 @@ const AREA_META: Record<string, { label: string; description: string }> = {
   REGULATION_TREND: {
     label: "Regulation",
     description: "Maturity/compliance trend capture for the Dashboard and each regulation's Compliance Assessment page.",
+  },
+  DPIA_WATCH: {
+    label: "Impact assessments",
+    description: "Suggests screenings for personal data no assessment covers, flags assessments whose catalog facts changed since the decision, and sends review-date and overdue-measure reminders.",
   },
 };
 

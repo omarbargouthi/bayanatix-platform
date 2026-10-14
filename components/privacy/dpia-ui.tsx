@@ -9,7 +9,7 @@ import type { I18nStrings } from "@/lib/i18n/strings";
 import type { DpiaStatus, RiskLevel } from "@/lib/privacy/dpia-types";
 import { assetTypeLabel } from "@/lib/privacy/dpia-text";
 
-export { fill, day, assetTypeLabel, flagText, factLines, FACT_BLOCKS, type FactBlock } from "@/lib/privacy/dpia-text";
+export { fill, day, assetTypeLabel, flagText, factLines, changeText, reasonText, FACT_BLOCKS, type FactBlock } from "@/lib/privacy/dpia-text";
 
 const STATUS_STYLE: Record<DpiaStatus, string> = {
   SCREENING: "bg-sky-50 text-sky-700 border-sky-200", ASSESSMENT: "bg-violet-50 text-violet-700 border-violet-200",
