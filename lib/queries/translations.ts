@@ -120,6 +120,7 @@ export async function getTranslationBundle(languageCode: string): Promise<Record
     FROM bayanat.translation_keys tk
     JOIN bayanat.translations t ON t.key_id = tk.key_id AND t.language_code = ${languageCode}
     WHERE tk.is_active_indicator = true AND t.translated_text IS NOT NULL AND t.status_code <> 'STALE'
+      AND tk.category_code IS DISTINCT FROM 'HELP_DOCS' -- long texts, served by /api/help only
   `;
   return Object.fromEntries(rows.map((r) => [r.keyCode, r.translatedText]));
 }

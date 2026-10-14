@@ -50,6 +50,7 @@ export type I18nStrings = {
     privacyRetention:  string;
     privacyRequests:   string;
     privacyDpia:       string;
+    helpCenter:        string;
   };
 
   // ── User role labels ────────────────────────────────────────────────────────
@@ -497,6 +498,10 @@ export type I18nStrings = {
     // Coverage cards
     cdesCoverage:     string;
     cdesCovered:      string;
+    cdeCoverageHow: string;
+    classificationHow: string;
+    metadataQualityHow: string;
+    dataQualityHow: string;
     dataClassification: string;
     columnsClassifiedLabel: string;
     metadataQuality:  string;
@@ -4295,5 +4300,29 @@ export type I18nStrings = {
       NONE_IN_USE: string;
       DEFAULT_NOT_IN_USE: string;
     };
+  };
+
+  help: {
+    title: string;
+    subtitle: string;
+    searchPh: string;
+    noResults: string;
+    allTopics: string;
+    onThisPage: string;
+    related: string;
+    openPage: string;
+    notFound: string;
+    untranslatedNote: string;
+    translateLink: string;
+    about: string;
+    howCalculated: string;
+    readMore: string;
+    groupStart: string;
+    groupWorkspace: string;
+    groupCatalog: string;
+    groupDomains: string;
+    groupPrivacy: string;
+    groupReports: string;
+    groupAdmin: string;
   };
 };

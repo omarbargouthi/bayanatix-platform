@@ -12,6 +12,9 @@ import { fmtNumber } from "@/lib/utils";
 import { useLang } from "@/lib/lang-context";
 import type { DataSource, DataSchema } from "@/lib/types";
 import { CdeDqConfigModal } from "./CdeDqConfigModal";
+import { HelpTip } from "@/components/ui/HelpTip";
+
+const INDICATORS_HELP = "/help/data-catalog#indicators";
 
 type CatalogStats = {
   tables: number; schemas: number; sources: number;
@@ -202,7 +205,7 @@ export function CatalogPageClient({
 
         <div className="card p-5 flex-1 min-w-[260px]">
           <div className="flex items-center justify-between mb-2.5">
-            <h3 className="font-bold">{c.cdesCoverage}</h3>
+            <h3 className="font-bold flex items-center gap-1.5">{c.cdesCoverage} <HelpTip text={c.cdeCoverageHow} href={INDICATORS_HELP} /></h3>
           </div>
           <div className="text-3xl font-extrabold text-brand-deep mb-1">{cdeCoveragePct}%</div>
           <div className="h-2 rounded-full bg-canvas overflow-hidden">
@@ -218,7 +221,7 @@ export function CatalogPageClient({
       <section className="grid grid-cols-3 gap-5 mb-6">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2.5">
-            <h3 className="font-bold">{c.dataClassification}</h3>
+            <h3 className="font-bold flex items-center gap-1.5">{c.dataClassification} <HelpTip text={c.classificationHow} href={INDICATORS_HELP} align="start" /></h3>
           </div>
           <div className="text-3xl font-extrabold text-brand-deep mb-1">{classifiedPct}%</div>
           <p className="text-[11px] text-muted mb-3">
@@ -253,7 +256,7 @@ export function CatalogPageClient({
 
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold">{c.metadataQuality}</h3>
+            <h3 className="font-bold flex items-center gap-1.5">{c.metadataQuality} <HelpTip text={c.metadataQualityHow} href={INDICATORS_HELP} align="start" /></h3>
           </div>
           {cdeMetadataQuality.totalCdes > 0 ? (
             <div className="flex items-center gap-4">
@@ -271,7 +274,7 @@ export function CatalogPageClient({
 
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold">{c.dataQuality}</h3>
+            <h3 className="font-bold flex items-center gap-1.5">{c.dataQuality} <HelpTip text={c.dataQualityHow} href={INDICATORS_HELP} /></h3>
             {canEdit && (
               <button onClick={() => setDqConfigOpen(true)} className="text-[11px] text-brand-purple hover:underline">
                 {c.configureBtn}
