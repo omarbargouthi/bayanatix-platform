@@ -74,6 +74,14 @@ Rule templates: not null, completeness rate, pattern (regular expression), allow
         body: `### A rule's score
 Each run checks a number of records. **Score = 100 − the percentage of records that failed.** A run with no records to check has no score and shows as an error.
 
+### A rule's status
+The thresholds are minimum scores. With a warning threshold of 95 and a failure threshold of 80:
+- 95 or more: **Passed**, even if some records failed;
+- from 80 to under 95: **Warning**;
+- under 80: **Failed**.
+
+A rule without thresholds is strict: it fails as soon as one record fails.
+
 ### On the Data Quality dashboard
 - **Total rules / Active rules:** all rules, and those switched on.
 - **Runs today:** rule runs since midnight.

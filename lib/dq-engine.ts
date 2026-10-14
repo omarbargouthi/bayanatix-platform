@@ -652,11 +652,21 @@ function simErr(msg: string): EngineResult {
   return { recordsScanned: null, recordsPassed: null, recordsFailed: null, failurePct: null, message: msg };
 }
 
-function determineStatus(rule: DqRule, failurePct: number | null, score: number | null): "PASSED" | "FAILED" | "WARNING" | "ERROR" {
+/**
+ * The thresholds are minimum scores ("Fail < 80%", "Warn < 95%"): below the fail
+ * threshold the run fails, below the warning threshold it warns, otherwise it passes,
+ * even with some failing records. A rule with no thresholds is strict: any failing
+ * record fails it. (This used to fall through to "any failing record fails" after the
+ * threshold checks, so a run at 99% failed while one at 90% only warned.)
+ */
+export function determineStatus(
+  rule: Pick<DqRule, "thresholdFail" | "thresholdWarn">, failurePct: number | null, score: number | null,
+): "PASSED" | "FAILED" | "WARNING" | "ERROR" {
   if (failurePct === null) return "ERROR";
-  const threshold     = rule.thresholdFail;
-  const warnThreshold = rule.thresholdWarn;
-  if (threshold != null && score != null && score < threshold) return "FAILED";
-  if (warnThreshold != null && score != null && score < warnThreshold) return "WARNING";
-  return failurePct > 0 ? "FAILED" : "PASSED";
+  const fail = rule.thresholdFail;
+  const warn = rule.thresholdWarn;
+  if ((fail == null && warn == null) || score == null) return failurePct > 0 ? "FAILED" : "PASSED";
+  if (fail != null && score < fail) return "FAILED";
+  if (warn != null && score < warn) return "WARNING";
+  return "PASSED";
 }
