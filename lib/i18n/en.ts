@@ -37,6 +37,9 @@ export const en: I18nStrings = {
     sectionCompliance: "Compliance",
     catalogAssets:     "Data Assets",
     catalogGlossaries: "Glossaries",
+    privacyRetention:  "Data Retention",
+    privacyRequests:   "Data Subject Requests",
+    privacyDpia:       "Impact Assessments",
   },
 
   roles: {
@@ -992,7 +995,7 @@ export const en: I18nStrings = {
 
   retention: {
     pageTitle:          "Data Retention",
-    pageDesc:           "Manage data retention categories, schedules, legal holds and data subject requests",
+    pageDesc:           "Manage data retention categories, schedules and legal holds",
     tabCategories:      "Categories & Schedules",
     tabLegalHolds:      "Legal Holds",
     tabOverview:        "Overview",

@@ -37,6 +37,9 @@ export const ar: I18nStrings = {
     sectionCompliance: "الامتثال",
     catalogAssets:     "أصول البيانات",
     catalogGlossaries: "المسارد",
+    privacyRetention:  "الاحتفاظ بالبيانات",
+    privacyRequests:   "طلبات أصحاب البيانات",
+    privacyDpia:       "تقييمات الأثر",
   },
 
   roles: {
@@ -992,7 +995,7 @@ export const ar: I18nStrings = {
 
   retention: {
     pageTitle:          "الاحتفاظ بالبيانات",
-    pageDesc:           "إدارة فئات الاحتفاظ بالبيانات والجداول الزمنية والتجميد القانوني وطلبات أصحاب البيانات",
+    pageDesc:           "إدارة فئات الاحتفاظ بالبيانات والجداول الزمنية والتجميد القانوني",
     tabCategories:      "الفئات والجداول الزمنية",
     tabLegalHolds:      "التجميد القانوني",
     tabOverview:        "نظرة عامة",

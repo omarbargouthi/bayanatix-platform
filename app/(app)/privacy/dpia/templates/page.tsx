@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function DpiaTemplatesPage() {
   const user = await getSession();
   if (!user) redirect("/login");
-  if (!isDpiaReviewer(user.role)) redirect("/privacy?tab=dpia");
+  if (!isDpiaReviewer(user.role)) redirect("/privacy/dpia");
   const t = await getServerT(user);
 
   return (
@@ -20,7 +20,7 @@ export default async function DpiaTemplatesPage() {
         crumbs={[
           { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.privacy, href: "/privacy" },
-          { label: t.dpia.tab, href: "/privacy?tab=dpia" },
+          { label: t.nav.privacyDpia, href: "/privacy/dpia" },
           { label: t.dpiaTemplates.title },
         ]}
         user={user}

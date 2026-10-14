@@ -68,7 +68,7 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
 
   return (
     <main className="px-8 py-7 pb-14 space-y-4">
-      <Link href="/privacy?tab=dpia" className="text-[13px] text-brand-purple hover:underline">{d.back}</Link>
+      <Link href="/privacy/dpia" className="text-[13px] text-brand-purple hover:underline">{d.back}</Link>
 
       <div className="card p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -98,7 +98,7 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
               {p?.canDelete && <button onClick={async () => {
                 if (!window.confirm(d.deleteConfirm)) return;
                 const r = await fetch(`/api/privacy/dpia/${dpiaId}`, { method: "DELETE" });
-                if (r.ok) router.push("/privacy?tab=dpia"); else setMessage({ kind: "err", text: errorText(t, await r.json().catch(() => ({}))) });
+                if (r.ok) router.push("/privacy/dpia"); else setMessage({ kind: "err", text: errorText(t, await r.json().catch(() => ({}))) });
               }} className="btn btn-sm text-red-600">{t.common.delete}</button>}
             </div>
           </div>

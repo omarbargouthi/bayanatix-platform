@@ -13,7 +13,7 @@ import type { SessionUser } from "@/lib/types";
 import {
   IconDashboard, IconHome, IconReports, IconCircle, IconBook, IconCheck, IconLines,
   IconLock, IconShare, IconChat, IconCog, IconShield, IconHistory, IconFlag, IconAI,
-  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout, IconUserPlus, IconTag,
+  IconBulk, IconGlossary, IconDB, IconLineage, IconLogout, IconUserPlus, IconTag, IconCollaborate,
 } from "./icons";
 
 type Item = {
@@ -109,6 +109,18 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
     { href: "/lineage",  label: t.nav.lineage,           Icon: IconLineage },
   ];
   const catalogChildActive = CATALOG_CHILDREN.some((c) => isActive(c.href));
+
+  // Data Privacy sub-menu. Data Retention lives at /privacy itself, so it is active only
+  // there, not on the pages below it. Data subject requests are for admins, data
+  // protection officers and stewards (the same rule as the page).
+  const seesDsr = user.role === "ADMIN" || user.role === "OFFICER" || user.role === "STEWARD";
+  const PRIVACY_CHILDREN: (Item & { exact?: boolean })[] = [
+    { href: "/privacy",          label: t.nav.privacyRetention, Icon: IconHistory, exact: true },
+    ...(seesDsr ? [{ href: "/privacy/requests", label: t.nav.privacyRequests, Icon: IconCollaborate }] : []),
+    { href: "/privacy/dpia",     label: t.nav.privacyDpia,      Icon: IconShield },
+  ];
+  const privacyActive = (c: { href: string; exact?: boolean }) => (c.exact ? pathname === c.href : isActive(c.href));
+  const privacyChildActive = PRIVACY_CHILDREN.some(privacyActive);
 
   const borderSide = isRtl ? "border-l border-line" : "border-r border-line";
 
@@ -209,6 +221,17 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
               <div className={`mt-0.5 flex flex-col gap-0.5 ${isRtl ? "mr-4 border-r pr-1.5" : "ml-4 border-l pl-1.5"} border-line`}>
                 {CATALOG_CHILDREN.map((c) => (
                   <NavLink key={c.href} item={c} active={isActive(c.href)} collapsed={false} isRtl={isRtl} small />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : it.href === "/privacy" ? (
+          <div key={it.href}>
+            <NavLink item={it} active={collapsed && privacyChildActive} collapsed={collapsed} isRtl={isRtl} />
+            {!collapsed && (
+              <div className={`mt-0.5 flex flex-col gap-0.5 ${isRtl ? "mr-4 border-r pr-1.5" : "ml-4 border-l pl-1.5"} border-line`}>
+                {PRIVACY_CHILDREN.map((c) => (
+                  <NavLink key={c.href} item={c} active={privacyActive(c)} collapsed={false} isRtl={isRtl} small />
                 ))}
               </div>
             )}

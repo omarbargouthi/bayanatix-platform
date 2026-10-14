@@ -162,7 +162,7 @@ export async function refreshDpiaSuggestions(): Promise<{ open: number; added: n
     await notifyAll(await officers(), {
       title: `${added} new impact assessment suggestion${added === 1 ? "" : "s"}`,
       body: "The catalog shows personal data that no impact assessment covers yet.",
-      href: "/privacy?tab=dpia", severity: "INFO",
+      href: "/privacy/dpia", severity: "INFO",
     });
   }
   return { open, added, resolved: gone.length };

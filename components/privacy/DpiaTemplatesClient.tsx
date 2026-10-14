@@ -44,7 +44,7 @@ export function DpiaTemplatesClient() {
 
   return (
     <main className="px-8 py-7 pb-14 space-y-4">
-      <Link href="/privacy?tab=dpia" className="text-[13px] text-brand-purple hover:underline">{t.dpia.back}</Link>
+      <Link href="/privacy/dpia" className="text-[13px] text-brand-purple hover:underline">{t.dpia.back}</Link>
       <div className="card p-5 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-bold text-brand-deep">{w.title}</h1>

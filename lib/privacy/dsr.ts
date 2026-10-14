@@ -430,7 +430,7 @@ export async function notifyDsrOwners(requestId: number, userId: string): Promis
       userId: person, type: "WORKFLOW", severity: m.request.daysLeft <= 7 ? "WARNING" : "INFO",
       title: `Data subject request ${m.request.referenceCode} — due ${m.request.dueDate}`,
       body: lines.slice(0, 6).join("; ") + (lines.length > 6 ? ` (+${lines.length - 6} more)` : ""),
-      actionLabel: "Open request", actionHref: `/privacy?tab=dsr&dsr=${requestId}`,
+      actionLabel: "Open request", actionHref: `/privacy/requests?dsr=${requestId}`,
     }).catch(() => {});
   }
   return byPerson.size;

@@ -6,30 +6,25 @@ import { useLang } from "@/lib/lang-context";
 import { DataCategoriesTab } from "@/components/retention/DataCategoriesTab";
 import { LegalHoldsTab } from "@/components/retention/LegalHoldsTab";
 import { RetentionOverviewTab } from "@/components/retention/RetentionOverviewTab";
-import { DataSubjectRequestsTab } from "@/components/retention/DataSubjectRequestsTab";
-import { DpiaRegisterTab } from "@/components/privacy/DpiaRegisterTab";
 
-type Tab = "overview" | "categories" | "holds" | "dsr" | "dpia";
+type Tab = "overview" | "categories" | "holds";
+const TABS: Tab[] = ["overview", "categories", "holds"];
 
 export function PrivacyClient({ userRole }: { userRole: string }) {
   const { t } = useLang();
   const r = t.retention;
   const searchParams = useSearchParams();
-  // Data subject requests: admins, data protection officers and stewards (owners act on their tables).
-  const canSeeDsr = userRole === "ADMIN" || userRole === "OFFICER" || userRole === "STEWARD";
-  const [tab, setTab] = useState<Tab>(searchParams.get("tab") === "dsr" && canSeeDsr ? "dsr" : searchParams.get("tab") === "dpia" ? "dpia" : "overview");
-  const dsrId = Number(searchParams.get("dsr")) || null;
+  const asked = searchParams.get("tab") as Tab;
+  const [tab, setTab] = useState<Tab>(TABS.includes(asked) ? asked : "overview");
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "overview",    label: r.tabOverview,    icon: "📊" },
     { id: "categories",  label: r.tabCategories,  icon: "🗂️" },
     { id: "holds",       label: r.tabLegalHolds,  icon: "⚖️" },
-    ...(canSeeDsr ? [{ id: "dsr" as Tab, label: t.dsr.tab, icon: "🧾" }] : []),
-    { id: "dpia",        label: t.dpia.tab,       icon: "🛡️" },
   ];
 
   return (
-    <main className="page-content">
+    <main className="px-8 py-7 pb-14">
       {/* Page header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink">{r.pageTitle}</h1>
@@ -59,8 +54,6 @@ export function PrivacyClient({ userRole }: { userRole: string }) {
       {tab === "overview"   && <RetentionOverviewTab />}
       {tab === "categories" && <DataCategoriesTab userRole={userRole} />}
       {tab === "holds"      && <LegalHoldsTab />}
-      {tab === "dsr"        && <DataSubjectRequestsTab userRole={userRole} initialId={dsrId} />}
-      {tab === "dpia"       && <DpiaRegisterTab />}
     </main>
   );
 }

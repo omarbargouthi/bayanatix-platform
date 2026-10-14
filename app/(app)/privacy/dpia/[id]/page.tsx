@@ -19,7 +19,7 @@ export default async function DpiaPage({ params }: { params: { id: string } }) {
         crumbs={[
           { label: "Bayanis", href: "/dashboard" },
           { label: t.nav.privacy, href: "/privacy" },
-          { label: t.dpia.tab, href: "/privacy?tab=dpia" },
+          { label: t.nav.privacyDpia, href: "/privacy/dpia" },
         ]}
         user={user}
       />

@@ -47,6 +47,9 @@ export type I18nStrings = {
     // Data Catalog sub-menu
     catalogAssets:     string;
     catalogGlossaries: string;
+    privacyRetention:  string;
+    privacyRequests:   string;
+    privacyDpia:       string;
   };
 
   // ── User role labels ────────────────────────────────────────────────────────
