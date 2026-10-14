@@ -6,6 +6,7 @@ import { DQ_TEMPLATES, buildRuleConfig } from "@/lib/dq-templates";
 import { AssetPicker, type SelectedAsset } from "@/components/dq/AssetPicker";
 import { RefIntegrityPicker } from "@/components/dq/RefIntegrityPicker";
 import { useLang } from "@/lib/lang-context";
+import { useDqTemplateText } from "@/lib/dq-template-text";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
@@ -125,6 +126,7 @@ function RuleFormModal({
   onSaved: () => void;
 }) {
   const { t, lang, lookupLabel } = useLang();
+  const tpl = useDqTemplateText();
   const dq = t.dq;
   function dimLabel(d: DqDimension) {
     return lookupLabel("DQ_DIMENSION", d.code) || pickTranslation(d.name, d.nameTranslations, lang);
@@ -343,8 +345,8 @@ function RuleFormModal({
                       : "border-line hover:border-brand-purple/40 text-ink-soft"
                   }`}
                 >
-                  <div className="font-semibold">{t.label}</div>
-                  <div className="text-[10px] text-muted mt-0.5 line-clamp-2">{t.description}</div>
+                  <div className="font-semibold">{tpl.templateName(t.code, t.label)}</div>
+                  <div className="text-[10px] text-muted mt-0.5 line-clamp-2">{tpl.templateDescription(t.code, t.description)}</div>
                 </button>
               ))}
             </div>
@@ -364,7 +366,7 @@ function RuleFormModal({
                 ) : (
                   selectedTemplate.configFields.map((f) => (
                     <div key={f.key} className={f.key === "allowed_values" ? "col-span-2" : ""}>
-                      <label className="block text-[11px] text-muted mb-1">{f.label}</label>
+                      <label className="block text-[11px] text-muted mb-1">{tpl.fieldLabel(f.key, f.label)}</label>
                       {f.key === "allowed_values" ? (
                         <>
                           <textarea

@@ -99,7 +99,7 @@ See [Data Catalog › Indicators](/help/data-catalog).`,
         id: "how",
         title: "How to use it",
         body: `1. Open a table's **Data Quality** tab, or the Rule Library on the Data Quality page, and choose **New Rule**.
-2. Pick the template, the column, the dimension and the severity; set the thresholds and, if you want, a schedule.
+2. Pick the template, the column, the dimension and the severity; set the thresholds and, if you want, a schedule. Choosing a template fills in its usual dimension, which you can change.
 3. Run it. Open a run to see failing examples.
 4. Use **Suggest Rules** on a table to get rules from profiling and AI, and accept the ones you want.`,
       },

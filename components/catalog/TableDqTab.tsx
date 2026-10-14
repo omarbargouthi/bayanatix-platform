@@ -8,6 +8,7 @@ import { DqRuleSuggestPanel } from "./DqRuleSuggestPanel";
 import { useLang } from "@/lib/lang-context";
 import { useDqDimensionLabel } from "@/lib/dq-dimension-label";
 import { tableDqScore } from "@/lib/dq-table-score";
+import { useDqTemplateText } from "@/lib/dq-template-text";
 import { HelpTip } from "@/components/ui/HelpTip";
 
 // ── Colour palette shared across all charts ───────────────────────────────────
@@ -415,27 +416,25 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
           <button onClick={onClose} className="text-muted hover:text-ink text-xl leading-none">&times;</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          {loading && <div className="text-sm text-muted text-center py-8">Loading…</div>}
+          {loading && <div className="text-sm text-muted text-center py-8">{t.common.loading}</div>}
           {!loading && samples.length === 0 && (
-            <div className="text-sm text-muted text-center py-8">
-              No value samples were captured for this run.
-            </div>
+            <div className="text-sm text-muted text-center py-8">{t.dq.noSamples}</div>
           )}
           {!loading && samples.length > 0 && (
             <>
               {/* Failing records first */}
               <div>
                 <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <span>Failing Records ({invalid.length})</span>
-                  <span className="text-[10px] font-normal text-muted">— values that did not meet the DQ rule condition</span>
+                  <span>{c.dqFailingRecordsN.replace("{n}", String(invalid.length))}</span>
+                  <span className="text-[10px] font-normal text-muted normal-case">— {c.dqFailingHint}</span>
                 </div>
                 {invalid.length === 0 ? (
-                  <div className="text-xs text-muted bg-canvas-soft rounded-md px-3 py-2">No failing records captured</div>
+                  <div className="text-xs text-muted bg-canvas-soft rounded-md px-3 py-2">{c.dqNoFailingCaptured}</div>
                 ) : (
                   <div className="space-y-1 max-h-72 overflow-y-auto">
                     {invalid.map((s) => (
                       <div key={s.sampleId} className="flex justify-between bg-red-50 border border-red-100 rounded px-3 py-1.5">
-                        <span className="font-mono text-[12px] text-red-800">{s.sampleValue}</span>
+                        <span className="font-mono text-[12px] text-red-800" dir="auto">{s.sampleValue}</span>
                         <span className="text-[11px] text-muted">×{s.sampleCount}</span>
                       </div>
                     ))}
@@ -446,12 +445,12 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
               {valid.length > 0 && (
                 <div>
                   <div className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">
-                    Sample Valid Values ({valid.length})
+                    {c.dqValidSamplesN.replace("{n}", String(valid.length))}
                   </div>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {valid.map((s) => (
                       <div key={s.sampleId} className="flex justify-between bg-emerald-50 border border-emerald-100 rounded px-3 py-1.5">
-                        <span className="font-mono text-[12px] text-emerald-800">{s.sampleValue}</span>
+                        <span className="font-mono text-[12px] text-emerald-800" dir="auto">{s.sampleValue}</span>
                         <span className="text-[11px] text-muted">×{s.sampleCount}</span>
                       </div>
                     ))}
@@ -471,8 +470,11 @@ function SamplesPanel({ resultId, onClose }: { resultId: number; onClose: () => 
 type ColumnItem = { id: number; name: string; dataType: string | null; isPk: boolean };
 
 function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: number; entityName: string; onClose: () => void; onSaved: () => void }) {
-  const { t, lookupLabel } = useLang();
+  const { t, lookupLabel, lookupCache } = useLang();
   const c = t.catalog;
+  const tpl = useDqTemplateText();
+  const dimLabel = useDqDimensionLabel();
+  const dimensionCodes = Object.keys(lookupCache["DQ_DIMENSION"] ?? {});
   const [ruleLevel, setRuleLevel] = useState<"table" | "column">("table");
   const [availableCols, setAvailableCols] = useState<ColumnItem[]>([]);
   const [selectedColIds, setSelectedColIds] = useState<number[]>([]);
@@ -496,6 +498,15 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
   );
   const template = applicableTemplates.find((t) => t.code === ruleTemplateCode) ?? applicableTemplates[0];
 
+  // Choosing a template also picks its usual dimension; the user can still change it.
+  function pickTemplate(code: string) {
+    if (code === ruleTemplateCode) return;
+    setRuleTemplateCode(code);
+    setRuleConfig({});
+    const dim = DQ_TEMPLATES.find((x) => x.code === code)?.dimension;
+    if (dim) setDimensionCode(dim);
+  }
+
   function switchLevel(level: "table" | "column") {
     if (level === ruleLevel) return;
     setRuleLevel(level);
@@ -506,7 +517,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
     );
     if (!valid) {
       const fallback = DQ_TEMPLATES.find((t) => t.assetType === level || t.assetType === "any");
-      if (fallback) { setRuleTemplateCode(fallback.code); setRuleConfig({}); }
+      if (fallback) pickTemplate(fallback.code);
     }
     if (level === "column" && availableCols.length === 0) {
       setLoadingCols(true);
@@ -532,8 +543,8 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
       : selectedColIds.map((id) => ({ assetTypeCode: "DATA_ATTRIBUTES", assetId: id }));
 
   async function save() {
-    if (!ruleName.trim()) { setError("Rule name is required"); return; }
-    if (ruleLevel === "column" && selectedColIds.length === 0) { setError("Select at least one column"); return; }
+    if (!ruleName.trim()) { setError(c.dqErrNameRequired); return; }
+    if (ruleLevel === "column" && selectedColIds.length === 0) { setError(c.dqErrSelectColumn); return; }
     setSaving(true); setError("");
     try {
       const results = await Promise.all(
@@ -557,7 +568,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
       );
       if (results.some((r) => !r.ok)) throw new Error("Some rules failed to save");
       onSaved();
-    } catch { setError("Failed to create rule(s)"); } finally { setSaving(false); }
+    } catch { setError(c.dqErrCreate); } finally { setSaving(false); }
   }
 
   const sourceName = entityCtx?.sourceName ?? "—";
@@ -591,24 +602,22 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               <button
                 type="button"
                 onClick={() => switchLevel("column")}
-                className={`px-4 py-1.5 transition-colors border-l border-line ${ruleLevel === "column" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas"}`}
+                className={`px-4 py-1.5 transition-colors border-s border-line ${ruleLevel === "column" ? "bg-brand-purple text-white" : "bg-white text-ink-soft hover:bg-canvas"}`}
               >
                 {c.dqColumnLvl}
               </button>
             </div>
             <p className="text-[11px] text-muted mt-1.5">
-              {ruleLevel === "table"
-                ? `Rule applies to the entire ${entityName} table (row counts, freshness, etc.)`
-                : `Select one or more columns — creates one rule per column`}
+              {ruleLevel === "table" ? c.dqLevelTableHint.replace("{name}", entityName) : c.dqLevelColumnHint}
             </p>
           </div>
 
           {/* ── Table level: entity chip ── */}
           {ruleLevel === "table" && (
             <div className="flex items-center gap-2.5 px-3 py-2.5 bg-canvas-soft rounded-lg border border-line">
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">TABLE</span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase">{c.tableBadge}</span>
               <span className="font-semibold text-sm text-ink">{entityName}</span>
-              <span className="text-[11px] text-muted ml-auto italic">{c.dqPreSelected}</span>
+              <span className="text-[11px] text-muted ms-auto italic">{c.dqPreSelected}</span>
             </div>
           )}
 
@@ -619,15 +628,15 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
                 <label className="block text-[11px] font-semibold text-muted">
                   {c.dqSelectCols}
                   {selectedColIds.length > 0 && (
-                    <span className="ml-2 font-normal text-brand-purple">
-                      {selectedColIds.length} selected — {selectedColIds.length} rule{selectedColIds.length !== 1 ? "s" : ""} will be created
+                    <span className="ms-2 font-normal text-brand-purple">
+                      {c.dqColsSelected.replace("{n}", String(selectedColIds.length))}
                     </span>
                   )}
                 </label>
                 {availableCols.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setSelectedColIds(availableCols.map((c) => c.id))} className="text-[10px] text-brand-purple hover:underline">All</button>
-                    <button type="button" onClick={() => setSelectedColIds([])} className="text-[10px] text-muted hover:underline">None</button>
+                    <button type="button" onClick={() => setSelectedColIds(availableCols.map((c) => c.id))} className="text-[10px] text-brand-purple hover:underline">{c.dqSelectAll}</button>
+                    <button type="button" onClick={() => setSelectedColIds([])} className="text-[10px] text-muted hover:underline">{c.dqSelectNone}</button>
                   </div>
                 )}
               </div>
@@ -671,7 +680,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
                       <div key={id} className="flex items-center gap-1 bg-brand-purple/5 border border-brand-purple/20 rounded px-2 py-0.5 text-[11px]">
                         <span className="text-muted text-[10px]">{sourceName} › {schemaName} › {entityName} › </span>
                         <span className="font-semibold text-brand-purple">{col.name}</span>
-                        <button type="button" onClick={() => toggleCol(id)} className="ml-0.5 text-muted hover:text-red-500 leading-none">×</button>
+                        <button type="button" onClick={() => toggleCol(id)} className="ms-0.5 text-muted hover:text-red-500 leading-none">×</button>
                       </div>
                     );
                   })}
@@ -684,7 +693,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           <div className="grid grid-cols-[1fr_140px] gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-muted mb-1">{t.dq.ruleNameLabel}</label>
-              <input className="input w-full text-sm" value={ruleName} onChange={(e) => setRuleName(e.target.value)} placeholder="e.g. Row Count Check" />
+              <input className="input w-full text-sm" value={ruleName} onChange={(e) => setRuleName(e.target.value)} placeholder={c.dqRuleNamePh} />
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-muted mb-1">{t.dq.severityLabel}</label>
@@ -699,19 +708,30 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           {/* ── Template picker ── */}
           <div>
             <div className="flex items-baseline gap-2 mb-2">
-              <label className="block text-[11px] font-semibold text-muted">Template</label>
-              <span className="text-[10px] text-muted">{ruleLevel}-level rules only</span>
+              <label className="block text-[11px] font-semibold text-muted">{t.dq.ruleTemplate}</label>
+              <span className="text-[10px] text-muted">{ruleLevel === "table" ? c.dqTplTableOnly : c.dqTplColumnOnly}</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {applicableTemplates.map((t) => (
                 <button key={t.code} type="button"
-                  onClick={() => { if (ruleTemplateCode !== t.code) { setRuleTemplateCode(t.code); setRuleConfig({}); } }}
-                  className={`text-left px-2.5 py-2 rounded-lg border text-[11px] transition-colors ${ruleTemplateCode === t.code ? "border-brand-purple bg-brand-purple/5 text-brand-purple" : "border-line hover:border-brand-purple/40 text-ink-soft"}`}
+                  onClick={() => pickTemplate(t.code)}
+                  title={tpl.templateDescription(t.code, t.description)}
+                  className={`text-start px-2.5 py-2 rounded-lg border text-[11px] transition-colors ${ruleTemplateCode === t.code ? "border-brand-purple bg-brand-purple/5 text-brand-purple" : "border-line hover:border-brand-purple/40 text-ink-soft"}`}
                 >
-                  <div className="font-semibold">{t.label}</div>
+                  <div className="font-semibold">{tpl.templateName(t.code, t.label)}</div>
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* ── Dimension (follows the template, can be changed) ── */}
+          <div>
+            <label className="block text-[11px] font-semibold text-muted mb-1">{t.dq.dqDimensionLabel}</label>
+            <select className="input w-full text-sm" value={dimensionCode} onChange={(e) => setDimensionCode(e.target.value)}>
+              {(dimensionCodes.includes(dimensionCode) ? dimensionCodes : [dimensionCode, ...dimensionCodes]).map((code) => (
+                <option key={code} value={code}>{dimLabel(code)}</option>
+              ))}
+            </select>
           </div>
 
           {/* ── Template config ── */}
@@ -726,7 +746,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
               ) : (
                 template.configFields.map((f) => (
                   <div key={f.key} className={f.key === "allowed_values" ? "col-span-2" : ""}>
-                    <label className="block text-[11px] text-muted mb-1">{f.label}</label>
+                    <label className="block text-[11px] text-muted mb-1">{tpl.fieldLabel(f.key, f.label)}</label>
                     {f.key === "allowed_values" ? (
                       <>
                         <textarea
@@ -735,7 +755,7 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
                           placeholder="active, inactive, pending"
                           onChange={(e) => setRuleConfig((prev) => ({ ...prev, [f.key]: e.target.value }))}
                         />
-                        <p className="text-[10px] text-muted mt-1">Comma-separated list of allowed values (e.g. active, inactive, pending)</p>
+                        <p className="text-[10px] text-muted mt-1">{c.dqAllowedValuesHint}</p>
                       </>
                     ) : (
                       <input className="input w-full text-sm" type={f.type === "number" ? "number" : "text"}
@@ -751,11 +771,11 @@ function AddRulePanel({ entityId, entityName, onClose, onSaved }: { entityId: nu
           {/* ── Thresholds ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] text-muted mb-1">Warn below (%)</label>
+              <label className="block text-[11px] text-muted mb-1">{t.dq.warnBelow} (%)</label>
               <input className="input w-full text-sm" type="number" value={thresholdWarn} onChange={(e) => setWarn(e.target.value)} />
             </div>
             <div>
-              <label className="block text-[11px] text-muted mb-1">Fail below (%)</label>
+              <label className="block text-[11px] text-muted mb-1">{t.dq.failBelow} (%)</label>
               <input className="input w-full text-sm" type="number" value={thresholdFail} onChange={(e) => setFail(e.target.value)} />
             </div>
           </div>
@@ -812,6 +832,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   const { t, lookupLabel } = useLang();
   const c = t.catalog;
   const dimLabel = useDqDimensionLabel();
+  const tpl = useDqTemplateText();
   const [rules, setRules] = useState<DqRule[]>([]);
   const [latestResults, setLatestResults] = useState<Record<number, DqResult>>({});
   const [loading, setLoading] = useState(true);
@@ -868,18 +889,18 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
       }
       await load();
     } catch {
-      setRunErrors((prev) => ({ ...prev, [ruleId]: "Failed to connect to run service" }));
+      setRunErrors((prev) => ({ ...prev, [ruleId]: c.dqRunUnreachable }));
     } finally { setRunningId(null); }
   }
 
   async function deleteRule(ruleId: number, ruleName: string) {
-    if (!confirm(`Delete the rule "${ruleName}"? This also removes its run history.`)) return;
+    if (!confirm(c.dqDeleteConfirm.replace("{name}", ruleName))) return;
     setDeletingId(ruleId);
     try {
       const res = await fetch(`/api/dq/rules/${ruleId}`, { method: "DELETE" });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        alert(d.error ?? "Failed to delete rule");
+        alert(d.error ?? c.dqDeleteFailed);
         return;
       }
       await load();
@@ -1055,10 +1076,10 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-ink">{rule.ruleName}</span>
                         {rule.assetTypeCode === "DATA_ATTRIBUTES" && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">COL</span>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 uppercase">{c.dqColChip}</span>
                         )}
                         {rule.ruleTemplateCode && (
-                          <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
+                          <span className="text-[10px] bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{tpl.templateName(rule.ruleTemplateCode)}</span>
                         )}
                         {rule.severityLevelCode && (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_RING[rule.severityLevelCode] ?? ""}`}>{lookupLabel("DQ_SEVERITY", rule.severityLevelCode)}</span>
@@ -1070,14 +1091,14 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                         </div>
                       )}
                       <div className="text-[11px] text-muted mt-0.5 flex items-center gap-3 flex-wrap">
-                        {rule.thresholdFail != null && <span>Fail &lt; {rule.thresholdFail}%</span>}
-                        {rule.thresholdWarn != null && <span>Warn &lt; {rule.thresholdWarn}%</span>}
+                        {rule.thresholdFail != null && <span>{c.dqFailBelowShort.replace("{n}", String(rule.thresholdFail))}</span>}
+                        {rule.thresholdWarn != null && <span>{c.dqWarnBelowShort.replace("{n}", String(rule.thresholdWarn))}</span>}
                         {latest?.executionTimestamp && (
-                          <span>Last: {new Date(latest.executionTimestamp).toLocaleDateString()}</span>
+                          <span>{c.dqLastRun.replace("{date}", new Date(latest.executionTimestamp).toLocaleDateString())}</span>
                         )}
-                        {latest?.recordsScanned != null && <span>Scanned: {Number(latest.recordsScanned).toLocaleString()}</span>}
+                        {latest?.recordsScanned != null && <span>{c.dqScanned.replace("{n}", Number(latest.recordsScanned).toLocaleString())}</span>}
                         {latest?.recordsFailed != null && latest.recordsFailed > 0 && (
-                          <span className="text-red-600">{Number(latest.recordsFailed).toLocaleString()} failed records</span>
+                          <span className="text-red-600">{c.dqFailedRecordsN.replace("{n}", Number(latest.recordsFailed).toLocaleString())}</span>
                         )}
                       </div>
                     </div>
@@ -1100,7 +1121,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                         <button
                           onClick={() => setSamplesResultId(latest.resultId)}
                           className="btn btn-sm text-[11px] px-2 py-1 text-red-600 border-red-200 hover:bg-red-50"
-                          title="View records that failed this check"
+                          title={c.dqViewFailingTitle}
                         >
                           {c.dqFailRecords}
                         </button>
@@ -1117,9 +1138,9 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                           onClick={() => deleteRule(rule.ruleId, rule.ruleName)}
                           disabled={deletingId === rule.ruleId}
                           className="btn btn-sm text-[11px] px-2 py-1 text-red-600 border-red-200 hover:bg-red-50"
-                          title="Delete this rule"
+                          title={c.dqDeleteTitle}
                         >
-                          {deletingId === rule.ruleId ? "…" : "Delete"}
+                          {deletingId === rule.ruleId ? "…" : t.common.delete}
                         </button>
                       )}
                     </div>
@@ -1128,7 +1149,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                   {/* Inline run error */}
                   {runErr && (
                     <div className="mx-5 mb-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-[11px] text-amber-800">
-                      <span className="shrink-0 font-bold">Execution error:</span>
+                      <span className="shrink-0 font-bold">{c.dqExecError}</span>
                       <span className="flex-1">{runErr}</span>
                       <button
                         onClick={() => setRunErrors((prev) => { const n = { ...prev }; delete n[rule.ruleId]; return n; })}
@@ -1149,7 +1170,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
           <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
             <span className="text-sm font-bold text-amber-700">{c.dqExecErrors} ({errorRules.length})</span>
             <span className="text-[11px] text-amber-600 flex-1">
-              These rules failed to execute. Review their configuration in the DQ Dashboard.
+              {c.dqExecErrorsHint}
             </span>
           </div>
           <div className="divide-y divide-line-soft">
@@ -1160,11 +1181,11 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm text-ink">{rule.ruleName}</div>
                     {rule.ruleTemplateCode && (
-                      <span className="text-[10px] font-mono bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{rule.ruleTemplateCode}</span>
+                      <span className="text-[10px] bg-canvas-soft px-1.5 py-0.5 rounded border border-line text-muted">{tpl.templateName(rule.ruleTemplateCode)}</span>
                     )}
                     {runErr && <div className="text-[11px] text-amber-700 mt-1 truncate max-w-lg">{runErr}</div>}
                   </div>
-                  <Badge text="Execution Error" className="bg-amber-100 text-amber-700 shrink-0" />
+                  <Badge text={c.dqExecErrorBadge} className="bg-amber-100 text-amber-700 shrink-0" />
                   <button
                     onClick={() => runOne(rule.ruleId)}
                     disabled={runningId === rule.ruleId}
@@ -1177,9 +1198,9 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
                       onClick={() => deleteRule(rule.ruleId, rule.ruleName)}
                       disabled={deletingId === rule.ruleId}
                       className="btn btn-sm text-[11px] px-2 py-1 shrink-0 text-red-600 border-red-200 hover:bg-red-50"
-                      title="Delete this rule"
+                      title={c.dqDeleteTitle}
                     >
-                      {deletingId === rule.ruleId ? "…" : "Delete"}
+                      {deletingId === rule.ruleId ? "…" : t.common.delete}
                     </button>
                   )}
                 </div>

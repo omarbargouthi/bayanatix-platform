@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useLang } from "@/lib/lang-context";
+import { useDqTemplateText } from "@/lib/dq-template-text";
 
 type TableRow = { id: number; name: string; schemaName: string; sourceName: string };
 type ColRow   = { id: number; name: string; dataType: string | null };
@@ -12,6 +14,9 @@ type Props = {
 };
 
 export function RefIntegrityPicker({ refTable, refColumn, onChange }: Props) {
+  const { t: tr } = useLang();
+  const dq = tr.dq;
+  const tpl = useDqTemplateText();
   const [tableSearch,  setTableSearch]  = useState("");
   const [tables,       setTables]       = useState<TableRow[]>([]);
   const [tableLoading, setTableLoading] = useState(false);
@@ -84,13 +89,13 @@ export function RefIntegrityPicker({ refTable, refColumn, onChange }: Props) {
     <div className="col-span-2 grid grid-cols-2 gap-3">
       {/* ── Reference Table ── */}
       <div ref={tableRef} className="relative">
-        <label className="block text-[11px] text-muted mb-1">Reference Table</label>
+        <label className="block text-[11px] text-muted mb-1">{tpl.fieldLabel("ref_table", "Reference Table")}</label>
         <div
           onClick={() => setTableOpen((v) => !v)}
           className="input w-full cursor-pointer flex items-center justify-between text-sm select-none"
         >
           <span className={refTable ? "text-ink" : "text-muted/50 italic"}>
-            {refTable || "Select table…"}
+            {refTable || dq.refSelectTable}
           </span>
           <span className="text-muted text-[10px] ml-2">▼</span>
         </div>
@@ -100,15 +105,15 @@ export function RefIntegrityPicker({ refTable, refColumn, onChange }: Props) {
               <input
                 autoFocus
                 className="input w-full text-xs"
-                placeholder="Search tables…"
+                placeholder={dq.refSearchTables}
                 value={tableSearch}
                 onChange={(e) => setTableSearch(e.target.value)}
               />
             </div>
             <div className="overflow-y-auto flex-1">
-              {tableLoading && <div className="px-3 py-3 text-xs text-muted">Loading…</div>}
+              {tableLoading && <div className="px-3 py-3 text-xs text-muted">{tr.common.loading}</div>}
               {!tableLoading && tables.length === 0 && (
-                <div className="px-3 py-3 text-xs text-muted">No tables found</div>
+                <div className="px-3 py-3 text-xs text-muted">{dq.refNoTables}</div>
               )}
               {!tableLoading && tables.map((t) => (
                 <div
@@ -127,13 +132,13 @@ export function RefIntegrityPicker({ refTable, refColumn, onChange }: Props) {
 
       {/* ── Reference Column ── */}
       <div ref={colRef} className="relative">
-        <label className="block text-[11px] text-muted mb-1">Reference Column</label>
+        <label className="block text-[11px] text-muted mb-1">{tpl.fieldLabel("ref_column", "Reference Column")}</label>
         <div
           onClick={() => canOpenCols && setColOpen((v) => !v)}
           className={`input w-full flex items-center justify-between text-sm select-none ${canOpenCols ? "cursor-pointer" : "opacity-50 cursor-not-allowed"}`}
         >
           <span className={refColumn ? "text-ink" : "text-muted/50 italic"}>
-            {refColumn || "Select column…"}
+            {refColumn || dq.refSelectColumn}
           </span>
           <span className="text-muted text-[10px] ml-2">▼</span>
         </div>
@@ -143,16 +148,16 @@ export function RefIntegrityPicker({ refTable, refColumn, onChange }: Props) {
               <input
                 autoFocus
                 className="input w-full text-xs"
-                placeholder="Filter columns…"
+                placeholder={dq.refFilterColumns}
                 value={colSearch}
                 onChange={(e) => setColSearch(e.target.value)}
               />
             </div>
             <div className="overflow-y-auto flex-1">
-              {colLoading && <div className="px-3 py-3 text-xs text-muted">Loading…</div>}
+              {colLoading && <div className="px-3 py-3 text-xs text-muted">{tr.common.loading}</div>}
               {!colLoading && filteredCols.length === 0 && (
                 <div className="px-3 py-3 text-xs text-muted">
-                  {selectedEntityId ? "No columns found" : "Select a table first"}
+                  {selectedEntityId ? dq.refNoColumns : dq.refSelectTableFirst}
                 </div>
               )}
               {!colLoading && filteredCols.map((c) => (
