@@ -234,9 +234,23 @@ export async function getSchemaById(schemaId: number): Promise<
       deu.unique_users_prev as "uniqueUsersPrev",
       deu.avg_query_ms      as "avgQueryMs",
       deu.avg_query_ms_prev as "avgQueryMsPrev",
-      deu.last_accessed_at  as "lastAccessedAt"
+      deu.last_accessed_at  as "lastAccessedAt",
+      -- Dimension scores, as on the table page (getTableDqDimensions)
+      dq.comp_score         as "dqCompleteness",
+      dq.validity_score     as "dqValidity"
     from bayanat.data_entities e
     left join bayanat.data_entity_usage deu on deu.entity_id = e.entity_id
+    left join lateral (
+      select
+        (avg(r.last_score) filter (where r.dimension_code = 'COMP'))::float8     as comp_score,
+        (avg(r.last_score) filter (where r.dimension_code = 'VALIDITY'))::float8 as validity_score
+      from bayanat.dq_rules r
+      left join bayanat.data_attributes a on r.asset_type_code = 'DATA_ATTRIBUTES' and a.attribute_id = r.asset_id
+      where r.is_active_indicator = true
+        and r.last_status_code is distinct from 'ERROR'
+        and ((r.asset_type_code = 'DATA_ENTITIES' and r.asset_id = e.entity_id)
+          or (r.asset_type_code = 'DATA_ATTRIBUTES' and a.entity_id = e.entity_id))
+    ) dq on true
     left join lateral (
       select
         (count(*) filter (where status_code != 'RESOLVED'))::int as open_count,

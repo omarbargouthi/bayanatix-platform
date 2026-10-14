@@ -770,6 +770,26 @@ export type I18nStrings = {
     dqAutoOpenFail:    string;
     dqFirstBaseline:   string;
     dqVsPrevRun:       string;
+    dqRulesHeading: string;
+    dqRuleSummary: string;
+    dqErrorCount: string;
+    dqRuleCountShort: string;
+    dqChartRulesPerDim: string;
+    dqChartRulesPerDimSub: string;
+    dqChartBySeverity: string;
+    dqChartBySeveritySub: string;
+    dqChartScore: string;
+    dqChartScoreSub: string;
+    dqChartResults: string;
+    dqChartResultsSub: string;
+    dqNoRulesYet: string;
+    dqRunToSeeScores: string;
+    dqAvgLabel: string;
+    dqAvgPct: string;
+    dqOtherDim: string;
+    dqPassShort: string;
+    dqWarnShort: string;
+    dqFailShort: string;
     // Table page — governance panel
     governanceRoles:   string;
     editRoles:         string;

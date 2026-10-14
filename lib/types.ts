@@ -94,6 +94,9 @@ export type DataEntity = {
   avgQueryMs?: number | null;
   avgQueryMsPrev?: number | null;
   lastAccessedAt?: string | null;
+  // Completeness and Validity dimension scores (active rules' latest results), for the list view
+  dqCompleteness?: number | null;
+  dqValidity?: number | null;
   // Set to DEPRECATED when a rescan no longer finds this table at the source —
   // soft-deleted rather than removed, so history/references stay intact.
   lifecycleStatus?: "ACTIVE" | "DEPRECATED";

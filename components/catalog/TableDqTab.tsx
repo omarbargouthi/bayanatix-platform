@@ -48,24 +48,25 @@ function Badge({ text, className }: { text: string; className: string }) {
 
 /** Chart 1 — horizontal bar: rule count per DQ dimension */
 function ChartRulesPerDimension({ rules }: { rules: DqRule[] }) {
+  const c = useLang().t.catalog;
   const dimLabel = useDqDimensionLabel();
   const byDim: Record<string, number> = {};
   for (const r of rules) {
-    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || c.dqOtherDim;
     byDim[key] = (byDim[key] ?? 0) + 1;
   }
   const entries = Object.entries(byDim).sort((a, b) => b[1] - a[1]);
   const maxVal  = Math.max(...entries.map(([, v]) => v), 1);
 
   if (entries.length === 0) {
-    return <EmptyChart label="No rules defined yet" />;
+    return <EmptyChart label={c.dqNoRulesYet} />;
   }
 
   return (
     <div className="space-y-2.5">
       {entries.map(([dim, count], i) => (
         <div key={dim} className="flex items-center gap-3">
-          <div className="w-28 text-[11px] text-ink-soft truncate text-right shrink-0">{dim}</div>
+          <div className="w-28 text-[11px] text-ink-soft truncate text-end shrink-0">{dim}</div>
           <div className="flex-1 h-6 bg-canvas-soft rounded-md overflow-hidden relative">
             <div
               className="h-full rounded-md transition-all duration-500"
@@ -84,6 +85,9 @@ function ChartRulesPerDimension({ rules }: { rules: DqRule[] }) {
 
 /** Chart 2 — horizontal bar: rule count by severity/priority */
 function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
+  const { t, lookupLabel } = useLang();
+  const c = t.catalog;
+  const sevLabel = (sev: string) => lookupLabel("DQ_SEVERITY", sev);
   const bySev: Record<string, number> = { CRITICAL: 0, WARNING: 0, INFO: 0 };
   for (const r of rules) {
     const k = r.severityLevelCode ?? "INFO";
@@ -92,7 +96,7 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
   const total  = rules.length || 1;
   const order  = ["CRITICAL", "WARNING", "INFO"];
 
-  if (rules.length === 0) return <EmptyChart label="No rules defined yet" />;
+  if (rules.length === 0) return <EmptyChart label={c.dqNoRulesYet} />;
 
   return (
     <div className="space-y-4">
@@ -106,7 +110,7 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
               key={sev}
               className="h-full transition-all duration-500 flex items-center justify-center text-white text-[10px] font-bold"
               style={{ width: `${pct}%`, background: SEV_COLORS[sev] }}
-              title={`${sev}: ${bySev[sev]} rule(s)`}
+              title={`${sevLabel(sev)} · ${c.dqRuleCountShort.replace("{n}", String(bySev[sev]))}`}
             >
               {pct > 12 ? `${Math.round(pct)}%` : ""}
             </div>
@@ -118,7 +122,7 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
         {order.map((sev) => (
           <div key={sev} className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm" style={{ background: SEV_COLORS[sev] }} />
-            <span className="text-[11px] text-muted">{sev} ({bySev[sev] ?? 0})</span>
+            <span className="text-[11px] text-muted">{sevLabel(sev)} ({bySev[sev] ?? 0})</span>
           </div>
         ))}
       </div>
@@ -129,7 +133,7 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
           const pct   = (count / total) * 100;
           return (
             <div key={sev} className="flex items-center gap-3">
-              <div className="w-20 text-[11px] text-ink-soft text-right shrink-0">{sev}</div>
+              <div className="w-20 text-[11px] text-ink-soft text-end shrink-0">{sevLabel(sev)}</div>
               <div className="flex-1 h-5 bg-canvas-soft rounded overflow-hidden">
                 <div
                   className="h-full rounded transition-all duration-500"
@@ -147,6 +151,7 @@ function ChartRulesBySeverity({ rules }: { rules: DqRule[] }) {
 
 /** Chart 3 — pie chart: aggregated DQ score % per dimension */
 function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
+  const c = useLang().t.catalog;
   const dimLabel = useDqDimensionLabel();
   // Same calculation as the DQ score card and the Schema tab: active rules only.
   const { overall, byDimension } = tableDqScore(rules, (r) => r.lastScore);
@@ -156,7 +161,7 @@ function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
     color: DIM_COLORS[i % DIM_COLORS.length],
   }));
 
-  if (entries.length === 0) return <EmptyChart label="Run rules to see dimension scores" />;
+  if (entries.length === 0) return <EmptyChart label={c.dqRunToSeeScores} />;
 
   // Build pie segments
   const size  = 140;
@@ -201,7 +206,7 @@ function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
           <text x={cx} y={cy - 6} textAnchor="middle" className="text-[10px]" fontSize="11" fontWeight="800" fill="#1a1a2e">
             {Math.round(overallAvg)}%
           </text>
-          <text x={cx} y={cy + 9} textAnchor="middle" fontSize="7" fill="#94a3b8">avg score</text>
+          <text x={cx} y={cy + 9} textAnchor="middle" fontSize="7" fill="#94a3b8">{c.dqAvgLabel}</text>
         </svg>
       </div>
       <div className="flex-1 space-y-1.5 min-w-0">
@@ -221,11 +226,12 @@ function ChartDqScorePerDimension({ rules }: { rules: DqRule[] }) {
 
 /** Chart 4 — stacked horizontal bars: PASSED/FAILED/WARNING per dimension (threshold results only) */
 function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
+  const c = useLang().t.catalog;
   const dimLabel = useDqDimensionLabel();
   // Only count successfully-executed rules (threshold outcomes)
   const byDim: Record<string, { PASSED: number; FAILED: number; WARNING: number; NONE: number }> = {};
   for (const r of rules) {
-    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || c.dqOtherDim;
     if (!byDim[key]) byDim[key] = { PASSED: 0, FAILED: 0, WARNING: 0, NONE: 0 };
     const s = r.lastStatusCode;
     if (s === "PASSED" || s === "FAILED" || s === "WARNING") byDim[key][s]++;
@@ -233,13 +239,13 @@ function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
   }
 
   const entries = Object.entries(byDim);
-  if (entries.length === 0) return <EmptyChart label="No rules to display" />;
+  if (entries.length === 0) return <EmptyChart label={c.dqNoRulesYet} />;
 
   const statusConfig = [
-    { key: "PASSED",  color: "#10B981", label: "Above threshold" },
-    { key: "WARNING", color: "#F59E0B", label: "Near threshold"  },
-    { key: "FAILED",  color: "#EF4444", label: "Below threshold" },
-    { key: "NONE",    color: "#E2E8F0", label: "Not run"         },
+    { key: "PASSED",  color: "#10B981", label: c.dqAboveThresh },
+    { key: "WARNING", color: "#F59E0B", label: c.dqNearThresh  },
+    { key: "FAILED",  color: "#EF4444", label: c.dqBelowThresh },
+    { key: "NONE",    color: "#E2E8F0", label: c.dqNotYetRun   },
   ];
 
   return (
@@ -256,7 +262,7 @@ function ChartResultsByDimension({ rules }: { rules: DqRule[] }) {
         const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
         return (
           <div key={dim} className="flex items-center gap-3">
-            <div className="w-24 text-[11px] text-ink-soft truncate text-right shrink-0">{dim}</div>
+            <div className="w-24 text-[11px] text-ink-soft truncate text-end shrink-0">{dim}</div>
             <div className="flex-1 h-6 rounded-md overflow-hidden flex">
               {statusConfig.map((s) => {
                 const cnt = counts[s.key as keyof typeof counts] ?? 0;
@@ -350,15 +356,15 @@ function OverallScoreCard({ rules }: { rules: DqRule[] }) {
       <div className="mt-3 grid grid-cols-3 gap-2 w-full text-center">
         <div className="bg-emerald-50 rounded-md py-1.5">
           <div className="text-sm font-bold text-emerald-600">{activeRules.filter((r) => r.lastStatusCode === "PASSED").length}</div>
-          <div className="text-[9px] text-muted uppercase">Pass</div>
+          <div className="text-[9px] text-muted uppercase">{c.dqPassShort}</div>
         </div>
         <div className="bg-amber-50 rounded-md py-1.5">
           <div className="text-sm font-bold text-amber-600">{activeRules.filter((r) => r.lastStatusCode === "WARNING").length}</div>
-          <div className="text-[9px] text-muted uppercase">Warn</div>
+          <div className="text-[9px] text-muted uppercase">{c.dqWarnShort}</div>
         </div>
         <div className="bg-red-50 rounded-md py-1.5">
           <div className="text-sm font-bold text-red-600">{activeRules.filter((r) => r.lastStatusCode === "FAILED" || r.lastStatusCode === "ERROR").length}</div>
-          <div className="text-[9px] text-muted uppercase">Fail</div>
+          <div className="text-[9px] text-muted uppercase">{c.dqFailShort}</div>
         </div>
       </div>
     </div>
@@ -887,7 +893,7 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
   // Group threshold-result rules by dimension
   const byDimension: Record<string, DqRule[]> = {};
   for (const r of thresholdRules) {
-    const key = dimLabel(r.dimensionCode, r.dimensionName) || "Other";
+    const key = dimLabel(r.dimensionCode, r.dimensionName) || c.dqOtherDim;
     if (!byDimension[key]) byDimension[key] = [];
     byDimension[key].push(r);
   }
@@ -906,10 +912,10 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-ink flex items-center gap-1.5">DQ Rules — {entityName} <HelpTip text={c.dqRuleCountsHow} href="/help/data-catalog#table-indicators" align="start" /></h3>
+              <h3 className="font-bold text-ink flex items-center gap-1.5"><span dir="auto">{c.dqRulesHeading.replace("{name}", entityName)}</span> <HelpTip text={c.dqRuleCountsHow} href="/help/data-catalog#table-indicators" align="start" /></h3>
               <p className="text-[11px] text-muted mt-0.5">
-                {rules.length} rule{rules.length !== 1 ? "s" : ""} across {Object.keys(byDimension).length} dimension{Object.keys(byDimension).length !== 1 ? "s" : ""}
-                {errorRules.length > 0 && <span className="text-amber-600 ml-1">· {errorRules.length} execution error{errorRules.length !== 1 ? "s" : ""}</span>}
+                {c.dqRuleSummary.replace("{n}", String(rules.length)).replace("{d}", String(Object.keys(byDimension).length))}
+                {errorRules.length > 0 && <span className="text-amber-600 ms-1">· {c.dqErrorCount.replace("{n}", String(errorRules.length))}</span>}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -941,15 +947,15 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
       {!loading && (
         <div className="grid grid-cols-2 gap-5">
           <ChartCard
-            title="Rules per DQ Dimension"
-            subtitle="Number of DQ checks defined for each quality dimension"
+            title={c.dqChartRulesPerDim}
+            subtitle={c.dqChartRulesPerDimSub}
           >
             <ChartRulesPerDimension rules={rules} />
           </ChartCard>
 
           <ChartCard
-            title="Rules by Priority / Severity"
-            subtitle="Distribution of rules by criticality level"
+            title={c.dqChartBySeverity}
+            subtitle={c.dqChartBySeveritySub}
           >
             <ChartRulesBySeverity rules={rules} />
           </ChartCard>
@@ -960,15 +966,15 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
       {!loading && (
         <div className="grid grid-cols-2 gap-5">
           <ChartCard
-            title="Aggregated DQ Score % per Dimension"
-            subtitle="Average pass rate across all rules in each dimension"
+            title={c.dqChartScore}
+            subtitle={c.dqChartScoreSub}
           >
             <ChartDqScorePerDimension rules={rules} />
           </ChartCard>
 
           <ChartCard
-            title="DQ Check Results by Dimension"
-            subtitle="Latest run outcome for each dimension — pass / warn / fail"
+            title={c.dqChartResults}
+            subtitle={c.dqChartResultsSub}
           >
             <ChartResultsByDimension rules={rules} />
           </ChartCard>
@@ -999,14 +1005,14 @@ export function TableDqTab({ entityId, entityName, canEdit }: { entityId: number
         <div key={dim} className="card overflow-hidden">
           <div className="px-5 py-3 bg-canvas-soft border-b border-line flex items-center gap-3">
             <h4 className="font-bold text-sm text-ink">{dim}</h4>
-            <span className="text-xs text-muted">{dimRules.length} rule{dimRules.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-muted">{c.dqRuleCountShort.replace("{n}", String(dimRules.length))}</span>
             {(() => {
               const scored = dimRules.filter((r) => r.isActive && r.lastScore != null && r.lastStatusCode !== "ERROR");
               if (scored.length === 0) return null;
               const avg = scored.reduce((s, r) => s + Number(r.lastScore!), 0) / scored.length;
               return (
-                <span className={`ml-auto text-sm font-bold ${avg >= 90 ? "text-emerald-600" : avg >= 70 ? "text-amber-600" : "text-red-600"}`}>
-                  {avg.toFixed(1)}% avg
+                <span className={`ms-auto text-sm font-bold ${avg >= 90 ? "text-emerald-600" : avg >= 70 ? "text-amber-600" : "text-red-600"}`}>
+                  {c.dqAvgPct.replace("{pct}", avg.toFixed(1))}
                 </span>
               );
             })()}

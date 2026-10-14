@@ -521,8 +521,8 @@ export function SchemaTableList({
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         {([
                           { label: c.trustScore,   value: trust != null ? `${trust}%` : "—" },
-                          { label: dimLabel("COMP", c.completeness), value: "—" },
-                          { label: dimLabel("VALIDITY", c.validity), value: "—" },
+                          { label: dimLabel("COMP", c.completeness), value: entity.dqCompleteness != null ? `${Math.round(entity.dqCompleteness)}%` : "—" },
+                          { label: dimLabel("VALIDITY", c.validity), value: entity.dqValidity != null ? `${Math.round(entity.dqValidity)}%` : "—" },
                         ] as { label: string; value: string }[]).map(({ label, value }) => (
                           <div key={label} className="bg-white border border-line rounded-lg px-3 py-2.5">
                             <div className="text-sm font-bold text-ink">{value}</div>
