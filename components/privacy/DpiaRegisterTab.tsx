@@ -47,7 +47,10 @@ export function DpiaRegisterTab() {
           <h2 className="text-lg font-bold text-brand-deep">{d.title}</h2>
           <p className="text-[13px] text-muted mt-1 max-w-4xl">{d.desc}</p>
         </div>
-        {canCreate && <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm shrink-0">{d.newDpia}</button>}
+        <div className="flex gap-2 shrink-0">
+          {isReviewer && <Link href="/privacy/dpia/templates" className="btn btn-sm">{t.dpiaTemplates.open}</Link>}
+          {canCreate && <button onClick={() => setCreating(true)} className="btn btn-primary btn-sm">{d.newDpia}</button>}
+        </div>
       </div>
 
       {canCreate && <SuggestionsCard suggestions={suggestions} lastChecked={lastChecked} isReviewer={isReviewer} reload={load} />}

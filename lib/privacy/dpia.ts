@@ -166,6 +166,7 @@ export async function getDpia(dpiaId: number): Promise<DpiaDetail | null> {
     FROM bayanat.dpia_template_questions q
     LEFT JOIN bayanat.dpia_answers a ON a.question_id = q.question_id AND a.dpia_id = ${dpiaId}
     WHERE q.template_id = ${extra.templateId}
+      AND (NOT q.is_retired_indicator OR a.answer_code IS NOT NULL OR btrim(coalesce(a.answer_text, '')) <> '')
     ORDER BY q.sort_order_int, q.question_id
   `;
   const risks = await sql<DpiaRisk[]>`
