@@ -14,6 +14,8 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
       { text: "Personal-data classification flows automatically to every downstream copy of a column through lineage.", href: "/lineage?view=propagation" },
       { text: "\"Assess a change\" shows every downstream asset before a column is changed and asks its owners to review.", href: "/lineage" },
       { text: "Schema changes found by re-crawls raise a metadata-update review for the table's stewards." },
+      { text: "A daily check suggests an impact assessment for tables with sensitive or large-scale personal data, data shared outside the organisation or abroad, and processing activities that handle personal data, when no assessment covers them.", href: "/privacy/dpia" },
+      { text: "Assessments are compared with the catalog: new personal-data columns, sensitive categories, sharing agreements or systems reached are flagged and notified to the owner and the privacy officers; review dates and overdue measures are reminded." },
     ],
   },
   {
@@ -33,7 +35,8 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
     evidence: [
       { text: "Every classification term carries a personal-data flag and category, shown wherever the column appears." },
       { text: "Retention categories, legal holds with record-level conditions, and purge manifests sit alongside the catalog.", href: "/privacy" },
-      { text: "A records-of-processing template requires purpose and legal basis.", href: "/assets" },
+      { text: "A records-of-processing template requires purpose and legal basis, and records data subject categories, cross-border transfers with destination countries, and the retention period.", href: "/assets" },
+      { text: "Impact assessments (DPIA) are prefilled from the catalog: personal-data columns and categories, downstream flows from lineage, sharing agreements, clear-text access grants, retention and legal holds. Screening follows the Saudi PDPL or GDPR Art. 35 questionnaire.", href: "/privacy/dpia" },
       { text: "Data-sharing agreements and the open-data workflow check classification before anything is published.", href: "/sharing" },
     ],
   },
@@ -65,7 +68,8 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
       { text: "Data access log of every view of live data, recording whether personal-data columns were masked or shown in clear text.", href: "/admin/audit-logs?tab=data-access" },
       { text: "Manual lineage changes go through approval and keep a full history; inherited classifications show where they came from.", href: "/lineage?view=register" },
       { text: "Every background job (crawls, imports, exports, propagation) keeps a log.", href: "/admin/audit-logs?tab=job-logs" },
-      { text: "When enabled by the administrator, users accept an activity-monitoring notice after signing in, explaining what is recorded and why; every decision is kept as evidence." },
+      { text: "When enabled by the administrator, users accept an activity-monitoring notice after signing in, explaining what is recorded and why; every decision is kept in a consent register, with the users who have not yet accepted, and can be exported.", href: "/admin/audit-logs?tab=consent" },
+      { text: "Every impact assessment decision (approve, approve with conditions, return, reject) freezes a version that can be read and exported to PDF later; approving a high remaining risk requires the regulator consultation to be recorded.", href: "/privacy/dpia" },
     ],
   },
   {
@@ -83,6 +87,7 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
 const GAPS = [
   "Data-subject requests for Bayanis's own user accounts (export or erase a user's profile and activity) are handled manually.",
   "Encryption keys are rotated manually; there is no built-in key-rotation tool yet.",
+  "Personal-data breaches are not recorded in Bayanis: there is no breach register or tracking of the regulator and data-subject notification deadlines.",
 ];
 
 export default function PrivacyByDesignPage() {
