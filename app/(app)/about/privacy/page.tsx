@@ -81,13 +81,13 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
       { text: "Access to personal data in clear text is tied to a purpose and legal basis, and every such access is logged." },
       { text: "Data subject requests (access, correction, erasure, restriction) are answered by following the retention path: the master table, its related tables and their PI columns, with legal-hold and retention-period exceptions, due dates and per-table tracking. Bayanis never stores the person's identity — the locate queries take it as a parameter.", href: "/privacy/requests" },
       { text: "Compliance assessments cover PDPL and other privacy regulations, with evidence and review.", href: "/governance/compliance" },
+      { text: "Every personal data breach is recorded, with the affected assets and the personal data in them read from the catalog, the risk to the people concerned, the 72-hour regulator deadline with hourly reminders, the notice to the people concerned, and a regulator report.", href: "/privacy/breaches" },
     ],
   },
 ];
 
 const GAPS = [
   "Data-subject requests for Bayanis's own user accounts (export or erase a user's profile and activity) are handled manually.",
-  "Personal-data breaches are not recorded in Bayanis: there is no breach register or tracking of the regulator and data-subject notification deadlines.",
 ];
 
 export default function PrivacyByDesignPage() {

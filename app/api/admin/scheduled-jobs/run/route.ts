@@ -5,6 +5,7 @@ import { getAllReportCodes, captureSnapshot } from "@/lib/queries/reports";
 import { captureMaturityTrendSnapshot } from "@/lib/queries/dashboard";
 import { captureComplianceTrendSnapshot } from "@/lib/queries/gov-compliance";
 import { runDpiaWatch } from "@/lib/privacy/dpia-watch";
+import { runBreachWatch } from "@/lib/privacy/breach-watch";
 
 // Hit by scripts/scheduler.mjs's poll tick (Authorization: Bearer CRON_SECRET,
 // same convention as /api/admin/sources/scheduled-crawl and
@@ -38,6 +39,9 @@ export async function POST(req: Request) {
     } else if (area.areaCode === "DPIA_WATCH") {
       // Impact assessments: suggestions, changes since decisions, review and measure reminders.
       results[area.areaCode] = await runDpiaWatch();
+    } else if (area.areaCode === "BREACH_WATCH") {
+      // Personal data breaches: reminders before and after the 72-hour regulator deadline.
+      results[area.areaCode] = await runBreachWatch();
     }
     await markScheduledJobRan(area.areaCode);
   }

@@ -9,7 +9,7 @@ type ScheduledJobArea = {
   lastRunAt:    string | null;
 };
 
-// Deliberately only the AREA-level jobs (Reports, Regulation, Impact assessments) -- crawl and
+// Deliberately only the AREA-level jobs (Reports, Regulation, Impact assessments, Data breaches) -- crawl and
 // DQ rule scheduling are per-row (one connection, one rule) and stay managed
 // from their own pages (Admin > Sources / the DQ rule editor), unchanged.
 const AREA_META: Record<string, { label: string; description: string }> = {
@@ -24,6 +24,10 @@ const AREA_META: Record<string, { label: string; description: string }> = {
   DPIA_WATCH: {
     label: "Impact assessments",
     description: "Suggests screenings for personal data no assessment covers, flags assessments whose catalog facts changed since the decision, and sends review-date and overdue-measure reminders.",
+  },
+  BREACH_WATCH: {
+    label: "Data breaches",
+    description: "Reminds the breach handler and the data protection officers when a breach's 72-hour regulator notification deadline is less than 24 hours away, and when it has passed. Runs hourly by default.",
   },
 };
 

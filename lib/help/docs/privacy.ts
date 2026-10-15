@@ -122,6 +122,59 @@ Which questionnaires are used, and the default, is chosen by an administrator in
 4. The officer decides. Follow measures and review dates in the register.`,
       },
     ],
-    related: ["data-retention", "classification", "custom-assets"],
+    related: ["data-retention", "data-breaches", "classification", "custom-assets"],
+  },
+  {
+    slug: "data-breaches",
+    group: "privacy",
+    title: "Personal data breaches",
+    summary: "Record every breach of personal data, see which data and people it affects, and notify the regulator within 72 hours.",
+    page: "/privacy/breaches",
+    sections: [
+      {
+        id: "what",
+        title: "What it is",
+        body: `The breach register under **Data Privacy › Data Breaches** records every suspected or confirmed breach of personal data, whether or not it has to be reported, as the Saudi PDPL and the GDPR require. For each breach it keeps:
+- what happened, when the organisation became aware of it, the kind of breach and its cause;
+- the **affected data**: the systems, tables or columns involved, with the catalog's facts about the personal data in them (categories, sensitive data, row counts, copies elsewhere, sharing);
+- the **risk** to the people concerned;
+- the **notifications**: to the regulator, and to the people concerned;
+- the **measures** taken to contain it and prevent it happening again, and a timeline of every step.`,
+      },
+      {
+        id: "value",
+        title: "Business value",
+        body: `- Meets the PDPL and GDPR duty to notify the regulator within 72 hours and to document every breach.
+- In minutes, the catalog shows which personal data was in the affected systems and how many people it may concern, instead of a manual investigation.
+- Deadline reminders, and a regulator report ready to send.`,
+      },
+      {
+        id: "deadline",
+        title: "The 72-hour deadline and what must be notified",
+        body: `The regulator must be notified within **72 hours of the organisation becoming aware** of the breach (PDPL Implementing Regulation, art. 24; GDPR art. 33). The clock starts from the time recorded as *When the organisation became aware*.
+
+| Risk to the people concerned | Regulator | Data subjects |
+|---|---|---|
+| Not assessed yet | Required: the deadline applies until the risk is assessed | — |
+| Unlikely to put people at risk | Not required; record why | Not required |
+| Risk to people | Required within 72 hours | Not required |
+| High risk to people | Required within 72 hours | Required without undue delay, or record why not |
+
+When the affected assets hold personal data, the catalog suggests a level: **High** for sensitive categories, large scale (100,000 rows or more) or unencrypted personal data columns, otherwise **Risk**; **Unlikely** when they hold none. The officer decides.
+
+The register shows for each breach whether the notice is due, due within 24 hours, overdue, or was made on time or late. An hourly check reminds the handler and the compliance officers once when less than 24 hours are left and once when the deadline has passed (Configuration › Scheduling › Data breaches).`,
+      },
+      {
+        id: "how",
+        title: "How to use it",
+        body: `1. Anyone who suspects a breach clicks **Report a breach**, with a short description and when it became known. Compliance officers are notified at once.
+2. The compliance officer (or administrator) assigns a handler, adds the affected assets and records the risk.
+3. Notify the regulator and record when, with their reference; notify the data subjects when the risk is high. **Regulator report (PDF)** gives the details a notification asks for.
+4. Record the containment and prevention measures, then **Close** the breach. Bayanis lists anything still missing. A report that turns out not to involve personal data is closed as **Not a breach**.
+
+Compliance officers and administrators see every breach. The person who reported a breach, and its handler, see that breach; only officers, administrators and the handler can change it. Breaches are never deleted.`,
+      },
+    ],
+    related: ["impact-assessments", "data-subject-requests", "data-catalog"],
   },
 ];

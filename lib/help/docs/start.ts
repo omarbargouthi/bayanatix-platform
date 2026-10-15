@@ -29,7 +29,7 @@ Bayanis reads the **structure** of your systems (databases, files, APIs, pipelin
         body: `| Part of the menu | What you find there |
 |---|---|
 | Top | Dashboard, your Homepage, Reports, AI Enrichment, Custom Assets and New Request |
-| Domains | Data Governance, Data Catalog (Data Assets, Glossaries, Data Lineage), Data Quality, Classification, Data Privacy (Data Retention, Data Subject Requests, Impact Assessments), Data Sharing, Open Data and FOI Requests |
+| Domains | Data Governance, Data Catalog (Data Assets, Glossaries, Data Lineage), Data Quality, Classification, Data Privacy (Data Retention, Data Subject Requests, Impact Assessments, Data Breaches), Data Sharing, Open Data and FOI Requests |
 | Administration | Users, tags, bulk operations, workflows, data sources, audit logs, configuration, AI providers, regulation setup, report KPIs and custom asset types (administrators only) |
 
 Menu items with sub-pages open and close with the arrow beside them. The menu only shows the domains you have access to.
@@ -76,7 +76,7 @@ Your name at the top of the menu opens your profile, your requests, this Help Ce
 |---|---|---|
 | Administrator | Data management office, platform owner | Everything, including Administration, configuration and final decisions |
 | Data Steward | Business or technical data steward | Edit metadata, manage quality rules, handle requests on the assets they look after |
-| Compliance Officer | Data protection officer, compliance team | Privacy work: data subject requests, impact assessment decisions, retention, legal holds |
+| Compliance Officer | Data protection officer, compliance team | Privacy work: data subject requests, impact assessment decisions, data breaches, retention, legal holds |
 | Viewer | Any employee | Search and read the catalog, raise requests |`,
       },
       {

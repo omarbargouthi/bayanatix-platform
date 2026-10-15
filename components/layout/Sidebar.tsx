@@ -138,6 +138,7 @@ export function Sidebar({ user, domainAccess }: { user: SessionUser; domainAcces
     { href: "/privacy",          label: t.nav.privacyRetention, Icon: IconHistory, exact: true },
     ...(seesDsr ? [{ href: "/privacy/requests", label: t.nav.privacyRequests, Icon: IconCollaborate }] : []),
     { href: "/privacy/dpia",     label: t.nav.privacyDpia,      Icon: IconShield },
+    { href: "/privacy/breaches", label: t.nav.privacyBreaches,  Icon: IconFlag },
   ];
   const childActive = (c: Child) => (c.exact ? pathname === c.href : isActive(c.href));
 
