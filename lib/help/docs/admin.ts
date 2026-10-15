@@ -45,7 +45,7 @@ export const ADMIN_DOCS: HelpDoc[] = [
       {
         id: "security",
         title: "Credentials",
-        body: `Passwords and client secrets are stored encrypted. Use a read-only account on the source. Bayanis needs to read the system catalog (tables, columns, keys, comments, view definitions) and, for profiling, data quality rules and sample data, to read the tables.`,
+        body: `Passwords and client secrets are stored encrypted, or, when your organisation keeps them in HashiCorp Vault, Bayanis stores only where they are in Vault and reads them each time it connects (see [Encryption keys](/help/configuration#encryption-keys)). Use a read-only account on the source. Bayanis needs to read the system catalog (tables, columns, keys, comments, view definitions) and, for profiling, data quality rules and sample data, to read the tables.`,
       },
     ],
     related: ["connectors", "data-catalog", "data-lineage"],
@@ -262,7 +262,10 @@ Bayanis can use the Transit engine of your HashiCorp Vault instead: Vault holds 
 2. Click **Test**, then **Move … to HashiCorp Vault Transit**. Every stored secret moves to Vault; nobody re-enters a password.
 3. When nothing uses the local key any more, the server administrator removes it.
 
-With Vault, **Rotate key in Vault** creates a new key version, and re-encryption happens inside Vault, so the passwords never pass through Bayanis. If Vault cannot be reached, sign-in with local accounts keeps working; connecting to data sources and AI providers fails with a clear message until Vault is back.`,
+With Vault, **Rotate key in Vault** creates a new key version, and re-encryption happens inside Vault, so the passwords never pass through Bayanis. If Vault cannot be reached, sign-in with local accounts keeps working; connecting to data sources and AI providers fails with a clear message until Vault is back.
+
+### Passwords kept in Vault
+When Vault is configured, every password field (data sources, AI provider keys, LDAP bind passwords, the SSO client secret) offers **Vault reference** next to **Password**. Enter where the password is kept, as *path#field* (for example \`secret/bayanis/finance-db#password\`), and click **Check** to confirm Bayanis can read it. Bayanis then stores only that location and reads the password from Vault each time it connects, so your security team can change it in Vault without touching Bayanis. The server administrator can limit which Vault paths may be used. On Encryption Keys, these fields are counted as **Vault reference**, and re-encryption leaves them as they are.`,
       },
     ],
     related: ["languages", "ai-providers"],

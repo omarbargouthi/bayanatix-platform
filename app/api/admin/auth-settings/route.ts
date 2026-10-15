@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { invalidVaultRef } from "@/lib/secrets-vault";
 import { getSession } from "@/lib/auth";
 import { getAuthSettings, updateAuthSettings, AuthSettingsError, type AuthSettingsPatch } from "@/lib/queries/auth-settings";
 import { clearOidcConfigCache } from "@/lib/auth/oidc";
@@ -15,6 +16,8 @@ export async function PATCH(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as AuthSettingsPatch;
 
+  const badRef = invalidVaultRef(body.oidcClientSecret, body.ldapBindPassword);
+  if (badRef) return NextResponse.json({ error: badRef }, { status: 400 });
   try {
     await updateAuthSettings(body, session.userId);
   } catch (e) {

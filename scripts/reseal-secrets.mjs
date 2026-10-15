@@ -37,7 +37,7 @@ if (!res.ok) { console.error(`Failed (${res.status}): ${body.error ?? "no detail
 const status = statusOnly ? body : body.status;
 if (!statusOnly) {
   const r = body.result;
-  console.log(`Key ${r.keyId}: ${r.resealed} re-encrypted, ${r.alreadyCurrent} already current, ${r.failed.length} failed`);
+  console.log(`Key ${r.keyId}: ${r.resealed} re-encrypted, ${r.alreadyCurrent} already current, ${r.references ?? 0} Vault reference(s) left as they are, ${r.failed.length} failed`);
   for (const f of r.failed) console.log(`  failed: ${f.store} — ${f.label}: ${f.reason}`);
   if (r.failed.length) process.exitCode = 1;
 }
@@ -47,7 +47,7 @@ console.log(`Provider ${status.provider}${status.location ? ` at ${status.locati
 if (status.otherProvider) console.log(`${status.otherProvider} stored secret(s) are still under another provider; re-encrypting moves them.`);
 for (const s of status.stores) {
   const c = s.counts;
-  console.log(`  ${s.name}: ${s.total} — ${c.current} current, ${c["older-key"]} older key, ${c.plain} not encrypted, ${c.unreadable} unreadable`);
+  console.log(`  ${s.name}: ${s.total} — ${c.current} current, ${c["older-key"]} older key, ${c.plain} not encrypted, ${c.reference ?? 0} Vault reference(s), ${c.unreadable} unreadable`);
   for (const l of s.unreadable) console.log(`    unreadable: ${l}`);
 }
 if (status.unusedPreviousKeyIds.length) {

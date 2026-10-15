@@ -5,6 +5,8 @@
 //   enc:v2:<keyId>:<iv>:<authTag>:<ciphertext>   local AES-256-GCM, names its key
 //   enc:v1:<iv>:<authTag>:<ciphertext>           older local format, key not named
 //   enc:vt:<mount>:<key>:vault:v<N>:<ciphertext>  HashiCorp Vault Transit (lib/secrets-vault.ts)
+//   ref:vault:<path>#<field>                      not a secret but where it is: read from
+//                                                 Vault KV on each use, never stored here
 //   anything else                                legacy plain text (connection
 //                                                passwords from before encryption)
 //
@@ -15,17 +17,20 @@
 // secrets move between them (lib/secrets-rotation.ts re-encrypts them).
 
 import crypto from "crypto";
-import { vaultTransitProvider } from "./secrets-vault";
+import { vaultTransitProvider, vaultKvReferences, toVaultRef, vaultRefPath } from "./secrets-vault";
 
 const ALGORITHM = "aes-256-gcm";
 const V1 = "enc:v1:";
 const V2 = "enc:v2:";
 
 /** Where a stored value stands against the active provider's current key. */
-export type SecretState = "current" | "older-key" | "plain" | "unreadable";
+/** "reference": a pointer to a password kept in Vault KV, which re-encryption leaves alone. */
+export type SecretState = "current" | "older-key" | "plain" | "unreadable" | "reference";
 
 export interface SecretProvider {
   readonly name: string;
+  /** Holds pointers to secrets kept elsewhere, not encrypted values: never the active provider. */
+  readonly reference?: boolean;
   /** True when this provider wrote the stored value (and so can open it). */
   owns(stored: string): boolean;
   seal(plaintext: string): Promise<string>;
@@ -117,12 +122,13 @@ const localProvider: SecretProvider = {
 // ── Provider selection ─────────────────────────────────────────────────────────
 // New backends register here; opening dispatches on the value's own prefix, so a
 // database part-way through a move between backends keeps working.
-const PROVIDERS: SecretProvider[] = [localProvider, vaultTransitProvider];
+const PROVIDERS: SecretProvider[] = [localProvider, vaultTransitProvider, vaultKvReferences];
 
 export function activeSecretProvider(): SecretProvider {
   const name = (process.env.SECRETS_PROVIDER ?? "local").trim().toLowerCase();
-  const p = PROVIDERS.find((x) => x.name === name);
-  if (!p) throw new Error(`SECRETS_PROVIDER "${name}" is not supported — available: ${PROVIDERS.map((x) => x.name).join(", ")}`);
+  const choices = PROVIDERS.filter((x) => !x.reference);
+  const p = choices.find((x) => x.name === name);
+  if (!p) throw new Error(`SECRETS_PROVIDER "${name}" is not supported — available: ${choices.map((x) => x.name).join(", ")}`);
   return p;
 }
 
@@ -130,9 +136,12 @@ export function isSealed(value: string | null | undefined): boolean {
   return !!value && PROVIDERS.some((p) => p.owns(value));
 }
 
-/** Encrypts with the active provider's current key. Null and "" pass through. */
+/** Encrypts with the active provider's current key. Null and "" pass through, and so
+ *  does a Vault reference ("ref:vault:<path>#<field>"), once checked. */
 export async function sealSecret(plaintext: string | null | undefined): Promise<string | null> {
   if (plaintext == null || plaintext === "") return plaintext ?? null;
+  const ref = vaultRefPath(plaintext);
+  if (ref != null) return toVaultRef(ref);
   if (isSealed(plaintext)) return plaintext;
   return activeSecretProvider().seal(plaintext);
 }
@@ -156,6 +165,6 @@ export async function inspectSecret(stored: string): Promise<{ state: SecretStat
   const p = ownerOf(stored);
   if (!p) return { state: "plain", keyId: null };
   const r = await p.inspect(stored).catch(() => ({ state: "unreadable" as SecretState, keyId: null }));
-  if (p !== activeSecretProvider() && r.state === "current") return { ...r, state: "older-key" };
+  if (!p.reference && p !== activeSecretProvider() && r.state === "current") return { ...r, state: "older-key" };
   return r;
 }

@@ -54,6 +54,7 @@ const PRINCIPLES: { title: string; summary: string; evidence: { text: string; hr
     summary: "Data is protected from collection to deletion.",
     evidence: [
       { text: "Data source passwords, AI provider keys and sign-in secrets are encrypted at rest with a key held outside the database: in the server environment (AES-256-GCM) or in the customer's HashiCorp Vault (Transit), where the key never leaves Vault. Each value records its key, so the key can be rotated and every secret re-encrypted, or moved to Vault, without re-entering passwords; each re-encryption is audited.", href: "/admin/configuration" },
+      { text: "Passwords can stay in the customer's HashiCorp Vault altogether: a password field can hold a Vault reference instead, and Bayanis reads the value on each use without storing it, within the Vault paths the administrator allows." },
       { text: "Role-based access at domain, source, schema, table and column level; single sign-on with LDAP / Active Directory and OpenID Connect." },
       { text: "Security headers on every page, including a nonce-based Content-Security-Policy (only scripts carrying that request's one-time nonce can run), HSTS, clickjacking protection and a strict referrer policy." },
       { text: "Retention schedules drive deletion, with legal holds that block it where required.", href: "/privacy" },

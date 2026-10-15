@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CustomAttributesPanel } from "@/components/catalog/CustomAttributesPanel";
+import { SecretInput } from "@/components/ui/SecretInput";
 
 type Conn = {
   connectionId: number; connectionName: string; dbTypeCode: string;
   hostAddress: string; portNumber: number; databaseName: string | null;
   serviceName: string | null; defaultSchema: string | null;
   usernameText: string | null; sslEnabled: boolean; isActiveBoolean: boolean;
+  /** Where in Vault the password is kept, when it is a Vault reference. */
+  passwordRef?: string | null;
   connectionStatus: string; lastTestedAt: string | null;
   crawlStatus: string; crawlErrorText: string | null;
   crawledSchemaCount: number; crawledTableCount: number; crawledColumnCount: number;
@@ -140,7 +143,6 @@ export default function DataSourcesPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [crawling, setCrawling]   = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [showPwd, setShowPwd]     = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Crawl config state
@@ -315,12 +317,12 @@ export default function DataSourcesPage() {
   }, [selected?.connectionId, selected?.crawlStatus]);
 
   function selectConn(c: Conn) {
-    setSelected(c); setIsAdding(false); setTestResult(null); setDeleteConfirm(false); setShowPwd(false);
+    setSelected(c); setIsAdding(false); setTestResult(null); setDeleteConfirm(false);
     setForm({ connectionName: c.connectionName, dbTypeCode: c.dbTypeCode, hostAddress: c.hostAddress, portNumber: c.portNumber, databaseName: c.databaseName || "", serviceName: c.serviceName || "", defaultSchema: c.defaultSchema || "", usernameText: c.usernameText || "", passwordText: "", sslEnabled: c.sslEnabled });
   }
 
   function startAdd() {
-    setSelected(null); setIsAdding(true); setTestResult(null); setDeleteConfirm(false); setShowPwd(false);
+    setSelected(null); setIsAdding(true); setTestResult(null); setDeleteConfirm(false);
     setForm({ ...BLANK_FORM });
   }
 
@@ -579,10 +581,7 @@ export default function DataSourcesPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-ink mb-1">Client Secret {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
-                    <div className="relative">
-                      <input type={showPwd ? "text" : "password"} autoComplete="new-password" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} />
-                      <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
-                    </div>
+                    <SecretInput value={form.passwordText} onChange={v => setForm(f => ({ ...f, passwordText: v }))} currentRef={isEditing ? selected?.passwordRef : null} />
                   </div>
                   <p className="col-span-2 text-[11px] text-muted -mt-2">
                     {form.dbTypeCode === "ADF"
@@ -607,10 +606,7 @@ export default function DataSourcesPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-ink mb-1">Password {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
-                    <div className="relative">
-                      <input type={showPwd ? "text" : "password"} autoComplete="new-password" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} placeholder={isEditing ? "unchanged" : "optional"} />
-                      <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
-                    </div>
+                    <SecretInput value={form.passwordText} onChange={v => setForm(f => ({ ...f, passwordText: v }))} currentRef={isEditing ? selected?.passwordRef : null} placeholder={isEditing ? "unchanged" : "optional"} />
                   </div>
                   </>
                 ) : (
@@ -642,10 +638,7 @@ export default function DataSourcesPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1">Password {isEditing && <span className="text-muted font-normal">(leave blank to keep)</span>}</label>
-                  <div className="relative">
-                    <input type={showPwd ? "text" : "password"} autoComplete="new-password" className="w-full border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-purple pr-10" value={form.passwordText} onChange={e => setForm(f => ({ ...f, passwordText: e.target.value }))} placeholder={isEditing ? "unchanged" : "••••••••"} />
-                    <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-2.5 text-muted hover:text-ink text-xs">{showPwd ? "Hide" : "Show"}</button>
-                  </div>
+                  <SecretInput value={form.passwordText} onChange={v => setForm(f => ({ ...f, passwordText: v }))} currentRef={isEditing ? selected?.passwordRef : null} placeholder={isEditing ? "unchanged" : "••••••••"} />
                 </div>
 
                 <div className="col-span-2 flex items-center gap-3">

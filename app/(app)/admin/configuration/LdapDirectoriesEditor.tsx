@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SecretInput } from "@/components/ui/SecretInput";
 
 // The LDAP directories behind "LDAP / Active Directory" sign-in (db/157). Each one is
 // saved on its own — independently of the Authentication page's Save button — and has
@@ -14,6 +15,7 @@ type Directory = {
   ldapUseStartTls: boolean;
   ldapBindDn: string | null;
   hasBindCredential: boolean;
+  bindCredentialRef: string | null;
   ldapBaseDn: string | null;
   ldapUserFilter: string | null;
   ldapEmailAttr: string | null;
@@ -21,7 +23,7 @@ type Directory = {
   userCount: number;
 };
 
-type Draft = Omit<Directory, "directoryId" | "hasBindCredential" | "userCount"> & { bindPassword: string };
+type Draft = Omit<Directory, "directoryId" | "hasBindCredential" | "bindCredentialRef" | "userCount"> & { bindPassword: string };
 
 const BLANK: Draft = {
   directoryName: "", isEnabled: true, ldapUrl: "", ldapUseStartTls: false, ldapBindDn: "", bindPassword: "",
@@ -121,8 +123,11 @@ export function LdapDirectoriesEditor() {
       </label>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Bind DN (service account)" placeholder="CN=svc-bayanis,OU=Service Accounts,DC=corp,DC=example,DC=com" value={draft.ldapBindDn ?? ""} onChange={(v) => set("ldapBindDn", v)} />
-        <Field label={`Bind password ${saved?.hasBindCredential ? "(set — leave blank to keep)" : ""}`} type="password"
-          placeholder={saved?.hasBindCredential ? "••••••••" : ""} value={draft.bindPassword} onChange={(v) => set("bindPassword", v)} />
+        <div>
+          <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">{`Bind password ${saved?.hasBindCredential ? "(set — leave blank to keep)" : ""}`}</label>
+          <SecretInput inputClassName="input w-full bg-white" currentRef={saved?.bindCredentialRef}
+            placeholder={saved?.hasBindCredential ? "••••••••" : ""} value={draft.bindPassword} onChange={(v) => set("bindPassword", v)} />
+        </div>
       </div>
       <Field label="Base DN — the branch this directory's users are under" placeholder="OU=Contractors,DC=corp,DC=example,DC=com" value={draft.ldapBaseDn ?? ""} onChange={(v) => set("ldapBaseDn", v)} />
       <Field label="User search filter" placeholder="(mail={{username}})" value={draft.ldapUserFilter ?? ""} onChange={(v) => set("ldapUserFilter", v)} />

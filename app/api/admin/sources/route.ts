@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { vaultRefPath, invalidVaultRef } from "@/lib/secrets-vault";
 import { getSession } from "@/lib/auth";
 import { listConnections, createConnection } from "@/lib/queries/sources";
 import { cleanSourcePath } from "@/lib/source-path";
@@ -8,7 +9,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const connections = await listConnections();
   // Mask passwords in response
-  return NextResponse.json(connections.map(c => ({ ...c, passwordText: c.passwordText ? "••••••••" : null })));
+  return NextResponse.json(connections.map(c => ({ ...c, passwordText: c.passwordText ? "••••••••" : null, passwordRef: vaultRefPath(c.passwordText) })));
 }
 
 export async function POST(req: Request) {
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
   const noPortNeeded = isFileType || isSpecType || isPipelineType;
   if (!connectionName || !hostAddress || (!noPortNeeded && !portNumber))
     return NextResponse.json({ error: noPortNeeded ? "connectionName and hostAddress (path/URL) are required" : "connectionName, dbTypeCode, hostAddress, portNumber are required" }, { status: 400 });
+  const badRef = invalidVaultRef(passwordText);
+  if (badRef) return NextResponse.json({ error: badRef }, { status: 400 });
   const id = await createConnection({
     connectionName, dbTypeCode, hostAddress, portNumber: noPortNeeded ? 0 : Number(portNumber),
     databaseName: isPipelineType ? (databaseName || null) : noPortNeeded ? null : (databaseName || null),

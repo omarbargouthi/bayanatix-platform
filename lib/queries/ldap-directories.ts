@@ -2,7 +2,7 @@
 // contractors, a subsidiary — each with its own connection and its own on/off switch.
 // The sign-in screen lists the enabled ones and the user picks which to sign in to.
 import { sql } from "../db";
-import { storeCredential, readCredential } from "./credentials";
+import { storeCredential, readCredential, CREDENTIAL_REF_SQL } from "./credentials";
 import { logCreate, logUpdate } from "../audit";
 
 /** Safe for API responses — the bind password is reduced to "is one set". */
@@ -15,6 +15,8 @@ export type LdapDirectory = {
   ldapUseStartTls: boolean;
   ldapBindDn: string | null;
   hasBindCredential: boolean;
+  /** Where in Vault the bind password is kept, when it is a Vault reference. */
+  bindCredentialRef: string | null;
   ldapBaseDn: string | null;
   ldapUserFilter: string | null;
   ldapEmailAttr: string | null;
@@ -23,7 +25,7 @@ export type LdapDirectory = {
 };
 
 /** Internal only (sign-in, test connection) — carries the decrypted bind password. */
-export type LdapDirectoryConfig = Omit<LdapDirectory, "hasBindCredential" | "userCount"> & { ldapBindPassword: string | null };
+export type LdapDirectoryConfig = Omit<LdapDirectory, "hasBindCredential" | "bindCredentialRef" | "userCount"> & { ldapBindPassword: string | null };
 
 export type LdapDirectoryInput = {
   directoryName?: string;
@@ -51,8 +53,10 @@ const COLUMNS = sql`
 export async function listLdapDirectories(): Promise<LdapDirectory[]> {
   return sql<LdapDirectory[]>`
     SELECT ${COLUMNS}, d.bind_credential_id IS NOT NULL AS "hasBindCredential",
+           ${sql.unsafe(CREDENTIAL_REF_SQL)} AS "bindCredentialRef",
            (SELECT count(*)::int FROM bayanat.users u WHERE u.ldap_directory_id = d.directory_id) AS "userCount"
     FROM bayanat.ldap_directories d
+    LEFT JOIN bayanat.llm_credentials c ON c.credential_id = d.bind_credential_id
     ORDER BY d.sort_order, d.directory_name
   `;
 }

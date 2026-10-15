@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 
-type State = "current" | "older-key" | "plain" | "unreadable";
+type State = "current" | "older-key" | "plain" | "unreadable" | "reference";
 type Store = { code: string; name: string; total: number; counts: Record<State, number>; byKey: Record<string, number>; unreadable: string[] };
 type Status = {
   provider: string; location: string | null; providerError: string | null; canRotate: boolean;
   currentKeyId: string; previousKeyIds: string[]; unusedPreviousKeyIds: string[]; otherProvider: number;
   stores: Store[]; lastReseal: { at: string; keyId: string; byUserId: string } | null;
 };
-type Result = { keyId: string; resealed: number; alreadyCurrent: number; failed: { store: string; label: string; reason: string }[] };
+type Result = { keyId: string; resealed: number; alreadyCurrent: number; references: number; failed: { store: string; label: string; reason: string }[] };
 type Test = { ok: boolean; message: string; ms: number };
 
 const PROVIDER_LABEL: Record<string, string> = {
@@ -111,6 +111,7 @@ export function EncryptionKeysSection() {
               <th className="text-end px-3 py-2 font-semibold">Current key</th>
               <th className="text-end px-3 py-2 font-semibold">{moving ? "Older key or other provider" : "Older key"}</th>
               <th className="text-end px-3 py-2 font-semibold">Not encrypted</th>
+              <th className="text-end px-3 py-2 font-semibold">Vault reference</th>
               <th className="text-end px-4 py-2 font-semibold">Unreadable</th>
             </tr>
           </thead>
@@ -122,6 +123,7 @@ export function EncryptionKeysSection() {
                 <td className="px-3 py-2 text-end tabular-nums">{s.counts.current}</td>
                 <td className={`px-3 py-2 text-end tabular-nums ${s.counts["older-key"] ? "text-amber-700 font-semibold" : ""}`}>{s.counts["older-key"]}</td>
                 <td className={`px-3 py-2 text-end tabular-nums ${s.counts.plain ? "text-amber-700 font-semibold" : ""}`}>{s.counts.plain}</td>
+                <td className="px-3 py-2 text-end tabular-nums">{s.counts.reference}</td>
                 <td className={`px-4 py-2 text-end tabular-nums ${s.counts.unreadable ? "text-red-700 font-semibold" : ""}`}>{s.counts.unreadable}</td>
               </tr>
             ))}
@@ -131,7 +133,7 @@ export function EncryptionKeysSection() {
 
       {unreadable > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-[13px] text-red-800">
-          {unreadable} stored secret(s) cannot be opened with any configured key:{" "}
+          {unreadable} stored secret(s) cannot be opened with any configured key, or Vault references cannot be read:{" "}
           {status.stores.flatMap((s) => s.unreadable).join(", ")}.{" "}
           {vault
             ? "Check that Vault is reachable, that Bayanis's policy allows decrypting with that key, and that the key version has not been retired (min_decryption_version)."
@@ -170,6 +172,7 @@ export function EncryptionKeysSection() {
       {result && (
         <div className={`rounded-xl p-4 text-[13px] border ${result.failed.length ? "bg-amber-50 border-amber-200 text-amber-900" : "bg-emerald-50 border-emerald-200 text-emerald-900"}`}>
           {result.resealed} re-encrypted with key <span className="font-mono">{result.keyId}</span>, {result.alreadyCurrent} already current
+          {result.references > 0 && <>, {result.references} Vault reference(s) left as they are</>}
           {result.failed.length > 0 && <>, {result.failed.length} failed:
             <ul className="mt-1 list-disc ms-5">{result.failed.map((f) => <li key={f.store + f.label}>{f.label} ({f.store}): {f.reason}</li>)}</ul>
           </>}

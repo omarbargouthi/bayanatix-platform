@@ -2,7 +2,7 @@
 
 import { sql } from "../db";
 import { logCreate, logUpdate } from "../audit";
-import { storeCredential, readCredential } from "./credentials";
+import { storeCredential, readCredential, CREDENTIAL_REF_SQL } from "./credentials";
 
 export type ProviderType = "MANAGED_API" | "CLOUD_REGION" | "SELF_HOSTED";
 export type ApiFlavor = "OPENAI_COMPAT" | "ANTHROPIC" | "BEDROCK" | "VERTEX";
@@ -31,12 +31,15 @@ export type ProviderProfile = {
   healthStatus: HealthStatus;
   healthCheckedAt: string | null;
   healthMessage: string | null;
+  /** Where in Vault the key is kept, when it is a Vault reference. */
+  credentialRef: string | null;
 };
 
 const PROFILE_COLS = `
   p.profile_id AS "profileId", p.profile_name_text AS "profileName", p.provider_type_code AS "providerType",
   p.api_flavor_code AS "apiFlavor", p.base_url_text AS "baseUrl", p.model_name_text AS "modelName",
   (p.credential_id IS NOT NULL) AS "hasCredential", c.last4_text AS "credentialLast4", c.rotated_at::text AS "credentialRotatedAt",
+  ${CREDENTIAL_REF_SQL} AS "credentialRef",
   p.region_text AS "region", p.max_tokens_int AS "maxTokens", p.temperature_number AS "temperature",
   p.timeout_seconds_int AS "timeoutSeconds", p.daily_token_budget AS "dailyTokenBudget",
   p.is_enabled_indicator AS "isEnabled", p.is_default_indicator AS "isDefault",
@@ -147,7 +150,7 @@ export async function setCredential(profileId: number, plaintextKey: string, use
   if (!plaintextKey.trim()) throw new Error("Credential value cannot be empty");
   const enc = await storeCredential(`profile-${profileId}`, plaintextKey.trim(), userId);
   await sql`UPDATE bayanat.llm_provider_profiles SET credential_id = ${enc.id}, updated_at = NOW() WHERE profile_id = ${profileId}`;
-  await logUpdate("LLM_PROVIDER_PROFILES", profileId, userId, [{ field: "credential", oldVal: null, newVal: `rotated (••••${enc.last4})`, force: true }]);
+  await logUpdate("LLM_PROVIDER_PROFILES", profileId, userId, [{ field: "credential", oldVal: null, newVal: enc.ref ? `Vault reference ${enc.ref}` : `rotated (••••${enc.last4})`, force: true }]);
 }
 
 /** Internal only — never call from an API route response path. */

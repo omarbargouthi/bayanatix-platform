@@ -86,12 +86,12 @@ export async function getSecretsStatus(db: Db = sql): Promise<SecretsStatus> {
     const rows = await s.list(db);
     const st: SecretStoreStatus = {
       code: s.code, name: s.name, total: rows.length,
-      counts: { current: 0, "older-key": 0, plain: 0, unreadable: 0 }, byKey: {}, unreadable: [],
+      counts: { current: 0, "older-key": 0, plain: 0, unreadable: 0, reference: 0 }, byKey: {}, unreadable: [],
     };
     for (const r of rows) {
       const { state, keyId } = await inspectSecret(r.value);
       const owner = ownerOf(r.value);
-      if (owner && owner !== active) otherProvider++;
+      if (owner && !owner.reference && owner !== active) otherProvider++;
       st.counts[state]++;
       if (keyId) { st.byKey[keyId] = (st.byKey[keyId] ?? 0) + 1; used.add(keyId); }
       if (state === "unreadable") st.unreadable.push(r.label);
@@ -112,6 +112,8 @@ export type ResealResult = {
   keyId: string;
   resealed: number;
   alreadyCurrent: number;
+  /** Vault references: nothing to re-encrypt, the password lives in Vault. */
+  references: number;
   failed: { store: string; label: string; reason: string }[];
 };
 
@@ -120,9 +122,10 @@ export type ResealResult = {
 export async function resealAll(userId: string, db: Db = sql): Promise<ResealResult> {
   const active = activeSecretProvider();
   const keyId = (await active.describe()).currentKeyId;
-  const result: ResealResult = { keyId, resealed: 0, alreadyCurrent: 0, failed: [] };
+  const result: ResealResult = { keyId, resealed: 0, alreadyCurrent: 0, references: 0, failed: [] };
   for (const s of STORES) {
     for (const r of await s.list(db)) {
+      if (ownerOf(r.value)?.reference) { result.references++; continue; }
       const { state } = await inspectSecret(r.value);
       if (state === "current") { result.alreadyCurrent++; continue; }
       try {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LdapDirectoriesEditor } from "./LdapDirectoriesEditor";
+import { SecretInput } from "@/components/ui/SecretInput";
 
 type AuthSettings = {
   localEnabled: boolean;
@@ -18,6 +19,7 @@ type AuthSettings = {
   oidcIssuerUrl: string | null;
   oidcClientId: string | null;
   oidcHasClientCredential: boolean;
+  oidcClientCredentialRef: string | null;
   oidcRedirectUri: string | null;
   oidcScopes: string | null;
   autoProvisionRoleId: number | null;
@@ -149,9 +151,11 @@ export function AuthSettingsSection() {
             value={form.oidcIssuerUrl ?? ""} onChange={(v) => setForm({ ...form, oidcIssuerUrl: v || null })} />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Client ID" value={form.oidcClientId ?? ""} onChange={(v) => setForm({ ...form, oidcClientId: v || null })} />
-            <Field label={`Client secret ${settings.oidcHasClientCredential ? "(set — leave blank to keep)" : ""}`}
-              type="password" placeholder={settings.oidcHasClientCredential ? "••••••••" : ""}
-              value={oidcClientSecret} onChange={setOidcClientSecret} />
+            <div>
+              <label className="text-[10px] font-semibold text-muted uppercase mb-1 block">{`Client secret ${settings.oidcHasClientCredential ? "(set — leave blank to keep)" : ""}`}</label>
+              <SecretInput inputClassName="input w-full" currentRef={settings.oidcClientCredentialRef}
+                placeholder={settings.oidcHasClientCredential ? "••••••••" : ""} value={oidcClientSecret} onChange={setOidcClientSecret} />
+            </div>
           </div>
           <Field label="Redirect URI" placeholder="http://localhost:3000/api/auth/oidc/callback"
             value={form.oidcRedirectUri ?? ""} onChange={(v) => setForm({ ...form, oidcRedirectUri: v || null })} />

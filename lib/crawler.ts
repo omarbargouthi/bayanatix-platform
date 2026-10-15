@@ -1188,7 +1188,7 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
   try {
     cfg.passwordText = await openSecret(cfg.passwordText);
   } catch (e) {
-    return { ok: false, message: `The stored password could not be decrypted: ${e instanceof Error ? e.message : String(e)}` };
+    return { ok: false, message: `The stored password could not be read: ${e instanceof Error ? e.message : String(e)}` };
   }
 
   try {

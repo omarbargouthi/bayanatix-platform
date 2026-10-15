@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { SecretInput } from "@/components/ui/SecretInput";
 
 type Profile = {
   profileId: number; profileName: string; providerType: string; apiFlavor: string; baseUrl: string; modelName: string;
-  hasCredential: boolean; credentialLast4: string | null; credentialRotatedAt: string | null; region: string | null;
+  hasCredential: boolean; credentialLast4: string | null; credentialRotatedAt: string | null; credentialRef: string | null; region: string | null;
   maxTokens: number; temperature: number; timeoutSeconds: number; dailyTokenBudget: number | null;
   isEnabled: boolean; isDefault: boolean; allowSampleValues: boolean; notes: string | null;
   healthStatus: string; healthCheckedAt: string | null; healthMessage: string | null;
@@ -245,14 +246,15 @@ export function AiProvidersClient() {
 
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-line-soft">
                   <span className="text-[11px] text-muted shrink-0">
-                    {p.hasCredential ? `Key: ••••${p.credentialLast4} (rotated ${p.credentialRotatedAt?.slice(0, 10)})` : "No credential set"}
+                    {!p.hasCredential ? "No credential set"
+                      : p.credentialRef ? <>Key: in Vault (set {p.credentialRotatedAt?.slice(0, 10)})</>
+                      : `Key: ••••${p.credentialLast4} (rotated ${p.credentialRotatedAt?.slice(0, 10)})`}
                   </span>
-                  <input
-                    type="password" placeholder="Set/rotate API key…" value={credentialInputs[p.profileId] ?? ""}
-                    onChange={(e) => setCredentialInputs((prev) => ({ ...prev, [p.profileId]: e.target.value }))}
-                    className="flex-1 text-[11px] border border-line rounded px-2 py-1"
-                  />
-                  <button onClick={() => setCredential(p.profileId)} className="text-[11px] font-semibold text-brand-purple hover:underline shrink-0">Save Key</button>
+                  <SecretInput compact placeholder="Set/rotate API key…" currentRef={p.credentialRef}
+                    value={credentialInputs[p.profileId] ?? ""}
+                    onChange={(v) => setCredentialInputs((prev) => ({ ...prev, [p.profileId]: v }))}
+                    inputClassName="w-full text-[11px] border border-line rounded px-2 py-1" />
+                  <button onClick={() => setCredential(p.profileId)} className="text-[11px] font-semibold text-brand-purple hover:underline shrink-0 self-end mb-1">Save Key</button>
                 </div>
               </div>
             );

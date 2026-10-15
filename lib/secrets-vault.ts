@@ -200,3 +200,112 @@ export const vaultTransitProvider: SecretProvider = {
     return label(mount, key, (await keyMeta(mount, key, true)).latest);
   },
 };
+
+// ── Vault KV references ────────────────────────────────────────────────────────
+// Instead of a password, a field can hold a pointer to it in a Vault KV engine:
+// "ref:vault:<path>#<field>", e.g. ref:vault:secret/bayanis/finance-db#password. The
+// customer's team keeps and rotates the password in Vault; Bayanis reads it each time
+// it connects and never stores it. Works with either SECRETS_PROVIDER, as long as
+// Vault is configured (VAULT_ADDR and sign-in). KV v1 and v2 are both supported; the
+// version is read from Vault. VAULT_KV_ALLOWED_PATHS (comma-separated path prefixes,
+// e.g. "secret/bayanis/") limits which paths a reference may point to.
+
+const REF = "ref:vault:";
+
+export function isVaultRef(value: string | null | undefined): boolean {
+  return !!value && value.startsWith(REF);
+}
+
+/** "secret/bayanis/db#password" → "ref:vault:secret/bayanis/db#password", after checking it. */
+export function toVaultRef(pathAndField: string): string {
+  parseRef(REF + pathAndField.trim());
+  return REF + pathAndField.trim();
+}
+
+/** The "<path>#<field>" part shown in forms (it is not secret). */
+export function vaultRefPath(value: string | null | undefined): string | null {
+  return isVaultRef(value) ? value!.slice(REF.length) : null;
+}
+
+export function vaultAllowedPaths(): string[] {
+  return (process.env.VAULT_KV_ALLOWED_PATHS ?? "").split(",").map((p) => p.trim().replace(/^\/+/, "")).filter(Boolean);
+}
+
+function parseRef(stored: string): { path: string; field: string } {
+  const body = stored.slice(REF.length);
+  const hash = body.lastIndexOf("#");
+  const path = (hash > 0 ? body.slice(0, hash) : "").replace(/^\/+|\/+$/g, "");
+  const field = hash > 0 ? body.slice(hash + 1).trim() : "";
+  if (!path || !field || !path.includes("/") || /\s|\.\./.test(path)) {
+    throw new Error(`"${body}" is not a Vault reference — write it as <mount>/<path>#<field>, e.g. secret/bayanis/finance-db#password`);
+  }
+  if (!vaultConfigured()) throw new Error("Vault is not configured on this server (VAULT_ADDR), so a Vault reference cannot be used");
+  const allowed = vaultAllowedPaths();
+  if (allowed.length && !allowed.some((p) => path.startsWith(p))) {
+    throw new Error(`Vault references must be under ${allowed.join(" or ")} (VAULT_KV_ALLOWED_PATHS)`);
+  }
+  return { path, field };
+}
+
+const kvMounts = new Map<string, { mount: string; version: number; at: number }>();
+
+async function kvMount(path: string): Promise<{ mount: string; version: number }> {
+  const hit = [...kvMounts.values()].find((m) => path.startsWith(m.mount) && Date.now() - m.at < 300_000);
+  if (hit) return hit;
+  const j = await vault("GET", `sys/internal/ui/mounts/${path.split("/").map(encodeURIComponent).join("/")}`);
+  const mount = String(j.data.path);
+  if (j.data.type && j.data.type !== "kv") throw new Error(`${mount} is not a KV secrets engine`);
+  const m = { mount, version: Number(j.data.options?.version ?? 1) === 2 ? 2 : 1, at: Date.now() };
+  kvMounts.set(mount, m);
+  return m;
+}
+
+async function readRef(stored: string): Promise<string> {
+  const { path, field } = parseRef(stored);
+  const { mount, version } = await kvMount(path);
+  const rest = path.slice(mount.length).split("/").map(encodeURIComponent).join("/");
+  let j: any;
+  try {
+    j = await vault("GET", version === 2 ? `${mount}data/${rest}` : `${mount}${rest}`);
+  } catch (e) {
+    if (e instanceof Error && /\(404/.test(e.message)) throw new Error(`Nothing is stored in Vault at ${path}`);
+    throw e;
+  }
+  const data = version === 2 ? j?.data?.data : j?.data;
+  const value = data?.[field];
+  if (value == null) throw new Error(`Vault has no field "${field}" at ${path}`);
+  return String(value);
+}
+
+export const vaultKvReferences: SecretProvider = {
+  name: "vault-kv",
+  reference: true,
+  owns: (stored) => stored.startsWith(REF),
+  async seal() { throw new Error("A Vault reference is entered, not created by encryption"); },
+  open: readRef,
+  async inspect(stored) {
+    try { await readRef(stored); return { state: "reference", keyId: null }; }
+    catch { return { state: "unreadable", keyId: null }; }
+  },
+  async describe() { throw new Error("Vault references are not a provider for new values"); },
+};
+
+/** Checks that a reference resolves, without returning the value. */
+export async function checkVaultRef(pathAndField: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    await readRef(toVaultRef(pathAndField));
+    return { ok: true, message: "Found in Vault" };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** For save routes: the reason a submitted Vault reference cannot be used, or null
+ *  (also null for an ordinary password). Lets them answer 400 instead of failing. */
+export function invalidVaultRef(...values: unknown[]): string | null {
+  for (const v of values) {
+    if (typeof v !== "string" || !isVaultRef(v.trim())) continue;
+    try { toVaultRef(vaultRefPath(v.trim())!); } catch (e) { return e instanceof Error ? e.message : String(e); }
+  }
+  return null;
+}

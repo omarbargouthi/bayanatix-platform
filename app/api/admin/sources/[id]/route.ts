@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { vaultRefPath, invalidVaultRef } from "@/lib/secrets-vault";
 import { getSession } from "@/lib/auth";
 import { getConnection, updateConnection, deleteConnection } from "@/lib/queries/sources";
 import { cleanSourcePath } from "@/lib/source-path";
@@ -10,7 +11,7 @@ export async function GET(_: Request, { params }: Params) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const conn = await getConnection(Number(params.id));
   if (!conn) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ ...conn, passwordText: conn.passwordText ? "••••••••" : null });
+  return NextResponse.json({ ...conn, passwordText: conn.passwordText ? "••••••••" : null, passwordRef: vaultRefPath(conn.passwordText) });
 }
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -21,6 +22,8 @@ export async function PATCH(req: Request, { params }: Params) {
     body.hostAddress = cleanSourcePath(body.hostAddress);
     if (!body.hostAddress) return NextResponse.json({ error: "Host / path is required" }, { status: 400 });
   }
+  const badRef = invalidVaultRef(body.passwordText);
+  if (badRef) return NextResponse.json({ error: badRef }, { status: 400 });
   await updateConnection(Number(params.id), body);
   return NextResponse.json({ ok: true });
 }

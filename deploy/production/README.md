@@ -116,6 +116,23 @@ or Rotate key in Vault on the page), followed by a re-encryption, which Vault pe
 itself (rewrap). If Vault is unreachable, local sign-in keeps working; crawls, data quality
 runs and AI calls fail with "Vault is unreachable" until it is back.
 
+### Passwords kept in Vault (references)
+
+When `VAULT_ADDR` and the sign-in settings are set (with either `SECRETS_PROVIDER`), each
+password field in Bayanis also offers **Vault reference**: the admin enters where the
+password is kept, as `path#field` (e.g. `secret/bayanis/finance-db#password`). Bayanis
+stores only that location and reads the value from Vault on every use, so the customer's
+team rotates passwords in Vault alone. KV v1 and v2 both work; the version is detected.
+Add read access to the policy, and limit references to the same paths:
+
+```hcl
+path "secret/data/bayanis/*" { capabilities = ["read"] }   # KV v2 ("secret/bayanis/...")
+```
+
+```bash
+VAULT_KV_ALLOWED_PATHS=secret/bayanis/
+```
+
 To try it locally: `powershell -ExecutionPolicy Bypass -File scripts\start-vault-dev.ps1`
 (a throw-away, in-memory Vault — move the secrets back to the local key before removing it).
 

@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { storeCredential, readCredential } from "./credentials";
+import { storeCredential, readCredential, credentialRef } from "./credentials";
 import { logUpdate } from "../audit";
 
 export type AuthSettings = {
@@ -19,6 +19,8 @@ export type AuthSettings = {
   oidcIssuerUrl: string | null;
   oidcClientId: string | null;
   oidcHasClientCredential: boolean;
+  /** Where in Vault the client secret is kept, when it is a Vault reference. */
+  oidcClientCredentialRef: string | null;
   oidcRedirectUri: string | null;
   oidcScopes: string | null;
 
@@ -82,6 +84,7 @@ export async function getAuthSettings(): Promise<AuthSettings> {
     oidcIssuerUrl: row.oidcIssuerUrl,
     oidcClientId: row.oidcClientId,
     oidcHasClientCredential: row.oidcClientCredentialId != null,
+    oidcClientCredentialRef: await credentialRef(row.oidcClientCredentialId),
     oidcRedirectUri: row.oidcRedirectUri,
     oidcScopes: row.oidcScopes,
     autoProvisionRoleId: row.autoProvisionRoleId,
