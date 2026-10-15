@@ -1185,7 +1185,11 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!cfg) throw new Error("Connection not found");
-  cfg.passwordText = await openSecret(cfg.passwordText);
+  try {
+    cfg.passwordText = await openSecret(cfg.passwordText);
+  } catch (e) {
+    return { ok: false, message: `The stored password could not be decrypted: ${e instanceof Error ? e.message : String(e)}` };
+  }
 
   try {
     if (cfg.dbTypeCode === "POSTGRES") {

@@ -89,7 +89,13 @@ export async function getAuthSettings(): Promise<AuthSettings> {
   };
 }
 
-/** Internal only (login route, test-connection route) — never expose these plaintext values in an API response. */
+/** The sign-in switches and provisioning settings, without opening any secret — so local
+ *  sign-in keeps working when the secrets backend (e.g. Vault) cannot be reached. */
+export async function getAuthSwitches(): Promise<Row> {
+  return getRow();
+}
+
+/** Internal only (SSO sign-in, test-connection route) — never expose these plaintext values in an API response. */
 export type ResolvedAuthConfig = Row & { ldapBindPassword: string | null; oidcClientSecret: string | null };
 
 export async function getResolvedAuthConfig(): Promise<ResolvedAuthConfig> {

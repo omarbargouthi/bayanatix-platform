@@ -4,7 +4,7 @@
 // relies on, and lib/can.ts for how data_read role_assignments are enforced.
 
 import { sql } from "./db";
-import { getResolvedAuthConfig } from "./queries/auth-settings";
+import { getAuthSwitches } from "./queries/auth-settings";
 import type { SessionUser } from "./types";
 
 function slugifyUserId(email: string): string {
@@ -107,7 +107,7 @@ export async function findOrCreateExternalUser(identity: ExternalIdentity): Prom
     };
   }
 
-  const authConfig = await getResolvedAuthConfig();
+  const authConfig = await getAuthSwitches();
   const userId = await uniqueUserId(slugifyUserId(identity.email));
 
   await sql`

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { findUserByEmail } from "@/lib/queries/users";
 import { setSessionCookie, signSession, verifyPassword } from "@/lib/auth";
-import { getResolvedAuthConfig } from "@/lib/queries/auth-settings";
+import { getAuthSwitches } from "@/lib/queries/auth-settings";
 import { authenticateLdap, LdapAuthError } from "@/lib/auth/ldap";
 import { getLdapDirectoryConfig, listEnabledLdapDirectoryNames } from "@/lib/queries/ldap-directories";
 import { findOrCreateExternalUser } from "@/lib/provisioning";
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many failed attempts. Try again later." }, { status: 429 });
   }
 
-  const config = await getResolvedAuthConfig();
+  const config = await getAuthSwitches();
 
   try {
     if (parsed.provider === "LDAP") {

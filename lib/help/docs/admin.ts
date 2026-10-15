@@ -245,7 +245,7 @@ You can only change assets you are allowed to edit. Jobs and their files are lis
       {
         id: "encryption-keys",
         title: "Encryption keys and key rotation",
-        body: `Data source passwords, AI provider keys, LDAP bind passwords and the SSO client secret are stored encrypted (AES-256-GCM). The key is held in the server environment, not in the database, and each stored value records which key encrypted it.
+        body: `Data source passwords, AI provider keys, LDAP bind passwords and the SSO client secret are stored encrypted. The key is never stored in the database: it is held in the server environment (AES-256-GCM), or in your HashiCorp Vault. Each stored value records which key encrypted it.
 
 **Configuration › Encryption Keys** shows the current key and any previous keys (by a short identifier, never the key itself), how many stored secrets use each, and when they were last re-encrypted.
 
@@ -254,7 +254,15 @@ You can only change assets you are allowed to edit. Jobs and their files are lis
 2. Click **Re-encrypt with the current key**. Each secret is opened with its old key, encrypted with the new one and checked before it is saved. Nobody re-enters a password.
 3. When the old key shows *no longer used*, the server administrator removes it.
 
-Every re-encryption is recorded in the audit log. A secret that cannot be opened with any configured key is listed by name, so it can be entered again.`,
+Every re-encryption is recorded in the audit log. A secret that cannot be opened with any configured key is listed by name, so it can be entered again.
+
+### Keeping the key in HashiCorp Vault
+Bayanis can use the Transit engine of your HashiCorp Vault instead: Vault holds the key and does the encryption, and Bayanis stores only what Vault returns.
+1. The server administrator sets the Vault address, the key name and how Bayanis signs in to Vault (token, AppRole or Kubernetes) in the server environment, keeping the local key for now, and restarts Bayanis.
+2. Click **Test**, then **Move … to HashiCorp Vault Transit**. Every stored secret moves to Vault; nobody re-enters a password.
+3. When nothing uses the local key any more, the server administrator removes it.
+
+With Vault, **Rotate key in Vault** creates a new key version, and re-encryption happens inside Vault, so the passwords never pass through Bayanis. If Vault cannot be reached, sign-in with local accounts keeps working; connecting to data sources and AI providers fails with a clear message until Vault is back.`,
       },
     ],
     related: ["languages", "ai-providers"],

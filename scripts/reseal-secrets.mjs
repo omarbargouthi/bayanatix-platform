@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Re-encrypts every stored secret with the current key — the command-line twin of
-// Configuration › Encryption Keys › Re-encrypt, for a key rotation done on the server.
+// Configuration › Encryption Keys › Re-encrypt, for a key rotation or a move to (or from)
+// HashiCorp Vault done on the server.
 // The running app does the work (it holds the keys), so this only calls it, with the
 // same CRON_SECRET bearer as scripts/scheduler.mjs. Safe to re-run.
 //
@@ -40,12 +41,17 @@ if (!statusOnly) {
   for (const f of r.failed) console.log(`  failed: ${f.store} — ${f.label}: ${f.reason}`);
   if (r.failed.length) process.exitCode = 1;
 }
-console.log(`Provider ${status.provider}, current key ${status.currentKeyId}, previous keys: ${status.previousKeyIds.join(", ") || "none"}`);
+if (status.providerError) console.log(`Provider ${status.provider} cannot be used: ${status.providerError}`);
+console.log(`Provider ${status.provider}${status.location ? ` at ${status.location}` : ""}, current key ${status.currentKeyId || "?"}, ` +
+  `${status.provider === "local" ? "previous keys" : "older key versions"}: ${status.previousKeyIds.join(", ") || "none"}`);
+if (status.otherProvider) console.log(`${status.otherProvider} stored secret(s) are still under another provider; re-encrypting moves them.`);
 for (const s of status.stores) {
   const c = s.counts;
   console.log(`  ${s.name}: ${s.total} — ${c.current} current, ${c["older-key"]} older key, ${c.plain} not encrypted, ${c.unreadable} unreadable`);
   for (const l of s.unreadable) console.log(`    unreadable: ${l}`);
 }
 if (status.unusedPreviousKeyIds.length) {
-  console.log(`No stored secret uses ${status.unusedPreviousKeyIds.join(", ")} any more; it can be removed from LLM_SECRETS_PREVIOUS_KEYS.`);
+  console.log(`No stored secret uses ${status.unusedPreviousKeyIds.join(", ")} any more; ` + (status.provider === "local"
+    ? "it can be removed from LLM_SECRETS_PREVIOUS_KEYS."
+    : "Vault can retire it by raising the key's min_decryption_version."));
 }

@@ -79,6 +79,46 @@ docker compose exec scheduler node scripts/reseal-secrets.mjs   # or Configurati
 empty `LLM_SECRETS_PREVIOUS_KEYS` and restart. Keep a copy of the old key as long as you
 keep database backups taken before the rotation.
 
+## Keeping the key in HashiCorp Vault
+
+With `SECRETS_PROVIDER=vault-transit`, Vault's Transit engine holds the key and does the
+encryption; Bayanis stores only Vault's ciphertext. The customer's Vault team creates:
+
+```bash
+vault secrets enable transit                      # if not already enabled
+vault write -f transit/keys/bayanis
+vault policy write bayanis - <<'EOF'
+path "transit/encrypt/bayanis"     { capabilities = ["update"] }
+path "transit/decrypt/bayanis"     { capabilities = ["update"] }
+path "transit/rewrap/bayanis"      { capabilities = ["update"] }
+path "transit/keys/bayanis"        { capabilities = ["read"] }
+path "transit/keys/bayanis/rotate" { capabilities = ["update"] }   # optional: Rotate from Bayanis
+EOF
+vault auth enable approle                         # or kubernetes / token
+vault write auth/approle/role/bayanis token_policies=bayanis token_ttl=20m token_max_ttl=1h
+vault read -field=role_id auth/approle/role/bayanis/role-id
+vault write -f -field=secret_id auth/approle/role/bayanis/secret-id
+```
+
+Then, in `.env` (all settings are in `.env.example`): `SECRETS_PROVIDER=vault-transit`,
+`VAULT_ADDR`, `VAULT_AUTH_METHOD=approle`, `VAULT_ROLE_ID` and `VAULT_SECRET_ID` (or
+`VAULT_SECRET_ID_FILE`). Keep `LLM_SECRETS_MASTER_KEY` until the move is done. A private CA
+is trusted with `NODE_EXTRA_CA_CERTS`.
+
+```bash
+docker compose up -d
+docker compose exec scheduler node scripts/reseal-secrets.mjs   # or Configuration › Encryption Keys › Move
+```
+
+When the status shows no secret left under another provider, `LLM_SECRETS_MASTER_KEY` can
+be removed. Rotation is then done in Vault (`vault write -f transit/keys/bayanis/rotate`,
+or Rotate key in Vault on the page), followed by a re-encryption, which Vault performs
+itself (rewrap). If Vault is unreachable, local sign-in keeps working; crawls, data quality
+runs and AI calls fail with "Vault is unreachable" until it is back.
+
+To try it locally: `powershell -ExecutionPolicy Bypass -File scripts\start-vault-dev.ps1`
+(a throw-away, in-memory Vault — move the secrets back to the local key before removing it).
+
 ## Releasing
 
 ```bash

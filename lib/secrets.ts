@@ -4,15 +4,18 @@
 //
 //   enc:v2:<keyId>:<iv>:<authTag>:<ciphertext>   local AES-256-GCM, names its key
 //   enc:v1:<iv>:<authTag>:<ciphertext>           older local format, key not named
+//   enc:vt:<mount>:<key>:vault:v<N>:<ciphertext>  HashiCorp Vault Transit (lib/secrets-vault.ts)
 //   anything else                                legacy plain text (connection
 //                                                passwords from before encryption)
 //
 // Secrets are write-only: nothing that returns data to a browser ever opens one.
-// All calls are async so a network backend (Vault Transit, a cloud KMS) can sit
-// behind the same functions; SECRETS_PROVIDER picks the backend new values use.
-// Only "local" exists today. Rotation of the local key: see lib/secrets-rotation.ts.
+// All calls are async so a network backend can sit behind the same functions;
+// SECRETS_PROVIDER picks the backend new values use: "local" (default) or
+// "vault-transit". Values sealed by the other backend keep opening, which is how
+// secrets move between them (lib/secrets-rotation.ts re-encrypts them).
 
 import crypto from "crypto";
+import { vaultTransitProvider } from "./secrets-vault";
 
 const ALGORITHM = "aes-256-gcm";
 const V1 = "enc:v1:";
@@ -28,7 +31,11 @@ export interface SecretProvider {
   seal(plaintext: string): Promise<string>;
   open(stored: string): Promise<string>;
   inspect(stored: string): Promise<{ state: SecretState; keyId: string | null }>;
-  describe(): { provider: string; currentKeyId: string; previousKeyIds: string[] };
+  describe(): Promise<{ provider: string; currentKeyId: string; previousKeyIds: string[]; location?: string }>;
+  /** Re-encrypts under the current key version without the plaintext leaving the backend. */
+  rewrap?(stored: string): Promise<string>;
+  /** Creates a new key version in the backend; returns its id. */
+  rotate?(): Promise<string>;
 }
 
 // ── Local provider: keys from the environment ──────────────────────────────────
@@ -101,7 +108,7 @@ const localProvider: SecretProvider = {
       return { state: "unreadable", keyId: stored.startsWith(V2) ? stored.slice(V2.length).split(":")[0] : null };
     }
   },
-  describe() {
+  async describe() {
     const { current, previous } = keyring();
     return { provider: "local", currentKeyId: current.id, previousKeyIds: previous.map((k) => k.id) };
   },
@@ -110,7 +117,7 @@ const localProvider: SecretProvider = {
 // ── Provider selection ─────────────────────────────────────────────────────────
 // New backends register here; opening dispatches on the value's own prefix, so a
 // database part-way through a move between backends keeps working.
-const PROVIDERS: SecretProvider[] = [localProvider];
+const PROVIDERS: SecretProvider[] = [localProvider, vaultTransitProvider];
 
 export function activeSecretProvider(): SecretProvider {
   const name = (process.env.SECRETS_PROVIDER ?? "local").trim().toLowerCase();
@@ -137,10 +144,18 @@ export async function openSecret(stored: string | null | undefined): Promise<str
   return p ? p.open(stored) : stored;
 }
 
-/** Where a stored value stands; used by the key-rotation status and re-encryption. */
+/** The provider that sealed a stored value (null for plain text). */
+export function ownerOf(stored: string): SecretProvider | null {
+  return PROVIDERS.find((x) => x.owns(stored)) ?? null;
+}
+
+/** Where a stored value stands; used by the key-rotation status and re-encryption.
+ *  A value sealed by another provider than the active one is "older-key" when still
+ *  readable: re-encryption moves it. */
 export async function inspectSecret(stored: string): Promise<{ state: SecretState; keyId: string | null }> {
-  const p = PROVIDERS.find((x) => x.owns(stored));
+  const p = ownerOf(stored);
   if (!p) return { state: "plain", keyId: null };
-  if (p !== activeSecretProvider()) return { state: "older-key", keyId: null };
-  return p.inspect(stored);
+  const r = await p.inspect(stored).catch(() => ({ state: "unreadable" as SecretState, keyId: null }));
+  if (p !== activeSecretProvider() && r.state === "current") return { ...r, state: "older-key" };
+  return r;
 }

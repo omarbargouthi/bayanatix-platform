@@ -1,12 +1,17 @@
-// Key rotation for stored secrets. The key itself lives in the environment, so a
-// rotation is: set the new key as LLM_SECRETS_MASTER_KEY, move the old one to
-// LLM_SECRETS_PREVIOUS_KEYS, restart, then re-encrypt here (Configuration ›
-// Encryption Keys, or scripts/reseal-secrets.mjs). Once nothing uses the old key it
-// can be removed. Re-encryption also seals any plain-text data source password.
+// Key rotation and moving secrets between backends. Re-encryption brings every stored
+// secret under the active provider's current key:
+//  * local key rotated: set the new key as LLM_SECRETS_MASTER_KEY, move the old one to
+//    LLM_SECRETS_PREVIOUS_KEYS, restart, re-encrypt; then remove the old key.
+//  * Vault Transit key rotated (in Vault, or Rotate on the page): Vault rewraps each
+//    value itself, so the plaintext never reaches Bayanis.
+//  * moving to Vault (or back): set SECRETS_PROVIDER, keep the old backend configured,
+//    restart, re-encrypt — each value is opened by the backend that sealed it.
+// Runs from Configuration › Encryption Keys or scripts/reseal-secrets.mjs. Also seals
+// any plain-text data source password.
 
 import { sql } from "./db";
 import { logUpdate } from "./audit";
-import { activeSecretProvider, inspectSecret, openSecret, sealSecret, type SecretState } from "./secrets";
+import { activeSecretProvider, inspectSecret, openSecret, ownerOf, sealSecret, type SecretState } from "./secrets";
 
 type Db = typeof sql;
 
@@ -51,8 +56,15 @@ export type SecretStoreStatus = {
 
 export type SecretsStatus = {
   provider: string;
+  /** Where the key lives, for a network backend (Vault address and namespace). */
+  location: string | null;
+  /** Set when the active provider cannot be reached or is misconfigured. */
+  providerError: string | null;
+  canRotate: boolean;
   currentKeyId: string;
   previousKeyIds: string[];
+  /** Stored values sealed by another backend than the active one, still to be moved. */
+  otherProvider: number;
   /** Previous keys no stored value uses any more: safe to remove from the environment. */
   unusedPreviousKeyIds: string[];
   stores: SecretStoreStatus[];
@@ -60,9 +72,16 @@ export type SecretsStatus = {
 };
 
 export async function getSecretsStatus(db: Db = sql): Promise<SecretsStatus> {
-  const provider = activeSecretProvider().describe();
+  const active = activeSecretProvider();
+  let provider: { provider: string; currentKeyId: string; previousKeyIds: string[]; location?: string };
+  let providerError: string | null = null;
+  try { provider = await active.describe(); } catch (e) {
+    providerError = e instanceof Error ? e.message : String(e);
+    provider = { provider: active.name, currentKeyId: "", previousKeyIds: [] };
+  }
   const stores: SecretStoreStatus[] = [];
   const used = new Set<string>();
+  let otherProvider = 0;
   for (const s of STORES) {
     const rows = await s.list(db);
     const st: SecretStoreStatus = {
@@ -71,6 +90,8 @@ export async function getSecretsStatus(db: Db = sql): Promise<SecretsStatus> {
     };
     for (const r of rows) {
       const { state, keyId } = await inspectSecret(r.value);
+      const owner = ownerOf(r.value);
+      if (owner && owner !== active) otherProvider++;
       st.counts[state]++;
       if (keyId) { st.byKey[keyId] = (st.byKey[keyId] ?? 0) + 1; used.add(keyId); }
       if (state === "unreadable") st.unreadable.push(r.label);
@@ -80,6 +101,7 @@ export async function getSecretsStatus(db: Db = sql): Promise<SecretsStatus> {
   const [cfg] = await db<{ value: string }[]>`SELECT value FROM bayanat.system_config WHERE key = 'secrets_last_reseal'`;
   return {
     ...provider,
+    location: provider.location ?? null, providerError, canRotate: !!active.rotate, otherProvider,
     unusedPreviousKeyIds: provider.previousKeyIds.filter((k) => !used.has(k)),
     stores,
     lastReseal: cfg ? JSON.parse(cfg.value) : null,
@@ -96,7 +118,8 @@ export type ResealResult = {
 /** Re-encrypts every stored secret not yet under the current key. Each value is checked
  *  by opening it again before it is written, and only replaces the exact value read. */
 export async function resealAll(userId: string, db: Db = sql): Promise<ResealResult> {
-  const keyId = activeSecretProvider().describe().currentKeyId;
+  const active = activeSecretProvider();
+  const keyId = (await active.describe()).currentKeyId;
   const result: ResealResult = { keyId, resealed: 0, alreadyCurrent: 0, failed: [] };
   for (const s of STORES) {
     for (const r of await s.list(db)) {
@@ -104,9 +127,15 @@ export async function resealAll(userId: string, db: Db = sql): Promise<ResealRes
       if (state === "current") { result.alreadyCurrent++; continue; }
       try {
         if (state === "unreadable") throw new Error("not readable with any configured key");
-        const plaintext = (await openSecret(r.value))!;
-        const sealed = (await sealSecret(plaintext))!;
-        if ((await openSecret(sealed)) !== plaintext) throw new Error("check after re-encryption failed");
+        let sealed: string;
+        if (ownerOf(r.value) === active && active.rewrap) {
+          sealed = await active.rewrap(r.value);
+          if ((await inspectSecret(sealed)).state !== "current") throw new Error("check after re-encryption failed");
+        } else {
+          const plaintext = (await openSecret(r.value))!;
+          sealed = (await sealSecret(plaintext))!;
+          if ((await openSecret(sealed)) !== plaintext) throw new Error("check after re-encryption failed");
+        }
         if (!(await s.write(db, r.id, r.value, sealed))) throw new Error("changed while re-encrypting — run again");
         result.resealed++;
       } catch (e) {
@@ -126,4 +155,27 @@ export async function logReseal(userId: string, r: ResealResult): Promise<void> 
     field: "secrets_reencrypted", oldVal: null, force: true,
     newVal: `key ${r.keyId}: ${r.resealed} re-encrypted, ${r.alreadyCurrent} already current, ${r.failed.length} failed`,
   }]);
+}
+
+/** Creates a new key version in the active backend (Vault Transit), when it allows it. */
+export async function rotateKey(userId: string): Promise<string> {
+  const active = activeSecretProvider();
+  if (!active.rotate) throw new Error("This key lives in the server environment: rotate it there (see How to rotate the key)");
+  const before = (await active.describe()).currentKeyId;
+  const after = await active.rotate();
+  await logUpdate("PLATFORM_SETTINGS", 1, userId, [{ field: "secrets_key_rotated", oldVal: before, newVal: after, force: true }]);
+  return after;
+}
+
+/** Seals and opens a test value with the active backend, without storing anything. */
+export async function testProvider(): Promise<{ ok: boolean; message: string; ms: number }> {
+  const started = Date.now();
+  try {
+    const canary = `bayanis-check-${started}`;
+    const sealed = (await sealSecret(canary))!;
+    const ok = (await openSecret(sealed)) === canary;
+    return { ok, message: ok ? "Encrypted and decrypted a test value" : "The test value did not decrypt to the same text", ms: Date.now() - started };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e), ms: Date.now() - started };
+  }
 }
