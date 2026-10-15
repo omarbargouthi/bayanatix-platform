@@ -5,7 +5,7 @@
 // report reads the same everywhere. Rendered to PDF by lib/reports/pdf-render.
 import type { I18nStrings } from "../i18n/strings";
 import { assetTypeLabel, factLines, fill } from "./dpia-text";
-import { formatSpan, type BreachDetail } from "./breach-types";
+import { authorityLabel, formatSpan, type BreachDetail } from "./breach-types";
 
 const esc = (v: unknown): string =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -28,7 +28,6 @@ export function buildBreachHtml(br: BreachDetail, t: I18nStrings, lang: string, 
     ${row(b.fRegulations, join(br.regulations, b.regulations))}
     ${row(b.fDiscoveredAt, val(utc(br.discoveredAt)))}
     ${row(`${b.fOccurredFrom} / ${b.fOccurredTo}`, `${val(utc(br.occurredFrom))} — ${val(utc(br.occurredTo))}`)}
-    ${row(b.exportDeadline, esc(utc(br.authorityDeadline)))}
     ${row(b.fOwner, contact ? `<bdi>${esc(contact.name)}</bdi>${contact.email ? ` · <bdi dir="ltr">${esc(contact.email)}</bdi>` : ""}` : none)}
     ${row(b.exportReporter, esc(br.reportedByName ?? br.reportedByUserId))}
   </table>`;
@@ -62,13 +61,15 @@ export function buildBreachHtml(br: BreachDetail, t: I18nStrings, lang: string, 
     ${row(b.fPrevention, para(br.prevention))}
   </table>`;
 
-  const notifications = `<h3>${esc(b.authTitle)}</h3><table class="kv">
-    ${row(b.colStatus, esc(fill(b.authorityStates[br.authorityState], { time: formatSpan(new Date(br.authorityDeadline).getTime() - Date.now(), b.hoursN, b.daysHours) })))}
-    ${row(b.fAuthorityName, val(br.authorityName))}
-    ${row(b.fAuthorityAt, val(utc(br.authorityNotifiedAt)))}
-    ${row(b.fAuthorityRef, val(br.authorityReference))}
-    ${br.authorityLateReason ? row(b.fLateReason, para(br.authorityLateReason)) : ""}
-  </table>
+  const notifications = br.notices.map((n) => `<h3>${esc(b.authTitle)} — ${esc(b.regulations[n.regulation])}</h3>
+  <p class="muted">${esc(b.lawRules[n.regulation])}</p><table class="kv">
+    ${row(b.colStatus, esc(fill(b.authorityStates[n.state], { time: n.deadline ? formatSpan(new Date(n.deadline).getTime() - Date.now(), b.hoursN, b.daysHours) : "" })))}
+    ${n.deadline ? row(b.exportDeadline, esc(utc(n.deadline))) : ""}
+    ${row(b.fAuthorityName, val(authorityLabel(n, b.authorities)))}
+    ${row(b.fAuthorityAt, val(utc(n.notifiedAt)))}
+    ${row(b.fAuthorityRef, val(n.reference))}
+    ${n.lateReason ? row(b.fLateReason, para(n.lateReason)) : ""}
+  </table>`).join("") + `
   <h3>${esc(b.subjTitle)}</h3><table class="kv">
     ${row(b.colSubjects, esc(b.subjectsStates[br.subjectsState]))}
     ${row(b.fSubjectsAt, val(utc(br.subjectsNotifiedAt)))}

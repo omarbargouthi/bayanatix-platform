@@ -268,7 +268,7 @@ export default function ConfigurationPage() {
             className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showPrivacyRetention ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
           >
             <div className="font-medium text-ink">Privacy &amp; Retention</div>
-            <div className="text-[10px] text-muted mt-0.5">Record retention · User consent notice · Impact assessment questionnaires</div>
+            <div className="text-[10px] text-muted mt-0.5">Record retention · User consent notice · Impact assessment questionnaires · Data breach laws</div>
           </button>
           <button
             onClick={() => { resetNav(); setSelectedGroup(null); setShowFollowSettings(true); }}

@@ -4493,12 +4493,26 @@ export type I18nStrings = {
       DUE: string;
       DUE_SOON: string;
       OVERDUE: string;
+      NOTIFIED: string;
+      ASAP: string;
     };
     subjectsStates: {
       NOT_REQUIRED: string;
       NOTIFIED: string;
       EXEMPT: string;
       PENDING: string;
+    };
+    lawRules: {
+      PDPL: string;
+      GDPR: string;
+      PIPEDA: string;
+      LAW25: string;
+    };
+    authorities: {
+      PDPL: string;
+      GDPR: string;
+      PIPEDA: string;
+      LAW25: string;
     };
     hoursN: string;
     daysHours: string;
@@ -4521,6 +4535,8 @@ export type I18nStrings = {
     regulations: {
       PDPL: string;
       GDPR: string;
+      PIPEDA: string;
+      LAW25: string;
     };
     back: string;
     loading: string;
@@ -4533,6 +4549,8 @@ export type I18nStrings = {
     deadlineOnTime: string;
     deadlineLate: string;
     deadlineNotRequired: string;
+    deadlineAsap: string;
+    deadlineNotified: string;
     deadlineNotBreach: string;
     deadlineUnassessed: string;
     actInvestigate: string;
@@ -4583,6 +4601,7 @@ export type I18nStrings = {
     authTitle: string;
     authRequired: string;
     authNotRequired: string;
+    noticeNotRequired: string;
     fAuthorityName: string;
     authorityPh: string;
     fAuthorityAt: string;
@@ -4652,6 +4671,8 @@ export type I18nStrings = {
       ACTION_INVALID: string;
       STATUS_INVALID: string;
       CLOSE_INCOMPLETE: string;
+      LAWS_REQUIRED: string;
+      LAW_NOTIFIED: string;
     };
     exportTitle: string;
     exportGenerated: string;

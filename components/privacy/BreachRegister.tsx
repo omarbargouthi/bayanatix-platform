@@ -6,11 +6,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
-import { BREACH_STATUSES, isBreachOpen, type BreachSummary } from "@/lib/privacy/breach-types";
+import { BREACH_REGULATIONS, BREACH_STATUSES, isBreachOpen, type BreachRegulation, type BreachSummary } from "@/lib/privacy/breach-types";
 import { AssetPicker, Dialog, ErrorNote, fill, type CustomTypeOption } from "./dpia-ui";
 import { AuthorityCell, BreachRiskBadge, BreachStatusBadge, SubjectsCell, breachError, fromLocalInput, toLocalInput, when } from "./breach-ui";
 
-type Options = { users: { userId: string; name: string; role: string }[]; customTypes: CustomTypeOption[]; canAssign: boolean };
+type Options = { users: { userId: string; name: string; role: string }[]; customTypes: CustomTypeOption[]; canAssign: boolean; regulations: BreachRegulation[] };
 
 export function BreachRegister() {
   const { t, lang } = useLang();
@@ -45,8 +45,8 @@ export function BreachRegister() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
           [b.kpiOpen, count((r) => isBreachOpen(r.statusCode)), ""],
-          [b.kpiDueSoon, count((r) => r.authorityState === "DUE_SOON"), "text-amber-700"],
-          [b.kpiOverdue, count((r) => r.authorityState === "OVERDUE"), "text-red-700"],
+          [b.kpiDueSoon, count((r) => r.notices.some((n) => n.state === "DUE_SOON")), "text-amber-700"],
+          [b.kpiOverdue, count((r) => r.notices.some((n) => n.state === "OVERDUE")), "text-red-700"],
           [b.kpiClosedYear, count((r) => r.statusCode === "CLOSED" && (r.closedAt ?? "").startsWith(year)), ""],
         ] as [string, number, string][]).map(([label, value, tone]) => (
           <div key={label} className="card p-4">
@@ -90,7 +90,7 @@ export function BreachRegister() {
                 <td className="px-4 py-2.5 text-[12px] text-ink-soft whitespace-nowrap">{when(r.discoveredAt, lang)}</td>
                 <td className="px-4 py-2.5"><BreachStatusBadge status={r.statusCode} /></td>
                 <td className="px-4 py-2.5"><BreachRiskBadge level={r.riskLevel} /></td>
-                <td className="px-4 py-2.5"><AuthorityCell state={r.authorityState} deadline={r.authorityDeadline} notifiedAt={r.authorityNotifiedAt} /></td>
+                <td className="px-4 py-2.5"><AuthorityCell notices={r.notices} /></td>
                 <td className="px-4 py-2.5"><SubjectsCell state={r.subjectsState} /></td>
                 <td className="px-4 py-2.5 text-[12px] text-ink-soft">
                   {r.piColumns > 0 ? fill(b.piColumnsN, { n: r.piColumns }) : "—"}
@@ -116,13 +116,16 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
   const [assets, setAssets] = useState<{ typeCode: string; id: number; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { fetch("/api/privacy/breaches?options=1").then((r) => (r.ok ? r.json() : null)).then(setOptions); }, []);
+  const [laws, setLaws] = useState<BreachRegulation[]>([]);
+  useEffect(() => {
+    fetch("/api/privacy/breaches?options=1").then((r) => (r.ok ? r.json() : null)).then((o: Options | null) => { setOptions(o); if (o) setLaws(o.regulations); });
+  }, []);
 
   async function submit() {
     setBusy(true); setError(null);
     try {
       const r = await fetch("/api/privacy/breaches", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, discoveredAt: fromLocalInput(form.discoveredAt), assets: assets.map((a) => ({ typeCode: a.typeCode, id: a.id })) }) });
+        body: JSON.stringify({ ...form, discoveredAt: fromLocalInput(form.discoveredAt), regulations: laws, assets: assets.map((a) => ({ typeCode: a.typeCode, id: a.id })) }) });
       const res = await r.json().catch(() => ({}));
       if (!r.ok) { setError(breachError(t, res)); return; }
       router.push(`/privacy/breaches/${res.breachId}`);
@@ -132,7 +135,7 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title={b.reportTitle} onClose={onClose} wide footer={<>
       <button onClick={onClose} className="btn btn-sm">{t.common.cancel}</button>
-      <button onClick={submit} disabled={busy || !form.title.trim()} className="btn btn-primary btn-sm">{busy ? b.reporting : b.submit}</button>
+      <button onClick={submit} disabled={busy || !form.title.trim() || (!!options?.canAssign && laws.length === 0)} className="btn btn-primary btn-sm">{busy ? b.reporting : b.submit}</button>
     </>}>
       <p className="text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{b.reportHint}</p>
       <div>
@@ -159,6 +162,19 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
+      {options?.canAssign && (
+        <div>
+          <label className="field-label">{b.fRegulations}</label>
+          <div className="flex flex-wrap gap-x-5 gap-y-1">
+            {BREACH_REGULATIONS.map((l) => (
+              <label key={l} className="flex items-center gap-2 text-[13px] text-ink">
+                <input type="checkbox" className="accent-brand-purple" checked={laws.includes(l)} onChange={(e) => setLaws(e.target.checked ? [...laws, l] : laws.filter((x) => x !== l))} />
+                {b.regulations[l]}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <div>
         <label className="field-label">{b.fAssets}</label>
         {assets.length > 0 && (

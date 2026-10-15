@@ -4,7 +4,7 @@
 // and times shown in the reader's own time zone (deadlines are counted in hours).
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
-import { formatSpan, type AuthorityState, type BreachRisk, type BreachStatus, type SubjectsState } from "@/lib/privacy/breach-types";
+import { formatSpan, type AuthorityState, type BreachNotice, type BreachRisk, type BreachStatus, type SubjectsState } from "@/lib/privacy/breach-types";
 import { fill } from "./dpia-ui";
 
 const PILL = "inline-block text-[11px] font-semibold border rounded-full px-2 py-0.5 whitespace-nowrap";
@@ -17,7 +17,8 @@ const RISK_STYLE: Record<BreachRisk, string> = {
   UNLIKELY: "bg-emerald-50 text-emerald-700 border-emerald-200", RISK: "bg-amber-50 text-amber-800 border-amber-200", HIGH: "bg-red-50 text-red-700 border-red-200",
 };
 const AUTHORITY_STYLE: Record<AuthorityState, string> = {
-  NOT_REQUIRED: "text-muted", ON_TIME: "text-emerald-700", LATE: "text-amber-700", DUE: "text-ink-soft", DUE_SOON: "text-amber-700 font-semibold", OVERDUE: "text-red-700 font-semibold",
+  NOT_REQUIRED: "text-muted", NOTIFIED: "text-emerald-700", ON_TIME: "text-emerald-700", LATE: "text-amber-700", ASAP: "text-amber-700 font-semibold",
+  DUE: "text-ink-soft", DUE_SOON: "text-amber-700 font-semibold", OVERDUE: "text-red-700 font-semibold",
 };
 
 export function BreachStatusBadge({ status }: { status: BreachStatus }) {
@@ -47,19 +48,25 @@ export const toLocalInput = (iso: string | null | undefined) => {
 };
 export const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
-export function AuthorityCell({ state, deadline, notifiedAt }: { state: AuthorityState; deadline: string; notifiedAt: string | null }) {
+/** One regulator notice: its state, and the deadline or the date it was made. */
+export function NoticeLine({ n, showLaw = true }: { n: BreachNotice; showLaw?: boolean }) {
   const { t, lang } = useLang();
-  const left = new Date(deadline).getTime() - Date.now();
-  const label = state === "DUE" || state === "DUE_SOON" || state === "OVERDUE"
-    ? fill(t.breach.authorityStates[state], { time: span(left, t) })
-    : t.breach.authorityStates[state];
+  const timed = n.state === "DUE" || n.state === "DUE_SOON" || n.state === "OVERDUE";
+  const label = timed ? fill(t.breach.authorityStates[n.state], { time: span(new Date(n.deadline!).getTime() - Date.now(), t) }) : t.breach.authorityStates[n.state];
   return (
-    <div className={`text-[12px] ${AUTHORITY_STYLE[state]}`}>
+    <div className={`text-[12px] ${AUTHORITY_STYLE[n.state]}`}>
+      {showLaw && <span className="text-[10px] font-bold text-muted me-1.5">{t.breach.regulations[n.regulation]}</span>}
       {label}
-      {(state === "ON_TIME" || state === "LATE") && <div className="text-[11px] text-muted font-normal">{when(notifiedAt, lang)}</div>}
-      {(state === "DUE" || state === "DUE_SOON" || state === "OVERDUE") && <div className="text-[11px] text-muted font-normal">{when(deadline, lang)}</div>}
+      {n.notifiedAt && <span className="text-[11px] text-muted font-normal"> · {when(n.notifiedAt, lang)}</span>}
+      {timed && <span className="text-[11px] text-muted font-normal"> · {when(n.deadline, lang)}</span>}
     </div>
   );
+}
+
+/** The register's regulator column: every law that applies, one line each. */
+export function AuthorityCell({ notices }: { notices: BreachNotice[] }) {
+  if (notices.length === 0) return <span className="text-[12px] text-muted">—</span>;
+  return <div className="space-y-0.5">{notices.map((n) => <NoticeLine key={n.regulation} n={n} showLaw={notices.length > 1} />)}</div>;
 }
 
 export function SubjectsCell({ state }: { state: SubjectsState }) {

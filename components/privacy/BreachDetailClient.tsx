@@ -9,11 +9,11 @@ import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import {
-  BREACH_CAUSES, BREACH_REGULATIONS, BREACH_RISKS, BREACH_TYPES, authorityRequired, isBreachOpen, subjectsRequired,
-  type BreachDetail, type BreachPermissions,
+  BREACH_CAUSES, BREACH_LAWS, BREACH_REGULATIONS, BREACH_RISKS, BREACH_TYPES, authorityLabel, isBreachOpen, subjectsRequired,
+  type BreachDetail, type BreachNotice, type BreachPermissions,
 } from "@/lib/privacy/breach-types";
 import { AssetPicker, Dialog, ErrorNote, FactLines, assetTypeLabel, factLines, fill, type CustomTypeOption } from "./dpia-ui";
-import { BreachRiskBadge, BreachStatusBadge, breachError, fromLocalInput, span, toLocalInput, when } from "./breach-ui";
+import { BreachRiskBadge, BreachStatusBadge, NoticeLine, breachError, fromLocalInput, span, toLocalInput, when } from "./breach-ui";
 
 type Loaded = { breach: BreachDetail; permissions: BreachPermissions & { canAssign?: boolean }; missing: string[] };
 type FieldKind = "text" | "textarea" | "datetime" | "number" | "select" | "multi";
@@ -110,14 +110,7 @@ export function BreachDetailClient({ breachId }: { breachId: number }) {
       <RiskSection br={br} edit={edit} save={patch} />
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Section title={b.authTitle} br={br} edit={edit} save={patch} cols={1}
-          note={authorityRequired(br.riskLevel) ? b.authRequired : b.authNotRequired}
-          fields={[
-            { key: "authorityName", label: b.fAuthorityName, kind: "text", ph: b.authorityPh },
-            { key: "authorityNotifiedAt", label: b.fAuthorityAt, kind: "datetime" },
-            { key: "authorityReference", label: b.fAuthorityRef, kind: "text" },
-            ...(br.authorityState === "LATE" || br.authorityState === "OVERDUE" || br.authorityLateReason ? [{ key: "authorityLateReason", label: b.fLateReason, kind: "textarea" as const }] : []),
-          ]} />
+        {br.notices.map((n) => <NoticeCard key={n.regulation} n={n} edit={edit} save={patch} />)}
         <Section title={b.subjTitle} br={br} edit={edit} save={patch} cols={1}
           note={subjectsRequired(br.riskLevel) ? b.subjRequired : b.subjNotRequired}
           fields={[
@@ -143,22 +136,78 @@ export function BreachDetailClient({ breachId }: { breachId: number }) {
   );
 }
 
+/** One line per law that applies: when and to whom the regulator notice is due, or was made. */
 function DeadlineBanner({ br }: { br: BreachDetail }) {
   const { t, lang } = useLang();
   const b = t.breach;
-  const deadline = when(br.authorityDeadline, lang);
-  const ms = new Date(br.authorityDeadline).getTime() - Date.now();
-  const late = br.authorityNotifiedAt ? new Date(br.authorityNotifiedAt).getTime() - new Date(br.authorityDeadline).getTime() : -ms;
-  const [tone, text] = br.statusCode === "NOT_A_BREACH" ? ["bg-slate-50 border-slate-200 text-slate-700", b.deadlineNotBreach]
-    : br.authorityState === "NOT_REQUIRED" ? ["bg-slate-50 border-slate-200 text-slate-700", b.deadlineNotRequired]
-    : br.authorityState === "ON_TIME" ? ["bg-emerald-50 border-emerald-200 text-emerald-900", fill(b.deadlineOnTime, { date: when(br.authorityNotifiedAt, lang) })]
-    : br.authorityState === "LATE" ? ["bg-amber-50 border-amber-200 text-amber-900", fill(b.deadlineLate, { date: when(br.authorityNotifiedAt, lang), late: span(late, t) })]
-    : br.authorityState === "OVERDUE" ? ["bg-red-50 border-red-300 text-red-800", fill(b.deadlineOverdue, { date: deadline, late: span(late, t) })]
-    : [br.authorityState === "DUE_SOON" ? "bg-amber-50 border-amber-300 text-amber-900" : "bg-sky-50 border-sky-200 text-sky-900", fill(b.deadlineDue, { date: deadline, left: span(ms, t) })];
+  if (br.statusCode === "NOT_A_BREACH") return <div className="rounded-xl border px-5 py-3 text-[13px] font-semibold bg-slate-50 border-slate-200 text-slate-700">{b.deadlineNotBreach}</div>;
+  const line = (n: BreachNotice) => {
+    const v = { law: b.regulations[n.regulation], authority: authorityLabel(n, b.authorities), date: when(n.deadline, lang) };
+    const due = n.deadline ? new Date(n.deadline).getTime() : 0;
+    const late = n.notifiedAt ? new Date(n.notifiedAt).getTime() - due : Date.now() - due;
+    switch (n.state) {
+      case "NOT_REQUIRED": return fill(b.deadlineNotRequired, v);
+      case "NOTIFIED": return fill(b.deadlineNotified, { ...v, date: when(n.notifiedAt, lang) });
+      case "ON_TIME": return fill(b.deadlineOnTime, { ...v, date: when(n.notifiedAt, lang) });
+      case "LATE": return fill(b.deadlineLate, { ...v, date: when(n.notifiedAt, lang), late: span(late, t) });
+      case "ASAP": return fill(b.deadlineAsap, v);
+      case "OVERDUE": return fill(b.deadlineOverdue, { ...v, late: span(late, t) });
+      default: return fill(b.deadlineDue, { ...v, left: span(due - Date.now(), t) });
+    }
+  };
+  const s = br.authorityState;
+  const tone = s === "OVERDUE" ? "bg-red-50 border-red-300 text-red-800"
+    : s === "DUE_SOON" || s === "ASAP" || s === "LATE" ? "bg-amber-50 border-amber-300 text-amber-900"
+    : s === "DUE" ? "bg-sky-50 border-sky-200 text-sky-900"
+    : s === "NOT_REQUIRED" ? "bg-slate-50 border-slate-200 text-slate-700" : "bg-emerald-50 border-emerald-200 text-emerald-900";
   return (
-    <div className={`rounded-xl border px-5 py-3 text-[13px] font-semibold ${tone}`}>
-      {text}
-      {!br.riskLevel && isBreachOpen(br.statusCode) && <span className="block text-[12px] font-normal mt-0.5">{b.deadlineUnassessed}</span>}
+    <div className={`rounded-xl border px-5 py-3 text-[13px] font-semibold space-y-0.5 ${tone}`}>
+      {br.notices.map((n) => <div key={n.regulation}>{line(n)}</div>)}
+      {!br.riskLevel && isBreachOpen(br.statusCode) && <span className="block text-[12px] font-normal mt-1">{b.deadlineUnassessed}</span>}
+    </div>
+  );
+}
+
+/** The regulator notice under one law: its rule, and when it was made. */
+function NoticeCard({ n, edit, save }: { n: BreachNotice; edit: boolean; save: (b: object) => Promise<string | null> }) {
+  const { t, lang } = useLang();
+  const b = t.breach;
+  const init = () => ({ authorityName: n.authorityName ?? "", notifiedAt: toLocalInput(n.notifiedAt), reference: n.reference ?? "", lateReason: n.lateReason ?? "" });
+  const [d, setD] = useState(init);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setD(init()); setError(null); }, [n]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = JSON.stringify(d) !== JSON.stringify(init());
+  const showLate = n.state === "LATE" || n.state === "OVERDUE" || !!n.lateReason;
+  const field = (label: string, el: React.ReactNode, value: string) => (
+    <div><label className="field-label">{label}</label>{edit ? el : <div className="text-[13px] text-ink" dir="auto">{value || "—"}</div>}</div>
+  );
+  async function submit() {
+    setBusy(true); setError(null);
+    try {
+      setError(await save({ notices: { [n.regulation]: { authorityName: d.authorityName, notifiedAt: fromLocalInput(d.notifiedAt), reference: d.reference, ...(showLate ? { lateReason: d.lateReason } : {}) } } }));
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-[15px] font-bold text-brand-deep">{b.authTitle} · {b.regulations[n.regulation]}</h2>
+        <NoticeLine n={n} showLaw={false} />
+      </div>
+      <p className="text-[12px] text-muted mt-0.5">{b.lawRules[n.regulation]}{!n.required && n.state === "NOT_REQUIRED" ? ` ${b.noticeNotRequired}` : ""}</p>
+      <div className="space-y-3 mt-3">
+        {field(b.fAuthorityName, <input className="input-field w-full" value={d.authorityName} placeholder={BREACH_LAWS[n.regulation].authority} dir="auto" onChange={(e) => setD({ ...d, authorityName: e.target.value })} />, authorityLabel(n, b.authorities))}
+        {field(b.fAuthorityAt, <input type="datetime-local" className="input-field w-full" value={d.notifiedAt} max={toLocalInput(new Date().toISOString())} onChange={(e) => setD({ ...d, notifiedAt: e.target.value })} />, when(n.notifiedAt, lang))}
+        {field(b.fAuthorityRef, <input className="input-field w-full" value={d.reference} dir="auto" onChange={(e) => setD({ ...d, reference: e.target.value })} />, n.reference ?? "")}
+        {showLate && field(b.fLateReason, <textarea className="input-field w-full" rows={2} value={d.lateReason} dir="auto" onChange={(e) => setD({ ...d, lateReason: e.target.value })} />, n.lateReason ?? "")}
+      </div>
+      {edit && dirty && (
+        <div className="flex items-center gap-2 mt-3">
+          <button onClick={submit} disabled={busy} className="btn btn-primary btn-sm">{busy ? b.saving : b.save}</button>
+          <button onClick={() => setD(init())} className="btn btn-sm">{t.common.cancel}</button>
+        </div>
+      )}
+      <ErrorNote text={error} />
     </div>
   );
 }
@@ -388,7 +437,11 @@ function MoveDialog({ kind, missing, onClose, onDone }: { kind: "CLOSE" | "NOT_A
       {blocked ? (
         <div className="text-[13px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
           <div className="font-semibold">{b.missingTitle}</div>
-          <ul className="list-disc ms-5 mt-1">{missing.map((m) => <li key={m}>{(b.missing as Record<string, string>)[m] ?? m}</li>)}</ul>
+          <ul className="list-disc ms-5 mt-1">{missing.map((m) => {
+            const [code, law] = m.split(":");
+            const text = (b.missing as Record<string, string>)[code] ?? code;
+            return <li key={m}>{law ? fill(text, { law: (b.regulations as Record<string, string>)[law] ?? law }) : text}</li>;
+          })}</ul>
         </div>
       ) : <>
         {kind !== "REOPEN" && <p className="text-[12px] text-muted">{kind === "CLOSE" ? b.closeHint : b.notBreachHint}</p>}

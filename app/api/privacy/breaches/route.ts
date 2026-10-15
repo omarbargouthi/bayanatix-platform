@@ -3,25 +3,25 @@ import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { canAccessDomain } from "@/lib/can";
 import { getCustomAssetTypes } from "@/lib/queries/custom-assets";
-import { breachUserOptions, createBreach, handlesAllBreaches, listBreaches } from "@/lib/privacy/breach";
+import { breachUserOptions, createBreach, defaultBreachRegulations, handlesAllBreaches, listBreaches } from "@/lib/privacy/breach";
 
 // Personal data breaches. Data protection officers and admins see the whole register;
 // anyone else sees the breaches they reported or were assigned to handle.
 
-// GET — the register. ?options=1 → handlers and asset types for the report form.
+// GET — the register. ?options=1 → handlers, asset types and the default laws for the report form.
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (new URL(req.url).searchParams.get("options")) {
     const all = handlesAllBreaches(session.role);
-    const [users, types] = await Promise.all([all ? breachUserOptions() : [], getCustomAssetTypes()]);
+    const [users, types, regulations] = await Promise.all([all ? breachUserOptions() : [], getCustomAssetTypes(), defaultBreachRegulations()]);
     const customTypes = types.map((x) => ({ typeCode: x.typeCode, name: x.typeNameText, nameTranslations: x.nameTranslations }));
-    return NextResponse.json({ users, customTypes, canAssign: all });
+    return NextResponse.json({ users, customTypes, canAssign: all, regulations });
   }
   return NextResponse.json({ items: await listBreaches(session), handlesAll: handlesAllBreaches(session.role) });
 }
 
-// POST { title, description?, discoveredAt?, ownerUserId?, assets?: [{ typeCode, id }] } — anyone may report,
+// POST { title, description?, discoveredAt?, ownerUserId?, assets?: [{ typeCode, id }], regulations? } — anyone may report,
 // here or from New Request.
 export async function POST(req: Request) {
   const session = await getSession();
