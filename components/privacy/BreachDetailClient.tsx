@@ -103,7 +103,7 @@ export function BreachDetailClient({ breachId }: { breachId: number }) {
         { key: "occurredTo", label: b.fOccurredTo, kind: "datetime" },
         { key: "breachTypes", label: b.fTypes, kind: "multi", options: opts(BREACH_TYPES, b.types) },
         { key: "causeCode", label: b.fCause, kind: "select", options: [["", b.causeNone], ...opts(BREACH_CAUSES, b.causes)] },
-        { key: "regulations", label: b.fRegulations, kind: "multi", options: opts(BREACH_REGULATIONS, b.regulations) },
+        { key: "regulations", label: b.fRegulations, kind: "multi", options: opts(BREACH_REGULATIONS.filter((l) => br.regulations.includes(l) || frameworks.find((f) => f.law === l)?.applicable), b.regulations) },
       ]} />
 
       <AffectedData br={br} edit={edit} customTypes={options?.customTypes ?? []} post={post} save={patch} />

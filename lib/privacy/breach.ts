@@ -196,8 +196,10 @@ export async function createBreach(
 
   const [{ n }] = await sql<{ n: number }[]>`SELECT nextval('bayanat.breach_reference_seq')::int AS n`;
   const reference = `BR-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
-  const chosen = pick(input.regulations, BREACH_REGULATIONS);
-  const laws = chosen.length ? chosen : await defaultBreachRegulations();
+  // Only laws whose framework is applicable; inactive ones are not offered.
+  const active = await defaultBreachRegulations();
+  const chosen = pick(input.regulations, active);
+  const laws = chosen.length ? chosen : active;
   const [row] = await sql<{ breachId: number }[]>`
     INSERT INTO bayanat.privacy_breaches (reference_code, title_text, description_text, discovered_at, owner_user_id, reported_by_user_id, regulations)
     VALUES (${reference}, ${title}, ${text(input.description)}, ${discovered}, ${owner}, ${session.userId}, ${laws})
@@ -279,7 +281,10 @@ export async function updateBreach(breachId: number, input: Record<string, unkno
   // The laws that apply; dropping one is refused once its regulator has been notified.
   let laws: BreachRegulation[] | null = null;
   if ("regulations" in input) {
-    laws = pick(input.regulations, BREACH_REGULATIONS);
+    // Applicable laws, plus any already on the breach (its framework may have been switched off since).
+    const [cur] = await sql<{ regulations: BreachRegulation[] }[]>`SELECT regulations FROM bayanat.privacy_breaches WHERE breach_id = ${breachId}`;
+    const active = await defaultBreachRegulations();
+    laws = pick(input.regulations, BREACH_REGULATIONS.filter((l) => active.includes(l) || cur.regulations.includes(l)));
     if (laws.length === 0) return fail("LAWS_REQUIRED", "Choose at least one law.");
     const [kept] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM bayanat.privacy_breach_notices
       WHERE breach_id = ${breachId} AND notified_at IS NOT NULL AND NOT (regulation_code = ANY(${laws}))`;

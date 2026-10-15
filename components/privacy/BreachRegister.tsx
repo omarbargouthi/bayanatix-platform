@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
-import { BREACH_REGULATIONS, BREACH_STATUSES, isBreachOpen, type BreachRegulation, type BreachSummary } from "@/lib/privacy/breach-types";
+import { BREACH_STATUSES, isBreachOpen, type BreachRegulation, type BreachSummary } from "@/lib/privacy/breach-types";
 import { AssetPicker, Dialog, ErrorNote, fill, type CustomTypeOption } from "./dpia-ui";
 import { AuthorityCell, BreachRiskBadge, BreachStatusBadge, SubjectsCell, breachError, fromLocalInput, toLocalInput, when } from "./breach-ui";
 
@@ -135,7 +135,7 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title={b.reportTitle} onClose={onClose} wide footer={<>
       <button onClick={onClose} className="btn btn-sm">{t.common.cancel}</button>
-      <button onClick={submit} disabled={busy || !form.title.trim() || (!!options?.canAssign && laws.length === 0)} className="btn btn-primary btn-sm">{busy ? b.reporting : b.submit}</button>
+      <button onClick={submit} disabled={busy || !form.title.trim() || (!!options?.canAssign && options.regulations.length > 0 && laws.length === 0)} className="btn btn-primary btn-sm">{busy ? b.reporting : b.submit}</button>
     </>}>
       <p className="text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{b.reportHint}</p>
       <div>
@@ -162,11 +162,11 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-      {options?.canAssign && (
+      {options?.canAssign && options.regulations.length > 0 && (
         <div>
           <label className="field-label">{b.fRegulations}</label>
           <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {BREACH_REGULATIONS.map((l) => (
+            {options.regulations.map((l) => (
               <label key={l} className="flex items-center gap-2 text-[13px] text-ink">
                 <input type="checkbox" className="accent-brand-purple" checked={laws.includes(l)} onChange={(e) => setLaws(e.target.checked ? [...laws, l] : laws.filter((x) => x !== l))} />
                 {b.regulations[l]}
