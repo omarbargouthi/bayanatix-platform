@@ -107,7 +107,7 @@ An assessment is usually about a **processing activity** (from the records of pr
 
 Compliance officers and administrators edit them under **Questionnaires**, in English; translations are made in Languages & Translations.
 
-Which questionnaires are used, and the default, is chosen by an administrator in Configuration › Privacy & Retention. Edits apply to assessments not yet decided; questions already answered are retired rather than deleted.`,
+Which questionnaires are used, and the default, is chosen by an administrator in Configuration › Privacy & Retention. A questionnaire linked to a compliance framework (Governance › Compliance) is offered only while that framework is marked applicable in Regulation Setup. Edits apply to assessments not yet decided; questions already answered are retired rather than deleted.`,
       },
       {
         id: "watch",
@@ -140,7 +140,7 @@ Which questionnaires are used, and the default, is chosen by an administrator in
       {
         id: "what",
         title: "What it is",
-        body: `The breach register under **Data Privacy › Data Breaches** records every suspected or confirmed breach of personal data, whether or not it has to be reported, as the Saudi PDPL, the GDPR, Canada's PIPEDA and Québec's Law 25 require. For each breach it keeps:
+        body: `The breach register under **Data Privacy › Data Breaches** records every suspected or confirmed breach of personal data, whether or not it has to be reported, as the Saudi PDPL, the GDPR, Canada's PIPEDA, Québec's Law 25 and Ontario's PHIPA require. For each breach it keeps:
 - what happened, when the organisation became aware of it, the kind of breach and its cause;
 - the **laws that apply**, each with its own regulator and rule;
 - the **affected data**: the systems, tables or columns involved, with the catalog's facts about the personal data in them (categories, sensitive data, row counts, copies elsewhere, sharing);
@@ -158,7 +158,7 @@ Which questionnaires are used, and the default, is chosen by an administrator in
       {
         id: "deadline",
         title: "Laws, deadlines and what must be notified",
-        body: `Each breach lists the laws that apply. The laws preselected on a new breach are chosen by an administrator in Configuration › Privacy & Retention › Data breach laws; the handler can change them on the breach. Each law adds a notice to its regulator:
+        body: `Each breach lists the laws that apply. A new breach starts with the laws whose compliance framework is marked applicable in Regulation Setup (Configuration › Privacy & Retention › Data breach laws shows which); the handler can change them on the breach, and each regulator card links to the law's framework. Each law adds a notice to its regulator:
 
 | Law | Regulator | When to notify the regulator | Records |
 |---|---|---|---|
@@ -166,17 +166,18 @@ Which questionnaires are used, and the default, is chosen by an administrator in
 | EU GDPR (art. 33–34) | Lead supervisory authority | Within 72 hours of becoming aware, unless unlikely to result in a risk | Every breach documented |
 | Canada PIPEDA (s. 10.1) | Office of the Privacy Commissioner | As soon as feasible, when there is a real risk of significant harm | Every breach kept 24 months |
 | Québec Law 25 (Private Sector Act, ss. 3.5–3.8) | Commission d'accès à l'information | Promptly, when there is a risk of serious injury | Every incident kept at least 5 years |
+| Ontario PHIPA (s. 12(2); O. Reg. 329/04, s. 6.3) | Information and Privacy Commissioner | In the prescribed circumstances, such as theft, a significant breach or a pattern of similar breaches | Every breach counted in the annual report |
 
 Deadlines run from the time recorded as *When the organisation became aware*. Bayanis never deletes a breach, which meets every record-keeping period.
 
 | Risk to the people concerned | Regulators | Data subjects |
 |---|---|---|
-| Not assessed yet | Every notice is treated as required | — |
-| Unlikely to put people at risk | Not required under any law; record why | Not required |
-| Risk to people | Required under PDPL and GDPR; not under the Canadian laws | Not required |
+| Not assessed yet | Every notice is treated as required | Required under PHIPA |
+| Unlikely to put people at risk | Not required under any law; record why | Required under PHIPA only |
+| Risk to people | Required under PDPL and GDPR; not under the Canadian laws | Required under PHIPA only |
 | High risk to people | Required under every law that applies | Required without undue delay, or record why not |
 
-Under PIPEDA, *high risk* means a real risk of significant harm; under Law 25, a risk of serious injury.
+Under PIPEDA, *high risk* means a real risk of significant harm; under Law 25, a risk of serious injury; under PHIPA, one of the prescribed circumstances. PHIPA requires telling the people whose health information was stolen, lost, or used or disclosed without authority at the first reasonable opportunity, whatever the risk.
 
 When the affected assets hold personal data, the catalog suggests a level: **High** for sensitive categories, large scale (100,000 rows or more) or unencrypted personal data columns, otherwise **Risk**; **Unlikely** when they hold none. The officer decides.
 

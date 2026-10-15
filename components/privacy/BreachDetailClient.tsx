@@ -9,13 +9,14 @@ import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import {
-  BREACH_CAUSES, BREACH_LAWS, BREACH_REGULATIONS, BREACH_RISKS, BREACH_TYPES, authorityLabel, isBreachOpen, subjectsRequired,
+  BREACH_CAUSES, BREACH_LAWS, BREACH_REGULATIONS, BREACH_RISKS, BREACH_TYPES, authorityLabel, isBreachOpen, subjectsAlwaysUnder, subjectsRequired,
   type BreachDetail, type BreachNotice, type BreachPermissions,
 } from "@/lib/privacy/breach-types";
 import { AssetPicker, Dialog, ErrorNote, FactLines, assetTypeLabel, factLines, fill, type CustomTypeOption } from "./dpia-ui";
 import { BreachRiskBadge, BreachStatusBadge, NoticeLine, breachError, fromLocalInput, span, toLocalInput, when } from "./breach-ui";
 
-type Loaded = { breach: BreachDetail; permissions: BreachPermissions & { canAssign?: boolean }; missing: string[] };
+type LawFramework = { law: string; frameworkId: number | null; frameworkName: string | null; applicable: boolean };
+type Loaded = { breach: BreachDetail; permissions: BreachPermissions & { canAssign?: boolean }; missing: string[]; frameworks: LawFramework[] };
 type FieldKind = "text" | "textarea" | "datetime" | "number" | "select" | "multi";
 type Field = { key: string; label: string; kind: FieldKind; options?: [string, string][]; ph?: string; hint?: string; wide?: boolean };
 
@@ -34,7 +35,7 @@ export function BreachDetailClient({ breachId }: { breachId: number }) {
 
   if (data === null) return <p className="text-sm text-muted">{b.loading}</p>;
   if (data === "missing") return <div className="card p-6 text-sm text-muted">{b.notFound} <Link href="/privacy/breaches" className="text-brand-purple hover:underline">{b.back}</Link></div>;
-  const { breach: br, permissions: p, missing } = data;
+  const { breach: br, permissions: p, missing, frameworks } = data;
   const edit = p.canManage;
   const open = isBreachOpen(br.statusCode);
 
@@ -110,14 +111,15 @@ export function BreachDetailClient({ breachId }: { breachId: number }) {
       <RiskSection br={br} edit={edit} save={patch} />
 
       <div className="grid md:grid-cols-2 gap-4">
-        {br.notices.map((n) => <NoticeCard key={n.regulation} n={n} edit={edit} save={patch} />)}
+        {br.notices.map((n) => <NoticeCard key={n.regulation} n={n} edit={edit} save={patch} framework={frameworks.find((f) => f.law === n.regulation)} />)}
         <Section title={b.subjTitle} br={br} edit={edit} save={patch} cols={1}
-          note={subjectsRequired(br.riskLevel) ? b.subjRequired : b.subjNotRequired}
+          note={subjectsAlwaysUnder(br.regulations).length ? fill(b.subjAlways, { laws: subjectsAlwaysUnder(br.regulations).map((l) => b.regulations[l]).join(", ") })
+            : subjectsRequired(br.riskLevel, br.regulations) ? b.subjRequired : b.subjNotRequired}
           fields={[
             { key: "subjectsNotifiedAt", label: b.fSubjectsAt, kind: "datetime" },
             { key: "subjectsMethod", label: b.fSubjectsMethod, kind: "text" },
             { key: "subjectsNotified", label: b.fSubjectsCount, kind: "number" },
-            ...(subjectsRequired(br.riskLevel) || br.subjectsExemption ? [{ key: "subjectsExemption", label: b.fExemption, kind: "textarea" as const, ph: b.exemptionPh }] : []),
+            ...(subjectsRequired(br.riskLevel, br.regulations) || br.subjectsExemption ? [{ key: "subjectsExemption", label: b.fExemption, kind: "textarea" as const, ph: b.exemptionPh }] : []),
           ]} />
       </div>
 
@@ -169,7 +171,7 @@ function DeadlineBanner({ br }: { br: BreachDetail }) {
 }
 
 /** The regulator notice under one law: its rule, and when it was made. */
-function NoticeCard({ n, edit, save }: { n: BreachNotice; edit: boolean; save: (b: object) => Promise<string | null> }) {
+function NoticeCard({ n, edit, save, framework }: { n: BreachNotice; edit: boolean; save: (b: object) => Promise<string | null>; framework?: LawFramework }) {
   const { t, lang } = useLang();
   const b = t.breach;
   const init = () => ({ authorityName: n.authorityName ?? "", notifiedAt: toLocalInput(n.notifiedAt), reference: n.reference ?? "", lateReason: n.lateReason ?? "" });
@@ -195,6 +197,11 @@ function NoticeCard({ n, edit, save }: { n: BreachNotice; edit: boolean; save: (
         <NoticeLine n={n} showLaw={false} />
       </div>
       <p className="text-[12px] text-muted mt-0.5">{b.lawRules[n.regulation]}{!n.required && n.state === "NOT_REQUIRED" ? ` ${b.noticeNotRequired}` : ""}</p>
+      {framework?.frameworkId != null && (
+        <Link href={`/governance/compliance?fw=${framework.frameworkId}`} className="inline-block text-[12px] text-brand-purple hover:underline mt-1">
+          {fill(b.frameworkLink, { name: framework.frameworkName ?? n.regulation })}
+        </Link>
+      )}
       <div className="space-y-3 mt-3">
         {field(b.fAuthorityName, <input className="input-field w-full" value={d.authorityName} placeholder={BREACH_LAWS[n.regulation].authority} dir="auto" onChange={(e) => setD({ ...d, authorityName: e.target.value })} />, authorityLabel(n, b.authorities))}
         {field(b.fAuthorityAt, <input type="datetime-local" className="input-field w-full" value={d.notifiedAt} max={toLocalInput(new Date().toISOString())} onChange={(e) => setD({ ...d, notifiedAt: e.target.value })} />, when(n.notifiedAt, lang))}

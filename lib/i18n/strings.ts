@@ -4507,12 +4507,14 @@ export type I18nStrings = {
       GDPR: string;
       PIPEDA: string;
       LAW25: string;
+      PHIPA: string;
     };
     authorities: {
       PDPL: string;
       GDPR: string;
       PIPEDA: string;
       LAW25: string;
+      PHIPA: string;
     };
     hoursN: string;
     daysHours: string;
@@ -4537,6 +4539,7 @@ export type I18nStrings = {
       GDPR: string;
       PIPEDA: string;
       LAW25: string;
+      PHIPA: string;
     };
     back: string;
     loading: string;
@@ -4610,6 +4613,8 @@ export type I18nStrings = {
     subjTitle: string;
     subjRequired: string;
     subjNotRequired: string;
+    subjAlways: string;
+    frameworkLink: string;
     fSubjectsAt: string;
     fSubjectsMethod: string;
     fSubjectsCount: string;
@@ -4656,6 +4661,7 @@ export type I18nStrings = {
       LATE_REASON: string;
       SUBJECTS: string;
       CONTAINMENT: string;
+      LAWS: string;
     };
     errors: {
       TITLE_REQUIRED: string;

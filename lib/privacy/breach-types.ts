@@ -11,7 +11,7 @@ export const BREACH_TYPES = ["CONFIDENTIALITY", "INTEGRITY", "AVAILABILITY"] as 
 export type BreachType = (typeof BREACH_TYPES)[number];
 export const BREACH_CAUSES = ["CYBER_ATTACK", "UNAUTHORISED_ACCESS", "MISDIRECTED", "LOST_DEVICE", "SYSTEM_ERROR", "INSIDER", "THIRD_PARTY", "OTHER"] as const;
 export type BreachCause = (typeof BREACH_CAUSES)[number];
-export const BREACH_REGULATIONS = ["PDPL", "GDPR", "PIPEDA", "LAW25"] as const;
+export const BREACH_REGULATIONS = ["PDPL", "GDPR", "PIPEDA", "LAW25", "PHIPA"] as const;
 export type BreachRegulation = (typeof BREACH_REGULATIONS)[number];
 
 /** UNLIKELY: no notification needed (the reason is recorded); RISK: some laws require
@@ -22,10 +22,12 @@ export type BreachRisk = (typeof BREACH_RISKS)[number];
 const RANK: Record<BreachRisk, number> = { UNLIKELY: 0, RISK: 1, HIGH: 2 };
 
 /**
- * What each law asks after a breach. "regulatorFrom" is the lowest risk at which the
- * regulator must be told; the people concerned are told when the risk is HIGH under all
- * four. Canadian thresholds ("real risk of significant harm", "risk of serious injury")
- * are read as HIGH.
+ * What each law asks after a breach. "regulatorFrom" / "subjectsFrom" are the lowest risk
+ * at which the regulator / the people concerned must be told; "ALWAYS" means whatever the
+ * risk. Canadian thresholds ("real risk of significant harm", "risk of serious injury",
+ * PHIPA's prescribed circumstances) are read as HIGH. "framework" is the code of the
+ * law's compliance framework (Governance › Compliance): the laws whose framework is
+ * marked applicable are preselected on a new breach.
  *  - PDPL Implementing Regulation art. 24: SDAIA within 72 hours.
  *  - GDPR art. 33–34: the supervisory authority within 72 hours.
  *  - PIPEDA s. 10.1 and the Breach of Security Safeguards Regulations: the OPC as soon
@@ -33,14 +35,22 @@ const RANK: Record<BreachRisk, number> = { UNLIKELY: 0, RISK: 1, HIGH: 2 };
  *  - Québec Private Sector Act ss. 3.5–3.8 (Law 25) and the Regulation respecting
  *    confidentiality incidents: the CAI promptly; every incident in a register kept
  *    at least 5 years.
- * Breaches are never deleted here, which meets both record-keeping periods.
+ *  - Ontario PHIPA s. 12(2) and O. Reg. 329/04 s. 6.3: the people whose health
+ *    information was stolen, lost, or used or disclosed without authority are told at
+ *    the first reasonable opportunity, whatever the risk; the IPC in the prescribed
+ *    circumstances; every breach counted in the annual report to the IPC.
+ * Breaches are never deleted here, which meets every record-keeping period.
  */
-export type BreachLaw = { authority: string; hours: number | null; regulatorFrom: BreachRisk; keepMonths: number | null };
+export type BreachLaw = {
+  authority: string; framework: string; hours: number | null;
+  regulatorFrom: BreachRisk; subjectsFrom: BreachRisk | "ALWAYS"; keepMonths: number | null;
+};
 export const BREACH_LAWS: Record<BreachRegulation, BreachLaw> = {
-  PDPL:   { authority: "SDAIA (Saudi Data & AI Authority)", hours: 72, regulatorFrom: "RISK", keepMonths: null },
-  GDPR:   { authority: "Lead supervisory authority", hours: 72, regulatorFrom: "RISK", keepMonths: null },
-  PIPEDA: { authority: "Office of the Privacy Commissioner of Canada (OPC)", hours: null, regulatorFrom: "HIGH", keepMonths: 24 },
-  LAW25:  { authority: "Commission d'accès à l'information du Québec (CAI)", hours: null, regulatorFrom: "HIGH", keepMonths: 60 },
+  PDPL:   { authority: "SDAIA (Saudi Data & AI Authority)", framework: "PDPL", hours: 72, regulatorFrom: "RISK", subjectsFrom: "HIGH", keepMonths: null },
+  GDPR:   { authority: "Lead supervisory authority", framework: "GDPR", hours: 72, regulatorFrom: "RISK", subjectsFrom: "HIGH", keepMonths: null },
+  PIPEDA: { authority: "Office of the Privacy Commissioner of Canada (OPC)", framework: "PIPEDA", hours: null, regulatorFrom: "HIGH", subjectsFrom: "HIGH", keepMonths: 24 },
+  LAW25:  { authority: "Commission d'accès à l'information du Québec (CAI)", framework: "QC_LAW25", hours: null, regulatorFrom: "HIGH", subjectsFrom: "HIGH", keepMonths: 60 },
+  PHIPA:  { authority: "Information and Privacy Commissioner of Ontario (IPC)", framework: "ON_PHIPA", hours: null, regulatorFrom: "HIGH", subjectsFrom: "ALWAYS", keepMonths: null },
 };
 
 /** The regulator's name in the reader's language while it is still the law's default;
@@ -59,7 +69,12 @@ export function formatSpan(ms: number, hoursN: string, daysHours: string): strin
 
 /** Until the risk is assessed, every regulator notice is treated as required. */
 export const noticeRequired = (law: BreachRegulation, risk: BreachRisk | null) => risk === null || RANK[risk] >= RANK[BREACH_LAWS[law].regulatorFrom];
-export const subjectsRequired = (risk: BreachRisk | null) => risk === "HIGH";
+/** The people concerned must be told under at least one of the laws: at HIGH risk, or
+ *  whatever the risk under a law like PHIPA. */
+export const subjectsRequired = (risk: BreachRisk | null, laws: readonly BreachRegulation[]) =>
+  laws.some((l) => { const from = BREACH_LAWS[l].subjectsFrom; return from === "ALWAYS" || (risk !== null && RANK[risk] >= RANK[from]); });
+/** The laws that require telling the people concerned whatever the risk. */
+export const subjectsAlwaysUnder = (laws: readonly BreachRegulation[]) => laws.filter((l) => BREACH_LAWS[l].subjectsFrom === "ALWAYS");
 export const noticeDeadline = (law: BreachRegulation, discoveredAt: string) => {
   const h = BREACH_LAWS[law].hours;
   return h == null ? null : new Date(new Date(discoveredAt).getTime() + h * 3600_000).toISOString();
@@ -96,9 +111,9 @@ export function overallNotice(notices: BreachNotice[]): { state: AuthorityState;
 }
 
 export type SubjectsState = "NOT_REQUIRED" | "NOTIFIED" | "EXEMPT" | "PENDING";
-export function subjectsState(b: { riskLevel: BreachRisk | null; subjectsNotifiedAt: string | null; subjectsExemption: string | null; statusCode: BreachStatus }): SubjectsState {
+export function subjectsState(b: { riskLevel: BreachRisk | null; regulations: readonly BreachRegulation[]; subjectsNotifiedAt: string | null; subjectsExemption: string | null; statusCode: BreachStatus }): SubjectsState {
   if (b.subjectsNotifiedAt) return "NOTIFIED";
-  if (b.statusCode === "NOT_A_BREACH" || !subjectsRequired(b.riskLevel)) return "NOT_REQUIRED";
+  if (b.statusCode === "NOT_A_BREACH" || !subjectsRequired(b.riskLevel, b.regulations)) return "NOT_REQUIRED";
   return b.subjectsExemption ? "EXEMPT" : "PENDING";
 }
 

@@ -5,7 +5,6 @@
 // them (lib/privacy/dpia-facts.ts), which suggest the risk and the people affected.
 import { sql } from "../db";
 import { createNotification } from "../queries/notifications";
-import { logUpdate } from "../audit";
 import type { SessionUser } from "../types";
 import { buildDpiaFacts, describeAssets, type AssetRef } from "./dpia-facts";
 import type { DpiaFacts } from "./dpia-types";
@@ -151,22 +150,22 @@ export async function notifyBreach(breachId: number, recipients: (string | null)
 export const breachHandlers = handlers;
 
 // ── Report ───────────────────────────────────────────────────────────────────
-/** The laws preselected on a new breach (Configuration › Privacy & Retention). */
-export async function defaultBreachRegulations(): Promise<BreachRegulation[]> {
-  const [row] = await sql<{ value: string }[]>`SELECT value FROM bayanat.system_config WHERE key = 'breach_default_regulations'`;
-  let list: BreachRegulation[] = [];
-  try { list = pick(JSON.parse(row?.value ?? "[]"), BREACH_REGULATIONS); } catch { /* fall through */ }
-  return list.length ? list : ["PDPL"];
+/** Each law's compliance framework (Governance › Compliance), when one is set up. */
+export type LawFramework = { law: BreachRegulation; frameworkId: number | null; frameworkName: string | null; applicable: boolean };
+export async function breachLawFrameworks(): Promise<LawFramework[]> {
+  const codes = BREACH_REGULATIONS.map((l) => BREACH_LAWS[l].framework);
+  const rows = await sql<{ id: number; code: string; name: string; applicable: boolean }[]>`
+    SELECT framework_id AS id, code, name, is_applicable_indicator AS applicable FROM bayanat.gov_compliance_frameworks WHERE code = ANY(${codes})`;
+  return BREACH_REGULATIONS.map((law) => {
+    const f = rows.find((r) => r.code === BREACH_LAWS[law].framework);
+    return { law, frameworkId: f?.id ?? null, frameworkName: f?.name ?? null, applicable: !!f?.applicable };
+  });
 }
 
-export async function setDefaultBreachRegulations(input: unknown, userId: string): Promise<{ ok: true } | BreachError> {
-  const list = pick(input, BREACH_REGULATIONS);
-  if (list.length === 0) return fail("LAWS_REQUIRED", "Choose at least one law.");
-  const before = await defaultBreachRegulations();
-  await sql`INSERT INTO bayanat.system_config (key, value) VALUES ('breach_default_regulations', ${JSON.stringify(list)})
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
-  await logUpdate("PLATFORM_SETTINGS", 1, userId, [{ field: "breach_default_regulations", oldVal: before.join(", "), newVal: list.join(", ") }]);
-  return { ok: true };
+/** The laws preselected on a new breach: those whose compliance framework is marked
+ *  applicable in Regulation Setup. */
+export async function defaultBreachRegulations(): Promise<BreachRegulation[]> {
+  return (await breachLawFrameworks()).filter((f) => f.applicable).map((f) => f.law);
 }
 
 /** One notice row per law that applies, with the law's regulator filled in. */
@@ -374,7 +373,8 @@ export function closeBlockers(b: BreachDetail): string[] {
     if (n.required && !n.notifiedAt) missing.push(`AUTHORITY:${n.regulation}`);
     if (n.state === "LATE" && !n.lateReason) missing.push(`LATE_REASON:${n.regulation}`);
   }
-  if (subjectsRequired(b.riskLevel) && !b.subjectsNotifiedAt && !b.subjectsExemption) missing.push("SUBJECTS");
+  if (b.regulations.length === 0) missing.push("LAWS");
+  if (subjectsRequired(b.riskLevel, b.regulations) && !b.subjectsNotifiedAt && !b.subjectsExemption) missing.push("SUBJECTS");
   if (!b.containment) missing.push("CONTAINMENT");
   return missing;
 }

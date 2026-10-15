@@ -53,8 +53,15 @@ const templateCols = () => sql.unsafe(`
   ${translatedColumnSql("'dpia_templates.' || t.template_id || '.description'", "descriptionTranslations")}
 `);
 
+/** The questionnaires offered for a new assessment: in use (Configuration), and linked to a
+ *  compliance framework that is applicable, or to none that is set up (db/215). */
 export async function listDpiaTemplates(): Promise<DpiaTemplate[]> {
-  return sql<DpiaTemplate[]>`SELECT ${templateCols()} FROM bayanat.dpia_templates t WHERE t.is_active_indicator ORDER BY t.sort_order_int, t.template_id`;
+  return sql<DpiaTemplate[]>`
+    SELECT ${templateCols()} FROM bayanat.dpia_templates t
+    WHERE t.is_active_indicator AND (t.framework_code IS NULL
+      OR NOT EXISTS (SELECT 1 FROM bayanat.gov_compliance_frameworks f WHERE f.code = t.framework_code)
+      OR EXISTS (SELECT 1 FROM bayanat.gov_compliance_frameworks f WHERE f.code = t.framework_code AND f.is_applicable_indicator))
+    ORDER BY t.sort_order_int, t.template_id`;
 }
 
 // ── Register ─────────────────────────────────────────────────────────────────

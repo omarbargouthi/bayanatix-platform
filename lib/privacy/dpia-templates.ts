@@ -66,7 +66,11 @@ const templateCols = () => sql.unsafe(`
   (SELECT count(*)::int FROM bayanat.dpia_template_questions q WHERE q.template_id = t.template_id AND q.stage_code = 'ASSESSMENT' AND NOT q.is_retired_indicator) AS "assessmentCount",
   (SELECT count(*)::int FROM bayanat.dpias d WHERE d.template_id = t.template_id) AS "dpiaCount",
   (SELECT count(*)::int FROM bayanat.dpias d WHERE d.template_id = t.template_id AND d.status_code IN ('SCREENING', 'ASSESSMENT', 'IN_REVIEW')) AS "openDpiaCount",
-  t.updated_at::text AS "updatedAt", coalesce(u.full_name, t.updated_by_user_id) AS "updatedBy"
+  t.updated_at::text AS "updatedAt", coalesce(u.full_name, t.updated_by_user_id) AS "updatedBy",
+  t.framework_code AS "frameworkCode",
+  (SELECT f.framework_id FROM bayanat.gov_compliance_frameworks f WHERE f.code = t.framework_code) AS "frameworkId",
+  (SELECT f.name FROM bayanat.gov_compliance_frameworks f WHERE f.code = t.framework_code) AS "frameworkName",
+  (SELECT f.is_applicable_indicator FROM bayanat.gov_compliance_frameworks f WHERE f.code = t.framework_code) AS "frameworkApplicable"
 `);
 
 export async function listTemplatesForAdmin(): Promise<TemplateAdmin[]> {

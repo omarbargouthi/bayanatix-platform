@@ -48,6 +48,7 @@ export function DpiaQuestionnairesConfig() {
         <p className="text-[12px] text-muted mt-0.5">
           Choose the regulations your organisation assesses against. Only the questionnaires selected here are offered when an
           impact assessment is started, and the default is preselected. Assessments already started keep their questionnaire.
+          A questionnaire linked to a compliance framework is offered only while that framework is applicable.
           The questions are edited in{" "}
           <Link href="/privacy/dpia/templates" className="text-brand-purple hover:underline">Data Privacy → Impact Assessments → Questionnaires</Link>.
         </p>
@@ -67,6 +68,12 @@ export function DpiaQuestionnairesConfig() {
                 <div>
                   <div className="text-ink font-medium">{t.name}</div>
                   {t.regulation && <div className="text-[12px] text-muted">{t.regulation}</div>}
+                  {t.frameworkId != null && (
+                    <div className={`text-[11px] mt-0.5 ${t.frameworkApplicable ? "text-muted" : "text-amber-700 font-semibold"}`}>
+                      Compliance framework: <Link href={`/governance/compliance?fw=${t.frameworkId}`} className="text-brand-purple hover:underline">{t.frameworkName}</Link>
+                      {t.frameworkApplicable ? " · applicable" : <> · not applicable, so not offered. Turn it on in <Link href="/admin/maturity-index-setup" className="text-brand-purple hover:underline">Regulation Setup</Link>.</>}
+                    </div>
+                  )}
                 </div>
                 <span className="text-[12px] text-muted">{t.screeningCount} screening · {t.assessmentCount} assessment</span>
                 <input type="radio" name="dpia-default" checked={defaultId === t.templateId} disabled={!on} aria-label={`Default: ${t.name}`}

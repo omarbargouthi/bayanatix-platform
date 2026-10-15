@@ -173,6 +173,9 @@ export type TemplateAdmin = {
   isActive: boolean; isDefault: boolean;
   screeningCount: number; assessmentCount: number; dpiaCount: number; openDpiaCount: number;
   updatedAt: string | null; updatedBy: string | null;
+  /** The compliance framework the questionnaire follows (db/215). Offered only while it is
+   *  applicable; null id when no such framework is set up, and then it is not gated. */
+  frameworkCode: string | null; frameworkId: number | null; frameworkName: string | null; frameworkApplicable: boolean | null;
 };
 export type QuestionAdmin = {
   questionId: number; code: string; stage: "SCREENING" | "ASSESSMENT"; section: string;

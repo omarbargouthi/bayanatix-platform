@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import {
-  addBreachNote, breachPermissions, handlesAllBreaches, canViewBreach, changeBreachAsset, closeBlockers, getBreach, moveBreach, refreshBreach, updateBreach,
+  addBreachNote, breachLawFrameworks, breachPermissions, handlesAllBreaches, canViewBreach, changeBreachAsset, closeBlockers, getBreach, moveBreach, refreshBreach, updateBreach,
 } from "@/lib/privacy/breach";
 
 type Params = { params: { id: string } };
@@ -16,14 +16,18 @@ async function viewer(id: number) {
   return { session };
 }
 
-// GET — the breach, what the user may do, and what is still missing before it can be closed.
+// GET — the breach, what the user may do, what is still missing before it can be closed, and
+// each law's compliance framework.
 export async function GET(_: Request, { params }: Params) {
   const id = Number(params.id);
   const v = await viewer(id);
   if ("response" in v) return v.response;
   const breach = await getBreach(id);
   if (!breach) return NextResponse.json({ error: "Not found", code: "NOT_FOUND" }, { status: 404 });
-  return NextResponse.json({ breach, permissions: { ...breachPermissions(v.session!, breach), canAssign: handlesAllBreaches(v.session!.role) }, missing: closeBlockers(breach) });
+  return NextResponse.json({
+    breach, permissions: { ...breachPermissions(v.session!, breach), canAssign: handlesAllBreaches(v.session!.role) },
+    missing: closeBlockers(breach), frameworks: await breachLawFrameworks(),
+  });
 }
 
 // PATCH { field: value, … } — the editable fields (lib/privacy/breach.ts FIELDS) and ownerUserId.
