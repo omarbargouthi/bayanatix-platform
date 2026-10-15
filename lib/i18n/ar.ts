@@ -4519,5 +4519,11 @@ export const ar: I18nStrings = {
     exportNotProvided: "غير مسجّل",
     exportSummary: "الملخص",
     exportReporter: "المُبلِّغ",
+    newRequestLabel: "الإبلاغ عن خرق للبيانات",
+    newRequestDesc: "بيانات شخصية كُشفت أو فُقدت أو عُدّلت أو أُرسلت إلى شخص خاطئ",
+    newRequestNote: "يُشعَر فريق حماية البيانات فوراً. أبلغ حتى لو لم تكن متأكداً، وسيتحققون من الأمر.",
+    submitted: "تم الإبلاغ عن الخرق {ref}. وأُشعر فريق حماية البيانات وسيتابع الأمر.",
+    openIt: "فتح الخرق",
+    done: "تم",
   },
 };

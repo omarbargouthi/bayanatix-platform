@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { NewRequestForm, type NewRequestResult } from "@/components/requests/NewRequestForm";
+import { BreachReported, NewRequestForm, type NewRequestResult } from "@/components/requests/NewRequestForm";
 import { useLang } from "@/lib/lang-context";
 import type { DomainCode } from "@/lib/can";
 import type { AccessRequestRow, CatalogResourceType } from "@/lib/queries/access-requests";
@@ -93,7 +93,7 @@ export function RequestAccessClient() {
         <div className="card p-5">
           {submitted && (
             <p className="text-sm px-3 py-2 mb-5 rounded-md border text-emerald-700 bg-emerald-50 border-emerald-200">
-              {submitted.kind === "ACCESS" ? c.submitSuccess : c.assetRequestSubmitted}{" "}
+              {submitted.kind === "BREACH" ? <BreachReported result={submitted} /> : submitted.kind === "ACCESS" ? c.submitSuccess : c.assetRequestSubmitted}{" "}
               {submitted.kind === "ASSET" && (
                 <Link href={submitted.requestId ? `/requests/${submitted.requestId}` : "/requests"} className="font-semibold underline">
                   {c.viewAssetRequests}

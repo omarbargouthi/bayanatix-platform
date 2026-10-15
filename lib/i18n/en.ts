@@ -4519,5 +4519,11 @@ export const en: I18nStrings = {
     exportNotProvided: "Not recorded",
     exportSummary: "Summary",
     exportReporter: "Reported by",
+    newRequestLabel: "Report a data breach",
+    newRequestDesc: "Personal data exposed, lost, changed or sent to the wrong person",
+    newRequestNote: "The data protection team is notified at once. Report even if you are not sure: they will check.",
+    submitted: "Breach {ref} reported. The data protection team has been notified and will follow up.",
+    openIt: "Open the breach",
+    done: "Done",
   },
 };

@@ -167,7 +167,7 @@ The register shows for each breach whether the notice is due, due within 24 hour
       {
         id: "how",
         title: "How to use it",
-        body: `1. Anyone who suspects a breach clicks **Report a breach**, with a short description and when it became known. Compliance officers are notified at once.
+        body: `1. Anyone who suspects a breach reports it: **New Request › Report a data breach** (open to every user, also from a table's New Request), or **Report a breach** on this page. A short description and when it became known are enough; compliance officers are notified at once.
 2. The compliance officer (or administrator) assigns a handler, adds the affected assets and records the risk.
 3. Notify the regulator and record when, with their reference; notify the data subjects when the risk is high. **Regulator report (PDF)** gives the details a notification asks for.
 4. Record the containment and prevention measures, then **Close** the breach. Bayanis lists anything still missing. A report that turns out not to involve personal data is closed as **Not a breach**.

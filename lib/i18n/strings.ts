@@ -4661,5 +4661,11 @@ export type I18nStrings = {
     exportNotProvided: string;
     exportSummary: string;
     exportReporter: string;
+    newRequestLabel: string;
+    newRequestDesc: string;
+    newRequestNote: string;
+    submitted: string;
+    openIt: string;
+    done: string;
   };
 };

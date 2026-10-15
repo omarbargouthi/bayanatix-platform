@@ -11,7 +11,9 @@ import type { I18nStrings } from "@/lib/i18n/strings";
 // The single "New Request" form, used from the sidebar page and from asset pages.
 // "Access" is one of the request types: it files a real access request (a data
 // source, schema or table, or a feature domain) that grants the access once
-// approved. Every other type raises an asset request that follows its workflow.
+// approved. "Report a data breach" records a personal data breach in the breach
+// register (lib/privacy/breach.ts), open to everyone since anyone may discover one.
+// Every other type raises an asset request that follows its workflow.
 
 export interface RequestTarget {
   assetTypeCode: string;
@@ -19,8 +21,8 @@ export interface RequestTarget {
   assetName:     string;
 }
 
-export type NewRequestType = RequestTypeCode | "ACCESS";
-export type NewRequestResult = { kind: "ACCESS" } | { kind: "ASSET"; requestId?: number };
+export type NewRequestType = RequestTypeCode | "ACCESS" | "BREACH";
+export type NewRequestResult = { kind: "ACCESS" } | { kind: "ASSET"; requestId?: number } | { kind: "BREACH"; breachId: number; reference: string | null; canOpen: boolean };
 
 type CatalogItem = { id: number; name: string };
 
@@ -30,7 +32,7 @@ const ACCESS_LEVEL_OF_ASSET: Record<string, CatalogResourceType> = {
   DATA_SOURCES: "DATA_SOURCE", DATA_SCHEMAS: "SCHEMA", DATA_ENTITIES: "TABLE",
 };
 
-function buildRequestTypes(c: I18nStrings["catalog"]): { code: NewRequestType; label: string; desc: string; icon: string }[] {
+function buildRequestTypes(c: I18nStrings["catalog"], b: I18nStrings["breach"]): { code: NewRequestType; label: string; desc: string; icon: string }[] {
   return [
     { code: "ACCESS",            label: c.reqTypeAccess,            desc: c.reqTypeAccessDesc,            icon: "🔓" },
     { code: "FIX_DATA_ISSUE",    label: c.reqTypeFixDataIssue,      desc: c.reqTypeFixDataIssueDesc,      icon: "🔧" },
@@ -39,6 +41,7 @@ function buildRequestTypes(c: I18nStrings["catalog"]): { code: NewRequestType; l
     { code: "REMOVE_ACCESS",     label: c.reqTypeRemoveAccess,      desc: c.reqTypeRemoveAccessDesc,      icon: "🔒" },
     { code: "CLEANUP_DATA_ASSET", label: c.reqTypeCleanup,          desc: c.reqTypeCleanupDesc,           icon: "🧹" },
     { code: "OTHER",             label: c.reqTypeOther,             desc: c.reqTypeOtherDesc,             icon: "💬" },
+    { code: "BREACH",            label: b.newRequestLabel,          desc: b.newRequestDesc,               icon: "🚨" },
   ];
 }
 
@@ -68,7 +71,7 @@ export function NewRequestForm({
   const { t } = useLang();
   const c = t.catalog;
   const a = t.requestAccess;
-  const REQUEST_TYPES = buildRequestTypes(c);
+  const REQUEST_TYPES = buildRequestTypes(c, t.breach);
   const PRIORITY_OPTIONS = buildPriorityOptions(c);
   const domainLabel = (d: DomainCode): string => ({
     GOVERNANCE: t.nav.governance, DATA_QUALITY: t.nav.quality, DATA_PRIVACY: t.nav.privacy,
@@ -82,6 +85,7 @@ export function NewRequestForm({
   const startType: NewRequestType | "" = initialRequestType === "GRANT_ACCESS" ? "ACCESS" : initialRequestType ?? "";
   const [requestType, setRequestType] = useState<NewRequestType | "">(startType);
   const isAccess = requestType === "ACCESS";
+  const isBreach = requestType === "BREACH";
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
 
@@ -132,7 +136,7 @@ export function NewRequestForm({
   // ── Asset request state ─────────────────────────────────────────────────
   const [priority,    setPriority]    = useState<RequestPriority>("MEDIUM");
   const [title,       setTitle]       = useState(
-    startType && startType !== "ACCESS" ? REQUEST_TYPES.find((rt) => rt.code === startType)?.label ?? "" : ""
+    startType && startType !== "ACCESS" && startType !== "BREACH" ? REQUEST_TYPES.find((rt) => rt.code === startType)?.label ?? "" : ""
   );
   const [description, setDescription] = useState("");
   const [targets,     setTargets]     = useState<RequestTarget[]>(prefilledTarget ? [prefilledTarget] : []);
@@ -239,10 +243,39 @@ export function NewRequestForm({
     }
   }
 
+  // ── Data breach ─────────────────────────────────────────────────────────
+  const nowLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
+  const [awareAt, setAwareAt] = useState(nowLocal);
+  const [reported, setReported] = useState<Extract<NewRequestResult, { kind: "BREACH" }> | null>(null);
+
+  async function submitBreach() {
+    if (!title.trim()) { setError(t.breach.errors.TITLE_REQUIRED); return; }
+    setSaving(true);
+    try {
+      const r = await fetch("/api/privacy/breaches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+          discoveredAt: awareAt ? new Date(awareAt).toISOString() : null,
+          assets: effectiveTargets.map((tg) => ({ typeCode: tg.assetTypeCode, id: tg.assetId })),
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setError((t.breach.errors as Record<string, string>)[d.code] ?? d.error ?? t.breach.failed); return; }
+      const result = { kind: "BREACH" as const, breachId: d.breachId, reference: d.reference ?? null, canOpen: !!d.canOpen };
+      // In a dialog, confirm here before closing; the page shows its own confirmation.
+      if (variant === "modal") setReported(result); else onSaved(result);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function submit() {
     setError(null);
     if (!requestType) { setError(c.selectRequestTypeErr); return; }
-    void (isAccess ? submitAccess() : submitAsset());
+    void (isAccess ? submitAccess() : isBreach ? submitBreach() : submitAsset());
   }
 
   const sourceSelect = (
@@ -282,6 +315,15 @@ export function NewRequestForm({
     </div>
   );
 
+  if (reported) {
+    return (
+      <div className="px-6 py-5 space-y-4">
+        <p className="text-sm px-3 py-2 rounded-md border text-emerald-700 bg-emerald-50 border-emerald-200"><BreachReported result={reported} /></p>
+        <div className="flex justify-end"><button onClick={() => onSaved(reported)} className="btn btn-primary">{t.breach.done}</button></div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className={`space-y-5 ${variant === "modal" ? "px-6 py-5" : ""}`}>
@@ -296,7 +338,8 @@ export function NewRequestForm({
                 onClick={() => {
                   setRequestType(rt.code); setError(null);
                   // Keep a title the user typed; replace an empty one or another type's default.
-                  if (rt.code !== "ACCESS" && (!title || REQUEST_TYPES.some((x) => x.label === title))) setTitle(rt.label);
+                  // A breach gets its own title (what happened), not the type's name.
+                  if (rt.code !== "ACCESS" && (!title || REQUEST_TYPES.some((x) => x.label === title))) setTitle(rt.code === "BREACH" ? "" : rt.label);
                 }}
                 className={`text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
                   requestType === rt.code
@@ -389,8 +432,37 @@ export function NewRequestForm({
           </>
         )}
 
+        {/* ── Data breach ── */}
+        {isBreach && (
+          <>
+            <p className="text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{t.breach.newRequestNote} {t.breach.reportHint}</p>
+            <div>
+              <label className="field-label">{t.breach.fTitle}</label>
+              <input className="input-field" value={title} maxLength={255} dir="auto" placeholder={t.breach.titlePh} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label">{t.breach.fDescription}</label>
+              <textarea className="input-field resize-none" rows={3} value={description} dir="auto" placeholder={t.breach.descriptionPh} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label">{t.breach.fDiscoveredAt}</label>
+              <input type="datetime-local" className="input-field" value={awareAt} max={nowLocal()} onChange={(e) => setAwareAt(e.target.value)} />
+              <p className="text-[11px] text-muted mt-1">{t.breach.discoveredHint}</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="field-label">{t.breach.fAssets}</label>
+                <p className="text-[11px] text-muted -mt-1">{t.breach.assetsHint}</p>
+              </div>
+              {prefilledTarget
+                ? targets.map((tg, idx) => <div key={idx}>{targetChip(tg, () => setTargets((prev) => prev.filter((_, i) => i !== idx)))}</div>)
+                : <>{sourceSelect}{sourceId && schemaSelect}{schemaId && tableSelect}</>}
+            </div>
+          </>
+        )}
+
         {/* ── Every other request type ── */}
-        {requestType && !isAccess && (
+        {requestType && !isAccess && !isBreach && (
           <>
             {isCleanup && (
               <div className="rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2.5 space-y-2">
@@ -522,9 +594,20 @@ export function NewRequestForm({
       <div className={`flex justify-end gap-2 ${variant === "modal" ? "px-6 py-4 border-t border-line" : "pt-5"}`}>
         {onCancel && <button onClick={onCancel} className="btn">{t.common.cancel}</button>}
         <button onClick={submit} disabled={saving || !!domainBlock} className="btn btn-primary">
-          {saving ? t.common.submitting : c.submitRequestBtn}
+          {saving ? t.common.submitting : isBreach ? t.breach.submit : c.submitRequestBtn}
         </button>
       </div>
+    </>
+  );
+}
+
+/** "Breach BR-2026-0001 reported…", with a link when the reporter can open Data Privacy. */
+export function BreachReported({ result }: { result: Extract<NewRequestResult, { kind: "BREACH" }> }) {
+  const { t } = useLang();
+  return (
+    <>
+      {t.breach.submitted.replace("{ref}", result.reference ?? "")}{" "}
+      {result.canOpen && <a href={`/privacy/breaches/${result.breachId}`} className="font-semibold underline">{t.breach.openIt}</a>}
     </>
   );
 }
