@@ -232,7 +232,7 @@ You can only change assets you are allowed to edit. Jobs and their files are lis
 | Privacy & Retention | Data categories, consent notice, impact assessment questionnaires in use and the default |
 | Branding | Your logo, shown next to Bayanis |
 | Scheduling | Automatic jobs (report snapshots, regulation trends, the daily impact assessment check) and their schedules |
-| Security | Sign-in and password settings |
+| Security | Sign-in and password settings, and the encryption key for stored passwords and keys |
 | Compliance | Compliance assessment settings |
 | AI | AI enrichment settings: thresholds, freshness window, token budget |
 | FOI | Freedom of information settings such as fees and response times |`,
@@ -241,6 +241,20 @@ You can only change assets you are allowed to edit. Jobs and their files are lis
         id: "how",
         title: "How to use it",
         body: `Pick an area in the list on the left, change the values and save. Names and labels you add here are translated in Languages & Translations.`,
+      },
+      {
+        id: "encryption-keys",
+        title: "Encryption keys and key rotation",
+        body: `Data source passwords, AI provider keys, LDAP bind passwords and the SSO client secret are stored encrypted (AES-256-GCM). The key is held in the server environment, not in the database, and each stored value records which key encrypted it.
+
+**Configuration › Encryption Keys** shows the current key and any previous keys (by a short identifier, never the key itself), how many stored secrets use each, and when they were last re-encrypted.
+
+### Rotating the key
+1. The server administrator generates a new key and sets it as the current key, keeping the old one as a previous key, then restarts Bayanis.
+2. Click **Re-encrypt with the current key**. Each secret is opened with its old key, encrypted with the new one and checked before it is saved. Nobody re-enters a password.
+3. When the old key shows *no longer used*, the server administrator removes it.
+
+Every re-encryption is recorded in the audit log. A secret that cannot be opened with any configured key is listed by name, so it can be entered again.`,
       },
     ],
     related: ["languages", "ai-providers"],

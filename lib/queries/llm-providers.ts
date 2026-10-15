@@ -2,7 +2,7 @@
 
 import { sql } from "../db";
 import { logCreate, logUpdate } from "../audit";
-import { encryptSecret, decryptSecret } from "../secrets";
+import { storeCredential, readCredential } from "./credentials";
 
 export type ProviderType = "MANAGED_API" | "CLOUD_REGION" | "SELF_HOSTED";
 export type ApiFlavor = "OPENAI_COMPAT" | "ANTHROPIC" | "BEDROCK" | "VERTEX";
@@ -145,26 +145,17 @@ export async function setDefaultProfile(profileId: number, userId: string): Prom
 /** Write-only: sets/rotates a profile's credential. Never returns the plaintext again. */
 export async function setCredential(profileId: number, plaintextKey: string, userId: string): Promise<void> {
   if (!plaintextKey.trim()) throw new Error("Credential value cannot be empty");
-  const enc = encryptSecret(plaintextKey.trim());
-  const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.llm_credentials (label_text, ciphertext_b64, iv_b64, auth_tag_b64, last4_text, rotated_at, created_by_user_id)
-    VALUES (${`profile-${profileId}`}, ${enc.ciphertextB64}, ${enc.ivB64}, ${enc.authTagB64}, ${enc.last4}, NOW(), ${userId})
-    RETURNING credential_id AS id
-  `;
-  await sql`UPDATE bayanat.llm_provider_profiles SET credential_id = ${row.id}, updated_at = NOW() WHERE profile_id = ${profileId}`;
+  const enc = await storeCredential(`profile-${profileId}`, plaintextKey.trim(), userId);
+  await sql`UPDATE bayanat.llm_provider_profiles SET credential_id = ${enc.id}, updated_at = NOW() WHERE profile_id = ${profileId}`;
   await logUpdate("LLM_PROVIDER_PROFILES", profileId, userId, [{ field: "credential", oldVal: null, newVal: `rotated (••••${enc.last4})`, force: true }]);
 }
 
 /** Internal only — never call from an API route response path. */
 export async function getDecryptedCredential(profileId: number): Promise<string | null> {
-  const [row] = await sql<{ ciphertextB64: string; ivB64: string; authTagB64: string }[]>`
-    SELECT c.ciphertext_b64 AS "ciphertextB64", c.iv_b64 AS "ivB64", c.auth_tag_b64 AS "authTagB64"
-    FROM bayanat.llm_provider_profiles p
-    JOIN bayanat.llm_credentials c ON c.credential_id = p.credential_id
-    WHERE p.profile_id = ${profileId}
+  const [row] = await sql<{ credentialId: number | null }[]>`
+    SELECT credential_id AS "credentialId" FROM bayanat.llm_provider_profiles WHERE profile_id = ${profileId}
   `;
-  if (!row) return null;
-  return decryptSecret(row);
+  return row?.credentialId != null ? readCredential(row.credentialId) : null;
 }
 
 export async function updateHealthStatus(profileId: number, status: HealthStatus, message: string | null): Promise<void> {

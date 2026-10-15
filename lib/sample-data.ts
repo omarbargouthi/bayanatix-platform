@@ -38,7 +38,7 @@ async function getEntityConnectionInfo(entityId: number): Promise<EntityConn | n
     LEFT JOIN bayanat.connection_registry cr ON cr.connection_id = ds.connection_id
     WHERE e.entity_id = ${entityId}
   `;
-  if (row) row.passwordText = openSecret(row.passwordText);
+  if (row) row.passwordText = await openSecret(row.passwordText);
   return row ?? null;
 }
 

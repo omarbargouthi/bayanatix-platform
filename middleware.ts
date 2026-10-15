@@ -26,6 +26,7 @@ const PUBLIC_PREFIXES = [
   "/api/admin/scheduled-jobs/run",      // scripts/scheduler.mjs — no session cookie, same CRON_SECRET bearer check
   "/api/admin/retention/run",           // scripts/scheduler.mjs (CRON_SECRET bearer) — also accepts an admin session itself
                                          // (NOT /api/admin/scheduled-jobs itself — that one stays session-protected)
+  "/api/admin/secrets",                 // scripts/reseal-secrets.mjs (CRON_SECRET bearer) — also accepts an admin session itself
   "/api/languages",         // login page's language picker needs this before a session exists
   "/api/translations/bundle", // same reason — non-sensitive UI copy, needed pre-auth by login + public FOI pages
   "/api/branding/logo",     // login page's logo needs this before a session exists, same reason as /api/languages

@@ -2,7 +2,7 @@
 // contractors, a subsidiary — each with its own connection and its own on/off switch.
 // The sign-in screen lists the enabled ones and the user picks which to sign in to.
 import { sql } from "../db";
-import { encryptSecret, decryptSecret } from "../secrets";
+import { storeCredential, readCredential } from "./credentials";
 import { logCreate, logUpdate } from "../audit";
 
 /** Safe for API responses — the bind password is reduced to "is one set". */
@@ -73,11 +73,7 @@ export async function getLdapDirectoryConfig(directoryId: number): Promise<LdapD
   if (!row) return null;
   let ldapBindPassword: string | null = null;
   if (row.bindCredentialId != null) {
-    const [cred] = await sql<{ ciphertextB64: string; ivB64: string; authTagB64: string }[]>`
-      SELECT ciphertext_b64 AS "ciphertextB64", iv_b64 AS "ivB64", auth_tag_b64 AS "authTagB64"
-      FROM bayanat.llm_credentials WHERE credential_id = ${row.bindCredentialId}
-    `;
-    ldapBindPassword = cred ? decryptSecret(cred) : null;
+    ldapBindPassword = await readCredential(row.bindCredentialId);
   }
   const { bindCredentialId: _omit, ...config } = row;
   void _omit;
@@ -85,13 +81,7 @@ export async function getLdapDirectoryConfig(directoryId: number): Promise<LdapD
 }
 
 async function storeBindPassword(plaintext: string, userId: string): Promise<number> {
-  const enc = encryptSecret(plaintext);
-  const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.llm_credentials (label_text, ciphertext_b64, iv_b64, auth_tag_b64, last4_text, rotated_at, created_by_user_id)
-    VALUES ('ldap-bind-password', ${enc.ciphertextB64}, ${enc.ivB64}, ${enc.authTagB64}, ${enc.last4}, NOW(), ${userId})
-    RETURNING credential_id AS id
-  `;
-  return row.id;
+  return (await storeCredential("ldap-bind-password", plaintext, userId)).id;
 }
 
 async function nameTaken(name: string, exceptId?: number): Promise<boolean> {

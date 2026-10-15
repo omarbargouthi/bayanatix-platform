@@ -166,6 +166,7 @@ export async function createConnection(data: {
   databaseName: string | null; serviceName: string | null; defaultSchema: string | null;
   usernameText: string | null; passwordText: string | null; sslEnabled: boolean;
 }): Promise<number> {
+  const sealedPassword = await sealSecret(data.passwordText ?? null);
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.connection_registry
       (connection_name, db_type_code, host_address, port_number, database_name, service_name,
@@ -173,7 +174,7 @@ export async function createConnection(data: {
     VALUES (
       ${data.connectionName}, ${data.dbTypeCode}, ${data.hostAddress}, ${data.portNumber},
       ${data.databaseName ?? null}, ${data.serviceName ?? null}, ${data.defaultSchema ?? null},
-      ${data.usernameText ?? null}, ${sealSecret(data.passwordText ?? null)}, ${data.sslEnabled}
+      ${data.usernameText ?? null}, ${sealedPassword}, ${data.sslEnabled}
     )
     RETURNING connection_id AS id
   `;
@@ -188,6 +189,7 @@ export async function updateConnection(connectionId: number, data: {
   lineageEnabled?: boolean; lineageScanViews?: boolean; lineageScanMatviews?: boolean;
   lineageScanProcedures?: boolean; lineageScanFunctions?: boolean;
 }): Promise<void> {
+  const sealedPassword = await sealSecret(data.passwordText ?? null);
   await sql`
     UPDATE bayanat.connection_registry SET
       connection_name  = coalesce(${data.connectionName  ?? null}, connection_name),
@@ -200,7 +202,7 @@ export async function updateConnection(connectionId: number, data: {
       username_text    = coalesce(${data.usernameText    ?? null}, username_text),
       ssl_enabled      = coalesce(${data.sslEnabled      ?? null}, ssl_enabled),
       is_active_boolean= coalesce(${data.isActiveBoolean ?? null}, is_active_boolean),
-      password_text    = CASE WHEN ${data.passwordText ?? null}::text IS NOT NULL THEN ${sealSecret(data.passwordText ?? null)} ELSE password_text END,
+      password_text    = CASE WHEN ${data.passwordText ?? null}::text IS NOT NULL THEN ${sealedPassword} ELSE password_text END,
       lineage_enabled        = coalesce(${data.lineageEnabled        ?? null}, lineage_enabled),
       lineage_scan_views      = coalesce(${data.lineageScanViews      ?? null}, lineage_scan_views),
       lineage_scan_matviews   = coalesce(${data.lineageScanMatviews   ?? null}, lineage_scan_matviews),

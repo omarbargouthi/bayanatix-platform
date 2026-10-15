@@ -13,6 +13,7 @@ import { SitSettingsSection } from "./SitSettingsSection";
 import { TableTypeRulesSection } from "./TableTypeRulesSection";
 import { ColumnTypeRulesSection } from "./ColumnTypeRulesSection";
 import { AuthSettingsSection } from "./AuthSettingsSection";
+import { EncryptionKeysSection } from "./EncryptionKeysSection";
 import { BrandingSettingsSection } from "./BrandingSettingsSection";
 import { SchedulingConfigSection } from "./SchedulingConfigSection";
 import { FoiSettingsSection } from "./FoiSettingsSection";
@@ -68,6 +69,7 @@ export default function ConfigurationPage() {
   const [showTableTypeRules, setShowTableTypeRules] = useState(false);
   const [showColumnTypeRules, setShowColumnTypeRules] = useState(false);
   const [showAuthSettings, setShowAuthSettings] = useState(false);
+  const [showEncryptionKeys, setShowEncryptionKeys] = useState(false);
   const [showBrandingSettings, setShowBrandingSettings] = useState(false);
   const [showScheduling, setShowScheduling] = useState(false);
   const [showFoiSettings, setShowFoiSettings] = useState(false);
@@ -114,6 +116,7 @@ export default function ConfigurationPage() {
     setShowTableTypeRules(false);
     setShowColumnTypeRules(false);
     setShowAuthSettings(false);
+    setShowEncryptionKeys(false);
     setShowBrandingSettings(false);
     setShowScheduling(false);
     setShowFoiSettings(false);
@@ -194,7 +197,7 @@ export default function ConfigurationPage() {
 
   const isNothingSelected =
     !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
-    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showTableTypeRules && !showColumnTypeRules && !showAuthSettings
+    && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showTableTypeRules && !showColumnTypeRules && !showAuthSettings && !showEncryptionKeys
     && !showBrandingSettings && !showScheduling && !showFoiSettings;
 
   return (
@@ -338,6 +341,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">Authentication</div>
             <div className="text-[10px] text-muted mt-0.5">LOCAL · LDAP · OIDC · Auto-provisioning</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowEncryptionKeys(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showEncryptionKeys ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Encryption Keys</div>
+            <div className="text-[10px] text-muted mt-0.5">Stored secrets · Key rotation</div>
+          </button>
 
           {/* ── Compliance section */}
           <div className="px-4 py-2 text-[10px] font-semibold text-muted uppercase tracking-wider border-b border-t border-line bg-canvas-soft">
@@ -395,6 +405,7 @@ export default function ConfigurationPage() {
 
         {/* ── Authentication panel ── */}
         {showAuthSettings && <AuthSettingsSection />}
+        {showEncryptionKeys && <EncryptionKeysSection />}
 
         {/* ── Branding panel ── */}
         {showBrandingSettings && <BrandingSettingsSection />}

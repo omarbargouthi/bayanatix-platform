@@ -40,8 +40,8 @@ if (existing.length > 0) {
 
 const enc = encrypt(API_KEY, MASTER_KEY);
 const [cred] = await sql`
-  INSERT INTO bayanat.llm_credentials (label_text, ciphertext_b64, iv_b64, auth_tag_b64, last4_text, rotated_at, created_by_user_id)
-  VALUES ('Anthropic Claude', ${enc.ciphertextB64}, ${enc.ivB64}, ${enc.authTagB64}, ${enc.last4}, NOW(), 'SEED_SCRIPT')
+  INSERT INTO bayanat.llm_credentials (label_text, sealed_text, last4_text, rotated_at, created_by_user_id)
+  VALUES ('Anthropic Claude', ${`enc:v1:${enc.ivB64}:${enc.authTagB64}:${enc.ciphertextB64}`}, ${enc.last4}, NOW(), 'SEED_SCRIPT')
   RETURNING credential_id
 `;
 

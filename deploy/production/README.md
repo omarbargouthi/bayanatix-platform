@@ -62,6 +62,23 @@ After the restore, in Bayanis (Administration › Data Sources):
   dump was created with;
 - change the demo accounts' passwords.
 
+## Rotating the encryption key
+
+Stored source passwords, AI provider keys and sign-in secrets are encrypted with
+`LLM_SECRETS_MASTER_KEY`. To replace it:
+
+```bash
+openssl rand -hex 32                      # the new key
+# in .env: LLM_SECRETS_MASTER_KEY=<new>, LLM_SECRETS_PREVIOUS_KEYS=<old>
+docker compose up -d                      # restart with both keys
+docker compose exec scheduler node scripts/reseal-secrets.mjs   # or Configuration › Encryption Keys
+```
+
+(The scheduler container reaches the app at `http://app:3000` with `CRON_SECRET`.) When
+`docker compose exec scheduler node scripts/reseal-secrets.mjs --status` says the old key is no longer used,
+empty `LLM_SECRETS_PREVIOUS_KEYS` and restart. Keep a copy of the old key as long as you
+keep database backups taken before the rotation.
+
 ## Releasing
 
 ```bash

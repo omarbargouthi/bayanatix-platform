@@ -51,7 +51,7 @@ async function getSourceSql(rule: DqRule): Promise<ReturnType<typeof postgres> |
   `;
   if (rows.length === 0 || !rows[0].host) return null;
   const { host, port, dbName, username } = rows[0];
-  const password = openSecret(rows[0].password) ?? "";
+  const password = (await openSecret(rows[0].password)) ?? "";
   return postgres(
     `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${dbName}`,
     { max: 1, connect_timeout: 5, ssl: "prefer", transform: { undefined: null } }

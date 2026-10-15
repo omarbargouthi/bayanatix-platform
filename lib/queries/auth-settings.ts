@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { encryptSecret, decryptSecret } from "../secrets";
+import { storeCredential, readCredential } from "./credentials";
 import { logUpdate } from "../audit";
 
 export type AuthSettings = {
@@ -102,22 +102,11 @@ export async function getResolvedAuthConfig(): Promise<ResolvedAuthConfig> {
 }
 
 async function getDecryptedById(credentialId: number): Promise<string | null> {
-  const [row] = await sql<{ ciphertextB64: string; ivB64: string; authTagB64: string }[]>`
-    SELECT ciphertext_b64 AS "ciphertextB64", iv_b64 AS "ivB64", auth_tag_b64 AS "authTagB64"
-    FROM bayanat.llm_credentials WHERE credential_id = ${credentialId}
-  `;
-  if (!row) return null;
-  return decryptSecret(row);
+  return readCredential(credentialId);
 }
 
 async function storeSecret(label: string, plaintext: string, userId: string): Promise<number> {
-  const enc = encryptSecret(plaintext);
-  const [row] = await sql<{ id: number }[]>`
-    INSERT INTO bayanat.llm_credentials (label_text, ciphertext_b64, iv_b64, auth_tag_b64, last4_text, rotated_at, created_by_user_id)
-    VALUES (${label}, ${enc.ciphertextB64}, ${enc.ivB64}, ${enc.authTagB64}, ${enc.last4}, NOW(), ${userId})
-    RETURNING credential_id AS id
-  `;
-  return row.id;
+  return (await storeCredential(label, plaintext, userId)).id;
 }
 
 export type AuthSettingsPatch = {

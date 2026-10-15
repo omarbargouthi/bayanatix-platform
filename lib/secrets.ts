@@ -1,66 +1,146 @@
-// Encrypted secrets store (LLM Provider Config spec §3): AES-256-GCM with a master
-// key from the environment (v1 — pluggable backend for Vault/cloud KMS later). Keys
-// are write-only: nothing that reads a llm_credentials row ever returns the
-// plaintext, only encrypt() (called once, at entry/rotation time) touches it.
+// Encrypted secrets (LLM Provider Config spec §3, extended for key rotation and
+// pluggable backends). Every stored secret is one self-describing string, so values
+// written by different keys or backends can live side by side while they are moved:
+//
+//   enc:v2:<keyId>:<iv>:<authTag>:<ciphertext>   local AES-256-GCM, names its key
+//   enc:v1:<iv>:<authTag>:<ciphertext>           older local format, key not named
+//   anything else                                legacy plain text (connection
+//                                                passwords from before encryption)
+//
+// Secrets are write-only: nothing that returns data to a browser ever opens one.
+// All calls are async so a network backend (Vault Transit, a cloud KMS) can sit
+// behind the same functions; SECRETS_PROVIDER picks the backend new values use.
+// Only "local" exists today. Rotation of the local key: see lib/secrets-rotation.ts.
 
 import crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
+const V1 = "enc:v1:";
+const V2 = "enc:v2:";
 
-function getMasterKey(): Buffer {
+/** Where a stored value stands against the active provider's current key. */
+export type SecretState = "current" | "older-key" | "plain" | "unreadable";
+
+export interface SecretProvider {
+  readonly name: string;
+  /** True when this provider wrote the stored value (and so can open it). */
+  owns(stored: string): boolean;
+  seal(plaintext: string): Promise<string>;
+  open(stored: string): Promise<string>;
+  inspect(stored: string): Promise<{ state: SecretState; keyId: string | null }>;
+  describe(): { provider: string; currentKeyId: string; previousKeyIds: string[] };
+}
+
+// ── Local provider: keys from the environment ──────────────────────────────────
+// LLM_SECRETS_MASTER_KEY is the current key (64 hex characters). During a rotation
+// the old key moves to LLM_SECRETS_PREVIOUS_KEYS (comma-separated) so values it
+// sealed can still be opened until they are re-encrypted. A key is named by the
+// first 8 hex characters of its SHA-256, which says nothing about the key itself.
+
+type Key = { id: string; key: Buffer };
+
+function parseKey(raw: string, envName: string): Key {
+  const key = Buffer.from(raw.trim(), "hex");
+  if (key.length !== 32) throw new Error(`${envName} must hold 32-byte keys (64 hex characters)`);
+  return { id: crypto.createHash("sha256").update(key).digest("hex").slice(0, 8), key };
+}
+
+function keyring(): { current: Key; previous: Key[] } {
   const raw = process.env.LLM_SECRETS_MASTER_KEY;
   if (!raw) throw new Error("LLM_SECRETS_MASTER_KEY is not set — add a 32-byte (64 hex char) key to .env.local");
-  const key = Buffer.from(raw, "hex");
-  if (key.length !== 32) throw new Error("LLM_SECRETS_MASTER_KEY must decode to exactly 32 bytes (64 hex characters)");
-  return key;
+  const current = parseKey(raw, "LLM_SECRETS_MASTER_KEY");
+  const previous = (process.env.LLM_SECRETS_PREVIOUS_KEYS ?? "")
+    .split(/[\s,]+/).filter(Boolean)
+    .map((k) => parseKey(k, "LLM_SECRETS_PREVIOUS_KEYS"))
+    .filter((k) => k.id !== current.id);
+  return { current, previous };
 }
 
-export type EncryptedSecret = { ciphertextB64: string; ivB64: string; authTagB64: string; last4: string };
-
-export function encryptSecret(plaintext: string): EncryptedSecret {
-  const key = getMasterKey();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return {
-    ciphertextB64: ciphertext.toString("base64"),
-    ivB64: iv.toString("base64"),
-    authTagB64: authTag.toString("base64"),
-    last4: plaintext.slice(-4),
-  };
+function decrypt(key: Buffer, ivB64: string, authTagB64: string, ciphertextB64: string): string {
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivB64, "base64"));
+  decipher.setAuthTag(Buffer.from(authTagB64, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(ciphertextB64, "base64")), decipher.final()]).toString("utf8");
 }
 
-export function decryptSecret(enc: { ciphertextB64: string; ivB64: string; authTagB64: string }): string {
-  const key = getMasterKey();
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(enc.ivB64, "base64"));
-  decipher.setAuthTag(Buffer.from(enc.authTagB64, "base64"));
-  const plaintext = Buffer.concat([decipher.update(Buffer.from(enc.ciphertextB64, "base64")), decipher.final()]);
-  return plaintext.toString("utf8");
+/** Opens a value and says which key opened it; v1 values are tried against every key. */
+function openLocal(stored: string): { plaintext: string; keyId: string } {
+  const { current, previous } = keyring();
+  const all = [current, ...previous];
+  if (stored.startsWith(V2)) {
+    const [keyId, iv, tag, ct] = stored.slice(V2.length).split(":");
+    const k = all.find((x) => x.id === keyId);
+    if (!k) throw new Error(`Secret was encrypted with key ${keyId}, which is not configured — add it to LLM_SECRETS_PREVIOUS_KEYS`);
+    return { plaintext: decrypt(k.key, iv, tag, ct), keyId };
+  }
+  const [iv, tag, ct] = stored.slice(V1.length).split(":");
+  for (const k of all) {
+    try { return { plaintext: decrypt(k.key, iv, tag, ct), keyId: k.id }; } catch { /* next key */ }
+  }
+  throw new Error("Secret could not be decrypted with any configured key — add the key it was encrypted with to LLM_SECRETS_PREVIOUS_KEYS");
 }
 
-// ── Sealed strings: a secret stored in an ordinary text column ─────────────────
-// Format "enc:v1:<iv>:<authTag>:<ciphertext>" (base64 parts), so a column can hold
-// either a sealed value or — for rows written before encryption was introduced —
-// legacy plain text, which openSecret() passes through unchanged until
-// scripts/encrypt-connection-passwords.mjs seals it. Used for data source
-// connection passwords (bayanat.connection_registry.password_text).
-const SEALED_PREFIX = "enc:v1:";
+const localProvider: SecretProvider = {
+  name: "local",
+  owns: (stored) => stored.startsWith(V1) || stored.startsWith(V2),
+  async seal(plaintext) {
+    const { current } = keyring();
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(ALGORITHM, current.key, iv);
+    const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+    return `${V2}${current.id}:${iv.toString("base64")}:${cipher.getAuthTag().toString("base64")}:${ct.toString("base64")}`;
+  },
+  async open(stored) {
+    return openLocal(stored).plaintext;
+  },
+  async inspect(stored) {
+    try {
+      const { keyId } = openLocal(stored);
+      // A v1 value is rewritten even under the current key, so that it names its key.
+      return { state: keyId === keyring().current.id && stored.startsWith(V2) ? "current" : "older-key", keyId };
+    } catch {
+      return { state: "unreadable", keyId: stored.startsWith(V2) ? stored.slice(V2.length).split(":")[0] : null };
+    }
+  },
+  describe() {
+    const { current, previous } = keyring();
+    return { provider: "local", currentKeyId: current.id, previousKeyIds: previous.map((k) => k.id) };
+  },
+};
+
+// ── Provider selection ─────────────────────────────────────────────────────────
+// New backends register here; opening dispatches on the value's own prefix, so a
+// database part-way through a move between backends keeps working.
+const PROVIDERS: SecretProvider[] = [localProvider];
+
+export function activeSecretProvider(): SecretProvider {
+  const name = (process.env.SECRETS_PROVIDER ?? "local").trim().toLowerCase();
+  const p = PROVIDERS.find((x) => x.name === name);
+  if (!p) throw new Error(`SECRETS_PROVIDER "${name}" is not supported — available: ${PROVIDERS.map((x) => x.name).join(", ")}`);
+  return p;
+}
 
 export function isSealed(value: string | null | undefined): boolean {
-  return !!value && value.startsWith(SEALED_PREFIX);
+  return !!value && PROVIDERS.some((p) => p.owns(value));
 }
 
-export function sealSecret(plaintext: string | null | undefined): string | null {
+/** Encrypts with the active provider's current key. Null and "" pass through. */
+export async function sealSecret(plaintext: string | null | undefined): Promise<string | null> {
   if (plaintext == null || plaintext === "") return plaintext ?? null;
   if (isSealed(plaintext)) return plaintext;
-  const e = encryptSecret(plaintext);
-  return `${SEALED_PREFIX}${e.ivB64}:${e.authTagB64}:${e.ciphertextB64}`;
+  return activeSecretProvider().seal(plaintext);
 }
 
-export function openSecret(stored: string | null | undefined): string | null {
+/** Opens a stored value with whichever provider wrote it; legacy plain text passes through. */
+export async function openSecret(stored: string | null | undefined): Promise<string | null> {
   if (stored == null) return null;
-  if (!isSealed(stored)) return stored;
-  const [ivB64, authTagB64, ciphertextB64] = stored.slice(SEALED_PREFIX.length).split(":");
-  return decryptSecret({ ivB64, authTagB64, ciphertextB64 });
+  const p = PROVIDERS.find((x) => x.owns(stored));
+  return p ? p.open(stored) : stored;
+}
+
+/** Where a stored value stands; used by the key-rotation status and re-encryption. */
+export async function inspectSecret(stored: string): Promise<{ state: SecretState; keyId: string | null }> {
+  const p = PROVIDERS.find((x) => x.owns(stored));
+  if (!p) return { state: "plain", keyId: null };
+  if (p !== activeSecretProvider()) return { state: "older-key", keyId: null };
+  return p.inspect(stored);
 }

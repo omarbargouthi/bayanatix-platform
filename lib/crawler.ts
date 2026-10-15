@@ -1185,7 +1185,7 @@ export async function testConnection(connectionId: number): Promise<{ ok: boolea
     FROM bayanat.connection_registry WHERE connection_id = ${connectionId}
   `;
   if (!cfg) throw new Error("Connection not found");
-  cfg.passwordText = openSecret(cfg.passwordText);
+  cfg.passwordText = await openSecret(cfg.passwordText);
 
   try {
     if (cfg.dbTypeCode === "POSTGRES") {
@@ -1772,7 +1772,7 @@ export async function crawlDataSource(connectionId: number, triggeredByUserId: s
     await scanAzureConnection(connectionId, triggeredByUserId);
     return;
   }
-  cfgRow.passwordText = openSecret(cfgRow.passwordText);
+  cfgRow.passwordText = await openSecret(cfgRow.passwordText);
 
   // Load crawl config (schema/table filters, profiling settings, governance defaults)
   const [configRow] = await sql<{
