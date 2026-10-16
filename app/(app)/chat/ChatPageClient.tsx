@@ -11,7 +11,7 @@ function ChatPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { contextAsset } = useChatAssetContext();
-  const { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback } = useChatSession();
+  const { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback, updateAction } = useChatSession();
 
   const cParam = searchParams.get("c");
 
@@ -56,6 +56,7 @@ function ChatPageContent() {
           progressLabel={progressLabel}
           error={error}
           onFeedback={submitFeedback}
+          onAction={updateAction}
           bubbleMaxWidth="max-w-[520px]"
           emptyState={<div className="text-center text-muted text-sm py-10">Ask a question about your data assets to get started.</div>}
         />

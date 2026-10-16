@@ -81,7 +81,8 @@ export async function getSitSuggestionsQueue(filter: {
 /** Stamped as the classifier when a suggestion is accepted by the run, not by a person. */
 export const SIT_AUTO_ACCEPT_ACTOR = "SYSTEM:SIT-AUTO-ACCEPT";
 
-async function applyClassificationTerm(attributeId: number, glossaryId: number, userId: string): Promise<void> {
+/** Links the classification term to the column, sets its level and audits the change. Also used by Ask Bayanis's Apply. */
+export async function applyClassificationTerm(attributeId: number, glossaryId: number, userId: string): Promise<void> {
   const [term] = await sql<{ classificationCode: string | null }[]>`
     SELECT classification_code AS "classificationCode" FROM bayanat.business_glossaries WHERE glossary_id = ${glossaryId}
   `;

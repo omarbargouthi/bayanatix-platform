@@ -56,7 +56,7 @@ export function ChatbotBubble() {
   const c = t.chat;
   const { contextAsset } = useChatAssetContext();
   const record = useChatRecord();
-  const { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback } = useChatSession();
+  const { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback, updateAction } = useChatSession();
 
   const pageKind = pageKindForPath(pathname ?? "");
   const starters = STARTER_QUESTIONS[pageKind];
@@ -124,6 +124,7 @@ export function ChatbotBubble() {
                 progressLabel={progressLabel}
                 error={error}
                 onFeedback={submitFeedback}
+                onAction={updateAction}
                 emptyState={
                   <div className="flex flex-col gap-3">
                     <div className="flex gap-2">

@@ -4,6 +4,8 @@ import type { ChatUiMessage } from "@/lib/chat/useChatSession";
 import { SourceChips } from "./SourceChips";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { HelpText } from "@/components/help/HelpText";
+import { ApplyCard } from "./ApplyCard";
+import type { ClassificationProposal } from "@/lib/chat/classification-apply";
 
 function AiAvatar() {
   return (
@@ -18,6 +20,7 @@ export function ChatThread({
   progressLabel,
   error,
   onFeedback,
+  onAction,
   emptyState,
   bubbleMaxWidth = "max-w-[220px]",
 }: {
@@ -25,6 +28,7 @@ export function ChatThread({
   progressLabel: string | null;
   error: string | null;
   onFeedback: (messageId: number, code: "UP" | "DOWN", comment?: string) => void;
+  onAction?: (messageId: number, proposal: ClassificationProposal) => void;
   emptyState?: ReactNode;
   bubbleMaxWidth?: string;
 }) {
@@ -42,6 +46,9 @@ export function ChatThread({
           >
             {/* Answers may hold steps, bold and command blocks (how-to answers from the Help Center). */}
             {m.role === "ASSISTANT" ? <HelpText body={m.text} compact /> : m.text}
+            {m.role === "ASSISTANT" && onAction && (m.actions ?? []).map((a) => (
+              <ApplyCard key={a.kind} messageId={m.messageId} proposal={a} onApplied={(p) => onAction(m.messageId, p)} />
+            ))}
             {m.role === "ASSISTANT" && <SourceChips sources={m.sources} />}
             {m.role === "ASSISTANT" && (
               <FeedbackButtons feedbackCode={m.feedbackCode} onSubmit={(code, comment) => onFeedback(m.messageId, code, comment)} />

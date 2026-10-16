@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ComplianceConfigSection } from "./ComplianceConfigSection";
 import { DataCategoriesConfig } from "./DataCategoriesConfig";
 import { EnrichmentSettingsSection } from "./EnrichmentSettingsSection";
+import { AskBayanisSettingsSection } from "./AskBayanisSettingsSection";
 import { CustomAttributesConfigSection } from "./CustomAttributesConfigSection";
 import { SampleDataConfigSection } from "./SampleDataConfigSection";
 import { PrivacyRetentionSection } from "./PrivacyRetentionSection";
@@ -61,6 +62,7 @@ export default function ConfigurationPage() {
   const [showComplianceConfig, setShowComplianceConfig] = useState(false);
   const [showDataCategories, setShowDataCategories]     = useState(false);
   const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
+  const [showAskBayanis, setShowAskBayanis] = useState(false);
   const [showCustomAttributes, setShowCustomAttributes] = useState(false);
   const [showSampleData, setShowSampleData] = useState(false);
   const [showFollowSettings, setShowFollowSettings] = useState(false);
@@ -108,6 +110,7 @@ export default function ConfigurationPage() {
     setShowComplianceConfig(false);
     setShowDataCategories(false);
     setShowEnrichmentSettings(false);
+    setShowAskBayanis(false);
     setShowCustomAttributes(false);
     setShowSampleData(false);
     setShowFollowSettings(false);
@@ -196,7 +199,7 @@ export default function ConfigurationPage() {
   }
 
   const isNothingSelected =
-    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings
+    !selectedGroup && !adding && !showComplianceConfig && !showDataCategories && !showEnrichmentSettings && !showAskBayanis
     && !showCustomAttributes && !showSampleData && !showFollowSettings && !showPrivacyRetention && !showSitSettings && !showTableTypeRules && !showColumnTypeRules && !showAuthSettings && !showEncryptionKeys
     && !showBrandingSettings && !showScheduling && !showFoiSettings;
 
@@ -372,6 +375,13 @@ export default function ConfigurationPage() {
             <div className="font-medium text-ink">AI Enrichment</div>
             <div className="text-[10px] text-muted mt-0.5">Provider · Buffers · Token budget</div>
           </button>
+          <button
+            onClick={() => { resetNav(); setSelectedGroup(null); setShowAskBayanis(true); }}
+            className={`w-full text-left px-4 py-3 border-b border-line text-sm transition-colors hover:bg-white ${showAskBayanis ? "bg-white border-l-2 border-l-brand-purple" : ""}`}
+          >
+            <div className="font-medium text-ink">Ask Bayanis</div>
+            <div className="text-[10px] text-muted mt-0.5">Apply classification advice</div>
+          </button>
         </div>
       </aside>
 
@@ -383,6 +393,7 @@ export default function ConfigurationPage() {
 
         {/* ── AI Enrichment Settings panel ── */}
         {showEnrichmentSettings && <EnrichmentSettingsSection />}
+        {showAskBayanis && <AskBayanisSettingsSection />}
 
         {/* ── Custom Attributes panel ── */}
         {showCustomAttributes && <CustomAttributesConfigSection />}

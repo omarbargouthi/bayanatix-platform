@@ -10,7 +10,8 @@ export type SourceRef = {
 export type ToolExecContext = { session: SessionUser };
 
 export type ToolResult =
-  | { ok: true; data: unknown; sources: SourceRef[] }
+  // `action`: something the user can act on below the answer (e.g. an Apply button).
+  | { ok: true; data: unknown; sources: SourceRef[]; action?: unknown }
   | { ok: false; error: string };
 
 export type ToolDefinition = {

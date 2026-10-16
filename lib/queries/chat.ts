@@ -20,6 +20,8 @@ export type ChatMessageRow = {
   contentText:          string;
   toolTraceJson:        unknown;
   sourcesJson:          unknown;
+  /** Things the user can act on under an answer (e.g. a classification proposal to apply). */
+  actionsJson:          unknown;
   modelRefText:         string | null;
   tokenCountInt:        number | null;
   feedbackCode:         ChatFeedbackCode | null;
@@ -35,7 +37,7 @@ const CONVERSATION_COLS = `
 
 const MESSAGE_COLS = `
   message_id AS "messageId", conversation_id AS "conversationId", role_code AS "roleCode",
-  content_text AS "contentText", tool_trace_json AS "toolTraceJson", sources_json AS "sourcesJson",
+  content_text AS "contentText", tool_trace_json AS "toolTraceJson", sources_json AS "sourcesJson", actions_json AS "actionsJson",
   model_ref_text AS "modelRefText", token_count_int AS "tokenCountInt",
   feedback_code AS "feedbackCode", feedback_comment_text AS "feedbackCommentText", created_at::text AS "createdAt"
 `;
@@ -80,15 +82,16 @@ export async function getMessages(conversationId: number): Promise<ChatMessageRo
 
 export async function appendMessage(data: {
   conversationId: number; roleCode: ChatRoleCode; contentText: string;
-  toolTraceJson?: unknown; sourcesJson?: unknown;
+  toolTraceJson?: unknown; sourcesJson?: unknown; actionsJson?: unknown[];
   modelRefText?: string | null; tokenCountInt?: number | null;
 }): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO bayanat.chat_messages
-      (conversation_id, role_code, content_text, tool_trace_json, sources_json, model_ref_text, token_count_int)
+      (conversation_id, role_code, content_text, tool_trace_json, sources_json, actions_json, model_ref_text, token_count_int)
     VALUES (
       ${data.conversationId}, ${data.roleCode}, ${data.contentText},
       ${(data.toolTraceJson ?? null) as any}::jsonb, ${(data.sourcesJson ?? null) as any}::jsonb,
+      ${(data.actionsJson?.length ? data.actionsJson : null) as any}::jsonb,
       ${data.modelRefText ?? null}, ${data.tokenCountInt ?? null}
     )
     RETURNING message_id AS id

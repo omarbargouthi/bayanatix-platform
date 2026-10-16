@@ -2239,6 +2239,16 @@ export type I18nStrings = {
     feedbackComment:    string;
     deleteConversation: string;
     noConversations:    string;
+    applyTitle:         string;
+    applyHint:          string;
+    applyButton:        string;
+    applyConfirm:       string;
+    applyConfirmYes:    string;
+    applying:           string;
+    applied:            string;
+    appliedRequest:     string;
+    applyFailed:        string;
+    currentTerm:        string;
   };
 
   // ── Freedom of Information (FOI) case management ────────────────────────────

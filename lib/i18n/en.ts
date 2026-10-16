@@ -2113,6 +2113,16 @@ export const en: I18nStrings = {
     feedbackComment:    "Optional comment…",
     deleteConversation: "Delete conversation",
     noConversations:    "No conversations yet.",
+    applyTitle:         "Proposed classification changes",
+    applyHint:          "Untick any you don't want. Each change is recorded in the audit log and as a Classify Asset request.",
+    applyButton:        "Apply {n} selected",
+    applyConfirm:       "Classify {n} column(s) of {table}? Their sensitivity level and personal data category will change.",
+    applyConfirmYes:    "Apply",
+    applying:           "Applying…",
+    applied:            "Applied to {n} column(s) on {date}.",
+    appliedRequest:     "Request #{id}",
+    applyFailed:        "Couldn't apply: {error}",
+    currentTerm:        "now {term}",
   },
 
   foi: {

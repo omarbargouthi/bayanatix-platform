@@ -2113,6 +2113,16 @@ export const ar: I18nStrings = {
     feedbackComment:    "تعليق اختياري…",
     deleteConversation: "حذف المحادثة",
     noConversations:    "لا توجد محادثات بعد.",
+    applyTitle:         "تغييرات التصنيف المقترحة",
+    applyHint:          "ألغِ تحديد ما لا تريده. تُسجَّل كل تغييرات في سجل التدقيق وفي طلب «تصنيف أصل».",
+    applyButton:        "تطبيق المحدد ({n})",
+    applyConfirm:       "هل تريد تصنيف {n} من أعمدة {table}؟ سيتغيّر مستوى حساسيتها وفئة بياناتها الشخصية.",
+    applyConfirmYes:    "تطبيق",
+    applying:           "جارٍ التطبيق…",
+    applied:            "طُبّق على {n} من الأعمدة في {date}.",
+    appliedRequest:     "الطلب رقم {id}",
+    applyFailed:        "تعذّر التطبيق: {error}",
+    currentTerm:        "حالياً {term}",
   },
 
   foi: {

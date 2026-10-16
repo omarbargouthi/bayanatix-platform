@@ -76,11 +76,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         contentText: result.text,
         toolTraceJson: result.toolTrace,
         sourcesJson: result.sources,
+        actionsJson: result.actions,
         modelRefText: result.modelRef,
         tokenCountInt: result.tokenCount,
       });
 
-      controller.enqueue(encoder.encode(sseEvent("complete", { messageId, text: result.text, sources: result.sources })));
+      controller.enqueue(encoder.encode(sseEvent("complete", { messageId, text: result.text, sources: result.sources, actions: result.actions })));
       controller.close();
     },
   });

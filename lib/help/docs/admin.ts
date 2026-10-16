@@ -234,7 +234,7 @@ You can only change assets you are allowed to edit. Jobs and their files are lis
 | Scheduling | Automatic jobs (report snapshots, regulation trends, the daily impact assessment check) and their schedules |
 | Security | Sign-in and password settings, and the encryption key for stored passwords and keys |
 | Compliance | Compliance assessment settings |
-| AI | AI enrichment settings: thresholds, freshness window, token budget |
+| AI | AI enrichment settings: thresholds, freshness window, token budget; Ask Bayanis: whether users may apply its classification advice (off by default) |
 | FOI | Freedom of information settings such as fees and response times |`,
       },
       {

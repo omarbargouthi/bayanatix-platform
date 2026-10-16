@@ -164,7 +164,9 @@ The result is a confidence. Suggestions above the auto-accept band can be accept
 4. Save.
 
 ### Advice from Ask Bayanis
-On a table's page, ask Ask Bayanis "What classification suits the columns of this table?". It reviews each column (name, type, description, keys, Bayanis's suggestions and profiling statistics, never the values) and recommends a classification term from your glossary, with its reasons and how sure it is. It changes nothing: a steward applies the recommendations as above.`,
+On a table's page, ask Ask Bayanis "What classification suits the columns of this table?". It reviews each column (name, type, description, keys, Bayanis's suggestions and profiling statistics, never the values) and recommends a classification term from your glossary, with its reasons and how sure it is. It changes nothing by itself: a steward applies the recommendations as above.
+
+When an administrator allows it (**Configuration › Ask Bayanis › Allow applying classification advice**, off by default), users who may edit metadata also see the recommended changes under the answer. They untick any they don't want, confirm and click **Apply**. Only terms Bayanis checked against each column are offered. Every change is recorded in the audit log and as a **Classify Asset** request, which follows its workflow when one is set up.`,
       },
     ],
     related: ["data-catalog", "data-lineage", "impact-assessments"],

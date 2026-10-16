@@ -23,6 +23,7 @@ import { getRetentionOverview } from "@/lib/queries/retention";
 import { getUpstreamImpact, getDownstreamImpact } from "@/lib/queries/lineage";
 import { findHelpSections, helpDocForAssistant } from "@/lib/help/content";
 import { classificationAdvice } from "./classification-advice";
+import { buildProposal, canApplyClassification } from "./classification-apply";
 import type { SourceRef, ToolDefinition, ToolResult } from "./types";
 
 function ok(data: unknown, sources: SourceRef[] = []): ToolResult {
@@ -542,12 +543,47 @@ const suggestColumnClassifications: ToolDefinition = {
   },
 };
 
+// ── propose_classification_changes ───────────────────────────────────────────
+// Only offered when an administrator allows applying advice and the user may edit
+// metadata (the orchestrator leaves it out otherwise). It changes nothing: it stores
+// the checked proposal, and the user applies it with the Apply button.
+export const PROPOSE_TOOL = "propose_classification_changes";
+const proposeClassificationChanges: ToolDefinition = {
+  name: PROPOSE_TOOL,
+  description: "After recommending classification terms with suggest_column_classifications, record the recommended changes so the user can review and apply them with an Apply button under your answer. Include only columns for which you recommend a specific term (from that column's candidateTerms or sensitiveTypeSuggestion) that differs from its current term. This tool does not change anything.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      tableId: { type: "number" },
+      changes: {
+        type: "array",
+        items: { type: "object", properties: { columnId: { type: "number" }, term: { type: "string" } }, required: ["columnId", "term"] },
+      },
+    },
+    required: ["tableId", "changes"],
+  },
+  run: async (args, ctx) => {
+    if (!(await canApplyClassification(ctx.session))) return { ok: false, error: "Applying classification advice is not available to this user." };
+    const tableId = Number(args.tableId);
+    const changes = Array.isArray(args.changes) ? (args.changes as { columnId: number; term: string }[]).slice(0, 200) : [];
+    if (!Number.isInteger(tableId) || changes.length === 0) return { ok: false, error: "tableId and changes are required" };
+    const { proposal, skipped } = await buildProposal(tableId, changes);
+    return {
+      ok: true,
+      data: { proposed: proposal?.changes.map((c) => `${c.column}: ${c.term}`) ?? [], leftOut: skipped,
+              note: proposal ? "The user sees these with an Apply button under your answer." : "Nothing to apply." },
+      sources: [],
+      action: proposal ?? undefined,
+    };
+  },
+};
+
 export const TOOL_REGISTRY: Record<string, ToolDefinition> = Object.fromEntries(
   [
     searchAssets, getAsset, getAssetChildren, getClassificationSummary, getDqStatus,
     getDefinitions, getOpenData, getSharingAgreements, getFoiStatsTool, getFoiRequestTool,
     getComplianceStatus, getRetentionOverviewTool, getRetentionStatus, getLineageSummary,
-    searchHelpTool, getHelpDocTool, suggestColumnClassifications,
+    searchHelpTool, getHelpDocTool, suggestColumnClassifications, proposeClassificationChanges,
   ].map((t) => [t.name, t]),
 );
 

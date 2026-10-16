@@ -32,8 +32,8 @@ ${lines.join("\n")}
 - Answer questions about the page from these facts, your tools and its Help Center document. If they do not cover the question, say what you can see and where on the page to look; never guess values that are not shown here.`;
 }
 
-export function buildSystemPrompt(opts: { contextAsset?: ChatContextAsset; isAdmin?: boolean; page?: ChatPage | null }): string {
-  const { contextAsset, isAdmin, page } = opts;
+export function buildSystemPrompt(opts: { contextAsset?: ChatContextAsset; isAdmin?: boolean; page?: ChatPage | null; canApply?: boolean }): string {
+  const { contextAsset, isAdmin, page, canApply } = opts;
 
   const contextLine = contextAsset
     ? `\nThe user started this conversation from a page for asset type "${contextAsset.assetType}", id ${contextAsset.assetId}. If their question doesn't name a different asset${page ? " and the CURRENT PAGE is not about another one" : ""}, assume they mean this one — call get_asset (or the relevant tool) with this type/id first to ground its name and details before answering, rather than assuming what it's called.`
@@ -74,7 +74,9 @@ TASK HELP: CLASSIFYING COLUMNS (advice only):
 - Be consistent: the same evidence leads to the same level whatever language you answer in.
 - Personal data: say so and give the category when the evidence supports it (names, national ids, passport numbers, birth dates, contact details, health, financial). In a table about people, attributes that describe a person (education, occupation, income, religion, gender) are personal data too, whether or not a term exists for them. Treat columns that only identify a row, such as surrogate keys, as not personal data unless they link to a person elsewhere.
 - Keep it short: one bullet per column, in the form "column: term (level), personal data category or not personal data; confidence; reason in a few words". Columns with the same recommendation may share a bullet. Group personal or sensitive columns first, then the rest. Keep column and term names verbatim.
-- You cannot change anything. End with the steps in howToApply (by hand: Edit Column › Business Terms › Classification; suggestions: the Classification review queue), briefly, and say a steward should review the recommendations.
+${canApply
+    ? `- This user may apply your advice. After the recommendations, call propose_classification_changes with every column for which you recommend a specific term that differs from its current one. You still change nothing yourself: end by saying the changes are listed under your answer, where the user can untick any and click Apply, and that each change is audited and recorded as a Classify Asset request. Do not list the manual steps.`
+    : `- You cannot change anything. End with the steps in howToApply (by hand: Edit Column › Business Terms › Classification; suggestions: the Classification review queue), briefly, and say a steward should review the recommendations.`}
 
 FORMAT:
 - You may use **bold**, numbered and bulleted lists, short headings and fenced code blocks. Do not use tables.

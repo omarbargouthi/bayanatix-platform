@@ -1,5 +1,6 @@
 "use client";
 import type { ChatPage } from "./page-context";
+import type { ClassificationProposal } from "./classification-apply";
 import { useCallback, useRef, useState } from "react";
 import type { SourceRef } from "./types";
 
@@ -9,17 +10,19 @@ export type ChatUiMessage = {
   text:         string;
   sources:      SourceRef[];
   feedbackCode: "UP" | "DOWN" | null;
+  /** Proposals the user can apply under the answer (Configuration › Ask Bayanis). */
+  actions?:     ClassificationProposal[];
 };
 
 type ServerMessage = {
   messageId: number; roleCode: "USER" | "ASSISTANT"; contentText: string;
-  sourcesJson: SourceRef[] | null; feedbackCode: "UP" | "DOWN" | null;
+  sourcesJson: SourceRef[] | null; feedbackCode: "UP" | "DOWN" | null; actionsJson?: ClassificationProposal[] | null;
 };
 
 let tempIdCounter = -1;
 
 function toUiMessage(m: ServerMessage): ChatUiMessage {
-  return { messageId: m.messageId, role: m.roleCode, text: m.contentText, sources: m.sourcesJson ?? [], feedbackCode: m.feedbackCode };
+  return { messageId: m.messageId, role: m.roleCode, text: m.contentText, sources: m.sourcesJson ?? [], feedbackCode: m.feedbackCode, actions: Array.isArray(m.actionsJson) ? m.actionsJson : [] };
 }
 
 // Single implementation both the ChatbotBubble panel and the /chat full page call
@@ -104,7 +107,7 @@ export function useChatSession() {
               setProgressLabel(data.label);
             } else if (eventName === "complete") {
               setProgressLabel(null);
-              setMessages((prev) => [...prev, { messageId: data.messageId, role: "ASSISTANT", text: data.text, sources: data.sources ?? [], feedbackCode: null }]);
+              setMessages((prev) => [...prev, { messageId: data.messageId, role: "ASSISTANT", text: data.text, sources: data.sources ?? [], feedbackCode: null, actions: data.actions ?? [] }]);
             } else if (eventName === "error") {
               setProgressLabel(null);
               setError(data.error ?? "Assistant unavailable.");
@@ -137,5 +140,11 @@ export function useChatSession() {
     reset();
   }, [conversationId, reset]);
 
-  return { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback, deleteCurrentConversation };
+  /** Shows a proposal as applied once the server has applied it. */
+  const updateAction = useCallback((messageId: number, proposal: ClassificationProposal) => {
+    setMessages((prev) => prev.map((m) => (m.messageId === messageId
+      ? { ...m, actions: (m.actions ?? []).map((a) => (a.kind === proposal.kind ? proposal : a)) } : m)));
+  }, []);
+
+  return { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback, deleteCurrentConversation, updateAction };
 }
