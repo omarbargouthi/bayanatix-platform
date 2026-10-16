@@ -1,4 +1,4 @@
-# Bayanatix Platform
+# Bayanis Platform
 
 Data governance & catalog SPA — built on the same product direction as the Figma drafts, now wired to a real Postgres backend with auth.
 

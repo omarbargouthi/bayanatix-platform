@@ -169,7 +169,7 @@ export async function getPurgeQueueByAction(): Promise<{ action: string; count: 
 
 // ── Purge configuration manifest ────────────────────────────────────────────
 // Read-only bundle for an EXTERNAL retention/purge application to consume —
-// Bayanatix hosts this configuration but never executes any DELETE/UPDATE
+// Bayanis hosts this configuration but never executes any DELETE/UPDATE
 // against a source system itself. No credentials are included (host/db/
 // schema names only) — the external process is expected to hold its own
 // connection secrets.

@@ -2221,7 +2221,7 @@ export type I18nStrings = {
     };
   };
 
-  // ── AI Chat Assistant ("Ask Bayanatix") ──────────────────────────────────────
+  // ── AI Chat Assistant ("Ask Bayanis") ──────────────────────────────────────
   // UI chrome only — the assistant's own reply language follows the question's
   // language via a system-prompt instruction, independent of this UI setting.
   chat: {

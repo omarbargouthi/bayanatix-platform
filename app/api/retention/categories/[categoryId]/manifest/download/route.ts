@@ -4,7 +4,7 @@ import { getCategoryManifest } from "@/lib/queries/retention";
 
 // Downloadable form of GET /api/retention/categories/[categoryId]/manifest —
 // same read-only config bundle (see that route's comment for the "external
-// automation process, no credentials, Bayanatix never executes anything against
+// automation process, no credentials, Bayanis never executes anything against
 // the source system itself" design), just served with attachment headers so a
 // browser click actually saves a file instead of rendering raw JSON.
 // Restricted to ADMIN/OFFICER (same gate as legal-hold writes) since the bundle

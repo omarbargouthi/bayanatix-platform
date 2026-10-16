@@ -1,4 +1,4 @@
-# Bayanatix Platform — Claude Code Context
+# Bayanis Platform — Claude Code Context
 
 **Full project notes (Obsidian vault):** `C:\Omar\Bayanatix-Vault\`
 **GitHub:** https://github.com/omarbargouthi/bayanatix-platform (branch: master)

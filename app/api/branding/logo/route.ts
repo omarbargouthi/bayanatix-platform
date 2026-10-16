@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 // Public (see middleware.ts's PUBLIC_PREFIXES) — the login page needs to render
 // this before a session exists, same reasoning as /api/languages there.
-// This is an ADDITIONAL customer logo shown alongside the Bayanatix logo, not a
-// replacement for it — /logo.svg (Bayanatix) stays hardcoded in every component;
+// This is an ADDITIONAL customer logo shown alongside the Bayanis logo, not a
+// replacement for it — /logo.svg (Bayanis) stays hardcoded in every component;
 // components only render an <img> pointing here after checking hasCustomLogo via
 // GET /api/admin/branding, so a 404 here (no customer logo set) is expected and
 // never actually reaches the page.

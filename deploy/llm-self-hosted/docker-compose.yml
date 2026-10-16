@@ -1,17 +1,17 @@
 # Bundled self-hosted LLM services (spec §4). Ports match the two placeholder
 # profiles already seeded in the app's database (db/067_llm_provider_config.sql):
-#   "Bayanatix Local — Qwen2.5-32B"            -> http://localhost:8000/v1
-#   "Bayanatix Local — Qwen2.5-7B (fallback)"  -> http://localhost:8001/v1
+#   "Bayanis Local — Qwen2.5-32B"            -> http://localhost:8000/v1
+#   "Bayanis Local — Qwen2.5-7B (fallback)"  -> http://localhost:8001/v1
 # Both profiles start DISABLED — once one of these is actually reachable, enable it
 # in /admin/ai-providers (Test Connection first), then optionally Set Default or
 # route DESCRIBE/REPHRASE/DQ_SEMANTIC to it under Capability Routing.
 #
-# NOT tested against real GPU hardware — start with `docker compose up bayanatix-llm-32b`
+# NOT tested against real GPU hardware — start with `docker compose up bayanis-llm-32b`
 # and watch logs; first start pulls ~20-60GB of model weights unless HF_HUB_OFFLINE
 # is set with a pre-populated volume (see the commented block below).
 
 services:
-  bayanatix-llm-32b:
+  bayanis-llm-32b:
     build:
       context: .
       args:
@@ -19,8 +19,8 @@ services:
         QUANTIZATION: "awq"
         MAX_MODEL_LEN: "8192"
         GPU_MEMORY_UTILIZATION: "0.90"
-    image: bayanatix-llm:32b
-    container_name: bayanatix-llm-32b
+    image: bayanis-llm:32b
+    container_name: bayanis-llm-32b
     ports:
       - "8000:8000"
     environment:
@@ -38,7 +38,7 @@ services:
     # Single 48GB-class GPU (L40S/A6000) or one A100/H100. Recommended default tier.
     restart: unless-stopped
 
-  bayanatix-llm-7b:
+  bayanis-llm-7b:
     build:
       context: .
       args:
@@ -46,8 +46,8 @@ services:
         QUANTIZATION: ""
         MAX_MODEL_LEN: "8192"
         GPU_MEMORY_UTILIZATION: "0.85"
-    image: bayanatix-llm:7b
-    container_name: bayanatix-llm-7b
+    image: bayanis-llm:7b
+    container_name: bayanis-llm-7b
     ports:
       - "8001:8000"
     environment:

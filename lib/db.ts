@@ -9,7 +9,7 @@ if (!process.env.DATABASE_URL) {
   // Allow build-time without DB; runtime queries will throw.
   // The app is structured so any page using sql<T>`...` will fail loudly if DATABASE_URL is missing.
   if (process.env.NODE_ENV !== "production") {
-    console.warn("[bayanatix] DATABASE_URL is not set — DB queries will fail at runtime.");
+    console.warn("[bayanis] DATABASE_URL is not set — DB queries will fail at runtime.");
   }
 }
 

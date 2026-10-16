@@ -1,4 +1,4 @@
-# Bayanatix bundled self-hosted LLM (spec §4): vLLM serving Qwen2.5 as an
+# Bayanis bundled self-hosted LLM (spec §4): vLLM serving Qwen2.5 as an
 # OpenAI-compatible endpoint, air-gapped-friendly. Layers a thin, documented config
 # on top of the official vLLM image rather than reinventing the serving stack.
 #
@@ -7,8 +7,8 @@
 # what to verify before treating this as production-ready.
 #
 # Build:
-#   docker build --build-arg MODEL_NAME="Qwen/Qwen2.5-32B-Instruct-AWQ" -t bayanatix-llm:32b .
-#   docker build --build-arg MODEL_NAME="Qwen/Qwen2.5-7B-Instruct" --build-arg QUANTIZATION="" -t bayanatix-llm:7b .
+#   docker build --build-arg MODEL_NAME="Qwen/Qwen2.5-32B-Instruct-AWQ" -t bayanis-llm:32b .
+#   docker build --build-arg MODEL_NAME="Qwen/Qwen2.5-7B-Instruct" --build-arg QUANTIZATION="" -t bayanis-llm:7b .
 
 FROM vllm/vllm-openai:latest
 

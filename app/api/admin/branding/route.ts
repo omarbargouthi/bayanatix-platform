@@ -5,7 +5,7 @@ import { getBrandingInfo, setLogo, clearLogo } from "@/lib/queries/branding";
 const ALLOWED_MIME = new Set(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]);
 const MAX_BYTES = 2 * 1024 * 1024; // 2MB — a logo has no business being larger than this
 
-// This is an ADDITIONAL customer logo shown alongside the Bayanatix logo, not a
+// This is an ADDITIONAL customer logo shown alongside the Bayanis logo, not a
 // replacement for it. GET is open to any signed-in user — same reasoning as
 // /api/admin/follow-settings: every page deciding whether to render the customer
 // logo (via /api/branding/logo) needs hasCustomLogo, not just admins.

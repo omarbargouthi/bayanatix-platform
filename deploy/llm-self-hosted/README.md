@@ -1,7 +1,7 @@
-# Bayanatix Self-Hosted LLM (bundled default profile)
+# Bayanis Self-Hosted LLM (bundled default profile)
 
-Scaffold for the self-hosted open-weights deployment described in *Bayanatix — LLM
-Provider Configuration Feature Spec* §4. **Not yet run against real GPU hardware** —
+Scaffold for the self-hosted open-weights deployment described in the *LLM Provider
+Configuration Feature Spec* §4. **Not yet run against real GPU hardware** —
 treat this as a documented starting point, not a validated deployment.
 
 ## What's here
@@ -10,8 +10,8 @@ treat this as a documented starting point, not a validated deployment.
   `/v1/chat/completions` endpoint.
 - `docker-compose.yml` — two services matching the two placeholder profiles already
   seeded in the app's database:
-  - `bayanatix-llm-32b` → `Qwen2.5-32B-Instruct-AWQ` (int4 quantized), port `8000`
-  - `bayanatix-llm-7b` → `Qwen2.5-7B-Instruct`, port `8001`, opt-in via
+  - `bayanis-llm-32b` → `Qwen2.5-32B-Instruct-AWQ` (int4 quantized), port `8000`
+  - `bayanis-llm-7b` → `Qwen2.5-7B-Instruct`, port `8001`, opt-in via
     `docker compose --profile fallback up`
 - `health-check.sh` — the canary check baked into the image's `HEALTHCHECK` (a real
   chat-completion call, not just a TCP ping — vLLM accepts connections before the
@@ -26,16 +26,16 @@ treat this as a documented starting point, not a validated deployment.
 
 ## Bringing one online
 
-1. `docker compose up bayanatix-llm-32b` (add `--build` on first run). First start
+1. `docker compose up bayanis-llm-32b` (add `--build` on first run). First start
    pulls the model weights from Hugging Face (~20GB for the AWQ 32B tier) unless
    you've pre-populated the `hf-cache-32b` volume for an air-gapped install:
    ```bash
    huggingface-cli download Qwen/Qwen2.5-32B-Instruct-AWQ --local-dir ./hf-cache-32b
-   docker compose run --rm -v ./hf-cache-32b:/root/.cache/huggingface -e HF_HUB_OFFLINE=1 bayanatix-llm-32b
+   docker compose run --rm -v ./hf-cache-32b:/root/.cache/huggingface -e HF_HUB_OFFLINE=1 bayanis-llm-32b
    ```
 2. Wait for `Uvicorn running on http://0.0.0.0:8000` in the logs, then confirm
    directly: `curl -s localhost:8000/v1/models`.
-3. In the app: **Admin → AI Providers**, find "Bayanatix Local — Qwen2.5-32B",
+3. In the app: **Admin → AI Providers**, find "Bayanis Local — Qwen2.5-32B",
    click **Test Connection**. If it reports latency + token count, click **Enable**.
 4. Optional: **Set Default**, or route specific capabilities to it under
    **Capability Routing** (e.g. keep `DQ_SEMANTIC` on a stronger managed profile
