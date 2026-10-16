@@ -64,6 +64,8 @@ export type I18nStrings = {
 
   // ── Global / shared actions & messages ─────────────────────────────────────
   common: {
+    /** The environment badge (NEXT_PUBLIC_APP_ENVIRONMENT). */
+    environment: Record<"DEV" | "TEST" | "PROD" | "DEMO", string>;
     save:        string;
     cancel:      string;
     delete:      string;

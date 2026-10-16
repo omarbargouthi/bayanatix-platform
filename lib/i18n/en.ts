@@ -52,6 +52,7 @@ export const en: I18nStrings = {
   },
 
   common: {
+    environment: { DEV: "Development", TEST: "Test", PROD: "Production", DEMO: "Demo" },
     save:        "Save",
     cancel:      "Cancel",
     delete:      "Delete",

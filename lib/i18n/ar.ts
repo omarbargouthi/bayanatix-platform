@@ -52,6 +52,7 @@ export const ar: I18nStrings = {
   },
 
   common: {
+    environment: { DEV: "تطوير", TEST: "اختبار", PROD: "إنتاج", DEMO: "عرض تجريبي" },
     save:        "حفظ",
     cancel:      "إلغاء",
     delete:      "حذف",
