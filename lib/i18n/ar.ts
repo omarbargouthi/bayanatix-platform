@@ -4283,6 +4283,7 @@ export const ar: I18nStrings = {
     groupPrivacy: "خصوصية البيانات",
     groupReports: "التقارير",
     groupAdmin: "الإدارة",
+    groupSupport: "الدعم الفني",
   },
 
   breach: {

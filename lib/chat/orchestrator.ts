@@ -62,7 +62,7 @@ export async function runChatTurn(
     content: r.contentText,
   }));
 
-  const system = buildSystemPrompt({ contextAsset });
+  const system = buildSystemPrompt({ contextAsset, isAdmin: session.role === "ADMIN" });
   const ctx: ToolExecContext = { session };
 
   const toolTrace: ToolTraceEntry[] = [];

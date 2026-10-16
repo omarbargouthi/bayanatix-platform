@@ -10,7 +10,8 @@ import { DOMAIN_DOCS } from "./domains";
 import { PRIVACY_DOCS } from "./privacy";
 import { REPORT_DOCS } from "./reports";
 import { ADMIN_DOCS } from "./admin";
+import { SUPPORT_DOCS } from "./support";
 
 export const HELP_DOCS: HelpDoc[] = [
-  ...START_DOCS, ...WORKSPACE_DOCS, ...CATALOG_DOCS, ...DOMAIN_DOCS, ...PRIVACY_DOCS, ...REPORT_DOCS, ...ADMIN_DOCS,
+  ...START_DOCS, ...WORKSPACE_DOCS, ...CATALOG_DOCS, ...DOMAIN_DOCS, ...PRIVACY_DOCS, ...REPORT_DOCS, ...ADMIN_DOCS, ...SUPPORT_DOCS,
 ];

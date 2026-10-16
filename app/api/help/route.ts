@@ -9,6 +9,6 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const lang = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(searchParams.get("lang") ?? "") ? searchParams.get("lang")! : "en";
   const q = searchParams.get("q");
-  if (q != null) return NextResponse.json({ results: await searchHelp(q, lang) });
-  return NextResponse.json({ topics: await helpIndex(lang) });
+  if (q != null) return NextResponse.json({ results: await searchHelp(q, lang, session.role === "ADMIN") });
+  return NextResponse.json({ topics: await helpIndex(lang, session.role === "ADMIN") });
 }

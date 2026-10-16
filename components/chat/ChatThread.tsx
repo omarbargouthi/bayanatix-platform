@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ChatUiMessage } from "@/lib/chat/useChatSession";
 import { SourceChips } from "./SourceChips";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { HelpText } from "@/components/help/HelpText";
 
 function AiAvatar() {
   return (
@@ -35,11 +36,12 @@ export function ChatThread({
         <div key={m.messageId} className={`flex gap-2 ${m.role === "USER" ? "justify-end" : ""}`}>
           {m.role === "ASSISTANT" && <AiAvatar />}
           <div
-            className={`${bubbleMaxWidth} px-3 py-2 text-sm whitespace-pre-wrap ${
+            className={`${bubbleMaxWidth} min-w-0 px-3 py-2 text-sm ${m.role === "USER" ? "whitespace-pre-wrap" : ""} ${
               m.role === "USER" ? "bg-brand-purple text-white rounded-lg rounded-tr-none" : "bg-canvas text-ink rounded-lg rounded-tl-none"
             }`}
           >
-            {m.text}
+            {/* Answers may hold steps, bold and command blocks (how-to answers from the Help Center). */}
+            {m.role === "ASSISTANT" ? <HelpText body={m.text} compact /> : m.text}
             {m.role === "ASSISTANT" && <SourceChips sources={m.sources} />}
             {m.role === "ASSISTANT" && (
               <FeedbackButtons feedbackCode={m.feedbackCode} onSubmit={(code, comment) => onFeedback(m.messageId, code, comment)} />

@@ -8,9 +8,10 @@
 //   "### "            sub-heading
 //   "| a | b |"       table row; the first row is the header, a "|---|" row is skipped
 //   "> "              note
-//   **bold**, [label](/path)
+//   "$ command"       a command, shown in a code block (consecutive lines form one block)
+//   **bold**, *italic*, `code`, [label](/path)
 
-export const HELP_GROUPS = ["start", "workspace", "catalog", "domains", "privacy", "reports", "admin"] as const;
+export const HELP_GROUPS = ["start", "workspace", "catalog", "domains", "privacy", "reports", "admin", "support"] as const;
 export type HelpGroup = typeof HELP_GROUPS[number];
 
 export type HelpSection = { id: string; title: string; body: string };
@@ -23,6 +24,8 @@ export type HelpDoc = {
   /** The page in the app this document is about, for the "Open" link. */
   page?: string;
   sections: HelpSection[];
+  /** Who may read it: "ADMIN" documents (technical support) are shown only to platform administrators. */
+  audience?: "ADMIN";
   /** Slugs of related documents. */
   related?: string[];
 };

@@ -4424,6 +4424,7 @@ export type I18nStrings = {
     groupPrivacy: string;
     groupReports: string;
     groupAdmin: string;
+    groupSupport: string;
   };
 
   // ── Personal data breaches (db/207) ─────────────────────────────────────────

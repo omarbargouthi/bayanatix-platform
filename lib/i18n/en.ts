@@ -4283,6 +4283,7 @@ export const en: I18nStrings = {
     groupPrivacy: "Data Privacy",
     groupReports: "Reports",
     groupAdmin: "Administration",
+    groupSupport: "Technical support",
   },
 
   breach: {

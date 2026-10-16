@@ -9,6 +9,8 @@ export const TOOL_PROGRESS_LABELS: Record<string, string> = {
   get_sharing_agreements: "Checking sharing agreements…",
   get_foi_stats: "Checking FOI statistics…",
   get_foi_request: "Looking up the FOI request…",
+  search_help: "Searching the Help Center…",
+  get_help_doc: "Reading the Help Center…",
 };
 
 export function progressLabelForTool(name: string): string {

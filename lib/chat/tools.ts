@@ -21,6 +21,7 @@ import { listFoiRequests, getFoiCase, getFoiStats } from "@/lib/queries/foi";
 import { listFrameworks } from "@/lib/queries/gov-compliance";
 import { getRetentionOverview } from "@/lib/queries/retention";
 import { getUpstreamImpact, getDownstreamImpact } from "@/lib/queries/lineage";
+import { findHelpSections, helpDocForAssistant } from "@/lib/help/content";
 import type { SourceRef, ToolDefinition, ToolResult } from "./types";
 
 function ok(data: unknown, sources: SourceRef[] = []): ToolResult {
@@ -479,11 +480,50 @@ const getFoiRequestTool: ToolDefinition = {
   },
 };
 
+// ── search_help / get_help_doc ───────────────────────────────────────────────
+// The Help Center, for "how do I…" questions. Technical support guides (server,
+// logs, Vault, backups) are returned only to platform administrators, as in /help.
+const helpSource = (slug: string, title: string, href: string, i: number): SourceRef =>
+  ({ assetType: `HELP:${slug}`, assetId: i, label: title, href });
+
+const searchHelpTool: ToolDefinition = {
+  name: "search_help",
+  description: "Search the Bayanis Help Center and user manual for how to use or run Bayanis: features, settings, step-by-step procedures and, for platform administrators, technical support (restarting services, reading logs, HashiCorp Vault, encryption keys, backups, upgrades, troubleshooting). Returns the best-matching sections with their full text. Use it for any 'how do I…', 'where is…', 'what does … mean' or 'why does … fail' question about Bayanis itself.",
+  inputSchema: {
+    type: "object",
+    properties: { q: { type: "string", description: "The question or its key words, e.g. 'restart services' or 'vault approle sign in'" } },
+    required: ["q"],
+  },
+  run: async (args, ctx) => {
+    const q = String(args.q ?? "").trim();
+    if (!q) return { ok: false, error: "q is required" };
+    const lang = /[؀-ۿ]/.test(q) ? "ar" : "en";
+    const hits = await findHelpSections(q, lang, ctx.session.role === "ADMIN");
+    if (hits.length === 0) return notFound();
+    return ok(
+      { results: hits.map((h) => ({ document: h.docTitle, slug: h.slug, section: h.sectionTitle, link: h.href, text: h.body })) },
+      hits.map((h, i) => helpSource(h.slug, `${h.docTitle} › ${h.sectionTitle}`, h.href, i)),
+    );
+  },
+};
+
+const getHelpDocTool: ToolDefinition = {
+  name: "get_help_doc",
+  description: "Read a whole Help Center document by its slug (from search_help), when the matching sections are not enough to give complete steps.",
+  inputSchema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] },
+  run: async (args, ctx) => {
+    const doc = helpDocForAssistant(String(args.slug ?? "").trim(), ctx.session.role === "ADMIN");
+    if (!doc) return notFound();
+    return ok(doc, [helpSource(String(args.slug), doc.title, doc.href, 0)]);
+  },
+};
+
 export const TOOL_REGISTRY: Record<string, ToolDefinition> = Object.fromEntries(
   [
     searchAssets, getAsset, getAssetChildren, getClassificationSummary, getDqStatus,
     getDefinitions, getOpenData, getSharingAgreements, getFoiStatsTool, getFoiRequestTool,
     getComplianceStatus, getRetentionOverviewTool, getRetentionStatus, getLineageSummary,
+    searchHelpTool, getHelpDocTool,
   ].map((t) => [t.name, t]),
 );
 

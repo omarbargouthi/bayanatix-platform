@@ -12,7 +12,7 @@ type Result = { slug: string; title: string; sectionId: string | null; sectionTi
 export function groupLabel(h: I18nStrings["help"], g: HelpGroup): string {
   const map: Record<HelpGroup, string> = {
     start: h.groupStart, workspace: h.groupWorkspace, catalog: h.groupCatalog, domains: h.groupDomains,
-    privacy: h.groupPrivacy, reports: h.groupReports, admin: h.groupAdmin,
+    privacy: h.groupPrivacy, reports: h.groupReports, admin: h.groupAdmin, support: h.groupSupport,
   };
   return map[g];
 }

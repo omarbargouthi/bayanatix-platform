@@ -87,7 +87,9 @@ The overall score is recorded once a month. The chart shows these monthly points
         title: "Ask Bayanis (the assistant)",
         body: `The chat bubble at the bottom of every page opens the assistant. Ask about your catalog in English or Arabic, for example "Which tables hold national IDs?", "What is the data quality of the customer table?" or "Which regulations are we least compliant with?".
 
-The assistant answers only from what it looks up in Bayanis while answering, and says so when it cannot find something. It works on metadata, statistics and statuses and never shows row-level data values. It sees what any signed-in user can see.`,
+The assistant answers only from what it looks up in Bayanis while answering, and says so when it cannot find something. It works on metadata, statistics and statuses and never shows row-level data values. It sees what any signed-in user can see.
+
+It also answers "how do I…" questions from this Help Center, step by step, with links to the pages it used, for example "How do I report a data breach?". Platform administrators can also ask technical support questions, such as "How do I restart Bayanis?", "How do I find errors in the logs?" or "How do I change how Bayanis signs in to HashiCorp Vault?". It gives the steps and commands from the Technical support guides and never makes up a command; it does not run anything on the server itself.`,
       },
       {
         id: "value",
