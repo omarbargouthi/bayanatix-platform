@@ -22,6 +22,7 @@ import { listFrameworks } from "@/lib/queries/gov-compliance";
 import { getRetentionOverview } from "@/lib/queries/retention";
 import { getUpstreamImpact, getDownstreamImpact } from "@/lib/queries/lineage";
 import { findHelpSections, helpDocForAssistant } from "@/lib/help/content";
+import { classificationAdvice } from "./classification-advice";
 import type { SourceRef, ToolDefinition, ToolResult } from "./types";
 
 function ok(data: unknown, sources: SourceRef[] = []): ToolResult {
@@ -518,12 +519,35 @@ const getHelpDocTool: ToolDefinition = {
   },
 };
 
+// ── suggest_column_classifications ───────────────────────────────────────────
+// Advice only: gathers what a steward would look at; the assistant recommends, the
+// steward applies. Statistics and value shapes only, never column values.
+const suggestColumnClassifications: ToolDefinition = {
+  name: "suggest_column_classifications",
+  description: "Gather everything needed to recommend a classification for each column of a table: column names, types, descriptions and keys; the current classification term; Bayanis's sensitive information type suggestion with its confidence and evidence; business or technical use; profiling statistics; and the organisation's classification levels and classification terms to choose from. Use it when the user asks what classification suits a table's columns, which columns hold personal or sensitive data, or to review existing classifications. Needs the table's numeric id (DATA_ENTITIES), from the current page or search_assets.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      tableId: { type: "number", description: "The table's id (DATA_ENTITIES)" },
+      onlyUnclassified: { type: "boolean", description: "Only columns without a classification term (default false)" },
+    },
+    required: ["tableId"],
+  },
+  run: async (args) => {
+    const id = Number(args.tableId);
+    if (!Number.isInteger(id)) return { ok: false, error: "tableId must be a number" };
+    const advice = await classificationAdvice(id, args.onlyUnclassified === true);
+    if (!advice) return notFound();
+    return ok(advice, [{ assetType: "DATA_ENTITIES", assetId: id, label: advice.table.name, href: advice.href }]);
+  },
+};
+
 export const TOOL_REGISTRY: Record<string, ToolDefinition> = Object.fromEntries(
   [
     searchAssets, getAsset, getAssetChildren, getClassificationSummary, getDqStatus,
     getDefinitions, getOpenData, getSharingAgreements, getFoiStatsTool, getFoiRequestTool,
     getComplianceStatus, getRetentionOverviewTool, getRetentionStatus, getLineageSummary,
-    searchHelpTool, getHelpDocTool,
+    searchHelpTool, getHelpDocTool, suggestColumnClassifications,
   ].map((t) => [t.name, t]),
 );
 

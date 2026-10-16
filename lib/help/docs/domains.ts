@@ -155,7 +155,16 @@ The result is a confidence. Suggestions above the auto-accept band can be accept
         title: "How to use it",
         body: `1. Open **Classification** and run a scan for a source, schema or table (scans also run after each crawl).
 2. Review the queue: accept, change or reject each suggestion.
-3. Classification changes go through the classification review workflow when one is set up.`,
+3. Classification changes go through the classification review workflow when one is set up.
+
+### Classifying a column by hand
+1. Open the table in **Data Catalog** and find the column.
+2. Click **Edit Column** (in the column's row, or at the bottom of its details).
+3. Under **Business Terms**, choose the term in the **Classification** slot. The term gives the column its sensitivity level and personal data category.
+4. Save.
+
+### Advice from Ask Bayanis
+On a table's page, ask Ask Bayanis "What classification suits the columns of this table?". It reviews each column (name, type, description, keys, Bayanis's suggestions and profiling statistics, never the values) and recommends a classification term from your glossary, with its reasons and how sure it is. It changes nothing: a steward applies the recommendations as above.`,
       },
     ],
     related: ["data-catalog", "data-lineage", "impact-assessments"],

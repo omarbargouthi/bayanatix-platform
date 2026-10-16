@@ -21,7 +21,7 @@ export const STARTER_QUESTIONS: Record<PageKind, string[]> = {
   ASSET: [
     "Does this table have any data quality issues?",
     "What columns does this table have?",
-    "Is this table classified?",
+    "What classification suits the columns of this table?",
   ],
   REPORTS: [
     "Summarize our data quality status",

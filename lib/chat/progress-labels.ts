@@ -11,6 +11,7 @@ export const TOOL_PROGRESS_LABELS: Record<string, string> = {
   get_foi_request: "Looking up the FOI request…",
   search_help: "Searching the Help Center…",
   get_help_doc: "Reading the Help Center…",
+  suggest_column_classifications: "Reviewing the columns…",
 };
 
 export function progressLabelForTool(name: string): string {

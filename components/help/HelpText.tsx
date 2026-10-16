@@ -81,11 +81,14 @@ function parse(body: string): Block[] {
       continue;
     }
     if (bullet || num) {
+      // A paragraph line just before the item ends there; the item then joins only a
+      // list that is still the last block (not one before that paragraph).
       flush();
+      const last = blocks[blocks.length - 1];
       const kind = bullet ? "ul" : "ol";
       const text = bullet ? bullet[1] : num![2];
       // A numbered list interrupted by a command or a sub-list keeps its numbering ("3." stays 3).
-      if (prev?.kind === kind) prev.items.push({ text, sub: [] });
+      if (last?.kind === kind) last.items.push({ text, sub: [] });
       else blocks.push({ kind, items: [{ text, sub: [] }], start: num ? Number(num[1]) : undefined });
       continue;
     }
