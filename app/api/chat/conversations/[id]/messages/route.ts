@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { getConversation, appendMessage, updateConversationTitle } from "@/lib/queries/chat";
 import { runChatTurn, type OrchestratorEvent } from "@/lib/chat/orchestrator";
 import type { ChatContextAsset } from "@/lib/chat/system-prompt";
+import { readChatPage } from "@/lib/chat/page-context";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const body = await req.json().catch(() => ({}));
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) return new Response(JSON.stringify({ error: "text is required" }), { status: 400 });
+  // The page the user is on as they ask (path, breadcrumbs, filters, the record shown).
+  const page = readChatPage(body.page);
 
   await appendMessage({ conversationId, roleCode: "USER", contentText: text });
   if (!conversation.titleText) {
@@ -53,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
       let result;
       try {
-        result = await runChatTurn(conversationId, session, contextAsset, onEvent);
+        result = await runChatTurn(conversationId, session, contextAsset, onEvent, page);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Assistant unavailable";
         controller.enqueue(encoder.encode(sseEvent("error", { error: message })));

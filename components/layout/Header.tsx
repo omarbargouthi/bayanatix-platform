@@ -202,7 +202,7 @@ export function Header({ crumbs, user, contextTypes, collaborationHref, hideSear
       <EnvironmentBadge className="hidden md:inline-flex shrink-0" />
 
       {/* Breadcrumb */}
-      <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted shrink-0 min-w-0 overflow-hidden">
+      <nav data-chat-crumbs className="hidden sm:flex items-center gap-1.5 text-sm text-muted shrink-0 min-w-0 overflow-hidden">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
           return (

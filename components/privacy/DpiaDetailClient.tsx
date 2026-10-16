@@ -7,9 +7,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/lang-context";
+import { useSetChatRecord } from "@/lib/chat/chat-context";
 import { pickTranslation } from "@/lib/i18n-admin/translated-column";
 import {
-  CONSULTATION_CODES, isClosed, overallResidual, screeningRecommendation,
+  CONSULTATION_CODES, inherentLevel, isClosed, overallResidual, residualLevel, screeningRecommendation,
   type DpiaDetail, type DpiaPermissions, type DpiaQuestion,
 } from "@/lib/privacy/dpia-types";
 import {
@@ -44,6 +45,37 @@ export function DpiaDetailClient({ dpiaId }: { dpiaId: number }) {
   }, [dpiaId, version]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { fetch("/api/privacy/dpia?options=1").then((r) => (r.ok ? r.json() : null)).then((o) => o && setOptions(o)); }, []);
+
+  // What Ask Bayanis may know about this assessment: states, levels, counts and dates
+  // shown on the page. Not descriptions, answers' free text, opinions or names.
+  const dp = data?.dpia;
+  const unanswered = (stage: DpiaQuestion["stage"]) =>
+    dp ? dp.questions.filter((q) => q.stage === stage && q.required && !q.answerCode && !q.answerText?.trim()).length : 0;
+  useSetChatRecord(dp ? {
+    type: "IMPACT_ASSESSMENT", id: dp.dpiaId, label: dp.referenceCode,
+    facts: {
+      title: dp.title,
+      questionnaire: dp.template.code,
+      status: dp.statusCode,
+      screeningOutcome: dp.screeningOutcome,
+      assessedAsset: dp.subject ? `${dp.subject.typeName}: ${dp.subject.name}` : null,
+      affectedAssets: dp.assets.length,
+      inherentRisk: dp.inherentLevel,
+      residualRisk: dp.residualLevel,
+      risks: dp.risks.map((r) => `${r.title} (inherent ${inherentLevel(r)}, residual ${residualLevel(r)})`),
+      measures: `${dp.measuresTotal} total, ${dp.measuresOpen} open, ${dp.measuresOverdue} overdue`,
+      requiredScreeningQuestionsUnanswered: unanswered("SCREENING"),
+      requiredAssessmentQuestionsUnanswered: unanswered("ASSESSMENT"),
+      decidedAt: dp.decidedAt,
+      nextReviewDate: dp.nextReviewDate,
+      reviewDue: dp.reviewDue,
+      catalogChangedSinceDecision: dp.changesPending,
+      openTab: tab,
+      viewingOldVersion: data?.frozenVersion ?? null,
+      userCanEdit: !!data?.permissions?.canEdit,
+      userCanReview: !!data?.permissions?.canReview,
+    },
+  } : null);
 
   /** Sends a change and reloads; the caller decides how to show a failure. */
   const call = useCallback(async (url: string, method: string, body?: object) => {

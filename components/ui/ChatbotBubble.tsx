@@ -3,12 +3,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChatSession } from "@/lib/chat/useChatSession";
-import { useChatAssetContext } from "@/lib/chat/chat-context";
+import { useChatAssetContext, useChatRecord } from "@/lib/chat/chat-context";
+import type { ChatPage, ChatRecord } from "@/lib/chat/page-context";
 import { pageKindForPath, STARTER_QUESTIONS } from "@/lib/chat/starter-questions";
 import { useLang } from "@/lib/lang-context";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ConversationList } from "@/components/chat/ConversationList";
+
+/** Where the user is as they ask: the address, the breadcrumbs and the page's record. */
+function currentPage(pathname: string, record: ChatRecord | null): ChatPage {
+  const query: Record<string, string> = {};
+  new URLSearchParams(window.location.search).forEach((v, k) => { query[k] = v; });
+  const crumbs = Array.from(document.querySelectorAll<HTMLElement>("[data-chat-crumbs] [title]"))
+    .map((e) => e.getAttribute("title") ?? "").filter(Boolean);
+  return { path: pathname, query, crumbs, record };
+}
 
 function ChatIcon() {
   return (
@@ -45,13 +55,14 @@ export function ChatbotBubble() {
   const { t } = useLang();
   const c = t.chat;
   const { contextAsset } = useChatAssetContext();
+  const record = useChatRecord();
   const { conversationId, messages, progressLabel, sending, error, send, loadConversation, reset, submitFeedback } = useChatSession();
 
   const pageKind = pageKindForPath(pathname ?? "");
   const starters = STARTER_QUESTIONS[pageKind];
 
   function handleSend(text: string) {
-    send(text, contextAsset ? { assetType: contextAsset.assetType, assetId: contextAsset.assetId } : null);
+    send(text, contextAsset ? { assetType: contextAsset.assetType, assetId: contextAsset.assetId } : null, currentPage(pathname ?? "/", record));
     if (!conversationId) setHistoryKey((k) => k + 1);
   }
 

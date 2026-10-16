@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang-context";
+import { useSetChatRecord } from "@/lib/chat/chat-context";
 import type { I18nStrings } from "@/lib/i18n/strings";
 import {
   BREACH_CAUSES, BREACH_LAWS, BREACH_REGULATIONS, BREACH_RISKS, BREACH_TYPES, authorityLabel, isBreachOpen, subjectsAlwaysUnder, subjectsRequired,
@@ -32,6 +33,35 @@ export function BreachDetailClient({ breachId }: { breachId: number }) {
     setData(r.ok ? await r.json() : "missing");
   }, [breachId]);
   useEffect(() => { void load(); fetch("/api/privacy/breaches?options=1").then((r) => (r.ok ? r.json() : null)).then(setOptions); }, [load]);
+
+  // What Ask Bayanis may know about this breach: states, dates and counts shown on the
+  // page. Not the title, description or notes, which may hold personal data.
+  const loaded = data && data !== "missing" ? data : null;
+  useSetChatRecord(loaded ? {
+    type: "PERSONAL_DATA_BREACH", id: loaded.breach.breachId, label: loaded.breach.referenceCode,
+    facts: {
+      status: loaded.breach.statusCode,
+      awareAt: loaded.breach.discoveredAt,
+      risk: loaded.breach.riskLevel ?? "NOT_ASSESSED",
+      laws: loaded.breach.regulations,
+      regulatorNotices: loaded.breach.notices.map((n) =>
+        `${n.regulation}: ${n.state}${n.deadline ? `, deadline ${n.deadline}` : ""}${n.notifiedAt ? `, notified ${n.notifiedAt}` : ""}`),
+      dataSubjects: loaded.breach.subjectsState,
+      peopleAffectedEstimate: loaded.breach.subjectsEstimate,
+      affectedAssets: loaded.breach.assetCount,
+      personalDataColumns: loaded.breach.piColumns,
+      dataCategories: loaded.breach.categories,
+      handlerAssigned: !!loaded.breach.ownerUserId,
+      containedAt: loaded.breach.containedAt,
+      closedAt: loaded.breach.closedAt,
+      missingBeforeClosing: loaded.missing.map((m) => {
+        const [code, law] = m.split(":");
+        const text = (b.missing as Record<string, string>)[code] ?? code;
+        return law ? fill(text, { law: (b.regulations as Record<string, string>)[law] ?? law }) : text;
+      }),
+      userCanEdit: loaded.permissions.canManage,
+    },
+  } : null);
 
   if (data === null) return <p className="text-sm text-muted">{b.loading}</p>;
   if (data === "missing") return <div className="card p-6 text-sm text-muted">{b.notFound} <Link href="/privacy/breaches" className="text-brand-purple hover:underline">{b.back}</Link></div>;

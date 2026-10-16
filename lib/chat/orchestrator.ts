@@ -16,6 +16,7 @@ import { getMessages } from "@/lib/queries/chat";
 import { TOOL_REGISTRY, TOOL_DEFS_FOR_LLM } from "./tools";
 import { buildSystemPrompt, type ChatContextAsset } from "./system-prompt";
 import { progressLabelForTool } from "./progress-labels";
+import type { ChatPage } from "./page-context";
 import type { SourceRef, ToolExecContext } from "./types";
 import type { SessionUser } from "@/lib/types";
 
@@ -51,6 +52,7 @@ export async function runChatTurn(
   session: SessionUser,
   contextAsset: ChatContextAsset,
   onEvent?: (e: OrchestratorEvent) => void,
+  page: ChatPage | null = null,
 ): Promise<ChatTurnResult> {
   const resolved = await resolveProviderForCapability("CHAT");
   if ("error" in resolved) return { ok: false, error: resolved.error };
@@ -62,7 +64,7 @@ export async function runChatTurn(
     content: r.contentText,
   }));
 
-  const system = buildSystemPrompt({ contextAsset, isAdmin: session.role === "ADMIN" });
+  const system = buildSystemPrompt({ contextAsset, isAdmin: session.role === "ADMIN", page });
   const ctx: ToolExecContext = { session };
 
   const toolTrace: ToolTraceEntry[] = [];

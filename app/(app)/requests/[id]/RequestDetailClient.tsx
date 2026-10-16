@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AssetRequest } from "@/lib/types";
 import type { WorkflowInstance } from "@/lib/queries/workflow";
+import { useSetChatRecord } from "@/lib/chat/chat-context";
 
 const TYPE_LABEL: Record<string, string> = {
   FIX_DATA_ISSUE:    "Fix Data Issue",
@@ -73,6 +74,26 @@ export function RequestDetailClient() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // What Ask Bayanis may know about this request: type, status, targets and workflow
+  // stage. Not the description or notes, which may hold personal data.
+  useSetChatRecord(request ? {
+    type: "REQUEST", id: request.requestId, label: `#${request.requestId}`,
+    facts: {
+      requestType: request.requestTypeCode,
+      title: request.title,
+      priority: request.priorityCode,
+      status: request.statusCode,
+      raisedAt: request.createdAt,
+      updatedAt: request.updatedAt,
+      assigned: !!request.assignedToUserId,
+      assets: request.targets.map((x) => `${x.assetTypeCode}: ${x.assetName ?? x.assetIdText ?? x.assetId}`),
+      workflow: workflow ? workflow.workflowName : null,
+      workflowStatus: workflow?.statusCode ?? null,
+      currentStage: workflow?.currentStageName ? `${workflow.currentStageName} (stage ${workflow.currentStageOrder} of ${workflow.totalStages})` : null,
+      userIsCurrentApprover: !!workflow?.isCurrentActor,
+    },
+  } : null);
 
   async function advance(outcome: "APPROVED" | "REJECTED" | "COMPLETED") {
     setAdvancing(true);

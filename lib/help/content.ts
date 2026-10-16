@@ -183,6 +183,14 @@ export async function findHelpSections(q: string, lang: string, isAdmin: boolean
   return scored.filter((m) => m.score >= best * 0.4).slice(0, limit).map(({ score: _s, ...m }) => m);
 }
 
+/** The documents about the page at `path` (the most specific match: /privacy/breaches/9
+ *  finds the breaches document rather than the privacy one). */
+export function helpDocsForPath(path: string, isAdmin: boolean): { slug: string; title: string }[] {
+  const matches = HELP_DOCS.filter((d) => d.page && visible(d, isAdmin) && (path === d.page || path.startsWith(d.page + "/")));
+  const longest = Math.max(0, ...matches.map((d) => d.page!.length));
+  return matches.filter((d) => d.page!.length === longest).map((d) => ({ slug: d.slug, title: d.title }));
+}
+
 /** A whole document in English (the reviewed original), for the assistant. */
 export function helpDocForAssistant(slug: string, isAdmin: boolean): { title: string; summary: string; href: string; sections: { id: string; title: string; body: string }[] } | null {
   const d = HELP_DOCS.find((x) => x.slug === slug);

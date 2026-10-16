@@ -86,7 +86,7 @@ const getAsset: ToolDefinition = {
       if (!e) return notFound();
       const href = `/catalog/${e.schemaId}/tables/${e.entityId}`;
       return ok(
-        { name: e.entityName, description: e.description, isView: e.isView, rowCount: e.rowCount, schema: e.schema?.schemaName ?? null, source: e.source?.sourceName ?? null, columnCount: e.attributes.length, certified: e.certCode, trustScore: e.trustScore },
+        { name: e.entityName, description: e.description, isView: e.isView, rowCount: e.rowCount, schema: e.schema?.schemaName ?? null, source: e.source?.sourceName ?? null, columnCount: e.attributes.length, classifiedColumnCount: e.attributes.filter((a) => a.classificationCode).length, certified: e.certCode, trustScore: e.trustScore },
         [{ assetType: "DATA_ENTITIES", assetId: e.entityId, label: e.entityName, href }],
       );
     }

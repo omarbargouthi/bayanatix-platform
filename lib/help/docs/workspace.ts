@@ -89,7 +89,9 @@ The overall score is recorded once a month. The chart shows these monthly points
 
 The assistant answers only from what it looks up in Bayanis while answering, and says so when it cannot find something. It works on metadata, statistics and statuses and never shows row-level data values. It sees what any signed-in user can see.
 
-It also answers "how do I…" questions from this Help Center, step by step, with links to the pages it used, for example "How do I report a data breach?". Platform administrators can also ask technical support questions, such as "How do I restart Bayanis?", "How do I find errors in the logs?" or "How do I change how Bayanis signs in to HashiCorp Vault?". It gives the steps and commands from the Technical support guides and never makes up a command; it does not run anything on the server itself.`,
+It also answers "how do I…" questions from this Help Center, step by step, with links to the pages it used, for example "How do I report a data breach?". Platform administrators can also ask technical support questions, such as "How do I restart Bayanis?", "How do I find errors in the logs?" or "How do I change how Bayanis signs in to HashiCorp Vault?". It gives the steps and commands from the Technical support guides and never makes up a command; it does not run anything on the server itself.
+
+The assistant knows which page you are on, so you can ask about it directly: "What does this page show?", "Why can't I close this breach?", "What is left to do on this assessment?" or "Is this table classified?". It reads the page's Help Center document, and on a breach, an impact assessment or a request it sees the statuses, deadlines and counts the page shows. Names, descriptions and notes on the page are not sent to the assistant.`,
       },
       {
         id: "value",

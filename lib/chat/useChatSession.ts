@@ -1,4 +1,5 @@
 "use client";
+import type { ChatPage } from "./page-context";
 import { useCallback, useRef, useState } from "react";
 import type { SourceRef } from "./types";
 
@@ -49,7 +50,7 @@ export function useChatSession() {
     setMessages((data.messages as ServerMessage[]).map(toUiMessage));
   }, []);
 
-  const send = useCallback(async (text: string, contextAsset?: { assetType: string; assetId: number } | null) => {
+  const send = useCallback(async (text: string, contextAsset?: { assetType: string; assetId: number } | null, page?: ChatPage | null) => {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     setError(null);
@@ -76,7 +77,7 @@ export function useChatSession() {
       const res = await fetch(`/api/chat/conversations/${cid}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed }),
+        body: JSON.stringify({ text: trimmed, page: page ?? null }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error("Assistant unavailable. Please try again shortly.");
